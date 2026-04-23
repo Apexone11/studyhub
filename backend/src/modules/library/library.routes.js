@@ -117,7 +117,12 @@ router.get('/reading-progress/:volumeId', requireAuth, getReadingProgressHandler
  * Create or update reading progress for a book.
  * Body: { cfi?, percentage }
  */
-router.put('/reading-progress/:volumeId', requireAuth, libraryWriteLimiter, upsertReadingProgressHandler)
+router.put(
+  '/reading-progress/:volumeId',
+  requireAuth,
+  libraryWriteLimiter,
+  upsertReadingProgressHandler,
+)
 
 // ── BOOKMARKS ───────────────────────────────────────────────────────────────
 

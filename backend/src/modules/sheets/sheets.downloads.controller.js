@@ -31,7 +31,8 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    const isOwnerOrAdmin = req.user && (req.user.userId === sheet.userId || req.user.role === 'admin')
+    const isOwnerOrAdmin =
+      req.user && (req.user.userId === sheet.userId || req.user.role === 'admin')
     if (!canReadSheet(sheet, req.user)) {
       return res.status(404).json({ error: 'Sheet not found.' })
     }
@@ -45,10 +46,13 @@ router.get('/:id/download', attachmentDownloadLimiter, async (req, res) => {
     })
 
     const downloadAsHtml = sheet.contentFormat === 'html' || sheet.contentFormat === 'richtext'
-    res.setHeader('Content-Type', downloadAsHtml ? 'text/html; charset=utf-8' : 'text/markdown; charset=utf-8')
+    res.setHeader(
+      'Content-Type',
+      downloadAsHtml ? 'text/html; charset=utf-8' : 'text/markdown; charset=utf-8',
+    )
     res.setHeader(
       'Content-Disposition',
-      `attachment; filename="${safeDownloadName(sheet.title, downloadAsHtml ? '.html' : '.md')}"`
+      `attachment; filename="${safeDownloadName(sheet.title, downloadAsHtml ? '.html' : '.md')}"`,
     )
     /* Security headers — prevent script execution if browser opens the file inline */
     res.setHeader('X-Content-Type-Options', 'nosniff')
@@ -78,7 +82,8 @@ router.get('/:id/attachment', requireAuth, attachmentDownloadLimiter, async (req
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    const isOwnerOrAdmin = req.user && (req.user.userId === sheet.userId || req.user.role === 'admin')
+    const isOwnerOrAdmin =
+      req.user && (req.user.userId === sheet.userId || req.user.role === 'admin')
     if (!canReadSheet(sheet, req.user)) {
       return res.status(404).json({ error: 'Sheet not found.' })
     }
@@ -97,7 +102,10 @@ router.get('/:id/attachment', requireAuth, attachmentDownloadLimiter, async (req
       data: { downloads: { increment: 1 } },
     })
 
-    res.download(localPath, safeDownloadName(sheet.attachmentName || path.basename(localPath), path.extname(localPath)))
+    res.download(
+      localPath,
+      safeDownloadName(sheet.attachmentName || path.basename(localPath), path.extname(localPath)),
+    )
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -154,7 +162,8 @@ router.post('/:id/download', attachmentDownloadLimiter, async (req, res) => {
       select: { id: true, userId: true, status: true, allowDownloads: true },
     })
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    const isOwnerOrAdmin = req.user && (req.user.userId === sheet.userId || req.user.role === 'admin')
+    const isOwnerOrAdmin =
+      req.user && (req.user.userId === sheet.userId || req.user.role === 'admin')
     if (!canReadSheet(sheet, req.user)) {
       return res.status(404).json({ error: 'Sheet not found.' })
     }

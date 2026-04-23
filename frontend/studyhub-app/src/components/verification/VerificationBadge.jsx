@@ -31,7 +31,12 @@ export default function VerificationBadge({ user, size = 14 }) {
 
   return (
     <span
-      style={{ position: 'relative', display: 'inline-flex', alignItems: 'center', cursor: 'default' }}
+      style={{
+        position: 'relative',
+        display: 'inline-flex',
+        alignItems: 'center',
+        cursor: 'default',
+      }}
       onMouseEnter={() => setShowTooltip(true)}
       onMouseLeave={() => setShowTooltip(false)}
       aria-label={config.label}

@@ -71,35 +71,64 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
     return (
       <div className="admin-field">
         {label && <span className="admin-field__label">{label}</span>}
-        <div style={{
-          display: 'flex', alignItems: 'center', gap: 10,
-          padding: '8px 12px', borderRadius: 10,
-          border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
-          fontFamily: "'Plus Jakarta Sans', sans-serif", fontSize: 14,
-        }}>
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '8px 12px',
+            borderRadius: 10,
+            border: '1px solid var(--sh-border)',
+            background: 'var(--sh-soft)',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+            fontSize: 14,
+          }}
+        >
           {value.avatarUrl ? (
-            <img src={value.avatarUrl} alt="" loading="lazy" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }} />
+            <img
+              src={value.avatarUrl}
+              alt=""
+              loading="lazy"
+              style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
+            />
           ) : (
-            <div style={{
-              width: 28, height: 28, borderRadius: '50%',
-              background: 'var(--sh-brand-soft)', display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
-              fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)',
-            }}>
+            <div
+              style={{
+                width: 28,
+                height: 28,
+                borderRadius: '50%',
+                background: 'var(--sh-brand-soft)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 12,
+                fontWeight: 700,
+                color: 'var(--sh-brand)',
+              }}
+            >
               {(value.username || '?')[0].toUpperCase()}
             </div>
           )}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontWeight: 600, color: 'var(--sh-heading)' }}>{value.displayName || value.username}</div>
-            <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>@{value.username} · {value.email}</div>
+            <div style={{ fontWeight: 600, color: 'var(--sh-heading)' }}>
+              {value.displayName || value.username}
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+              @{value.username} · {value.email}
+            </div>
           </div>
           <button
             type="button"
             onClick={handleClear}
             style={{
-              background: 'none', border: 'none', cursor: 'pointer',
-              color: 'var(--sh-muted)', padding: 4, borderRadius: 6,
-              display: 'flex', alignItems: 'center',
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              color: 'var(--sh-muted)',
+              padding: 4,
+              borderRadius: 6,
+              display: 'flex',
+              alignItems: 'center',
             }}
             aria-label="Clear selection"
           >
@@ -117,8 +146,12 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
         <SearchIcon
           size={16}
           style={{
-            position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)',
-            color: 'var(--sh-muted)', pointerEvents: 'none',
+            position: 'absolute',
+            left: 12,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            color: 'var(--sh-muted)',
+            pointerEvents: 'none',
           }}
         />
         <input
@@ -131,22 +164,37 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
         />
       </div>
       {open && results.length > 0 && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-          marginTop: 4, background: 'var(--sh-surface)',
-          border: '1px solid var(--sh-border)', borderRadius: 12,
-          boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
-          maxHeight: 280, overflowY: 'auto',
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            marginTop: 4,
+            background: 'var(--sh-surface)',
+            border: '1px solid var(--sh-border)',
+            borderRadius: 12,
+            boxShadow: '0 8px 24px rgba(15, 23, 42, 0.12)',
+            maxHeight: 280,
+            overflowY: 'auto',
+          }}
+        >
           {results.map((user) => (
             <button
               key={user.id}
               type="button"
               onClick={() => handleSelect(user)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                width: '100%', padding: '10px 14px', border: 'none',
-                background: 'transparent', cursor: 'pointer', textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                width: '100%',
+                padding: '10px 14px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                textAlign: 'left',
                 fontFamily: "'Plus Jakarta Sans', sans-serif",
                 transition: 'background 0.1s',
               }}
@@ -154,14 +202,27 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
               {user.avatarUrl ? (
-                <img src={user.avatarUrl} alt="" loading="lazy" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                <img
+                  src={user.avatarUrl}
+                  alt=""
+                  loading="lazy"
+                  style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }}
+                />
               ) : (
-                <div style={{
-                  width: 32, height: 32, borderRadius: '50%',
-                  background: 'var(--sh-brand-soft)', display: 'flex',
-                  alignItems: 'center', justifyContent: 'center',
-                  fontSize: 13, fontWeight: 700, color: 'var(--sh-brand)',
-                }}>
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    borderRadius: '50%',
+                    background: 'var(--sh-brand-soft)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    color: 'var(--sh-brand)',
+                  }}
+                >
                   {(user.username || '?')[0].toUpperCase()}
                 </div>
               )}
@@ -169,7 +230,15 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
                 <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--sh-heading)' }}>
                   {user.displayName || user.username}
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--sh-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--sh-muted)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   @{user.username} · {user.email}
                 </div>
               </div>
@@ -178,24 +247,46 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
         </div>
       )}
       {loading && query.length >= 2 && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-          marginTop: 4, padding: '16px', textAlign: 'center',
-          background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
-          borderRadius: 12, color: 'var(--sh-muted)', fontSize: 13,
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            marginTop: 4,
+            padding: '16px',
+            textAlign: 'center',
+            background: 'var(--sh-surface)',
+            border: '1px solid var(--sh-border)',
+            borderRadius: 12,
+            color: 'var(--sh-muted)',
+            fontSize: 13,
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+          }}
+        >
           Searching...
         </div>
       )}
       {open && !loading && results.length === 0 && query.length >= 2 && (
-        <div style={{
-          position: 'absolute', top: '100%', left: 0, right: 0, zIndex: 100,
-          marginTop: 4, padding: '16px', textAlign: 'center',
-          background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
-          borderRadius: 12, color: searchError ? 'var(--sh-danger-text)' : 'var(--sh-muted)', fontSize: 13,
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '100%',
+            left: 0,
+            right: 0,
+            zIndex: 100,
+            marginTop: 4,
+            padding: '16px',
+            textAlign: 'center',
+            background: 'var(--sh-surface)',
+            border: '1px solid var(--sh-border)',
+            borderRadius: 12,
+            color: searchError ? 'var(--sh-danger-text)' : 'var(--sh-muted)',
+            fontSize: 13,
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+          }}
+        >
           {searchError ? 'Search failed. Check connection and try again.' : 'No users found.'}
         </div>
       )}

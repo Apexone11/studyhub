@@ -78,7 +78,8 @@ StudyHub Version 1 is a full-stack student collaboration platform with course-ba
   - `backend/src/routes/announcements.js`
 - Frontend:
   - `frontend/studyhub-app/src/pages/admin/AdminPage.jsx`
-  - `frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx`
+  - `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx` (personal overview at `/users/:username`; `/dashboard` redirects here via `DashboardRedirect` in `App.jsx`)
+  - `frontend/studyhub-app/src/pages/dashboard/DashboardWidgets.jsx` (widget library consumed by `UserProfilePage.jsx`)
   - `frontend/studyhub-app/src/lib/useLivePolling.js`
 
 ### Deployment, runtime, and testing
@@ -94,7 +95,7 @@ StudyHub Version 1 is a full-stack student collaboration platform with course-ba
   - `frontend/studyhub-app/Dockerfile`
   - `backend/railway.toml`
   - `frontend/studyhub-app/railway.toml`
-  - `docs/railway-deployment-checklist.md`
+  - `docs/internal/railway-deployment-checklist.md`
 - Tests and traffic:
   - `backend/scripts/smokeRoutes.js`
   - `backend/scripts/loadTraffic.js`

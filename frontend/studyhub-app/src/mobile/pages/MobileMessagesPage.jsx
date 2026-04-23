@@ -1,13 +1,17 @@
 // src/mobile/pages/MobileMessagesPage.jsx
-// Messages tab — conversation list with real-time unread badges.
+// Messages tab — conversation list with real-time unread badges,
+// inline search, human timestamps, and read-state ticks.
 // Tapping a conversation navigates to the web thread view (for now).
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import anime from '../lib/animeCompat'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
 import MobileTopBar from '../components/MobileTopBar'
+import SegmentedNav from '../components/SegmentedNav'
+import EmptyState from '../components/EmptyState'
+import { safeImageSrc } from '../lib/safeImage'
 import usePullToRefresh from '../hooks/usePullToRefresh'
 
 const PREFERS_REDUCED =
@@ -25,38 +29,50 @@ async function fetchConversations() {
 
 /* ── Time formatting ───────────────────────────────────────────── */
 
+function isSameCalendarDay(a, b) {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  )
+}
+
 function formatTime(isoStr) {
   if (!isoStr) return ''
   const date = new Date(isoStr)
   const now = new Date()
-  const diff = now.getTime() - date.getTime()
-  const mins = Math.floor(diff / 60000)
+  const diffMs = now.getTime() - date.getTime()
+  const mins = Math.floor(diffMs / 60000)
   if (mins < 1) return 'now'
   if (mins < 60) return `${mins}m`
-  const hrs = Math.floor(mins / 60)
-  if (hrs < 24) return `${hrs}h`
-  const days = Math.floor(hrs / 24)
-  if (days < 7) return `${days}d`
+  if (isSameCalendarDay(date, now)) {
+    return date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+  }
+  const yesterday = new Date(now)
+  yesterday.setDate(now.getDate() - 1)
+  if (isSameCalendarDay(date, yesterday)) return 'Yesterday'
+  const days = Math.floor(diffMs / (24 * 60 * 60 * 1000))
+  if (days < 7) return date.toLocaleDateString(undefined, { weekday: 'short' })
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
 /* ── Avatar component ──────────────────────────────────────────── */
 
 function ConversationAvatar({ conversation, currentUserId }) {
-  // For DMs, show the other participant's avatar
   const otherUser =
     conversation.type === 'dm'
       ? conversation.participants?.find((p) => p.id !== currentUserId)
       : null
 
-  const avatarUrl = otherUser?.avatarUrl || conversation.avatarUrl
+  const rawAvatarUrl = otherUser?.avatarUrl || conversation.avatarUrl
+  const avatarUrl = safeImageSrc(rawAvatarUrl)
   const name = otherUser?.username || conversation.name || '?'
   const initial = name.charAt(0).toUpperCase()
 
   if (avatarUrl) {
     return (
       <div className="mob-msg-avatar">
-        <img src={avatarUrl} alt="" className="mob-msg-avatar-img" />
+        <img src={avatarUrl} alt="" className="mob-msg-avatar-img" referrerPolicy="no-referrer" />
       </div>
     )
   }
@@ -70,6 +86,33 @@ function ConversationAvatar({ conversation, currentUserId }) {
 
 /* ── Conversation row ──────────────────────────────────────────── */
 
+function SentCheckIcon({ read }) {
+  if (read) {
+    return (
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M2 13l4 4 8-10M10 17l4 4 8-14"
+          stroke="currentColor"
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </svg>
+    )
+  }
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M4 13l5 5L20 7"
+        stroke="currentColor"
+        strokeWidth="2.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
 function ConversationRow({ conversation, currentUserId, onTap }) {
   const otherUser =
     conversation.type === 'dm'
@@ -82,12 +125,14 @@ function ConversationRow({ conversation, currentUserId, onTap }) {
       : conversation.name || 'Group Chat'
 
   const lastMsg = conversation.lastMessage
+  const lastFromMe = Boolean(lastMsg && lastMsg.sender?.id === currentUserId)
   const preview = lastMsg
-    ? (lastMsg.sender?.id === currentUserId ? 'You: ' : '') + (lastMsg.content?.slice(0, 60) || '')
+    ? (lastFromMe ? 'You: ' : '') + (lastMsg.content?.slice(0, 60) || '')
     : 'No messages yet'
 
   const time = lastMsg ? formatTime(lastMsg.createdAt) : ''
   const unread = conversation.unreadCount || 0
+  const showCheck = lastFromMe && unread === 0
 
   return (
     <button
@@ -102,6 +147,11 @@ function ConversationRow({ conversation, currentUserId, onTap }) {
           <span className="mob-msg-row-time">{time}</span>
         </div>
         <div className="mob-msg-row-bottom">
+          {showCheck && (
+            <span className="mob-msg-row-check" aria-label="Read">
+              <SentCheckIcon read />
+            </span>
+          )}
           <span className="mob-msg-row-preview">{preview}</span>
           {unread > 0 && <span className="mob-msg-row-badge">{unread > 99 ? '99+' : unread}</span>}
         </div>
@@ -112,25 +162,36 @@ function ConversationRow({ conversation, currentUserId, onTap }) {
 
 /* ── Empty state ───────────────────────────────────────────────── */
 
-function EmptyMessages() {
+function ChatBubbleArt() {
   return (
-    <div className="mob-feed-empty">
-      <div className="mob-feed-empty-icon">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path
-            d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2v10z"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-      <h3 className="mob-feed-empty-title">No conversations yet</h3>
-      <p className="mob-feed-empty-text">
-        Start a conversation from someone's profile or study group.
-      </p>
-    </div>
+    <svg width="160" height="160" viewBox="0 0 160 160" fill="none" aria-hidden="true">
+      <path
+        d="M40 58c0-8 6-14 14-14h52c8 0 14 6 14 14v32c0 8-6 14-14 14H72l-18 14v-14h-0c-8 0-14-6-14-14V58z"
+        stroke="currentColor"
+        strokeWidth="3"
+        strokeLinejoin="round"
+        fill="none"
+      />
+      <path d="M62 68h36" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      <path d="M62 80h24" stroke="currentColor" strokeWidth="3" strokeLinecap="round" />
+      <circle cx="116" cy="40" r="10" stroke="currentColor" strokeWidth="3" fill="none" />
+      <path d="M116 36v6M116 44v0" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  )
+}
+
+function NoUnreadArt() {
+  return (
+    <svg width="160" height="160" viewBox="0 0 160 160" fill="none" aria-hidden="true">
+      <circle cx="80" cy="80" r="40" stroke="currentColor" strokeWidth="3" fill="none" />
+      <path
+        d="M64 80l12 12 22-24"
+        stroke="currentColor"
+        strokeWidth="3.2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
   )
 }
 
@@ -154,6 +215,13 @@ function MessagesSkeleton() {
 
 /* ── Main Messages page ────────────────────────────────────────── */
 
+const FILTER_ITEMS = [
+  { id: 'all', label: 'All' },
+  { id: 'unread', label: 'Unread' },
+  { id: 'dms', label: 'DMs' },
+  { id: 'groups', label: 'Groups' },
+]
+
 export default function MobileMessagesPage() {
   const { user } = useSession()
   const navigate = useNavigate()
@@ -161,6 +229,8 @@ export default function MobileMessagesPage() {
   const [conversations, setConversations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [filter, setFilter] = useState('all')
+  const [query, setQuery] = useState('')
   const listRef = useRef(null)
 
   // Pull-to-refresh
@@ -221,9 +291,50 @@ export default function MobileMessagesPage() {
     [navigate],
   )
 
+  const visibleConversations = useMemo(() => {
+    if (!conversations) return []
+    let list = conversations
+    if (filter === 'unread') list = list.filter((c) => (c.unreadCount || 0) > 0)
+    else if (filter === 'dms') list = list.filter((c) => c.type === 'dm')
+    else if (filter === 'groups') list = list.filter((c) => c.type !== 'dm')
+
+    const q = query.trim().toLowerCase()
+    if (!q) return list
+    return list.filter((c) => {
+      const other = c.type === 'dm' ? c.participants?.find((p) => p.id !== user?.id) : null
+      const displayName = c.type === 'dm' ? other?.username || 'unknown' : c.name || 'group chat'
+      const preview = c.lastMessage?.content || ''
+      return displayName.toLowerCase().includes(q) || preview.toLowerCase().includes(q)
+    })
+  }, [conversations, filter, query, user?.id])
+
+  const totalUnread = useMemo(
+    () => (conversations || []).reduce((sum, c) => sum + (c.unreadCount || 0), 0),
+    [conversations],
+  )
+
+  const topBarRight = (
+    <button
+      type="button"
+      className="sh-m-topbar__icon-btn"
+      onClick={() => navigate('/m/search')}
+      aria-label="New message"
+    >
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+        <path
+          d="M4 20h4.5L19 9.5 14.5 5 4 15.5V20z"
+          stroke="currentColor"
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <path d="M13 6.5L17.5 11" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      </svg>
+    </button>
+  )
+
   return (
     <>
-      <MobileTopBar title="Messages" />
+      <MobileTopBar title="Messages" right={topBarRight} />
       <div ref={pullRef} style={{ overflowY: 'auto', flex: 1 }}>
         {(pulling || refreshing) && (
           <div className="mob-ptr" style={{ height: pullDistance }}>
@@ -235,22 +346,107 @@ export default function MobileMessagesPage() {
         {loading ? (
           <MessagesSkeleton />
         ) : error ? (
-          <div className="mob-feed-empty">
-            <p className="mob-feed-empty-text">Could not load messages.</p>
-          </div>
+          <EmptyState
+            art={<ChatBubbleArt />}
+            title="We could not load messages"
+            description="Pull down to retry, or try again in a moment."
+          />
         ) : conversations.length === 0 ? (
-          <EmptyMessages />
+          <EmptyState
+            art={<ChatBubbleArt />}
+            title="No conversations yet"
+            description="Start a conversation from someone's profile, a study group, or search for a classmate."
+            actionLabel="Find people"
+            onAction={() => navigate('/m/search')}
+          />
         ) : (
-          <div ref={listRef} className="mob-msg-list">
-            {conversations.map((conv) => (
-              <ConversationRow
-                key={conv.id}
-                conversation={conv}
-                currentUserId={user?.id}
-                onTap={handleTapConversation}
+          <>
+            <div className="sh-m-msg-search">
+              <svg
+                className="sh-m-msg-search__icon"
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                aria-hidden="true"
+              >
+                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="1.8" />
+                <path
+                  d="M20 20l-3.5-3.5"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search conversations"
+                aria-label="Search conversations"
+                className="sh-m-msg-search__input"
               />
-            ))}
-          </div>
+              {query && (
+                <button
+                  type="button"
+                  className="sh-m-msg-search__clear"
+                  onClick={() => setQuery('')}
+                  aria-label="Clear search"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                    <path
+                      d="M6 6l12 12M18 6L6 18"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </button>
+              )}
+            </div>
+            <div className="sh-m-msg-toolbar">
+              <SegmentedNav
+                items={FILTER_ITEMS}
+                value={filter}
+                onChange={setFilter}
+                block
+                ariaLabel="Filter conversations"
+              />
+              {totalUnread > 0 && (
+                <span className="sh-m-msg-unread-pill">
+                  {totalUnread > 99 ? '99+' : totalUnread} unread
+                </span>
+              )}
+            </div>
+            {visibleConversations.length === 0 ? (
+              <EmptyState
+                art={<NoUnreadArt />}
+                title={query ? 'No matches' : 'You are all caught up'}
+                description={
+                  query
+                    ? `Nothing matches "${query}". Try a different name or keyword.`
+                    : filter === 'unread'
+                      ? 'No unread messages — nice work.'
+                      : filter === 'dms'
+                        ? 'No direct messages match this filter.'
+                        : filter === 'groups'
+                          ? 'No group conversations match this filter.'
+                          : 'No conversations match this filter.'
+                }
+              />
+            ) : (
+              <div ref={listRef} className="mob-msg-list">
+                {visibleConversations.map((conv) => (
+                  <ConversationRow
+                    key={conv.id}
+                    conversation={conv}
+                    currentUserId={user?.id}
+                    onTap={handleTapConversation}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
     </>

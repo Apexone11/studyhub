@@ -10,7 +10,14 @@ export default function OverviewTab({ overview, loadOverview }) {
         padding: '22px',
       }}
     >
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 16,
+        }}
+      >
         <div>
           <h1 style={{ margin: 0, fontSize: 22, color: 'var(--sh-heading)' }}>Admin Overview</h1>
           <div style={{ fontSize: 12, color: 'var(--sh-subtext)', marginTop: 4 }}>
@@ -37,7 +44,16 @@ export default function OverviewTab({ overview, loadOverview }) {
       </div>
 
       {overview.error ? (
-        <div style={{ color: 'var(--sh-danger)', background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)', borderRadius: 12, padding: '12px 14px', fontSize: 13 }}>
+        <div
+          style={{
+            color: 'var(--sh-danger)',
+            background: 'var(--sh-danger-bg)',
+            border: '1px solid var(--sh-danger-border)',
+            borderRadius: 12,
+            padding: '12px 14px',
+            fontSize: 13,
+          }}
+        >
           {overview.error}
         </div>
       ) : null}

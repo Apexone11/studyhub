@@ -10,7 +10,9 @@ export default function AdminTable({ columns, rows, onRowClick, emptyText = 'No 
       <thead>
         <tr>
           {columns.map((col) => (
-            <th key={col.key} style={col.style}>{col.label}</th>
+            <th key={col.key} style={col.style}>
+              {col.label}
+            </th>
           ))}
         </tr>
       </thead>

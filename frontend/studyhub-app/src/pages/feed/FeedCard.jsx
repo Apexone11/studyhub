@@ -738,9 +738,9 @@ function FeedCardInner({
               </div>
               <div
                 style={{
-                  border: '1px solid var(--sh-border)',
+                  border: '1px solid var(--sh-paper-border)',
                   borderRadius: 10,
-                  background: 'var(--sh-surface)',
+                  background: 'var(--sh-paper)',
                   overflow: 'hidden',
                   maxHeight: 300,
                 }}
@@ -754,7 +754,7 @@ function FeedCardInner({
                       width: '100%',
                       maxHeight: 300,
                       objectFit: 'contain',
-                      background: 'var(--sh-soft)',
+                      background: 'var(--sh-paper-soft)',
                     }}
                   />
                 ) : (
@@ -768,7 +768,8 @@ function FeedCardInner({
                       width: '100%',
                       height: 300,
                       border: 'none',
-                      background: 'var(--sh-surface)',
+                      background: 'var(--sh-paper)',
+                      colorScheme: 'light',
                     }}
                   />
                 )}

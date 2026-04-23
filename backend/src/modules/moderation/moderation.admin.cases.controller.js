@@ -59,53 +59,49 @@ router.get('/cases', async (req, res) => {
 /* GET /cases/overview — Super admin dashboard stats */
 router.get('/cases/overview', async (req, res) => {
   try {
-    const [
-      totalPending,
-      totalBySource,
-      claimedByAdmin,
-      recentResolved,
-      abuseDetectionPending,
-    ] = await Promise.all([
-      prisma.moderationCase.count({ where: { status: 'pending' } }),
-      prisma.moderationCase.groupBy({
-        by: ['source'],
-        where: { status: 'pending' },
-        _count: true,
-      }),
-      prisma.moderationCase.groupBy({
-        by: ['claimedByAdminId'],
-        where: {
-          NOT: [{ claimedByAdminId: null }],
-          status: 'pending',
-        },
-        _count: true,
-      }),
-      prisma.moderationCase.findMany({
-        where: { status: { in: ['confirmed', 'dismissed'] } },
-        orderBy: { updatedAt: 'desc' },
-        take: 20,
-        select: {
-          id: true,
-          contentType: true,
-          status: true,
-          source: true,
-          updatedAt: true,
-          reviewer: { select: { id: true, username: true } },
-        },
-      }),
-      prisma.moderationCase.count({ where: { status: 'pending', source: 'auto_abuse_detection' } }).catch(() => 0),
-    ])
+    const [totalPending, totalBySource, claimedByAdmin, recentResolved, abuseDetectionPending] =
+      await Promise.all([
+        prisma.moderationCase.count({ where: { status: 'pending' } }),
+        prisma.moderationCase.groupBy({
+          by: ['source'],
+          where: { status: 'pending' },
+          _count: true,
+        }),
+        prisma.moderationCase.groupBy({
+          by: ['claimedByAdminId'],
+          where: {
+            NOT: [{ claimedByAdminId: null }],
+            status: 'pending',
+          },
+          _count: true,
+        }),
+        prisma.moderationCase.findMany({
+          where: { status: { in: ['confirmed', 'dismissed'] } },
+          orderBy: { updatedAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            contentType: true,
+            status: true,
+            source: true,
+            updatedAt: true,
+            reviewer: { select: { id: true, username: true } },
+          },
+        }),
+        prisma.moderationCase
+          .count({ where: { status: 'pending', source: 'auto_abuse_detection' } })
+          .catch(() => 0),
+      ])
 
     /* Resolve admin usernames for the groupBy results */
-    const adminIds = claimedByAdmin
-      .map((g) => g.claimedByAdminId)
-      .filter(Boolean)
-    const adminUsers = adminIds.length > 0
-      ? await prisma.user.findMany({
-          where: { id: { in: adminIds } },
-          select: { id: true, username: true },
-        })
-      : []
+    const adminIds = claimedByAdmin.map((g) => g.claimedByAdminId).filter(Boolean)
+    const adminUsers =
+      adminIds.length > 0
+        ? await prisma.user.findMany({
+            where: { id: { in: adminIds } },
+            select: { id: true, username: true },
+          })
+        : []
     const adminMap = Object.fromEntries(adminUsers.map((u) => [u.id, u.username]))
 
     const claimedBreakdown = claimedByAdmin.map((g) => ({
@@ -114,9 +110,7 @@ router.get('/cases/overview', async (req, res) => {
       pendingClaimed: g._count,
     }))
 
-    const sourceBreakdown = Object.fromEntries(
-      totalBySource.map((g) => [g.source, g._count]),
-    )
+    const sourceBreakdown = Object.fromEntries(totalBySource.map((g) => [g.source, g._count]))
 
     res.json({
       totalPending,
@@ -220,7 +214,9 @@ router.post('/cases/:id/unclaim', async (req, res) => {
     if (modCase.claimedByAdminId !== req.user.userId) {
       const isSuper = await isSuperAdmin(req.user.userId)
       if (!isSuper) {
-        return res.status(403).json({ error: 'Only the claiming admin or super admin can release this claim.' })
+        return res
+          .status(403)
+          .json({ error: 'Only the claiming admin or super admin can release this claim.' })
       }
     }
 
@@ -239,8 +235,11 @@ router.post('/cases/:id/unclaim', async (req, res) => {
 /* PATCH /cases/:id/review — Dismiss or confirm a case */
 router.patch('/cases/:id/review', async (req, res) => {
   const caseId = Number.parseInt(req.params.id, 10)
-  const action = String(req.body?.action || '').trim().toLowerCase()
-  const reviewNote = typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim().slice(0, 500) : ''
+  const action = String(req.body?.action || '')
+    .trim()
+    .toLowerCase()
+  const reviewNote =
+    typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim().slice(0, 500) : ''
 
   if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Invalid case ID.' })
   if (!['dismiss', 'confirm'].includes(action)) {
@@ -292,15 +291,29 @@ router.get('/cases/:id/preview', async (req, res) => {
     if (!modCase) return res.status(404).json({ error: 'Case not found.' })
 
     const { contentType, contentId } = modCase
-    const preview = { contentType, contentId, linkPath: null, title: null, text: null, attachments: [], owner: null, createdAt: null }
+    const preview = {
+      contentType,
+      contentId,
+      linkPath: null,
+      title: null,
+      text: null,
+      attachments: [],
+      owner: null,
+      createdAt: null,
+    }
 
     /* Resolve preview based on content type */
     if (contentType === 'post' || contentType === 'feed_post') {
       const post = await prisma.feedPost.findUnique({
         where: { id: contentId },
         select: {
-          id: true, content: true, attachmentUrl: true, attachmentType: true, attachmentName: true,
-          createdAt: true, moderationStatus: true,
+          id: true,
+          content: true,
+          attachmentUrl: true,
+          attachmentType: true,
+          attachmentName: true,
+          createdAt: true,
+          moderationStatus: true,
           author: { select: { id: true, username: true } },
         },
       })
@@ -323,15 +336,23 @@ router.get('/cases/:id/preview', async (req, res) => {
       const sheet = await prisma.studySheet.findUnique({
         where: { id: contentId },
         select: {
-          id: true, title: true, content: true, description: true,
-          attachmentUrl: true, attachmentType: true, attachmentName: true,
-          status: true, createdAt: true,
+          id: true,
+          title: true,
+          content: true,
+          description: true,
+          attachmentUrl: true,
+          attachmentType: true,
+          attachmentName: true,
+          status: true,
+          createdAt: true,
           author: { select: { id: true, username: true } },
         },
       })
       if (sheet) {
         preview.title = sheet.title
-        preview.text = sheet.description ? `${sheet.description}\n\n${sheet.content?.slice(0, 2000) || ''}` : sheet.content?.slice(0, 2000)
+        preview.text = sheet.description
+          ? `${sheet.description}\n\n${sheet.content?.slice(0, 2000) || ''}`
+          : sheet.content?.slice(0, 2000)
         preview.linkPath = `/sheets/${sheet.id}`
         preview.owner = sheet.author
         preview.createdAt = sheet.createdAt
@@ -349,7 +370,11 @@ router.get('/cases/:id/preview', async (req, res) => {
       const note = await prisma.note.findUnique({
         where: { id: contentId },
         select: {
-          id: true, title: true, content: true, moderationStatus: true, createdAt: true,
+          id: true,
+          title: true,
+          content: true,
+          moderationStatus: true,
+          createdAt: true,
           author: { select: { id: true, username: true } },
         },
       })
@@ -365,7 +390,11 @@ router.get('/cases/:id/preview', async (req, res) => {
       const comment = await prisma.feedPostComment.findUnique({
         where: { id: contentId },
         select: {
-          id: true, content: true, postId: true, moderationStatus: true, createdAt: true,
+          id: true,
+          content: true,
+          postId: true,
+          moderationStatus: true,
+          createdAt: true,
           author: { select: { id: true, username: true } },
         },
       })
@@ -380,7 +409,11 @@ router.get('/cases/:id/preview', async (req, res) => {
       const comment = await prisma.comment.findUnique({
         where: { id: contentId },
         select: {
-          id: true, content: true, sheetId: true, moderationStatus: true, createdAt: true,
+          id: true,
+          content: true,
+          sheetId: true,
+          moderationStatus: true,
+          createdAt: true,
           author: { select: { id: true, username: true } },
         },
       })
@@ -395,7 +428,11 @@ router.get('/cases/:id/preview', async (req, res) => {
       const comment = await prisma.noteComment.findUnique({
         where: { id: contentId },
         select: {
-          id: true, content: true, noteId: true, moderationStatus: true, createdAt: true,
+          id: true,
+          content: true,
+          noteId: true,
+          moderationStatus: true,
+          createdAt: true,
           author: { select: { id: true, username: true } },
         },
       })
@@ -438,8 +475,10 @@ router.post('/strikes', async (req, res) => {
   let caseId = req.body?.caseId ? Number.parseInt(req.body.caseId, 10) : null
 
   if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Valid userId is required.' })
-  if (reason.length < 10) return res.status(400).json({ error: 'Reason must be at least 10 characters.' })
-  if (reason.length > 1000) return res.status(400).json({ error: 'Reason must be 1000 characters or fewer.' })
+  if (reason.length < 10)
+    return res.status(400).json({ error: 'Reason must be at least 10 characters.' })
+  if (reason.length > 1000)
+    return res.status(400).json({ error: 'Reason must be 1000 characters or fewer.' })
 
   try {
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
@@ -447,11 +486,16 @@ router.post('/strikes', async (req, res) => {
 
     /* Protect super admin from receiving strikes */
     if (await isSuperAdmin(userId)) {
-      return res.status(403).json({ error: 'Cannot issue strikes to the super admin.', code: 'SUPER_ADMIN_PROTECTED' })
+      return res
+        .status(403)
+        .json({ error: 'Cannot issue strikes to the super admin.', code: 'SUPER_ADMIN_PROTECTED' })
     }
 
     if (caseId) {
-      const modCase = await prisma.moderationCase.findUnique({ where: { id: caseId }, select: { id: true } })
+      const modCase = await prisma.moderationCase.findUnique({
+        where: { id: caseId },
+        select: { id: true },
+      })
       if (!modCase) return res.status(404).json({ error: 'Moderation case not found.' })
     }
 
@@ -541,7 +585,10 @@ router.get('/cases/:id/plagiarism', async (req, res) => {
 
     /* Only sheets and notes have enough text to compare */
     if (contentType !== 'sheet' && contentType !== 'note') {
-      return res.json({ matches: [], message: 'Plagiarism check is only available for sheets and notes.' })
+      return res.json({
+        matches: [],
+        message: 'Plagiarism check is only available for sheets and notes.',
+      })
     }
 
     /* Fetch the reported content for side-by-side comparison */
@@ -549,12 +596,26 @@ router.get('/cases/:id/plagiarism', async (req, res) => {
     if (contentType === 'sheet') {
       reportedContent = await prisma.studySheet.findUnique({
         where: { id: contentId },
-        select: { id: true, title: true, content: true, userId: true, createdAt: true, author: { select: { id: true, username: true } } },
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          userId: true,
+          createdAt: true,
+          author: { select: { id: true, username: true } },
+        },
       })
     } else {
       reportedContent = await prisma.note.findUnique({
         where: { id: contentId },
-        select: { id: true, title: true, content: true, userId: true, createdAt: true, author: { select: { id: true, username: true } } },
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          userId: true,
+          createdAt: true,
+          author: { select: { id: true, username: true } },
+        },
       })
     }
 
@@ -563,23 +624,25 @@ router.get('/cases/:id/plagiarism', async (req, res) => {
     const matches = await findSimilarContent({ contentType, contentId, limit: 10 })
 
     /* For each match, fetch a text preview for side-by-side */
-    const enrichedMatches = await Promise.all(matches.map(async (m) => {
-      let preview = null
-      if (m.type === 'sheet') {
-        const s = await prisma.studySheet.findUnique({
-          where: { id: m.id },
-          select: { content: true },
-        })
-        preview = s?.content?.slice(0, 2000) || null
-      } else if (m.type === 'note') {
-        const n = await prisma.note.findUnique({
-          where: { id: m.id },
-          select: { content: true },
-        })
-        preview = n?.content?.slice(0, 2000) || null
-      }
-      return { ...m, textPreview: preview }
-    }))
+    const enrichedMatches = await Promise.all(
+      matches.map(async (m) => {
+        let preview = null
+        if (m.type === 'sheet') {
+          const s = await prisma.studySheet.findUnique({
+            where: { id: m.id },
+            select: { content: true },
+          })
+          preview = s?.content?.slice(0, 2000) || null
+        } else if (m.type === 'note') {
+          const n = await prisma.note.findUnique({
+            where: { id: m.id },
+            select: { content: true },
+          })
+          preview = n?.content?.slice(0, 2000) || null
+        }
+        return { ...m, textPreview: preview }
+      }),
+    )
 
     res.json({
       reported: {

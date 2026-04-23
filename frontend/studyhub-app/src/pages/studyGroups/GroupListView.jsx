@@ -24,6 +24,7 @@ import GroupListEmptyState from './GroupListEmptyState'
 import CreateGroupModal from './GroupModals'
 import autoAnimate from '@formkit/auto-animate'
 import { styles } from './studyGroupsStyles'
+import { getGroupListSubtitle } from './studyGroupsHelpers'
 
 function GroupListSkeleton() {
   return (
@@ -38,8 +39,10 @@ function GroupListSkeleton() {
 export default function GroupListView() {
   usePageTitle('Study Groups')
   const layout = useResponsiveAppLayout()
-  const tutorial = useTutorial('studyGroups', STUDY_GROUPS_STEPS, { version: TUTORIAL_VERSIONS.studyGroups })
-  const { isAuthenticated } = useSession()
+  const tutorial = useTutorial('studyGroups', STUDY_GROUPS_STEPS, {
+    version: TUTORIAL_VERSIONS.studyGroups,
+  })
+  const { isAuthenticated, user } = useSession()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
 
@@ -54,8 +57,13 @@ export default function GroupListView() {
 
   // Load data with current filters
   const {
-    groups, groupsLoading, groupsError, groupsTotal,
-    createGroup, joinGroup, loadGroups,
+    groups,
+    groupsLoading,
+    groupsError,
+    groupsTotal,
+    createGroup,
+    joinGroup,
+    loadGroups,
     schools: allSchools,
     courses: allCourses,
   } = useStudyGroupsData()
@@ -63,40 +71,48 @@ export default function GroupListView() {
   const hasActiveFilters = search || schoolId || courseId || mineOnly
 
   // Update search param
-  const handleSearch = useCallback((value) => {
-    const next = new URLSearchParams(searchParams)
-    if (value) {
-      next.set('search', value)
-    } else {
-      next.delete('search')
-    }
-    next.set('offset', '0') // Reset pagination
-    setSearchParams(next)
-  }, [searchParams, setSearchParams])
-
-  const handleSchoolFilter = useCallback((nextSchoolId) => {
-    const next = new URLSearchParams(searchParams)
-    if (nextSchoolId) {
-      next.set('schoolId', nextSchoolId)
-    } else {
-      next.delete('schoolId')
-    }
-
-    if (!nextSchoolId) {
-      next.delete('courseId')
-    } else {
-      const courseBelongsToSchool = allCourses?.some((course) => (
-        String(course.id) === String(courseId) && String(course.schoolId) === String(nextSchoolId)
-      ))
-
-      if (!courseBelongsToSchool) {
-        next.delete('courseId')
+  const handleSearch = useCallback(
+    (value) => {
+      const next = new URLSearchParams(searchParams)
+      if (value) {
+        next.set('search', value)
+      } else {
+        next.delete('search')
       }
-    }
+      next.set('offset', '0') // Reset pagination
+      setSearchParams(next)
+    },
+    [searchParams, setSearchParams],
+  )
 
-    next.set('offset', '0')
-    setSearchParams(next)
-  }, [allCourses, courseId, searchParams, setSearchParams])
+  const handleSchoolFilter = useCallback(
+    (nextSchoolId) => {
+      const next = new URLSearchParams(searchParams)
+      if (nextSchoolId) {
+        next.set('schoolId', nextSchoolId)
+      } else {
+        next.delete('schoolId')
+      }
+
+      if (!nextSchoolId) {
+        next.delete('courseId')
+      } else {
+        const courseBelongsToSchool = allCourses?.some(
+          (course) =>
+            String(course.id) === String(courseId) &&
+            String(course.schoolId) === String(nextSchoolId),
+        )
+
+        if (!courseBelongsToSchool) {
+          next.delete('courseId')
+        }
+      }
+
+      next.set('offset', '0')
+      setSearchParams(next)
+    },
+    [allCourses, courseId, searchParams, setSearchParams],
+  )
 
   // Toggle "My Groups" filter
   const toggleMine = useCallback(() => {
@@ -111,16 +127,19 @@ export default function GroupListView() {
   }, [mineOnly, searchParams, setSearchParams])
 
   // Filter by course
-  const handleCourseFilter = useCallback((cId) => {
-    const next = new URLSearchParams(searchParams)
-    if (cId) {
-      next.set('courseId', cId)
-    } else {
-      next.delete('courseId')
-    }
-    next.set('offset', '0')
-    setSearchParams(next)
-  }, [searchParams, setSearchParams])
+  const handleCourseFilter = useCallback(
+    (cId) => {
+      const next = new URLSearchParams(searchParams)
+      if (cId) {
+        next.set('courseId', cId)
+      } else {
+        next.delete('courseId')
+      }
+      next.set('offset', '0')
+      setSearchParams(next)
+    },
+    [searchParams, setSearchParams],
+  )
 
   // Clear all filters
   const clearAllFilters = useCallback(() => {
@@ -128,32 +147,46 @@ export default function GroupListView() {
   }, [setSearchParams])
 
   // Handle group creation
-  const handleCreateGroup = useCallback(async (groupData) => {
-    try {
-      const newGroup = await createGroup(groupData)
-      setCreateModalOpen(false)
-      // Navigate to new group detail
-      navigate(`/study-groups/${newGroup.id}`)
-    } catch {
-      // Error already shown via toast in hook
-    }
-  }, [createGroup, navigate])
+  const handleCreateGroup = useCallback(
+    async (groupData) => {
+      try {
+        const newGroup = await createGroup(groupData)
+        setCreateModalOpen(false)
+        // Navigate to new group detail
+        navigate(`/study-groups/${newGroup.id}`)
+      } catch {
+        // Error already shown via toast in hook
+      }
+    },
+    [createGroup, navigate],
+  )
 
   // Handle join group
-  const handleJoinGroup = useCallback((groupId) => {
-    joinGroup(groupId)
-  }, [joinGroup])
+  const handleJoinGroup = useCallback(
+    (groupId) => {
+      joinGroup(groupId)
+    },
+    [joinGroup],
+  )
 
   const selectedSchool = allSchools?.find((school) => String(school.id) === String(schoolId))
-  const selectedCourse = allCourses?.find(c => c.id === parseInt(courseId, 10))
-  const subtitle = mineOnly ? 'Groups you are a member of' : 'All study groups'
+  const selectedCourse = allCourses?.find((c) => c.id === parseInt(courseId, 10))
+
+  // v2 design refresh Week 2 (brainstorm §10) — role-aware, context-aware
+  // subtitle. Replaces the old "All study groups" copy which read dead.
+  // Logic extracted to getGroupListSubtitle (see studyGroupsHelpers.js) so
+  // it is unit-tested (studyGroupsHelpers.test.js) and cannot silently
+  // break when the role model evolves.
+  const subtitle = getGroupListSubtitle({
+    mineOnly,
+    accountType: user?.accountType ?? null,
+  })
 
   // Auto-animate the groups grid for smooth enter/exit transitions
   const gridRef = useRef(null)
   useEffect(() => {
     if (gridRef.current) autoAnimate(gridRef.current, { duration: 250 })
   }, [])
-
 
   return (
     <>
@@ -186,14 +219,14 @@ export default function GroupListView() {
               {/* Search and filter bar */}
               <GroupListFilters
                 search={search}
-                  schoolId={schoolId}
+                schoolId={schoolId}
                 courseId={courseId}
                 mineOnly={mineOnly}
-                  allSchools={allSchools}
+                allSchools={allSchools}
                 allCourses={allCourses}
                 onSearch={handleSearch}
                 onToggleMine={toggleMine}
-                  onSchoolFilter={handleSchoolFilter}
+                onSchoolFilter={handleSchoolFilter}
                 onCourseFilter={handleCourseFilter}
                 hasActiveFilters={hasActiveFilters}
                 onClearFilters={clearAllFilters}
@@ -232,10 +265,16 @@ export default function GroupListView() {
                 <GroupListEmptyState
                   search={search}
                   mineOnly={mineOnly}
-                  selectedCourse={selectedCourse ? {
-                    ...selectedCourse,
-                    name: selectedSchool ? `${selectedSchool.short} — ${selectedCourse.name}` : selectedCourse.name,
-                  } : null}
+                  selectedCourse={
+                    selectedCourse
+                      ? {
+                          ...selectedCourse,
+                          name: selectedSchool
+                            ? `${selectedSchool.short} — ${selectedCourse.name}`
+                            : selectedCourse.name,
+                        }
+                      : null
+                  }
                   onClearFilters={clearAllFilters}
                 />
               ) : (
@@ -246,10 +285,7 @@ export default function GroupListView() {
                       {groupsTotal} group{groupsTotal === 1 ? '' : 's'}
                     </span>
                     {hasActiveFilters && (
-                      <button
-                        onClick={clearAllFilters}
-                        style={styles.clearBtn}
-                      >
+                      <button onClick={clearAllFilters} style={styles.clearBtn}>
                         Clear filters
                       </button>
                     )}
@@ -273,15 +309,16 @@ export default function GroupListView() {
       </div>
 
       {/* Create Group Modal */}
-      {createModalOpen && createPortal(
-        <CreateGroupModal
-          open={createModalOpen}
-          onClose={() => setCreateModalOpen(false)}
-          onSubmit={handleCreateGroup}
-          courses={allCourses}
-        />,
-        document.body
-      )}
+      {createModalOpen &&
+        createPortal(
+          <CreateGroupModal
+            open={createModalOpen}
+            onClose={() => setCreateModalOpen(false)}
+            onSubmit={handleCreateGroup}
+            courses={allCourses}
+          />,
+          document.body,
+        )}
 
       <SafeJoyride {...tutorial.joyrideProps} />
     </>

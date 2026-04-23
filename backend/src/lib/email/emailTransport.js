@@ -26,7 +26,9 @@ function getFromAddress() {
 }
 
 function getAdminEmail() {
-  return (process.env.ADMIN_EMAIL || process.env.EMAIL_USER || DEFAULT_ADMIN_EMAIL).trim().toLowerCase()
+  return (process.env.ADMIN_EMAIL || process.env.EMAIL_USER || DEFAULT_ADMIN_EMAIL)
+    .trim()
+    .toLowerCase()
 }
 
 function getResendConfig() {
@@ -56,7 +58,8 @@ function getEmailMode() {
   if (transport === 'json') return 'json'
   if (shouldUseResend()) return 'resend'
   if (process.env.EMAIL_CAPTURE_DIR) return 'capture'
-  if (process.env.EMAIL_USER && process.env.EMAIL_PASS) return process.env.EMAIL_HOST ? 'smtp-host' : 'provider'
+  if (process.env.EMAIL_USER && process.env.EMAIL_PASS)
+    return process.env.EMAIL_HOST ? 'smtp-host' : 'provider'
   return 'json'
 }
 
@@ -89,9 +92,7 @@ function getTransporter(mode = getEmailMode()) {
 
 function normalizeEmailRecipients(value) {
   if (Array.isArray(value)) {
-    return value
-      .map((entry) => String(entry || '').trim())
-      .filter(Boolean)
+    return value.map((entry) => String(entry || '').trim()).filter(Boolean)
   }
 
   const single = String(value || '').trim()
@@ -99,7 +100,9 @@ function normalizeEmailRecipients(value) {
 }
 
 function normalizeRecipientLookupEmail(value) {
-  const normalized = String(value || '').trim().toLowerCase()
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
   return normalized || null
 }
 
@@ -107,9 +110,11 @@ function getRecipientLookupEmails(value) {
   const recipients = normalizeEmailRecipients(value)
   if (recipients.length === 0) return []
 
-  return [...new Set(recipients
-    .map((recipient) => normalizeRecipientLookupEmail(recipient))
-    .filter(Boolean))]
+  return [
+    ...new Set(
+      recipients.map((recipient) => normalizeRecipientLookupEmail(recipient)).filter(Boolean),
+    ),
+  ]
 }
 
 async function getSuppressedRecipients(toValue) {
@@ -137,16 +142,14 @@ async function assertRecipientsAllowed(toValue) {
   const suppressedRecipients = await getSuppressedRecipients(toValue)
   if (suppressedRecipients.length === 0) return
 
-  const blockedAddresses = suppressedRecipients
-    .map((entry) => entry.email)
-    .filter(Boolean)
-  const blockedReasons = [...new Set(
-    suppressedRecipients
-      .map((entry) => entry.reason)
-      .filter(Boolean),
-  )]
+  const blockedAddresses = suppressedRecipients.map((entry) => entry.email).filter(Boolean)
+  const blockedReasons = [
+    ...new Set(suppressedRecipients.map((entry) => entry.reason).filter(Boolean)),
+  ]
 
-  const error = new Error(`Email delivery blocked for suppressed recipient(s): ${blockedAddresses.join(', ')}`)
+  const error = new Error(
+    `Email delivery blocked for suppressed recipient(s): ${blockedAddresses.join(', ')}`,
+  )
   error.code = 'EMAIL_RECIPIENT_SUPPRESSED'
   error.suppressedRecipients = blockedAddresses
   error.suppressionReasons = blockedReasons
@@ -167,7 +170,9 @@ async function parseJsonSafely(response) {
 async function sendWithResend(mailOptions) {
   const resendConfig = getResendConfig()
   if (!resendConfig) {
-    throw new Error('Resend delivery is not configured. Set RESEND_API_KEY and EMAIL_TRANSPORT=resend.')
+    throw new Error(
+      'Resend delivery is not configured. Set RESEND_API_KEY and EMAIL_TRANSPORT=resend.',
+    )
   }
 
   const recipients = normalizeEmailRecipients(mailOptions.to)
@@ -200,9 +205,10 @@ async function sendWithResend(mailOptions) {
 
   const responsePayload = await parseJsonSafely(response)
   if (!response.ok) {
-    const errorMessage = responsePayload?.message
-      || responsePayload?.error
-      || `${response.status} ${response.statusText}`.trim()
+    const errorMessage =
+      responsePayload?.message ||
+      responsePayload?.error ||
+      `${response.status} ${response.statusText}`.trim()
     throw new Error(`Resend API request failed: ${errorMessage}`)
   }
 
@@ -234,16 +240,18 @@ async function validateEmailTransport({ logger = console, strict = false } = {})
         },
       })
 
-      const isRestrictedKey = !response.ok && (await parseJsonSafely(response.clone()))?.name === 'restricted_api_key'
+      const isRestrictedKey =
+        !response.ok && (await parseJsonSafely(response.clone()))?.name === 'restricted_api_key'
       if (response.ok || isRestrictedKey) {
         logger.info?.('[email] transport ready (resend)')
         return { ok: true, mode }
       }
 
       const responsePayload = await parseJsonSafely(response)
-      const errorMessage = responsePayload?.message
-        || responsePayload?.error
-        || `${response.status} ${response.statusText}`.trim()
+      const errorMessage =
+        responsePayload?.message ||
+        responsePayload?.error ||
+        `${response.status} ${response.statusText}`.trim()
       throw new Error(`Resend API validation failed: ${errorMessage}`)
     } catch (error) {
       const message = `Email transport validation failed (${mode}): ${error.message}`
@@ -256,7 +264,8 @@ async function validateEmailTransport({ logger = console, strict = false } = {})
   const transporter = getTransporter(mode)
 
   if (!transporter) {
-    const message = 'Email delivery is not configured. Configure Resend (EMAIL_TRANSPORT=resend + RESEND_API_KEY), SMTP, or EMAIL_TRANSPORT=json.'
+    const message =
+      'Email delivery is not configured. Configure Resend (EMAIL_TRANSPORT=resend + RESEND_API_KEY), SMTP, or EMAIL_TRANSPORT=json.'
     if (strict) throw new Error(message)
     logger.warn?.(`[email] ${message}`)
     return { ok: false, mode, message }
@@ -281,7 +290,9 @@ async function captureEmail(mailOptions, result, kind) {
   const captureDir = process.env.EMAIL_CAPTURE_DIR
   if (!captureDir) return
 
-  const safeKind = String(kind || 'email').replace(/[^a-z0-9_-]+/gi, '-').toLowerCase()
+  const safeKind = String(kind || 'email')
+    .replace(/[^a-z0-9_-]+/gi, '-')
+    .toLowerCase()
   const safeRecipient = String(mailOptions.to || 'unknown')
     .replace(/[^a-z0-9@._-]+/gi, '-')
     .toLowerCase()
@@ -298,7 +309,11 @@ async function captureEmail(mailOptions, result, kind) {
   }
 
   await fs.mkdir(captureDir, { recursive: true })
-  await fs.writeFile(path.join(captureDir, fileName), `${JSON.stringify(payload, null, 2)}\n`, 'utf8')
+  await fs.writeFile(
+    path.join(captureDir, fileName),
+    `${JSON.stringify(payload, null, 2)}\n`,
+    'utf8',
+  )
 }
 
 async function deliverMail(mailOptions, kind) {
@@ -312,7 +327,9 @@ async function deliverMail(mailOptions, kind) {
   } else {
     const transporter = getTransporter(mode)
     if (!transporter) {
-      throw new Error('Email delivery is not configured. Configure Resend (EMAIL_TRANSPORT=resend + RESEND_API_KEY), SMTP, or EMAIL_TRANSPORT=json.')
+      throw new Error(
+        'Email delivery is not configured. Configure Resend (EMAIL_TRANSPORT=resend + RESEND_API_KEY), SMTP, or EMAIL_TRANSPORT=json.',
+      )
     }
 
     result = await transporter.sendMail(mailOptions)

@@ -4,7 +4,12 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 export function MiniPreview({ md }) {
-  if (!md) return <div style={{ fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>Start typing to preview…</div>
+  if (!md)
+    return (
+      <div style={{ fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>
+        Start typing to preview…
+      </div>
+    )
   return (
     <div
       style={{

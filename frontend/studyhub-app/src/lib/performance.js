@@ -21,7 +21,9 @@ export function reportWebVitals(onReport) {
       })
     })
     lcpObserver.observe({ type: 'largest-contentful-paint', buffered: true })
-  } catch { /* unsupported */ }
+  } catch {
+    /* unsupported */
+  }
 
   // INP
   try {
@@ -32,17 +34,15 @@ export function reportWebVitals(onReport) {
             name: 'INP',
             value: entry.duration,
             rating:
-              entry.duration < 200
-                ? 'good'
-                : entry.duration < 500
-                  ? 'needs-improvement'
-                  : 'poor',
+              entry.duration < 200 ? 'good' : entry.duration < 500 ? 'needs-improvement' : 'poor',
           })
         }
       }
     })
     inpObserver.observe({ type: 'event', buffered: true, durationThreshold: 16 })
-  } catch { /* unsupported */ }
+  } catch {
+    /* unsupported */
+  }
 
   // CLS
   try {
@@ -54,14 +54,11 @@ export function reportWebVitals(onReport) {
       onReport({
         name: 'CLS',
         value: clsValue,
-        rating:
-          clsValue < 0.1
-            ? 'good'
-            : clsValue < 0.25
-              ? 'needs-improvement'
-              : 'poor',
+        rating: clsValue < 0.1 ? 'good' : clsValue < 0.25 ? 'needs-improvement' : 'poor',
       })
     })
     clsObserver.observe({ type: 'layout-shift', buffered: true })
-  } catch { /* unsupported */ }
+  } catch {
+    /* unsupported */
+  }
 }

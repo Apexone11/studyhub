@@ -30,20 +30,34 @@ import ReviewTab from './ReviewTab'
 import LegalTab from './LegalTab'
 import SessionsTab from './SessionsTab'
 import ReferralsTab from './ReferralsTab'
+import {
+  IconProfile,
+  IconShield,
+  IconMonitor,
+  IconBell,
+  IconEye,
+  IconPalette,
+  IconUser,
+  IconSpark,
+  IconUsers,
+  IconScroll,
+  IconFlag,
+  IconStar,
+} from '../../components/Icons'
 
 const NAV_TABS = [
-  { id: 'profile', label: 'Profile' },
-  { id: 'security', label: 'Security' },
-  { id: 'sessions', label: 'Sessions' },
-  { id: 'notifications', label: 'Notifications' },
-  { id: 'privacy', label: 'Privacy' },
-  { id: 'appearance', label: 'Appearance' },
-  { id: 'account', label: 'Account' },
-  { id: 'subscription', label: 'Subscription' },
-  { id: 'referrals', label: 'Referrals' },
-  { id: 'legal', label: 'Legal' },
-  { id: 'moderation', label: 'Moderation' },
-  { id: 'review', label: 'Leave a Review' },
+  { id: 'profile', label: 'Profile', icon: IconProfile },
+  { id: 'security', label: 'Security', icon: IconShield },
+  { id: 'sessions', label: 'Sessions', icon: IconMonitor },
+  { id: 'notifications', label: 'Notifications', icon: IconBell },
+  { id: 'privacy', label: 'Privacy', icon: IconEye },
+  { id: 'appearance', label: 'Appearance', icon: IconPalette },
+  { id: 'account', label: 'Account', icon: IconUser },
+  { id: 'subscription', label: 'Subscription', icon: IconSpark },
+  { id: 'referrals', label: 'Referrals', icon: IconUsers },
+  { id: 'legal', label: 'Legal', icon: IconScroll },
+  { id: 'moderation', label: 'Moderation', icon: IconFlag },
+  { id: 'review', label: 'Leave a Review', icon: IconStar },
 ]
 
 export default function SettingsPage() {
@@ -387,32 +401,54 @@ export default function SettingsPage() {
           )}
 
           <nav className="settings-nav" data-tutorial="settings-tabs">
-            {NAV_TABS.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="settings-nav-btn"
-                onClick={() => setTab(item.id)}
-                style={{
-                  display: 'block',
-                  width: '100%',
-                  textAlign: 'left',
-                  padding: '10px 14px',
-                  marginBottom: 4,
-                  borderRadius: 10,
-                  border: 'none',
-                  background: tab === item.id ? 'var(--sh-surface)' : 'transparent',
-                  color: tab === item.id ? 'var(--sh-heading)' : 'var(--sh-muted)',
-                  fontSize: 14,
-                  fontWeight: tab === item.id ? 700 : 500,
-                  cursor: 'pointer',
-                  boxShadow: tab === item.id ? 'var(--shadow-sm)' : 'none',
-                  fontFamily: 'inherit',
-                }}
-              >
-                {item.label}
-              </button>
-            ))}
+            {NAV_TABS.map((item) => {
+              const Icon = item.icon
+              const active = tab === item.id
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="settings-nav-btn"
+                  onClick={() => setTab(item.id)}
+                  style={{
+                    position: 'relative',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    width: '100%',
+                    textAlign: 'left',
+                    padding: '10px 14px 10px 16px',
+                    marginBottom: 4,
+                    borderRadius: 10,
+                    border: 'none',
+                    background: active ? 'var(--sh-surface)' : 'transparent',
+                    color: active ? 'var(--sh-heading)' : 'var(--sh-muted)',
+                    fontSize: 14,
+                    fontWeight: active ? 700 : 500,
+                    cursor: 'pointer',
+                    boxShadow: active ? 'var(--shadow-sm)' : 'none',
+                    fontFamily: 'inherit',
+                  }}
+                >
+                  {active && (
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        position: 'absolute',
+                        left: 0,
+                        top: 6,
+                        bottom: 6,
+                        width: 3,
+                        borderRadius: 2,
+                        background: 'var(--sh-brand)',
+                      }}
+                    />
+                  )}
+                  {Icon && <Icon size={18} />}
+                  <span>{item.label}</span>
+                </button>
+              )
+            })}
           </nav>
         </aside>
 

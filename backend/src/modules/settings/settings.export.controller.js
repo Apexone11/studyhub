@@ -143,47 +143,55 @@ router.get('/export', exportDataLimiter, async (req, res) => {
       }),
 
       // Starred notes
-      prisma.noteStar.findMany({
-        where: { userId: userId },
-        select: {
-          noteId: true,
-          createdAt: true,
-        },
-      }).catch(() => []),
+      prisma.noteStar
+        .findMany({
+          where: { userId: userId },
+          select: {
+            noteId: true,
+            createdAt: true,
+          },
+        })
+        .catch(() => []),
 
       // Preferences
-      prisma.preferences.findUnique({
-        where: { userId: userId },
-        select: {
-          theme: true,
-          emailNotifications: true,
-          pushNotifications: true,
-          profileVisibility: true,
-        },
-      }).catch(() => null),
+      prisma.preferences
+        .findUnique({
+          where: { userId: userId },
+          select: {
+            theme: true,
+            emailNotifications: true,
+            pushNotifications: true,
+            profileVisibility: true,
+          },
+        })
+        .catch(() => null),
 
       // Conversations (DM participation, no message content for privacy)
-      prisma.conversationParticipant.findMany({
-        where: { userId: userId },
-        select: {
-          conversationId: true,
-          joinedAt: true,
-          lastReadAt: true,
-        },
-      }).catch(() => []),
+      prisma.conversationParticipant
+        .findMany({
+          where: { userId: userId },
+          select: {
+            conversationId: true,
+            joinedAt: true,
+            lastReadAt: true,
+          },
+        })
+        .catch(() => []),
 
       // Study group memberships
-      prisma.studyGroupMember.findMany({
-        where: { userId: userId },
-        select: {
-          groupId: true,
-          role: true,
-          joinedAt: true,
-          group: {
-            select: { name: true },
+      prisma.studyGroupMember
+        .findMany({
+          where: { userId: userId },
+          select: {
+            groupId: true,
+            role: true,
+            joinedAt: true,
+            group: {
+              select: { name: true },
+            },
           },
-        },
-      }).catch(() => []),
+        })
+        .catch(() => []),
     ])
 
     const exportData = {

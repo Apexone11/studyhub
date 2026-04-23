@@ -16,7 +16,16 @@ const MAX_CHARS = 500
 
 function StarIcon({ filled, size = 28 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill={filled ? 'var(--sh-warning)' : 'none'} stroke={filled ? 'var(--sh-warning)' : 'var(--sh-border)'} strokeWidth="1.8" strokeLinejoin="round" strokeLinecap="round">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill={filled ? 'var(--sh-warning)' : 'none'}
+      stroke={filled ? 'var(--sh-warning)' : 'var(--sh-border)'}
+      strokeWidth="1.8"
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    >
       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
     </svg>
   )
@@ -24,16 +33,40 @@ function StarIcon({ filled, size = 28 }) {
 
 function StatusBadge({ status }) {
   const map = {
-    pending: { bg: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)', border: 'var(--sh-warning-border)', label: 'Pending' },
-    approved: { bg: 'var(--sh-success-bg)', color: 'var(--sh-success-text)', border: 'var(--sh-success-border)', label: 'Approved' },
-    rejected: { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)', border: 'var(--sh-danger-border)', label: 'Rejected' },
+    pending: {
+      bg: 'var(--sh-warning-bg)',
+      color: 'var(--sh-warning-text)',
+      border: 'var(--sh-warning-border)',
+      label: 'Pending',
+    },
+    approved: {
+      bg: 'var(--sh-success-bg)',
+      color: 'var(--sh-success-text)',
+      border: 'var(--sh-success-border)',
+      label: 'Approved',
+    },
+    rejected: {
+      bg: 'var(--sh-danger-bg)',
+      color: 'var(--sh-danger-text)',
+      border: 'var(--sh-danger-border)',
+      label: 'Rejected',
+    },
   }
   const s = map[status] || map.pending
   return (
-    <span style={{
-      display: 'inline-flex', alignItems: 'center', padding: '4px 12px', borderRadius: 999,
-      fontSize: 12, fontWeight: 700, background: s.bg, color: s.color, border: `1px solid ${s.border}`,
-    }}>
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        padding: '4px 12px',
+        borderRadius: 999,
+        fontSize: 12,
+        fontWeight: 700,
+        background: s.bg,
+        color: s.color,
+        border: `1px solid ${s.border}`,
+      }}
+    >
       {s.label}
     </span>
   )
@@ -105,11 +138,21 @@ export default function ReviewPage() {
   }
 
   const navActions = (
-    <Link to="/feed" style={{
-      display: 'inline-flex', alignItems: 'center', gap: 6, padding: '6px 12px',
-      borderRadius: 8, border: '1px solid var(--sh-border)', color: 'var(--sh-slate-400)',
-      textDecoration: 'none', fontSize: 12, fontWeight: 700,
-    }}>
+    <Link
+      to="/feed"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '6px 12px',
+        borderRadius: 8,
+        border: '1px solid var(--sh-border)',
+        color: 'var(--sh-slate-400)',
+        textDecoration: 'none',
+        fontSize: 12,
+        fontWeight: 700,
+      }}
+    >
       Back to Feed
     </Link>
   )
@@ -117,22 +160,51 @@ export default function ReviewPage() {
   const displayStars = hoverStar || stars
 
   return (
-    <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
+    <div
+      className="sh-app-page"
+      style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}
+    >
       <Navbar crumbs={[{ label: 'Leave a Review', to: '/review' }]} hideTabs actions={navActions} />
-      <div className="app-two-col-grid sh-ambient-grid sh-ambient-shell" style={{
-        ...pageShell('app'),
-        gap: 20,
-      }}>
+      <div
+        className="app-two-col-grid sh-ambient-grid sh-ambient-shell"
+        style={{
+          ...pageShell('app'),
+          gap: 20,
+        }}
+      >
         <AppSidebar mode={layout.sidebarMode} />
 
-        <main className="sh-ambient-main" id="main-content" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16, paddingTop: 8 }}>
-          <div style={{
-            background: 'var(--sh-surface)', borderRadius: 16, border: '1px solid var(--sh-border)',
-            padding: 'clamp(24px, 4vw, 40px)', maxWidth: 600, width: '100%',
-            boxShadow: 'var(--shadow-sm, 0 2px 10px rgba(15,23,42,0.05))',
-          }}>
+        <main
+          className="sh-ambient-main"
+          id="main-content"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 16,
+            paddingTop: 8,
+          }}
+        >
+          <div
+            style={{
+              background: 'var(--sh-surface)',
+              borderRadius: 16,
+              border: '1px solid var(--sh-border)',
+              padding: 'clamp(24px, 4vw, 40px)',
+              maxWidth: 600,
+              width: '100%',
+              boxShadow: 'var(--shadow-sm, 0 2px 10px rgba(15,23,42,0.05))',
+            }}
+          >
             <div style={{ textAlign: 'center', marginBottom: 28 }}>
-              <h1 style={{ margin: '0 0 8px', fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)' }}>
+              <h1
+                style={{
+                  margin: '0 0 8px',
+                  fontSize: 22,
+                  fontWeight: 800,
+                  color: 'var(--sh-heading)',
+                }}
+              >
                 Share Your Experience
               </h1>
               <p style={{ margin: 0, fontSize: 14, color: 'var(--sh-muted)' }}>
@@ -146,14 +218,24 @@ export default function ReviewPage() {
             </div>
 
             {loadingExisting ? (
-              <div style={{ textAlign: 'center', padding: 32, color: 'var(--sh-muted)', fontSize: 13 }}>
+              <div
+                style={{ textAlign: 'center', padding: 32, color: 'var(--sh-muted)', fontSize: 13 }}
+              >
                 Loading...
               </div>
             ) : (
               <form onSubmit={handleSubmit}>
                 {/* Star Rating */}
                 <div style={{ marginBottom: 24 }}>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 10 }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: 'var(--sh-heading)',
+                      marginBottom: 10,
+                    }}
+                  >
                     Rating
                   </label>
                   <div style={{ display: 'flex', gap: 6 }} onMouseLeave={() => setHoverStar(0)}>
@@ -164,9 +246,15 @@ export default function ReviewPage() {
                         onClick={() => setStars(n)}
                         onMouseEnter={() => setHoverStar(n)}
                         style={{
-                          background: 'none', border: 'none', cursor: 'pointer', padding: 2,
+                          background: 'none',
+                          border: 'none',
+                          cursor: 'pointer',
+                          padding: 2,
                           transition: 'transform 0.15s',
-                          transform: (hoverStar >= n || (!hoverStar && stars >= n)) ? 'scale(1.15)' : 'scale(1)',
+                          transform:
+                            hoverStar >= n || (!hoverStar && stars >= n)
+                              ? 'scale(1.15)'
+                              : 'scale(1)',
                         }}
                         aria-label={`${n} star${n > 1 ? 's' : ''}`}
                       >
@@ -178,7 +266,15 @@ export default function ReviewPage() {
 
                 {/* Review Text */}
                 <div style={{ marginBottom: 24 }}>
-                  <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 8 }}>
+                  <label
+                    style={{
+                      display: 'block',
+                      fontSize: 13,
+                      fontWeight: 700,
+                      color: 'var(--sh-heading)',
+                      marginBottom: 8,
+                    }}
+                  >
                     Your Review
                   </label>
                   <textarea
@@ -187,38 +283,70 @@ export default function ReviewPage() {
                     placeholder="What do you love about StudyHub?"
                     rows={5}
                     style={{
-                      width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 12,
-                      border: '1px solid var(--sh-input-border)', background: 'var(--sh-input-bg)',
-                      color: 'var(--sh-input-text)', fontSize: 14, fontFamily: FONT, resize: 'vertical',
-                      lineHeight: 1.6, outline: 'none', transition: 'border-color 0.15s',
+                      width: '100%',
+                      boxSizing: 'border-box',
+                      padding: '12px 14px',
+                      borderRadius: 12,
+                      border: '1px solid var(--sh-input-border)',
+                      background: 'var(--sh-input-bg)',
+                      color: 'var(--sh-input-text)',
+                      fontSize: 14,
+                      fontFamily: FONT,
+                      resize: 'vertical',
+                      lineHeight: 1.6,
+                      outline: 'none',
+                      transition: 'border-color 0.15s',
                     }}
-                    onFocus={(e) => { e.target.style.borderColor = 'var(--sh-brand)' }}
-                    onBlur={(e) => { e.target.style.borderColor = 'var(--sh-input-border)' }}
+                    onFocus={(e) => {
+                      e.target.style.borderColor = 'var(--sh-brand)'
+                    }}
+                    onBlur={(e) => {
+                      e.target.style.borderColor = 'var(--sh-input-border)'
+                    }}
                   />
-                  <div style={{
-                    textAlign: 'right', fontSize: 12, marginTop: 4,
-                    color: text.length > MAX_CHARS - 50 ? 'var(--sh-warning-text)' : 'var(--sh-muted)',
-                  }}>
+                  <div
+                    style={{
+                      textAlign: 'right',
+                      fontSize: 12,
+                      marginTop: 4,
+                      color:
+                        text.length > MAX_CHARS - 50 ? 'var(--sh-warning-text)' : 'var(--sh-muted)',
+                    }}
+                  >
                     {text.length}/{MAX_CHARS}
                   </div>
                 </div>
 
                 {/* Messages */}
                 {success && (
-                  <div style={{
-                    padding: '12px 14px', borderRadius: 12, marginBottom: 16,
-                    background: 'var(--sh-success-bg)', border: '1px solid var(--sh-success-border)',
-                    color: 'var(--sh-success-text)', fontSize: 13, fontWeight: 600,
-                  }}>
+                  <div
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: 12,
+                      marginBottom: 16,
+                      background: 'var(--sh-success-bg)',
+                      border: '1px solid var(--sh-success-border)',
+                      color: 'var(--sh-success-text)',
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
                     {success}
                   </div>
                 )}
                 {error && (
-                  <div style={{
-                    padding: '12px 14px', borderRadius: 12, marginBottom: 16,
-                    background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)',
-                    color: 'var(--sh-danger-text)', fontSize: 13, fontWeight: 600,
-                  }}>
+                  <div
+                    style={{
+                      padding: '12px 14px',
+                      borderRadius: 12,
+                      marginBottom: 16,
+                      background: 'var(--sh-danger-bg)',
+                      border: '1px solid var(--sh-danger-border)',
+                      color: 'var(--sh-danger-text)',
+                      fontSize: 13,
+                      fontWeight: 600,
+                    }}
+                  >
                     {error}
                   </div>
                 )}
@@ -228,10 +356,17 @@ export default function ReviewPage() {
                   type="submit"
                   disabled={!stars || !text.trim() || saving}
                   style={{
-                    width: '100%', padding: '12px 20px', borderRadius: 12, border: 'none',
-                    background: (!stars || !text.trim()) ? 'var(--sh-slate-300)' : 'var(--sh-brand)',
-                    color: '#fff', fontSize: 14, fontWeight: 700, cursor: (!stars || !text.trim() || saving) ? 'not-allowed' : 'pointer',
-                    fontFamily: FONT, transition: 'background 0.15s, opacity 0.15s',
+                    width: '100%',
+                    padding: '12px 20px',
+                    borderRadius: 12,
+                    border: 'none',
+                    background: !stars || !text.trim() ? 'var(--sh-slate-300)' : 'var(--sh-brand)',
+                    color: '#fff',
+                    fontSize: 14,
+                    fontWeight: 700,
+                    cursor: !stars || !text.trim() || saving ? 'not-allowed' : 'pointer',
+                    fontFamily: FONT,
+                    transition: 'background 0.15s, opacity 0.15s',
                     opacity: saving ? 0.7 : 1,
                   }}
                 >

@@ -10,10 +10,7 @@ const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { readLimiter } = require('../../lib/rateLimiters')
-const {
-  parseId,
-  requireGroupMember,
-} = require('./studyGroups.helpers')
+const { parseId, requireGroupMember } = require('./studyGroups.helpers')
 
 const router = express.Router({ mergeParams: true })
 
@@ -41,22 +38,43 @@ router.get('/', readLimiter, requireAuth, async (req, res) => {
         where: { groupId },
         orderBy: { createdAt: 'desc' },
         take: limit,
-        select: { id: true, title: true, type: true, createdAt: true, author: { select: { id: true, username: true, avatarUrl: true } } },
+        select: {
+          id: true,
+          title: true,
+          type: true,
+          createdAt: true,
+          author: { select: { id: true, username: true, avatarUrl: true } },
+        },
       }),
       prisma.groupResource.findMany({
         where: { groupId },
         orderBy: { createdAt: 'desc' },
         take: limit,
-        select: { id: true, title: true, resourceType: true, createdAt: true, user: { select: { id: true, username: true, avatarUrl: true } } },
+        select: {
+          id: true,
+          title: true,
+          resourceType: true,
+          createdAt: true,
+          user: { select: { id: true, username: true, avatarUrl: true } },
+        },
       }),
       prisma.studyGroupMember.findMany({
         where: { groupId, status: 'active' },
         orderBy: { joinedAt: 'desc' },
         take: limit,
-        select: { userId: true, role: true, joinedAt: true, user: { select: { id: true, username: true, avatarUrl: true } } },
+        select: {
+          userId: true,
+          role: true,
+          joinedAt: true,
+          user: { select: { id: true, username: true, avatarUrl: true } },
+        },
       }),
       prisma.groupSession.findMany({
-        where: { groupId, scheduledAt: { gte: new Date() }, status: { in: ['upcoming', 'in_progress'] } },
+        where: {
+          groupId,
+          scheduledAt: { gte: new Date() },
+          status: { in: ['upcoming', 'in_progress'] },
+        },
         orderBy: { scheduledAt: 'asc' },
         take: 5,
         select: { id: true, title: true, scheduledAt: true, location: true, status: true },

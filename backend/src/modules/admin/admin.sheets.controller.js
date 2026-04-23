@@ -1,6 +1,13 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
-const { validateHtmlForRuntime, classifyHtmlRisk, RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('../../lib/html/htmlSecurity')
+const {
+  validateHtmlForRuntime,
+  classifyHtmlRisk,
+  RISK_TIER,
+  generateRiskSummary,
+  generateTierExplanation,
+  groupFindingsByCategory,
+} = require('../../lib/html/htmlSecurity')
 const { sanitizePreviewHtml } = require('../../lib/html/htmlPreviewDocument')
 const prisma = require('../../lib/prisma')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
@@ -34,17 +41,34 @@ router.get('/sheets', async (req, res) => {
 // ── GET /api/admin/sheets/review?status=pending_review&page=1 ───────────────
 router.get('/sheets/review', async (req, res) => {
   const page = parsePage(req.query.page)
-  const rawStatus = String(req.query.status || 'pending_review').trim().toLowerCase()
-  const status = ['pending_review', 'rejected', 'draft', 'published', 'quarantined'].includes(rawStatus)
+  const rawStatus = String(req.query.status || 'pending_review')
+    .trim()
+    .toLowerCase()
+  const status = ['pending_review', 'rejected', 'draft', 'published', 'quarantined'].includes(
+    rawStatus,
+  )
     ? rawStatus
     : 'pending_review'
 
   /* Optional filters: contentFormat, htmlScanStatus, tier */
-  const rawFormat = String(req.query.contentFormat || '').trim().toLowerCase()
+  const rawFormat = String(req.query.contentFormat || '')
+    .trim()
+    .toLowerCase()
   const contentFormat = ['html', 'markdown', 'richtext'].includes(rawFormat) ? rawFormat : undefined
 
-  const rawScan = String(req.query.htmlScanStatus || '').trim().toLowerCase()
-  const htmlScanStatus = ['queued', 'running', 'passed', 'flagged', 'pending_review', 'quarantined'].includes(rawScan) ? rawScan : undefined
+  const rawScan = String(req.query.htmlScanStatus || '')
+    .trim()
+    .toLowerCase()
+  const htmlScanStatus = [
+    'queued',
+    'running',
+    'passed',
+    'flagged',
+    'pending_review',
+    'quarantined',
+  ].includes(rawScan)
+    ? rawScan
+    : undefined
 
   const rawTier = parseInt(req.query.tier, 10)
   const tierFilter = Number.isInteger(rawTier) && rawTier >= 0 && rawTier <= 3 ? rawTier : undefined
@@ -71,7 +95,14 @@ router.get('/sheets/review', async (req, res) => {
       }),
       prisma.studySheet.count({ where }),
     ])
-    res.json({ sheets, total, page, pages: Math.ceil(total / PAGE_SIZE), status, filters: { contentFormat, htmlScanStatus } })
+    res.json({
+      sheets,
+      total,
+      page,
+      pages: Math.ceil(total / PAGE_SIZE),
+      status,
+      filters: { contentFormat, htmlScanStatus },
+    })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -98,8 +129,12 @@ router.get('/sheets/:id/review-detail', async (req, res) => {
 
     const rawHtml = sheet.contentFormat === 'html' ? sheet.content : null
     const sanitizedHtml = rawHtml ? sanitizePreviewHtml(rawHtml) : null
-    const liveClassification = rawHtml ? classifyHtmlRisk(rawHtml) : { tier: 0, findings: [], summary: 'N/A' }
-    const runtimeValidation = rawHtml ? validateHtmlForRuntime(rawHtml) : { ok: true, issues: [], enrichedIssues: [] }
+    const liveClassification = rawHtml
+      ? classifyHtmlRisk(rawHtml)
+      : { tier: 0, findings: [], summary: 'N/A' }
+    const runtimeValidation = rawHtml
+      ? validateHtmlForRuntime(rawHtml)
+      : { ok: true, issues: [], enrichedIssues: [] }
 
     const storedFindings = sheet.htmlScanFindings || []
     const storedTier = sheet.htmlRiskTier || 0
@@ -119,7 +154,10 @@ router.get('/sheets/:id/review-detail', async (req, res) => {
       riskSummary: generateRiskSummary(storedTier, storedFindings),
       tierExplanation: generateTierExplanation(storedTier),
       findingsByCategory: groupFindingsByCategory(storedFindings),
-      liveRiskSummaryText: generateRiskSummary(liveClassification.tier, liveClassification.findings),
+      liveRiskSummaryText: generateRiskSummary(
+        liveClassification.tier,
+        liveClassification.findings,
+      ),
       liveTierExplanation: generateTierExplanation(liveClassification.tier),
       liveFindingsByCategory: groupFindingsByCategory(liveClassification.findings),
       htmlScanStatus: sheet.htmlScanStatus,
@@ -155,7 +193,9 @@ router.get('/sheets/:id/review-detail', async (req, res) => {
 // ── PATCH /api/admin/sheets/:id/review ─────────────────────────────
 router.patch('/sheets/:id/review', async (req, res) => {
   const sheetId = parseInt(req.params.id, 10)
-  const action = String(req.body?.action || '').trim().toLowerCase()
+  const action = String(req.body?.action || '')
+    .trim()
+    .toLowerCase()
   const reason = String(req.body?.reason || '').trim()
 
   if (!Number.isInteger(sheetId)) {
@@ -164,8 +204,8 @@ router.patch('/sheets/:id/review', async (req, res) => {
   if (!['approve', 'reject'].includes(action)) {
     return res.status(400).json({ error: 'Action must be "approve" or "reject".' })
   }
-  const effectiveReason = reason
-    || (action === 'approve' ? 'Approved by admin.' : 'Rejected by admin (quick reject).')
+  const effectiveReason =
+    reason || (action === 'approve' ? 'Approved by admin.' : 'Rejected by admin (quick reject).')
 
   try {
     const current = await prisma.studySheet.findUnique({
@@ -196,7 +236,9 @@ router.patch('/sheets/:id/review', async (req, res) => {
       where: { id: sheetId },
       data: {
         status: nextStatus,
-        ...(action === 'approve' ? { htmlRiskTier: RISK_TIER.CLEAN, htmlScanStatus: 'passed' } : {}),
+        ...(action === 'approve'
+          ? { htmlRiskTier: RISK_TIER.CLEAN, htmlScanStatus: 'passed' }
+          : {}),
         reviewedById: req.user.userId,
         reviewedAt: new Date(),
         reviewReason: effectiveReason,
@@ -251,7 +293,8 @@ router.post('/sheets/:id/ai-review', async (req, res) => {
     })
   } catch (err) {
     if (err.message === 'Sheet not found') return res.status(404).json({ error: err.message })
-    if (err.message === 'Only HTML sheets can be AI-reviewed') return res.status(400).json({ error: err.message })
+    if (err.message === 'Only HTML sheets can be AI-reviewed')
+      return res.status(400).json({ error: err.message })
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'AI review failed.' })
   }

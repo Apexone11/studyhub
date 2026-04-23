@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import {
-  detectLossyConversion,
-  sanitizeForTipTap,
-  sanitizeOutput,
-} from './editorSanitize'
+import { detectLossyConversion, sanitizeForTipTap, sanitizeOutput } from './editorSanitize'
 
 describe('sanitizeOutput', () => {
   it('returns empty string for empty input', () => {
@@ -88,7 +84,8 @@ describe('detectLossyConversion', () => {
   })
 
   it('does not flag tables (Phase 3 added TipTap table extension)', () => {
-    const html = '<table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>'
+    const html =
+      '<table><thead><tr><th>A</th></tr></thead><tbody><tr><td>1</td></tr></tbody></table>'
     const report = detectLossyConversion(html)
     expect(report.lossy).toBe(false)
   })

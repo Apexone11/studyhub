@@ -12,13 +12,19 @@ export default function DeletionReasonsTab({ deletionsState, loadPagedData }) {
           <thead>
             <tr style={{ background: 'var(--sh-soft)' }}>
               {['Username', 'Reason', 'Details', 'Date'].map((header) => (
-                <th key={header} style={tableHeadStyle}>{header}</th>
+                <th key={header} style={tableHeadStyle}>
+                  {header}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {deletionsState.items.length === 0 && (
-              <tr><td colSpan={4} className="admin-empty">No deletion records.</td></tr>
+              <tr>
+                <td colSpan={4} className="admin-empty">
+                  No deletion records.
+                </td>
+              </tr>
             )}
             {deletionsState.items.map((record) => (
               <tr key={record.id} style={{ borderBottom: '1px solid var(--sh-border)' }}>
@@ -31,7 +37,11 @@ export default function DeletionReasonsTab({ deletionsState, loadPagedData }) {
           </tbody>
         </table>
       </div>
-      <Pager page={deletionsState.page} total={deletionsState.total} onChange={(page) => void loadPagedData('deletion-reasons', page)} />
+      <Pager
+        page={deletionsState.page}
+        total={deletionsState.total}
+        onChange={(page) => void loadPagedData('deletion-reasons', page)}
+      />
     </>
   )
 }

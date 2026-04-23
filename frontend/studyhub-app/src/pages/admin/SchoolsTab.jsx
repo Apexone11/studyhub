@@ -41,18 +41,55 @@ function DomainCell({ school, apiJson, onUpdate }) {
             onChange={(e) => setValue(e.target.value)}
             placeholder="e.g. umd.edu"
             disabled={saving}
-            onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false) }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') save()
+              if (e.key === 'Escape') setEditing(false)
+            }}
             style={{
-              padding: '4px 8px', borderRadius: 6, border: '1px solid var(--sh-input-border)',
-              fontSize: 11, fontFamily: FONT, width: 120,
+              padding: '4px 8px',
+              borderRadius: 6,
+              border: '1px solid var(--sh-input-border)',
+              fontSize: 11,
+              fontFamily: FONT,
+              width: 120,
             }}
           />
-          <button type="button" onClick={save} disabled={saving}
-            style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--sh-brand)', background: 'var(--sh-brand)', color: '#fff', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}>
+          <button
+            type="button"
+            onClick={save}
+            disabled={saving}
+            style={{
+              padding: '3px 8px',
+              borderRadius: 6,
+              border: '1px solid var(--sh-brand)',
+              background: 'var(--sh-brand)',
+              color: '#fff',
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: FONT,
+            }}
+          >
             {saving ? '...' : 'Save'}
           </button>
-          <button type="button" onClick={() => { setValue(school.emailDomain || ''); setEditing(false) }}
-            style={{ padding: '3px 8px', borderRadius: 6, border: '1px solid var(--sh-border)', background: 'transparent', color: 'var(--sh-slate-500)', fontSize: 10, fontWeight: 700, cursor: 'pointer', fontFamily: FONT }}>
+          <button
+            type="button"
+            onClick={() => {
+              setValue(school.emailDomain || '')
+              setEditing(false)
+            }}
+            style={{
+              padding: '3px 8px',
+              borderRadius: 6,
+              border: '1px solid var(--sh-border)',
+              background: 'transparent',
+              color: 'var(--sh-slate-500)',
+              fontSize: 10,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: FONT,
+            }}
+          >
             Cancel
           </button>
         </div>
@@ -62,8 +99,19 @@ function DomainCell({ school, apiJson, onUpdate }) {
 
   return (
     <td style={tableCell}>
-      <button type="button" onClick={() => setEditing(true)}
-        style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', color: school.emailDomain ? 'var(--sh-slate-600)' : 'var(--sh-slate-300)', fontSize: 12, fontFamily: FONT }}>
+      <button
+        type="button"
+        onClick={() => setEditing(true)}
+        style={{
+          background: 'none',
+          border: 'none',
+          padding: 0,
+          cursor: 'pointer',
+          color: school.emailDomain ? 'var(--sh-slate-600)' : 'var(--sh-slate-300)',
+          fontSize: 12,
+          fontFamily: FONT,
+        }}
+      >
         {school.emailDomain || '—'}
       </button>
     </td>
@@ -91,7 +139,9 @@ export default function SchoolsTab({ apiJson }) {
     }
   }, [apiJson])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   function startUpload(schoolId) {
     pendingSchoolId.current = schoolId
@@ -125,7 +175,9 @@ export default function SchoolsTab({ apiJson }) {
         showToast(data.error || 'Could not upload logo.', 'error')
         return
       }
-      setSchools((prev) => prev.map((s) => s.id === schoolId ? { ...s, logoUrl: data.logoUrl } : s))
+      setSchools((prev) =>
+        prev.map((s) => (s.id === schoolId ? { ...s, logoUrl: data.logoUrl } : s)),
+      )
       showToast('Logo uploaded.', 'success')
     } catch {
       showToast('Check your connection and try again.', 'error')
@@ -138,7 +190,7 @@ export default function SchoolsTab({ apiJson }) {
     setUploadingId(schoolId)
     try {
       await apiJson(`/api/admin/schools/${schoolId}/logo`, { method: 'DELETE' })
-      setSchools((prev) => prev.map((s) => s.id === schoolId ? { ...s, logoUrl: null } : s))
+      setSchools((prev) => prev.map((s) => (s.id === schoolId ? { ...s, logoUrl: null } : s)))
       showToast('Logo removed.', 'success')
     } catch (err) {
       showToast(err.message || 'Could not remove logo.', 'error')
@@ -148,10 +200,11 @@ export default function SchoolsTab({ apiJson }) {
   }
 
   function handleDomainUpdate(schoolId, emailDomain) {
-    setSchools((prev) => prev.map((s) => s.id === schoolId ? { ...s, emailDomain } : s))
+    setSchools((prev) => prev.map((s) => (s.id === schoolId ? { ...s, emailDomain } : s)))
   }
 
-  if (loading) return <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading schools...</div>
+  if (loading)
+    return <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading schools...</div>
   if (error) return <div style={{ color: 'var(--sh-danger)', fontSize: 13 }}>{error}</div>
 
   return (
@@ -165,11 +218,14 @@ export default function SchoolsTab({ apiJson }) {
       />
 
       <div style={{ marginBottom: 14, fontSize: 13, color: 'var(--sh-muted)' }}>
-        {schools.length} schools · Upload logos (JPG, PNG, WebP, SVG, max 2 MB) · Click domain to edit
+        {schools.length} schools · Upload logos (JPG, PNG, WebP, SVG, max 2 MB) · Click domain to
+        edit
       </div>
 
       <div style={{ overflowX: 'auto' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontFamily: FONT }}>
+        <table
+          style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, fontFamily: FONT }}
+        >
           <thead>
             <tr>
               <th style={tableHeadStyle}>Logo</th>
@@ -186,18 +242,27 @@ export default function SchoolsTab({ apiJson }) {
               <tr key={school.id} style={{ borderBottom: '1px solid var(--sh-border)' }}>
                 {/* Logo */}
                 <td style={{ ...tableCell, width: 64 }}>
-                  <div style={{
-                    width: 48, height: 48, borderRadius: 12,
-                    background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
-                    display: 'grid', placeItems: 'center', overflow: 'hidden',
-                  }}>
+                  <div
+                    style={{
+                      width: 48,
+                      height: 48,
+                      borderRadius: 12,
+                      background: 'var(--sh-soft)',
+                      border: '1px solid var(--sh-border)',
+                      display: 'grid',
+                      placeItems: 'center',
+                      overflow: 'hidden',
+                    }}
+                  >
                     {school.logoUrl ? (
                       <img
                         src={`${API}${school.logoUrl}`}
                         alt={`${school.short} logo`}
                         loading="lazy"
                         style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 6 }}
-                        onError={(e) => { e.target.style.display = 'none' }}
+                        onError={(e) => {
+                          e.target.style.display = 'none'
+                        }}
                       />
                     ) : (
                       <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--sh-brand)' }}>
@@ -209,7 +274,10 @@ export default function SchoolsTab({ apiJson }) {
                 <td style={tableCellStrong}>{school.name}</td>
                 <td style={tableCell}>{school.short}</td>
                 <DomainCell school={school} apiJson={apiJson} onUpdate={handleDomainUpdate} />
-                <td style={tableCell}>{school.city}{school.state ? `, ${school.state}` : ''}</td>
+                <td style={tableCell}>
+                  {school.city}
+                  {school.state ? `, ${school.state}` : ''}
+                </td>
                 <td style={tableCell}>{school._count?.courses || 0}</td>
                 <td style={tableCell}>
                   <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
@@ -218,9 +286,15 @@ export default function SchoolsTab({ apiJson }) {
                       onClick={() => startUpload(school.id)}
                       disabled={uploadingId === school.id}
                       style={{
-                        padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
-                        border: '1px solid var(--sh-brand)', background: 'transparent',
-                        color: 'var(--sh-brand)', cursor: 'pointer', fontFamily: FONT,
+                        padding: '5px 10px',
+                        borderRadius: 8,
+                        fontSize: 11,
+                        fontWeight: 700,
+                        border: '1px solid var(--sh-brand)',
+                        background: 'transparent',
+                        color: 'var(--sh-brand)',
+                        cursor: 'pointer',
+                        fontFamily: FONT,
                       }}
                     >
                       {uploadingId === school.id ? '...' : school.logoUrl ? 'Replace' : 'Upload'}
@@ -231,9 +305,15 @@ export default function SchoolsTab({ apiJson }) {
                         onClick={() => removeLogo(school.id)}
                         disabled={uploadingId === school.id}
                         style={{
-                          padding: '5px 10px', borderRadius: 8, fontSize: 11, fontWeight: 700,
-                          border: '1px solid var(--sh-danger-border)', background: 'transparent',
-                          color: 'var(--sh-danger)', cursor: 'pointer', fontFamily: FONT,
+                          padding: '5px 10px',
+                          borderRadius: 8,
+                          fontSize: 11,
+                          fontWeight: 700,
+                          border: '1px solid var(--sh-danger-border)',
+                          background: 'transparent',
+                          color: 'var(--sh-danger)',
+                          cursor: 'pointer',
+                          fontFamily: FONT,
                         }}
                       >
                         Remove

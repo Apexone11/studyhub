@@ -62,13 +62,16 @@
   --elevation-2: var(--shadow-md);
   --elevation-3: var(--shadow-lg);
 
-  /* ── Radius ──────────────────────────────────────────────────────── */
-  --radius-sm: 6px;
-  --radius: 10px;
-  --radius-card: 14px;
-  --radius-lg: 20px;
-  --radius-control: 10px;
+  /* ── Radius — v2 design refresh (no sharp corners policy) ────────── */
+  /* Bumped sm (6→8) and base (10→12) so nothing reads as a sharp edge. */
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-card: 16px;
+  --radius-lg: 24px;
+  --radius-control: 12px;
   --radius-full: 9999px;
+  /* Focus ring used by .sh-focus-ring primitive in motion.css */
+  --sh-focus-ring: rgba(37, 99, 235, 0.35);
 
   /* ── Controls ────────────────────────────────────────────────────── */
   --control-h-sm: 2rem;
@@ -80,6 +83,14 @@
   --sh-surface: #ffffff;
   --sh-soft: #faf9f7;
   --sh-page-bg: #f0eeeb;
+
+  /* Paper surface — always light, for rendering user HTML content
+     (sheet previews, attachment iframes). Sheet authors assume a white
+     paper background; keeping this stable across themes prevents a
+     "black box behind sheets" effect in dark mode. */
+  --sh-paper: #ffffff;
+  --sh-paper-soft: #faf9f7;
+  --sh-paper-border: #e5e2dd;
 
   /* ── Text colors (ink) ───────────────────────────────────────────── */
   --sh-text: #1a1a1a;
@@ -366,6 +377,13 @@
   --sh-soft: #242424;
   --sh-page-bg: #0e0e0e;
 
+  /* Paper surfaces stay LIGHT in dark mode on purpose — sheet content
+     is authored assuming a white page, so rendering a dark panel around
+     it looks like an "unprofessional black box". */
+  --sh-paper: #ffffff;
+  --sh-paper-soft: #faf9f7;
+  --sh-paper-border: #d6d3cc;
+
   /* ── Text ────────────────────────────────────────────────────────── */
   --sh-text: #e8e8e8;
   --sh-heading: #f5f5f5;
@@ -505,6 +523,16 @@
     radial-gradient(circle at 50% 88%, rgba(16, 185, 129, 0.1), transparent 20%),
     linear-gradient(180deg, #161616 0%, #171717 42%, #111827 100%);
   --sh-home-hero-section-bg: var(--sh-home-page-backdrop);
+
+  /* Landing-page card surfaces. Without these overrides, the cards
+     stayed hardcoded white (#fbfdff / #f8fafc) in dark mode while the
+     heading text flipped to #f5f5f5 — making the "Create your account",
+     "Pick your school and courses", and "Access everything" titles
+     nearly invisible on white cards. */
+  --sh-home-step-card-bg: #1c1c1c;
+  --sh-home-panel-bg: #1c1c1c;
+  --sh-home-testimonials-gradient: linear-gradient(180deg, #161616 0%, #1c1c1c 100%);
+  --sh-home-step-number-shadow: 0 8px 24px rgba(59, 130, 246, 0.55);
 
   color-scheme: dark;
 }
@@ -1154,6 +1182,36 @@ textarea.sh-input {
 
 .sh-landing-search {
   display: flex;
+}
+
+/* Navbar search trigger — hover and keyboard-focus states. */
+[data-search-trigger] {
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+[data-search-trigger]:hover {
+  background: var(--sh-nav-muted-hover);
+  border-color: var(--sh-nav-muted);
+}
+[data-search-trigger]:focus-visible {
+  outline: none;
+  border-color: var(--sh-brand);
+  box-shadow: 0 0 0 3px var(--sh-brand-soft-bg);
+}
+
+/* SearchModal input row — focus-within highlight so users see the
+   active field even though the input itself has no border. */
+.sh-search-input-row {
+  transition: background 0.15s ease;
+}
+.sh-search-input-row:focus-within {
+  background: var(--sh-soft);
+}
+.sh-search-input::placeholder {
+  color: var(--sh-subtext);
+  opacity: 1;
 }
 
 .sh-landing-actions {

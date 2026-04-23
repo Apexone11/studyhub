@@ -4,6 +4,7 @@ const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 
 router.use(requireAuth)
@@ -17,6 +18,8 @@ router.get('/summary', async (req, res) => {
         id: true,
         username: true,
         role: true,
+        accountType: true,
+        isStaffVerified: true,
         createdAt: true,
         avatarUrl: true,
         email: true,
@@ -52,12 +55,20 @@ router.get('/summary', async (req, res) => {
     })
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found.' })
+      return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
     }
 
     const enrolledCourseIds = user.enrollments.map((enrollment) => enrollment.courseId)
 
-    const [starCount, recentSheets, forkCount, feedPostCount] = await Promise.all([
+    const [
+      starCount,
+      recentSheets,
+      forkCount,
+      feedPostCount,
+      noteCount,
+      groupMembershipCount,
+      topContributors,
+    ] = await Promise.all([
       prisma.starredSheet.count({
         where: { userId: user.id },
       }),
@@ -81,10 +92,64 @@ router.get('/summary', async (req, res) => {
       prisma.studySheet.count({ where: { userId: user.id, NOT: [{ forkOf: null }] } }),
       // Count feed posts made by this user
       prisma.feedPost.count({ where: { userId: user.id } }),
+      // Notes authored by this user — used by the self-learner checklist
+      prisma.note.count({ where: { userId: user.id } }),
+      // Active study-group memberships — used by the self-learner checklist
+      prisma.studyGroupMember.count({ where: { userId: user.id, status: 'active' } }),
+      // Top contributors — users with the most accepted SheetContribution
+      // proposals in the past 30 days, scoped to sheets in the calling
+      // user's enrolled courses (so teachers / self-learners see their
+      // course community; if no enrollments, fall back to platform-wide).
+      // Capped at 5. Empty array on any error (widget handles empty gracefully).
+      (async () => {
+        try {
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+          const sheetWhere =
+            enrolledCourseIds.length > 0 ? { courseId: { in: enrolledCourseIds } } : undefined
+
+          const grouped = await prisma.sheetContribution.groupBy({
+            by: ['proposerId'],
+            where: {
+              status: 'accepted',
+              createdAt: { gte: thirtyDaysAgo },
+              ...(sheetWhere ? { targetSheet: sheetWhere } : {}),
+            },
+            _count: { proposerId: true },
+            orderBy: { _count: { proposerId: 'desc' } },
+            take: 5,
+          })
+
+          if (grouped.length === 0) return []
+          const users = await prisma.user.findMany({
+            where: { id: { in: grouped.map((g) => g.proposerId) } },
+            select: { id: true, username: true, avatarUrl: true },
+          })
+          const byId = new Map(users.map((u) => [u.id, u]))
+          return grouped
+            .map((g) => {
+              const u = byId.get(g.proposerId)
+              if (!u) return null
+              return {
+                userId: u.id,
+                username: u.username,
+                avatarUrl: u.avatarUrl,
+                contributionCount: g._count.proposerId,
+              }
+            })
+            .filter(Boolean)
+        } catch (err) {
+          captureError(err, { route: 'dashboard.summary.topContributors', userId: user.id })
+          return []
+        }
+      })(),
     ])
 
     // ── Activation checklist ──────────────────────────────────────────────
-    // Guides new users through four key "aha moments" in product order.
+    // Role-aware onboarding: student, teacher, and self-learner each see a
+    // tailored set of next steps. Source of truth for the UX is
+    // frontend/studyhub-app/src/features/onboarding/checklistConfig.js; the
+    // backend re-implements the same items here so completion state can be
+    // evaluated against data we already fetched above (no extra round-trips).
     const hasCourse = user._count.enrollments > 0
     const hasStarred = starCount > 0
     const hasOwnSheet = user._count.studySheets > 0
@@ -92,8 +157,11 @@ router.get('/summary', async (req, res) => {
     const hasPosted = feedPostCount > 0
     const hasAvatar = Boolean(user.avatarUrl)
     const hasVerifiedEmail = Boolean(user.emailVerified)
+    const hasNote = noteCount > 0
+    const hasGroup = groupMembershipCount > 0
+    const isTeacherVerified = Boolean(user.isStaffVerified)
 
-    const activationChecklist = [
+    const studentChecklist = [
       {
         key: 'join_course',
         label: 'Join a course',
@@ -116,7 +184,7 @@ router.get('/summary', async (req, res) => {
         helper: 'Help classmates recognise you.',
         done: hasAvatar,
         actionLabel: 'Add photo',
-        actionPath: '/dashboard',
+        actionPath: '/settings?tab=profile',
       },
       {
         key: 'star_or_view_sheet',
@@ -144,6 +212,122 @@ router.get('/summary', async (req, res) => {
       },
     ]
 
+    const teacherChecklist = [
+      {
+        key: 'verify_email',
+        label: 'Verify your email',
+        helper: 'Required to publish and invite students.',
+        done: hasVerifiedEmail,
+        actionLabel: 'Verify now',
+        actionPath: '/settings?tab=account',
+      },
+      {
+        key: 'verify_teaching',
+        label: 'Verify your teaching status',
+        helper: 'Unlocks the teacher workspace and badges.',
+        done: isTeacherVerified,
+        actionLabel: 'Start verification',
+        actionPath: '/settings?tab=account',
+      },
+      {
+        key: 'add_photo',
+        label: 'Add a profile photo',
+        helper: 'Help your students recognise you.',
+        done: hasAvatar,
+        actionLabel: 'Add photo',
+        actionPath: '/settings?tab=profile',
+      },
+      {
+        key: 'publish_first_material',
+        label: 'Publish your first material',
+        helper: 'Upload a sheet your students can reference.',
+        done: hasOwnSheet,
+        actionLabel: hasOwnSheet ? 'See your sheets' : 'Publish a sheet',
+        actionPath: hasOwnSheet ? '/sheets?mine=true' : '/sheets/upload',
+      },
+      {
+        key: 'connect_a_course',
+        label: 'Connect a course you teach',
+        helper: 'So materials attach to the right class.',
+        done: hasCourse,
+        actionLabel: 'Connect course',
+        actionPath: '/settings?tab=courses',
+      },
+      {
+        key: 'make_post',
+        label: 'Share an announcement with your class',
+        helper: 'Drop a tip, a deadline, or a problem of the week.',
+        done: hasPosted,
+        actionLabel: 'Open feed',
+        actionPath: '/feed',
+      },
+    ]
+
+    const selfLearnerChecklist = [
+      {
+        key: 'verify_email',
+        label: 'Verify your email',
+        helper: 'Keeps your account recoverable.',
+        done: hasVerifiedEmail,
+        actionLabel: 'Verify now',
+        actionPath: '/settings?tab=account',
+      },
+      {
+        key: 'add_photo',
+        label: 'Add a profile photo',
+        helper: 'Make your learning profile your own.',
+        done: hasAvatar,
+        actionLabel: 'Add photo',
+        actionPath: '/settings?tab=profile',
+      },
+      {
+        key: 'star_topic_sheet',
+        label: 'Star a sheet that looks useful',
+        helper: 'Build your personal reference library.',
+        done: hasStarred,
+        actionLabel: 'Browse sheets',
+        actionPath: '/sheets',
+      },
+      {
+        key: 'write_reflection',
+        label: 'Write your first reflection note',
+        helper: 'Notes stay private until you share them.',
+        done: hasNote,
+        actionLabel: hasNote ? 'See your notes' : 'Write a note',
+        actionPath: '/notes',
+      },
+      {
+        key: 'join_study_group',
+        label: 'Join a study group',
+        helper: 'Learn alongside people with the same goal.',
+        done: hasGroup,
+        actionLabel: hasGroup ? 'Open study groups' : 'Find a group',
+        actionPath: '/study-groups',
+      },
+      {
+        key: 'make_post',
+        label: 'Share what you are learning',
+        helper: 'Post a question or a win in the feed.',
+        done: hasPosted,
+        actionLabel: 'Open feed',
+        actionPath: '/feed',
+      },
+    ]
+
+    function checklistForAccountType(accountType) {
+      switch (accountType) {
+        case 'teacher':
+          return teacherChecklist
+        case 'other':
+          return selfLearnerChecklist
+        case 'student':
+        default:
+          return studentChecklist
+      }
+    }
+
+    const activationChecklist = checklistForAccountType(user.accountType)
+
     const completedCount = activationChecklist.filter((item) => item.done).length
     const nextItem = activationChecklist.find((item) => !item.done) || null
 
@@ -155,6 +339,7 @@ router.get('/summary', async (req, res) => {
       hero: {
         username: user.username,
         role: user.role,
+        accountType: user.accountType || 'student',
         createdAt: user.createdAt,
         avatarUrl: user.avatarUrl || null,
         email: user.email || null,
@@ -167,6 +352,7 @@ router.get('/summary', async (req, res) => {
       },
       courses: user.enrollments.map((enrollment) => enrollment.course),
       recentSheets,
+      topContributors,
       activation: {
         isNewUser,
         completedCount,
@@ -177,7 +363,7 @@ router.get('/summary', async (req, res) => {
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

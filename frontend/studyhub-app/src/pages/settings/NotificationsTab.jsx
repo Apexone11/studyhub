@@ -25,14 +25,23 @@ export default function NotificationsTab() {
   const { prefs, loading, saving, msg, loadError, toggle, save, retry } = usePreferences()
 
   if (loading) {
-    return <SectionCard title="Notifications"><div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div></SectionCard>
+    return (
+      <SectionCard title="Notifications">
+        <div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div>
+      </SectionCard>
+    )
   }
 
   if (!prefs) {
     return (
-      <SectionCard title="Notifications" subtitle="StudyHub could not load your notification preferences right now.">
+      <SectionCard
+        title="Notifications"
+        subtitle="StudyHub could not load your notification preferences right now."
+      >
         <MsgList msg={{ type: 'error', text: loadError || 'Could not load preferences.' }} />
-        <Button secondary onClick={retry}>Retry</Button>
+        <Button secondary onClick={retry}>
+          Retry
+        </Button>
       </SectionCard>
     )
   }
@@ -78,7 +87,10 @@ export default function NotificationsTab() {
         />
       </SectionCard>
 
-      <SectionCard title="In-App Notifications" subtitle="Control which routine alerts appear in the StudyHub inbox.">
+      <SectionCard
+        title="In-App Notifications"
+        subtitle="Control which routine alerts appear in the StudyHub inbox."
+      >
         <ToggleRow
           label="Activity inbox"
           description="Show routine activity alerts in the bell menu and unread badge"
@@ -122,9 +134,13 @@ export default function NotificationsTab() {
         />
       </SectionCard>
 
-      <SectionCard title="Essential Account Alerts" subtitle="These stay enabled so you do not miss account-critical issues.">
+      <SectionCard
+        title="Essential Account Alerts"
+        subtitle="These stay enabled so you do not miss account-critical issues."
+      >
         <Message tone="info">
-          Moderation actions, billing problems, legal acceptance reminders, and other account-safety alerts still appear even if you turn off routine activity notifications above.
+          Moderation actions, billing problems, legal acceptance reminders, and other account-safety
+          alerts still appear even if you turn off routine activity notifications above.
         </Message>
       </SectionCard>
 

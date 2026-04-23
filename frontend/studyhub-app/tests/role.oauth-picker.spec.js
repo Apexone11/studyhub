@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * Role OAuth picker E2E (docs/roles-and-permissions-plan.md §12.4).
+ * Role OAuth picker E2E (docs/internal/roles-and-permissions-plan.md §12.4).
  * The Google button itself is rendered by @react-oauth/google, which is
  * painful to drive headlessly. Instead we simulate the backend response by
  * seeding sessionStorage (the same shape the `needs_role` handler writes)

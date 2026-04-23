@@ -147,7 +147,7 @@ export function identifyAuthenticatedUser(user) {
 
   const userId = user.id !== undefined && user.id !== null ? String(user.id) : undefined
   const username = typeof user.username === 'string' ? user.username : undefined
-  // Role-aware triage (docs/roles-and-permissions-plan.md §10.3/§10.4). Both
+  // Role-aware triage (docs/internal/roles-and-permissions-plan.md §10.3/§10.4). Both
   // axes are attached so funnels and Sentry searches can slice by either.
   const accountType = typeof user.accountType === 'string' ? user.accountType : undefined
   const role = typeof user.role === 'string' ? user.role : undefined

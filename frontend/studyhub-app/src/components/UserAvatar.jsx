@@ -58,9 +58,12 @@ export default function UserAvatar({
 
   const initials = (username || '?').slice(0, 2).toUpperCase()
 
-  const resolvedUrl = avatarUrl && !imgError
-    ? (avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`)
-    : null
+  const resolvedUrl =
+    avatarUrl && !imgError
+      ? avatarUrl.startsWith('http')
+        ? avatarUrl
+        : `${API}${avatarUrl}`
+      : null
 
   const isAdmin = role === 'admin'
   const hasPro = isPlan(plan)
@@ -120,7 +123,9 @@ export default function UserAvatar({
       {/* Pro / Donor badge overlay */}
       {showBadge && (
         <span
-          aria-label={hasPro && hasDonor ? 'Pro Subscriber and Donor' : hasPro ? 'Pro Subscriber' : 'Donor'}
+          aria-label={
+            hasPro && hasDonor ? 'Pro Subscriber and Donor' : hasPro ? 'Pro Subscriber' : 'Donor'
+          }
           style={{
             position: 'absolute',
             bottom: -2,
@@ -138,12 +143,22 @@ export default function UserAvatar({
         >
           {hasPro ? (
             // Crown icon for Pro
-            <svg width={badgeSize * 0.55} height={badgeSize * 0.55} viewBox="0 0 16 16" fill="#ffffff">
+            <svg
+              width={badgeSize * 0.55}
+              height={badgeSize * 0.55}
+              viewBox="0 0 16 16"
+              fill="#ffffff"
+            >
               <path d="M2 12h12v1.5H2V12zM3 11l-1-7 3.5 3L8 3l2.5 4L14 4l-1 7H3z" />
             </svg>
           ) : (
             // Heart icon for Donor
-            <svg width={badgeSize * 0.55} height={badgeSize * 0.55} viewBox="0 0 16 16" fill="#ffffff">
+            <svg
+              width={badgeSize * 0.55}
+              height={badgeSize * 0.55}
+              viewBox="0 0 16 16"
+              fill="#ffffff"
+            >
               <path d="M8 14s-5.5-3.5-5.5-7.5C2.5 4 4 2.5 5.5 2.5c1 0 2 .5 2.5 1.5.5-1 1.5-1.5 2.5-1.5C12 2.5 13.5 4 13.5 6.5 13.5 10.5 8 14 8 14z" />
             </svg>
           )}

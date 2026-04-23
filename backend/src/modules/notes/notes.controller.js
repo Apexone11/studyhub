@@ -79,7 +79,7 @@ async function getNoteById(req, res) {
   req._timingStart = Date.now()
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
 
   try {
     const mainSection = await timedSection('note-main', () =>
@@ -87,18 +87,18 @@ async function getNoteById(req, res) {
     )
     const note = mainSection.data
 
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
 
     // Notes require authentication to view
     if (!req.user) {
-      return res.status(401).json({ error: 'Sign in to view notes.' })
+      return sendError(res, 401, 'Sign in to view notes.', ERROR_CODES.UNAUTHORIZED)
     }
 
     const isOwner = req.user.userId === note.userId || req.user.role === 'admin'
 
     // Private notes: only owner/admin can see
     if (note.private && !isOwner) {
-      return res.status(404).json({ error: 'Note not found.' })
+      return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
     }
 
     // Fetch social data in parallel: star status, reaction counts, star count
@@ -131,7 +131,7 @@ async function getNoteById(req, res) {
     )
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -209,7 +209,7 @@ async function listNotes(req, res) {
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -220,13 +220,18 @@ async function createNote(req, res) {
   const { title, content, courseId, private: priv } = req.body || {}
   const trimmedTitle = typeof title === 'string' ? title.trim() : ''
 
-  if (!trimmedTitle) return res.status(400).json({ error: 'Title is required.' })
+  if (!trimmedTitle) return sendError(res, 400, 'Title is required.', ERROR_CODES.BAD_REQUEST)
   if (trimmedTitle.length > 120)
-    return res.status(400).json({ error: 'Title must be 120 characters or fewer.' })
+    return sendError(res, 400, 'Title must be 120 characters or fewer.', ERROR_CODES.BAD_REQUEST)
 
   const contentStr = typeof content === 'string' ? content : ''
   if (contentStr.length > 50000)
-    return res.status(400).json({ error: 'Content must be 50000 characters or fewer.' })
+    return sendError(
+      res,
+      400,
+      'Content must be 50000 characters or fewer.',
+      ERROR_CODES.BAD_REQUEST,
+    )
 
   try {
     const moderationStatus = priv === false ? getInitialModerationStatus(req.user) : 'clean' // Private notes don't need moderation hold
@@ -259,7 +264,7 @@ async function createNote(req, res) {
     res.status(201).json(serializeNote(note, { _starred: false }))
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -274,7 +279,7 @@ async function createNote(req, res) {
 async function updateNote(req, res) {
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
 
   const body = req.body || {}
   // Hardened save path is now the ONLY path. Legacy clients that omit
@@ -317,9 +322,9 @@ async function updateNoteHardened(req, res, noteId, body) {
   // Title validation (hardened path is now the only path)
   if (title !== undefined) {
     const trimmedTitle = typeof title === 'string' ? title.trim() : ''
-    if (!trimmedTitle) return res.status(400).json({ error: 'Title cannot be empty.' })
+    if (!trimmedTitle) return sendError(res, 400, 'Title cannot be empty.', ERROR_CODES.BAD_REQUEST)
     if (trimmedTitle.length > 120)
-      return res.status(400).json({ error: 'Title must be 120 characters or fewer.' })
+      return sendError(res, 400, 'Title must be 120 characters or fewer.', ERROR_CODES.BAD_REQUEST)
     title = trimmedTitle
   }
 
@@ -350,9 +355,7 @@ async function updateNoteHardened(req, res, noteId, body) {
     }
 
     if (isRevisionConflict(baseRevision ?? 0, note.revision)) {
-      return res.status(409).json({
-        code: ERROR_CODES.NOTE_REVISION_CONFLICT,
-        error: 'Note revision conflict',
+      return sendError(res, 409, 'Note revision conflict', ERROR_CODES.NOTE_REVISION_CONFLICT, {
         current: {
           revision: note.revision,
           title: note.title,
@@ -450,7 +453,7 @@ async function updateNoteHardened(req, res, noteId, body) {
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    return res.status(500).json({ error: 'Server error.' })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -471,10 +474,10 @@ async function prunePastFiftyAuto(noteId) {
 async function deleteNote(req, res) {
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
     if (
       !assertOwnerOrAdmin({
         res,
@@ -522,7 +525,7 @@ async function deleteNote(req, res) {
     res.json({ message: 'Note deleted.' })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -533,7 +536,7 @@ async function listNoteComments(req, res) {
   req._timingStart = Date.now()
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
 
   const limit = Math.min(100, Math.max(1, parseInt(req.query.limit, 10) || 50))
   const offset = Math.min(10000, Math.max(0, parseInt(req.query.offset, 10) || 0))
@@ -546,9 +549,9 @@ async function listNoteComments(req, res) {
       }),
     )
     const note = noteSection.data
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
     if (!canReadNote(note, req.user || null))
-      return res.status(404).json({ error: 'Note not found.' })
+      return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
 
     const commentWhere = { noteId, parentId: null }
 
@@ -635,7 +638,7 @@ async function listNoteComments(req, res) {
     res.json({ comments, total: countSection.data, limit, offset })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -645,7 +648,7 @@ async function listNoteComments(req, res) {
 async function createNoteComment(req, res) {
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
 
   const rawContent = typeof req.body.content === 'string' ? req.body.content.trim() : ''
   // Strip HTML tags from comments — comments are plain text only
@@ -660,9 +663,9 @@ async function createNoteComment(req, res) {
   const { attachments } = attachmentValidation
 
   if (!content && attachments.length === 0)
-    return res.status(400).json({ error: 'Comment cannot be empty.' })
+    return sendError(res, 400, 'Comment cannot be empty.', ERROR_CODES.BAD_REQUEST)
   if (content.length > 500)
-    return res.status(400).json({ error: 'Comment must be 500 characters or fewer.' })
+    return sendError(res, 400, 'Comment must be 500 characters or fewer.', ERROR_CODES.BAD_REQUEST)
 
   // Optional inline anchor fields — validated and context-enriched (only for top-level comments)
   const anchor = parentId ? null : validateAnchorInput(req.body)
@@ -672,8 +675,9 @@ async function createNoteComment(req, res) {
       where: { id: noteId },
       select: { id: true, private: true, userId: true, title: true, content: true },
     })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!canReadNote(note, req.user)) return res.status(404).json({ error: 'Note not found.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    if (!canReadNote(note, req.user))
+      return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
 
     // Validate parentId if provided (max 1 level deep)
     if (parentId) {
@@ -681,11 +685,22 @@ async function createNoteComment(req, res) {
         where: { id: parentId },
         select: { id: true, noteId: true, parentId: true },
       })
-      if (!parentComment) return res.status(400).json({ error: 'Parent comment not found.' })
+      if (!parentComment)
+        return sendError(res, 400, 'Parent comment not found.', ERROR_CODES.BAD_REQUEST)
       if (parentComment.noteId !== noteId)
-        return res.status(400).json({ error: 'Parent comment belongs to different note.' })
+        return sendError(
+          res,
+          400,
+          'Parent comment belongs to different note.',
+          ERROR_CODES.BAD_REQUEST,
+        )
       if (parentComment.parentId !== null)
-        return res.status(400).json({ error: 'Cannot reply to replies (max 1 level deep).' })
+        return sendError(
+          res,
+          400,
+          'Cannot reply to replies (max 1 level deep).',
+          ERROR_CODES.BAD_REQUEST,
+        )
     }
 
     // Build surrounding context for anchor re-matching after edits (only for top-level comments)
@@ -775,7 +790,7 @@ async function createNoteComment(req, res) {
     res.status(201).json(comment)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -876,9 +891,9 @@ async function deleteNoteComment(req, res) {
   const noteId = parseInt(req.params.id, 10)
   const commentId = parseInt(req.params.commentId, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
   if (!Number.isInteger(commentId) || commentId < 1)
-    return res.status(400).json({ error: 'Invalid comment id.' })
+    return sendError(res, 400, 'Invalid comment id.', ERROR_CODES.BAD_REQUEST)
 
   try {
     const comment = await prisma.noteComment.findUnique({
@@ -886,20 +901,21 @@ async function deleteNoteComment(req, res) {
       include: { note: { select: { id: true, userId: true } } },
     })
     if (!comment || comment.noteId !== noteId)
-      return res.status(404).json({ error: 'Comment not found.' })
+      return sendError(res, 404, 'Comment not found.', ERROR_CODES.NOT_FOUND)
 
     // Comment author, note owner, or admin can delete
     const canDelete =
       req.user.userId === comment.userId ||
       req.user.userId === comment.note.userId ||
       req.user.role === 'admin'
-    if (!canDelete) return res.status(403).json({ error: 'Not authorized to delete this comment.' })
+    if (!canDelete)
+      return sendError(res, 403, 'Not authorized to delete this comment.', ERROR_CODES.FORBIDDEN)
 
     await prisma.noteComment.delete({ where: { id: commentId } })
     res.json({ message: 'Comment deleted.' })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -909,11 +925,11 @@ async function deleteNoteComment(req, res) {
 async function createNoteVersion(req, res) {
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
 
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
     if (
       !assertOwnerOrAdmin({
         res,
@@ -945,7 +961,7 @@ async function createNoteVersion(req, res) {
     res.status(201).json(version)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -955,14 +971,14 @@ async function createNoteVersion(req, res) {
 async function listNoteVersions(req, res) {
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
 
   try {
     const note = await prisma.note.findUnique({
       where: { id: noteId },
       select: { id: true, userId: true },
     })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
     if (
       !assertOwnerOrAdmin({
         res,
@@ -994,7 +1010,7 @@ async function listNoteVersions(req, res) {
     res.json(versions)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1005,16 +1021,16 @@ async function getNoteVersion(req, res) {
   const noteId = parseInt(req.params.id, 10)
   const versionId = parseInt(req.params.versionId, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
   if (!Number.isInteger(versionId) || versionId < 1)
-    return res.status(400).json({ error: 'Invalid version id.' })
+    return sendError(res, 400, 'Invalid version id.', ERROR_CODES.BAD_REQUEST)
 
   try {
     const note = await prisma.note.findUnique({
       where: { id: noteId },
       select: { id: true, userId: true },
     })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
     if (
       !assertOwnerOrAdmin({
         res,
@@ -1029,12 +1045,12 @@ async function getNoteVersion(req, res) {
 
     const version = await prisma.noteVersion.findUnique({ where: { id: versionId } })
     if (!version || version.noteId !== noteId)
-      return res.status(404).json({ error: 'Version not found.' })
+      return sendError(res, 404, 'Version not found.', ERROR_CODES.NOT_FOUND)
 
     res.json(version)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1106,9 +1122,9 @@ async function restoreNoteVersion(req, res) {
   const noteId = parseInt(req.params.id, 10)
   const versionId = parseInt(req.params.versionId, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
   if (!Number.isInteger(versionId) || versionId < 1)
-    return res.status(400).json({ error: 'Invalid version id.' })
+    return sendError(res, 400, 'Invalid version id.', ERROR_CODES.BAD_REQUEST)
 
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
@@ -1164,7 +1180,7 @@ async function restoreNoteVersion(req, res) {
     return res.json({ note: updated, revision: updated.revision })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    return res.status(500).json({ error: 'Server error.' })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1174,15 +1190,16 @@ async function restoreNoteVersion(req, res) {
 async function starNote(req, res) {
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
 
   try {
     const note = await prisma.note.findUnique({
       where: { id: noteId },
       select: { id: true, private: true, userId: true },
     })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (!canReadNote(note, req.user)) return res.status(404).json({ error: 'Note not found.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    if (!canReadNote(note, req.user))
+      return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
 
     const existing = await prisma.noteStar.findUnique({
       where: { userId_noteId: { userId: req.user.userId, noteId } },
@@ -1193,7 +1210,7 @@ async function starNote(req, res) {
     res.json({ starred: true })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1203,14 +1220,14 @@ async function starNote(req, res) {
 async function unstarNote(req, res) {
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
 
   try {
     await prisma.noteStar.deleteMany({ where: { userId: req.user.userId, noteId } })
     res.json({ starred: false })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1220,14 +1237,14 @@ async function unstarNote(req, res) {
 async function toggleNotePin(req, res) {
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
 
   try {
     const note = await prisma.note.findUnique({
       where: { id: noteId },
       select: { id: true, userId: true, pinned: true },
     })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
     if (
       !assertOwnerOrAdmin({
         res,
@@ -1245,7 +1262,7 @@ async function toggleNotePin(req, res) {
     res.json({ pinned: updated.pinned })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1255,14 +1272,14 @@ async function toggleNotePin(req, res) {
 async function updateNoteTags(req, res) {
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
 
   try {
     const note = await prisma.note.findUnique({
       where: { id: noteId },
       select: { id: true, userId: true },
     })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
     if (
       !assertOwnerOrAdmin({
         res,
@@ -1292,7 +1309,7 @@ async function updateNoteTags(req, res) {
     res.json({ tags: JSON.parse(updated.tags) })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1302,7 +1319,7 @@ async function updateNoteTags(req, res) {
 async function uploadNoteImage(req, res) {
   const noteId = parseInt(req.params.id, 10)
   if (!Number.isInteger(noteId) || noteId < 1)
-    return res.status(400).json({ error: 'Invalid note id.' })
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
 
   if (!req.file) {
     return res
@@ -1315,7 +1332,7 @@ async function uploadNoteImage(req, res) {
       where: { id: noteId },
       select: { id: true, userId: true },
     })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
     if (
       !assertOwnerOrAdmin({
         res,
@@ -1333,7 +1350,7 @@ async function uploadNoteImage(req, res) {
     res.status(201).json({ url: imageUrl, markdown: `![image](${imageUrl})` })
   } catch (uploadErr) {
     captureError(uploadErr, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 

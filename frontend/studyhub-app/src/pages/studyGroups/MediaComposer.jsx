@@ -18,12 +18,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
-import {
-  IconUpload,
-  IconX,
-  IconInfoCircle,
-  IconCheck,
-} from '../../components/Icons'
+import { IconUpload, IconX, IconInfoCircle, IconCheck } from '../../components/Icons'
 import { uploadGroupMedia } from './groupMediaService'
 import useMediaQuota from './useMediaQuota'
 
@@ -47,12 +42,7 @@ function formatResetHint(resetsAt) {
   return 'resets in under an hour'
 }
 
-export default function MediaComposer({
-  groupId,
-  maxFiles = 4,
-  attachments,
-  onAttachmentsChange,
-}) {
+export default function MediaComposer({ groupId, maxFiles = 4, attachments, onAttachmentsChange }) {
   const { quota, refresh: refreshQuota, loading: quotaLoading } = useMediaQuota(groupId)
   const [dragging, setDragging] = useState(false)
   const [uploads, setUploads] = useState([]) // [{ id, name, progress, error }]
@@ -62,41 +52,52 @@ export default function MediaComposer({
   const isOverQuota = !quotaLoading && quota && !quota.unlimited && remaining <= 0
   const atMaxFiles = attachments.length >= maxFiles
 
-  const handleFiles = useCallback(async (files) => {
-    const list = Array.from(files || [])
-    if (list.length === 0) return
+  const handleFiles = useCallback(
+    async (files) => {
+      const list = Array.from(files || [])
+      if (list.length === 0) return
 
-    // Respect the maxFiles cap across the existing attachment list
-    const slotsLeft = Math.max(0, maxFiles - attachments.length)
-    const accepted = list.slice(0, slotsLeft)
-    if (accepted.length === 0) return
+      // Respect the maxFiles cap across the existing attachment list
+      const slotsLeft = Math.max(0, maxFiles - attachments.length)
+      const accepted = list.slice(0, slotsLeft)
+      if (accepted.length === 0) return
 
-    for (const file of accepted) {
-      const pendingId = `${Date.now()}-${file.name}`
-      setUploads((prev) => [...prev, { id: pendingId, name: file.name, progress: 0, error: '' }])
+      for (const file of accepted) {
+        const pendingId = `${Date.now()}-${file.name}`
+        setUploads((prev) => [...prev, { id: pendingId, name: file.name, progress: 0, error: '' }])
 
-      try {
-        const result = await uploadGroupMedia(groupId, file, {
-          onProgress: (p) => {
-            setUploads((prev) => prev.map((u) => (u.id === pendingId ? { ...u, progress: p } : u)))
-          },
-        })
-        setUploads((prev) => prev.filter((u) => u.id !== pendingId))
-        onAttachmentsChange([...attachments, result])
-        await refreshQuota()
-      } catch (error) {
-        const isQuotaError = error.status === 429
-        setUploads((prev) => prev.map((u) => (
-          u.id === pendingId
-            ? { ...u, progress: 1, error: isQuotaError ? 'Quota reached.' : (error.message || 'Upload failed.') }
-            : u
-        )))
-        if (isQuotaError) {
+        try {
+          const result = await uploadGroupMedia(groupId, file, {
+            onProgress: (p) => {
+              setUploads((prev) =>
+                prev.map((u) => (u.id === pendingId ? { ...u, progress: p } : u)),
+              )
+            },
+          })
+          setUploads((prev) => prev.filter((u) => u.id !== pendingId))
+          onAttachmentsChange([...attachments, result])
           await refreshQuota()
+        } catch (error) {
+          const isQuotaError = error.status === 429
+          setUploads((prev) =>
+            prev.map((u) =>
+              u.id === pendingId
+                ? {
+                    ...u,
+                    progress: 1,
+                    error: isQuotaError ? 'Quota reached.' : error.message || 'Upload failed.',
+                  }
+                : u,
+            ),
+          )
+          if (isQuotaError) {
+            await refreshQuota()
+          }
         }
       }
-    }
-  }, [groupId, attachments, maxFiles, onAttachmentsChange, refreshQuota])
+    },
+    [groupId, attachments, maxFiles, onAttachmentsChange, refreshQuota],
+  )
 
   // Paste handler so users can ctrl+v an image from clipboard.
   useEffect(() => {
@@ -136,14 +137,21 @@ export default function MediaComposer({
     <div style={wrapperStyle}>
       {/* Quota banner */}
       <div style={quotaBannerStyle(isOverQuota)}>
-        <IconInfoCircle size={13} style={{ color: 'var(--sh-muted)', flexShrink: 0 }} aria-hidden="true" />
+        <IconInfoCircle
+          size={13}
+          style={{ color: 'var(--sh-muted)', flexShrink: 0 }}
+          aria-hidden="true"
+        />
         {quotaLoading ? (
           <span>Loading media quota…</span>
         ) : quota?.unlimited ? (
           <span>Unlimited uploads (admin).</span>
         ) : quota ? (
           <span>
-            <strong>{quota.used}/{quota.quota}</strong> media this week · {formatResetHint(quota.resetsAt)}
+            <strong>
+              {quota.used}/{quota.quota}
+            </strong>{' '}
+            media this week · {formatResetHint(quota.resetsAt)}
             {isOverQuota ? (
               <>
                 {' · '}
@@ -182,7 +190,11 @@ export default function MediaComposer({
         onDrop={handleDrop}
         style={dropZoneStyle(dragging, isOverQuota || atMaxFiles)}
       >
-        <IconUpload size={20} style={{ color: 'var(--sh-brand)', marginBottom: 6 }} aria-hidden="true" />
+        <IconUpload
+          size={20}
+          style={{ color: 'var(--sh-brand)', marginBottom: 6 }}
+          aria-hidden="true"
+        />
         <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)' }}>
           {atMaxFiles
             ? `Max ${maxFiles} attachments reached`
@@ -213,7 +225,9 @@ export default function MediaComposer({
             <div key={item.id} style={uploadRowStyle}>
               <span style={{ flex: 1, fontSize: 12, color: 'var(--sh-text)' }}>{item.name}</span>
               {item.error ? (
-                <span style={{ fontSize: 11, color: 'var(--sh-danger)', fontWeight: 700 }}>{item.error}</span>
+                <span style={{ fontSize: 11, color: 'var(--sh-danger)', fontWeight: 700 }}>
+                  {item.error}
+                </span>
               ) : (
                 <div style={progressTrackStyle}>
                   <div style={progressFillStyle(item.progress)} />

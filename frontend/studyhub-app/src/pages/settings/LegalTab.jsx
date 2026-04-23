@@ -61,7 +61,9 @@ export default function LegalTab() {
       .finally(() => {
         if (active) setLoading(false)
       })
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [user?.id])
 
   const isTermsCurrent = Boolean(termsStatus && !termsStatus.needsAcceptance)
@@ -70,7 +72,6 @@ export default function LegalTab() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
-
       {/* Section 1: Terms Acceptance Status */}
       <SectionCard title="Terms Acceptance">
         {loading ? (
@@ -80,30 +81,41 @@ export default function LegalTab() {
         ) : error ? (
           <Message tone="error">{error}</Message>
         ) : isTermsCurrent ? (
-          <div style={{
-            padding: '12px 16px',
-            borderRadius: 10,
-            background: 'var(--sh-success-bg)',
-            border: '1px solid var(--sh-success-border)',
-            color: 'var(--sh-success-text)',
-            fontSize: 13,
-            lineHeight: 1.6,
-          }}>
-            <strong>Up to date</strong> -- Your required legal acceptance is current (version {termsStatus.acceptedVersion || CURRENT_LEGAL_VERSION}). Last confirmed {formatDateTime(termsStatus.lastAcceptedAt || termsStatus.acceptedAt)}.
+          <div
+            style={{
+              padding: '12px 16px',
+              borderRadius: 10,
+              background: 'var(--sh-success-bg)',
+              border: '1px solid var(--sh-success-border)',
+              color: 'var(--sh-success-text)',
+              fontSize: 13,
+              lineHeight: 1.6,
+            }}
+          >
+            <strong>Up to date</strong> -- Your required legal acceptance is current (version{' '}
+            {termsStatus.acceptedVersion || CURRENT_LEGAL_VERSION}). Last confirmed{' '}
+            {formatDateTime(termsStatus.lastAcceptedAt || termsStatus.acceptedAt)}.
           </div>
         ) : (
           <>
-            <div style={{
-              padding: '12px 16px',
-              borderRadius: 10,
-              background: 'var(--sh-warning-bg)',
-              border: '1px solid var(--sh-warning-border)',
-              color: 'var(--sh-warning-text)',
-              fontSize: 13,
-              lineHeight: 1.6,
-              marginBottom: 12,
-            }}>
-              <strong>Update required</strong> -- Review and accept the latest required legal documents to keep using StudyHub. Missing: {missingRequiredDocuments.map((slug) => LEGAL_DOCUMENT_LABELS[slug] || slug).join(', ')}.
+            <div
+              style={{
+                padding: '12px 16px',
+                borderRadius: 10,
+                background: 'var(--sh-warning-bg)',
+                border: '1px solid var(--sh-warning-border)',
+                color: 'var(--sh-warning-text)',
+                fontSize: 13,
+                lineHeight: 1.6,
+                marginBottom: 12,
+              }}
+            >
+              <strong>Update required</strong> -- Review and accept the latest required legal
+              documents to keep using StudyHub. Missing:{' '}
+              {missingRequiredDocuments
+                .map((slug) => LEGAL_DOCUMENT_LABELS[slug] || slug)
+                .join(', ')}
+              .
             </div>
             <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
               <Link to="/settings?tab=legal" style={{ textDecoration: 'none' }}>
@@ -120,7 +132,9 @@ export default function LegalTab() {
                     await refreshSession()
                   } catch (nextError) {
                     setError(nextError.message || 'Could not save your legal acceptance.')
-                  } finally { setAccepting(false) }
+                  } finally {
+                    setAccepting(false)
+                  }
                 }}
               >
                 {accepting ? 'Accepting...' : 'Accept Current Documents'}
@@ -131,12 +145,17 @@ export default function LegalTab() {
       </SectionCard>
 
       {/* Section 2: Legal Documents */}
-      <SectionCard title="Legal Documents" subtitle="Review all of our legal policies and guidelines.">
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: 12,
-        }}>
+      <SectionCard
+        title="Legal Documents"
+        subtitle="Review all of our legal policies and guidelines."
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            gap: 12,
+          }}
+        >
           {currentDocuments.map((doc) => (
             <div
               key={doc.slug}
@@ -150,21 +169,44 @@ export default function LegalTab() {
                 gap: 8,
               }}
             >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  gap: 10,
+                }}
+              >
                 <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>
                   {doc.title}
                 </div>
-                <span style={{
-                  padding: '4px 8px',
-                  borderRadius: 999,
-                  fontSize: 11,
-                  fontWeight: 800,
-                  background: doc.requiredAtSignup && !doc.isAccepted ? 'var(--sh-warning-bg)' : doc.isAccepted ? 'var(--sh-success-bg)' : 'var(--sh-soft)',
-                  border: `1px solid ${doc.requiredAtSignup && !doc.isAccepted ? 'var(--sh-warning-border)' : doc.isAccepted ? 'var(--sh-success-border)' : 'var(--sh-border)'}`,
-                  color: doc.requiredAtSignup && !doc.isAccepted ? 'var(--sh-warning-text)' : doc.isAccepted ? 'var(--sh-success-text)' : 'var(--sh-muted)',
-                  whiteSpace: 'nowrap',
-                }}>
-                  {doc.requiredAtSignup && !doc.isAccepted ? 'Required' : doc.isAccepted ? 'Accepted' : 'Optional'}
+                <span
+                  style={{
+                    padding: '4px 8px',
+                    borderRadius: 999,
+                    fontSize: 11,
+                    fontWeight: 800,
+                    background:
+                      doc.requiredAtSignup && !doc.isAccepted
+                        ? 'var(--sh-warning-bg)'
+                        : doc.isAccepted
+                          ? 'var(--sh-success-bg)'
+                          : 'var(--sh-soft)',
+                    border: `1px solid ${doc.requiredAtSignup && !doc.isAccepted ? 'var(--sh-warning-border)' : doc.isAccepted ? 'var(--sh-success-border)' : 'var(--sh-border)'}`,
+                    color:
+                      doc.requiredAtSignup && !doc.isAccepted
+                        ? 'var(--sh-warning-text)'
+                        : doc.isAccepted
+                          ? 'var(--sh-success-text)'
+                          : 'var(--sh-muted)',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
+                  {doc.requiredAtSignup && !doc.isAccepted
+                    ? 'Required'
+                    : doc.isAccepted
+                      ? 'Accepted'
+                      : 'Optional'}
                 </span>
               </div>
               <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5, flex: 1 }}>
@@ -174,7 +216,10 @@ export default function LegalTab() {
                 {doc.updatedLabel}
                 {doc.acceptedAt ? ` · Accepted ${formatDateTime(doc.acceptedAt)}` : ''}
               </div>
-              <Link to={LEGAL_DOC_ROUTES[doc.slug] || '/terms'} style={{ textDecoration: 'none', marginTop: 4 }}>
+              <Link
+                to={LEGAL_DOC_ROUTES[doc.slug] || '/terms'}
+                style={{ textDecoration: 'none', marginTop: 4 }}
+              >
                 <Button secondary style={{ fontSize: 12, padding: '7px 14px', width: '100%' }}>
                   View Document
                 </Button>
@@ -185,22 +230,29 @@ export default function LegalTab() {
       </SectionCard>
 
       {/* Section 3: Privacy Controls */}
-      <SectionCard title="Privacy Controls" subtitle="Manage your consent preferences and personal data.">
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: 12,
-        }}>
+      <SectionCard
+        title="Privacy Controls"
+        subtitle="Manage your consent preferences and personal data."
+      >
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
+            gap: 12,
+          }}
+        >
           {/* Consent Preferences */}
-          <div style={{
-            background: 'var(--sh-bg)',
-            border: '1px solid var(--sh-border)',
-            borderRadius: 12,
-            padding: 16,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}>
+          <div
+            style={{
+              background: 'var(--sh-bg)',
+              border: '1px solid var(--sh-border)',
+              borderRadius: 12,
+              padding: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>
               Consent Preferences
             </div>
@@ -232,15 +284,17 @@ export default function LegalTab() {
           </div>
 
           {/* Data Request */}
-          <div style={{
-            background: 'var(--sh-bg)',
-            border: '1px solid var(--sh-border)',
-            borderRadius: 12,
-            padding: 16,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: 8,
-          }}>
+          <div
+            style={{
+              background: 'var(--sh-bg)',
+              border: '1px solid var(--sh-border)',
+              borderRadius: 12,
+              padding: 16,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
             <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>
               Data Request
             </div>
@@ -264,18 +318,31 @@ export default function LegalTab() {
             { label: 'General Legal Questions', email: LEGAL_EMAILS.legal },
             { label: 'DMCA & Copyright Notices', email: LEGAL_EMAILS.dmca },
           ].map(({ label, email }) => (
-            <div key={email} style={{
-              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              padding: '12px 16px', borderRadius: 10,
-              background: 'var(--sh-bg)', border: '1px solid var(--sh-border)',
-              flexWrap: 'wrap', gap: 8,
-            }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-text)' }}>{label}</span>
+            <div
+              key={email}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                padding: '12px 16px',
+                borderRadius: 10,
+                background: 'var(--sh-bg)',
+                border: '1px solid var(--sh-border)',
+                flexWrap: 'wrap',
+                gap: 8,
+              }}
+            >
+              <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-text)' }}>
+                {label}
+              </span>
               <a
                 href={`mailto:${email}`}
                 style={{
-                  fontSize: 13, fontWeight: 700, color: 'var(--sh-brand)',
-                  textDecoration: 'none', fontFamily: FONT,
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: 'var(--sh-brand)',
+                  textDecoration: 'none',
+                  fontFamily: FONT,
                 }}
               >
                 {email}

@@ -47,7 +47,9 @@ export default function GroupBackgroundPicker({
   // Escape closes the modal.
   useEffect(() => {
     if (!open) return
-    const handler = (event) => { if (event.key === 'Escape') onClose?.() }
+    const handler = (event) => {
+      if (event.key === 'Escape') onClose?.()
+    }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose])
@@ -107,7 +109,9 @@ export default function GroupBackgroundPicker({
         onClick={(event) => event.stopPropagation()}
       >
         <div style={headerStyle}>
-          <h2 id="bg-picker-title" style={titleStyle}>Group background</h2>
+          <h2 id="bg-picker-title" style={titleStyle}>
+            Group background
+          </h2>
           <button
             type="button"
             onClick={onClose}
@@ -121,14 +125,12 @@ export default function GroupBackgroundPicker({
         <div style={hintStyle}>
           <IconInfoCircle size={13} style={{ flexShrink: 0 }} aria-hidden="true" />
           <span>
-            Upload a banner image to customize the group header. Uploads count
-            toward your weekly media quota.
+            Upload a banner image to customize the group header. Uploads count toward your weekly
+            media quota.
           </span>
         </div>
 
-        {error ? (
-          <div style={errorStyle}>{error}</div>
-        ) : null}
+        {error ? <div style={errorStyle}>{error}</div> : null}
 
         {/* Current/pending preview */}
         <div style={previewStyle}>
@@ -136,7 +138,13 @@ export default function GroupBackgroundPicker({
             <img
               src={pendingUrl}
               alt="Group background preview"
-              style={{ width: '100%', height: 160, objectFit: 'cover', display: 'block', borderRadius: 10 }}
+              style={{
+                width: '100%',
+                height: 160,
+                objectFit: 'cover',
+                display: 'block',
+                borderRadius: 10,
+              }}
             />
           ) : (
             <div style={emptyPreviewStyle}>
@@ -148,7 +156,9 @@ export default function GroupBackgroundPicker({
         {/* Upload button */}
         <label style={uploadLabelStyle(uploading)}>
           <IconUpload size={14} aria-hidden="true" />
-          <span>{uploading ? `Uploading… ${Math.round(uploadProgress * 100)}%` : 'Upload image'}</span>
+          <span>
+            {uploading ? `Uploading… ${Math.round(uploadProgress * 100)}%` : 'Upload image'}
+          </span>
           <input
             type="file"
             accept="image/*"
@@ -181,19 +191,11 @@ export default function GroupBackgroundPicker({
 
         <div style={actionsStyle}>
           {pendingUrl ? (
-            <button
-              type="button"
-              onClick={handleClear}
-              style={secondaryBtnStyle}
-            >
+            <button type="button" onClick={handleClear} style={secondaryBtnStyle}>
               Clear
             </button>
           ) : null}
-          <button
-            type="button"
-            onClick={onClose}
-            style={secondaryBtnStyle}
-          >
+          <button type="button" onClick={onClose} style={secondaryBtnStyle}>
             Cancel
           </button>
           <button

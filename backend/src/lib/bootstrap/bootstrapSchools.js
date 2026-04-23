@@ -17,7 +17,7 @@ async function ensureSchools(prisma) {
   })
 
   const schoolsByShort = new Map(
-    existingSchools.map((school) => [school.short.toUpperCase(), school])
+    existingSchools.map((school) => [school.short.toUpperCase(), school]),
   )
 
   let schoolsCreated = 0

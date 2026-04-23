@@ -5,33 +5,33 @@
 // Maps route patterns → { crumbs, tabs, backTo }
 // Pages can override these via props.
 export const ROUTE_CONFIG = {
-  '/feed':          { crumbs: [] },
-  '/sheets':        {
+  '/feed': { crumbs: [] },
+  '/sheets': {
     crumbs: [{ label: 'Study Sheets', to: '/sheets' }],
     tabs: [
-      { label: 'Browse',    to: '/sheets' },
+      { label: 'Browse', to: '/sheets' },
       { label: 'My Sheets', to: '/sheets?mine=1' },
-      { label: 'Starred',   to: '/sheets?starred=1' },
+      { label: 'Starred', to: '/sheets?starred=1' },
     ],
     backTo: '/feed',
   },
   '/sheets/upload': {
     crumbs: [
       { label: 'Study Sheets', to: '/sheets' },
-      { label: 'New Sheet',    to: null },
+      { label: 'New Sheet', to: null },
     ],
     backTo: '/sheets',
   },
-  '/tests':         { crumbs: [{ label: 'Practice Tests',  to: '/tests' }],         backTo: '/feed' },
-  '/notes':         { crumbs: [{ label: 'My Notes',        to: '/notes' }],         backTo: '/feed' },
-  '/messages':      { crumbs: [{ label: 'Messages',        to: '/messages' }],      backTo: '/feed' },
-  '/study-groups':  { crumbs: [{ label: 'Study Groups',    to: '/study-groups' }],  backTo: '/feed' },
-  '/announcements': { crumbs: [{ label: 'Announcements',   to: '/announcements' }], backTo: '/feed' },
-  '/submit':        { crumbs: [{ label: 'Submit Request',  to: '/submit' }],         backTo: '/feed' },
-  '/my-courses':    { crumbs: [{ label: 'My Courses',      to: '/my-courses' }],     backTo: '/feed' },
-  '/admin':         { crumbs: [{ label: 'Admin',           to: '/admin' }],          backTo: '/feed' },
-  '/dashboard':     { crumbs: [{ label: 'My Profile',      to: '/dashboard' }],      backTo: '/feed' },
-  '/users':         { crumbs: [{ label: 'Profile',          to: null }],              backTo: '/feed' },
+  '/tests': { crumbs: [{ label: 'Practice Tests', to: '/tests' }], backTo: '/feed' },
+  '/notes': { crumbs: [{ label: 'My Notes', to: '/notes' }], backTo: '/feed' },
+  '/messages': { crumbs: [{ label: 'Messages', to: '/messages' }], backTo: '/feed' },
+  '/study-groups': { crumbs: [{ label: 'Study Groups', to: '/study-groups' }], backTo: '/feed' },
+  '/announcements': { crumbs: [{ label: 'Announcements', to: '/announcements' }], backTo: '/feed' },
+  '/submit': { crumbs: [{ label: 'Submit Request', to: '/submit' }], backTo: '/feed' },
+  '/my-courses': { crumbs: [{ label: 'My Courses', to: '/my-courses' }], backTo: '/feed' },
+  '/admin': { crumbs: [{ label: 'Admin', to: '/admin' }], backTo: '/feed' },
+  '/dashboard': { crumbs: [{ label: 'My Profile', to: '/dashboard' }], backTo: '/feed' },
+  '/users': { crumbs: [{ label: 'Profile', to: null }], backTo: '/feed' },
 }
 
 export function formatRelativeTime(iso, nowMs) {
@@ -191,5 +191,5 @@ export const S = {
 
 export function handleIconHover(e, enter) {
   e.currentTarget.style.background = enter ? 'var(--sh-nav-search-bg)' : 'transparent'
-  e.currentTarget.style.color      = enter ? 'var(--sh-nav-accent)' : 'var(--sh-nav-muted)'
+  e.currentTarget.style.color = enter ? 'var(--sh-nav-accent)' : 'var(--sh-nav-muted)'
 }

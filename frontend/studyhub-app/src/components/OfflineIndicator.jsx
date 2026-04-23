@@ -63,9 +63,7 @@ export default function OfflineIndicator() {
         backgroundColor: isOffline
           ? 'var(--sh-warning-bg, #fef3c7)'
           : 'var(--sh-success-bg, #d1fae5)',
-        color: isOffline
-          ? 'var(--sh-warning-text, #92400e)'
-          : 'var(--sh-success-text, #065f46)',
+        color: isOffline ? 'var(--sh-warning-text, #92400e)' : 'var(--sh-success-text, #065f46)',
         border: isOffline
           ? '1px solid var(--sh-warning-border, #fbbf24)'
           : '1px solid var(--sh-success-border, #34d399)',
@@ -73,7 +71,16 @@ export default function OfflineIndicator() {
     >
       {isOffline ? (
         <>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <line x1="1" y1="1" x2="23" y2="23" />
             <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55" />
             <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39" />
@@ -86,7 +93,16 @@ export default function OfflineIndicator() {
         </>
       ) : (
         <>
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
             <polyline points="22 4 12 14.01 9 11.01" />
           </svg>

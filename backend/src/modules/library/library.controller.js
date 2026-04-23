@@ -7,10 +7,7 @@
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { searchBooks, getBookDetail, syncPopularBooksToDB } = require('./library.service')
-const {
-  MAX_SHELVES_PER_USER,
-  MAX_BOOKMARKS_PER_USER_FREE,
-} = require('./library.constants')
+const { MAX_SHELVES_PER_USER, MAX_BOOKMARKS_PER_USER_FREE } = require('./library.constants')
 const { getUserPlan, isPro } = require('../../lib/getUserPlan')
 
 const SHELF_VISIBILITY = new Set(['private', 'profile'])

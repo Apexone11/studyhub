@@ -36,8 +36,16 @@ const service = require('./payments.service')
 const prisma = require('../../lib/prisma')
 const { getUserPlan, isPro } = require('../../lib/getUserPlan')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 
 const router = express.Router()
+
+// Defense-in-depth Origin header enforcement for payment POST routes.
+// The global CSRF guard bails when neither Origin nor Referer is present;
+// payments are the highest-value target, so we require the header and
+// enforce it against the trusted-origin allowlist. Webhook is exempt —
+// it uses Stripe signature verification and is called server-to-server.
+const requireTrustedOrigin = originAllowlist()
 
 // ── Auth middleware ───────────────────────────────────────────────────────
 
@@ -62,108 +70,120 @@ function escapeCsvValue(value) {
 
 // ── POST /checkout/subscription ──────────────────────────────────────────
 
-router.post('/checkout/subscription', paymentCheckoutLimiter, requireAuth, async (req, res) => {
-  try {
-    const { plan } = req.body
-    if (!plan || !['pro_monthly', 'pro_yearly'].includes(plan)) {
-      return sendError(
-        res,
-        400,
-        'Invalid plan. Must be pro_monthly or pro_yearly.',
-        ERROR_CODES.VALIDATION,
-      )
-    }
+router.post(
+  '/checkout/subscription',
+  requireTrustedOrigin,
+  paymentCheckoutLimiter,
+  requireAuth,
+  async (req, res) => {
+    try {
+      const { plan } = req.body
+      if (!plan || !['pro_monthly', 'pro_yearly'].includes(plan)) {
+        return sendError(
+          res,
+          400,
+          'Invalid plan. Must be pro_monthly or pro_yearly.',
+          ERROR_CODES.VALIDATION,
+        )
+      }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    const successUrl = `${frontendUrl}/settings?tab=subscription&payment=success&session_id={CHECKOUT_SESSION_ID}`
-    const cancelUrl = `${frontendUrl}/pricing?payment=canceled`
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+      const successUrl = `${frontendUrl}/settings?tab=subscription&payment=success&session_id={CHECKOUT_SESSION_ID}`
+      const cancelUrl = `${frontendUrl}/pricing?payment=canceled`
 
-    // Fetch email from DB (auth middleware doesn't include email in req.user)
-    const dbUser = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: { email: true, username: true },
-    })
-    const user = {
-      id: req.user.userId,
-      email: dbUser?.email || '',
-      username: dbUser?.username || req.user.username,
-    }
-    const session = await service.createSubscriptionCheckout(user, plan, successUrl, cancelUrl)
-
-    res.json({ url: session.url, sessionId: session.id })
-  } catch (error) {
-    captureError(error, { context: 'checkout.subscription' })
-    log.error({ err: error }, 'Failed to create subscription checkout')
-    const msg =
-      error.message && error.message.includes('not configured')
-        ? 'Payments are not fully configured yet. Please try again later.'
-        : 'Failed to create checkout session.'
-    sendError(res, 500, msg, ERROR_CODES.INTERNAL)
-  }
-})
-
-// ── POST /checkout/donation ──────────────────────────────────────────────
-
-router.post('/checkout/donation', paymentCheckoutLimiter, optionalAuth, async (req, res) => {
-  try {
-    const { amount, message, anonymous } = req.body
-
-    // Validate amount (in dollars from frontend, convert to cents)
-    const amountCents = Math.round(Number(amount) * 100)
-    if (
-      isNaN(amountCents) ||
-      amountCents < DONATION_MIN_CENTS ||
-      amountCents > DONATION_MAX_CENTS
-    ) {
-      return sendError(
-        res,
-        400,
-        `Donation amount must be between $${DONATION_MIN_CENTS / 100} and $${DONATION_MAX_CENTS / 100}.`,
-        ERROR_CODES.VALIDATION,
-      )
-    }
-
-    if (message && message.length > DONATION_MESSAGE_MAX_LENGTH) {
-      return sendError(
-        res,
-        400,
-        `Message must be under ${DONATION_MESSAGE_MAX_LENGTH} characters.`,
-        ERROR_CODES.VALIDATION,
-      )
-    }
-
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    const successUrl = `${frontendUrl}/supporters?payment=success`
-    const cancelUrl = `${frontendUrl}/pricing?payment=canceled`
-
-    let user = null
-    if (req.user) {
-      const donorDbUser = await prisma.user.findUnique({
+      // Fetch email from DB (auth middleware doesn't include email in req.user)
+      const dbUser = await prisma.user.findUnique({
         where: { id: req.user.userId },
         select: { email: true, username: true },
       })
-      user = {
+      const user = {
         id: req.user.userId,
-        email: donorDbUser?.email || '',
-        username: donorDbUser?.username || '',
+        email: dbUser?.email || '',
+        username: dbUser?.username || req.user.username,
       }
-    }
-    const session = await service.createDonationCheckout({
-      user,
-      amountCents,
-      message: message || '',
-      anonymous: Boolean(anonymous),
-      successUrl,
-      cancelUrl,
-    })
+      const session = await service.createSubscriptionCheckout(user, plan, successUrl, cancelUrl)
 
-    res.json({ url: session.url, sessionId: session.id })
-  } catch (error) {
-    captureError(error, { context: 'checkout.donation' })
-    log.error({ err: error }, 'Failed to create donation checkout')
-    sendError(res, 500, 'Failed to create checkout session.', ERROR_CODES.INTERNAL)
-  }
-})
+      res.json({ url: session.url, sessionId: session.id })
+    } catch (error) {
+      captureError(error, { context: 'checkout.subscription' })
+      log.error({ err: error }, 'Failed to create subscription checkout')
+      const msg =
+        error.message && error.message.includes('not configured')
+          ? 'Payments are not fully configured yet. Please try again later.'
+          : 'Failed to create checkout session.'
+      sendError(res, 500, msg, ERROR_CODES.INTERNAL)
+    }
+  },
+)
+
+// ── POST /checkout/donation ──────────────────────────────────────────────
+
+router.post(
+  '/checkout/donation',
+  requireTrustedOrigin,
+  paymentCheckoutLimiter,
+  optionalAuth,
+  async (req, res) => {
+    try {
+      const { amount, message, anonymous } = req.body
+
+      // Validate amount (in dollars from frontend, convert to cents)
+      const amountCents = Math.round(Number(amount) * 100)
+      if (
+        isNaN(amountCents) ||
+        amountCents < DONATION_MIN_CENTS ||
+        amountCents > DONATION_MAX_CENTS
+      ) {
+        return sendError(
+          res,
+          400,
+          `Donation amount must be between $${DONATION_MIN_CENTS / 100} and $${DONATION_MAX_CENTS / 100}.`,
+          ERROR_CODES.VALIDATION,
+        )
+      }
+
+      if (message && message.length > DONATION_MESSAGE_MAX_LENGTH) {
+        return sendError(
+          res,
+          400,
+          `Message must be under ${DONATION_MESSAGE_MAX_LENGTH} characters.`,
+          ERROR_CODES.VALIDATION,
+        )
+      }
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+      const successUrl = `${frontendUrl}/supporters?payment=success`
+      const cancelUrl = `${frontendUrl}/pricing?payment=canceled`
+
+      let user = null
+      if (req.user) {
+        const donorDbUser = await prisma.user.findUnique({
+          where: { id: req.user.userId },
+          select: { email: true, username: true },
+        })
+        user = {
+          id: req.user.userId,
+          email: donorDbUser?.email || '',
+          username: donorDbUser?.username || '',
+        }
+      }
+      const session = await service.createDonationCheckout({
+        user,
+        amountCents,
+        message: message || '',
+        anonymous: Boolean(anonymous),
+        successUrl,
+        cancelUrl,
+      })
+
+      res.json({ url: session.url, sessionId: session.id })
+    } catch (error) {
+      captureError(error, { context: 'checkout.donation' })
+      log.error({ err: error }, 'Failed to create donation checkout')
+      sendError(res, 500, 'Failed to create checkout session.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 // ── POST /webhook ────────────────────────────────────────────────────────
 // Stripe sends events here. Must receive raw body for signature verification.
@@ -177,7 +197,7 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
 
   if (!webhookSecret) {
     log.error('STRIPE_WEBHOOK_SECRET is not configured')
-    return res.status(500).json({ error: 'Webhook not configured' })
+    return sendError(res, 500, 'Webhook not configured', ERROR_CODES.INTERNAL)
   }
 
   // Defense in depth: constructEvent needs the raw body Buffer to verify the
@@ -187,7 +207,7 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
   // would throw an opaque error. Fail fast with a clear signal instead.
   if (!Buffer.isBuffer(req.body)) {
     log.error('Stripe webhook received non-Buffer body — raw middleware not applied')
-    return res.status(400).json({ error: 'Invalid webhook payload' })
+    return sendError(res, 400, 'Invalid webhook payload', ERROR_CODES.BAD_REQUEST)
   }
 
   let event
@@ -195,7 +215,7 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret)
   } catch (err) {
     log.warn({ err: err.message }, 'Stripe webhook signature verification failed')
-    return res.status(400).json({ error: 'Webhook signature verification failed' })
+    return sendError(res, 400, 'Webhook signature verification failed', ERROR_CODES.BAD_REQUEST)
   }
 
   log.info({ type: event.type, id: event.id }, 'Stripe webhook received')
@@ -232,7 +252,9 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
     log.error({ err: error, eventType: event.type }, 'Error processing Stripe webhook')
     console.error('[stripe:webhook] Handler failed for', event.type, '-', error.message)
     // Return 500 so Stripe retries the webhook (up to ~3 days)
-    return res.status(500).json({ error: 'Webhook handler failed', eventType: event.type })
+    return sendError(res, 500, 'Webhook handler failed', ERROR_CODES.INTERNAL, {
+      eventType: event.type,
+    })
   }
 
   res.json({ received: true, handled })
@@ -285,32 +307,38 @@ router.get(
           : 'Subscription table does not exist. Run: npx prisma migrate deploy',
       })
     } catch (error) {
-      res.status(500).json({ error: error.message })
+      sendError(res, 500, error.message, ERROR_CODES.INTERNAL)
     }
   },
 )
 
 // ── POST /portal ─────────────────────────────────────────────────────────
 
-router.post('/portal', paymentPortalLimiter, requireAuth, async (req, res) => {
-  try {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
-    const returnUrl = `${frontendUrl}/settings`
+router.post(
+  '/portal',
+  requireTrustedOrigin,
+  paymentPortalLimiter,
+  requireAuth,
+  async (req, res) => {
+    try {
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+      const returnUrl = `${frontendUrl}/settings`
 
-    const user = { id: req.user.userId }
-    const session = await service.createPortalSession(user, returnUrl)
+      const user = { id: req.user.userId }
+      const session = await service.createPortalSession(user, returnUrl)
 
-    res.json({ url: session.url })
-  } catch (error) {
-    captureError(error, { context: 'payments.portal' })
-    log.error({ err: error }, 'Failed to create portal session')
+      res.json({ url: session.url })
+    } catch (error) {
+      captureError(error, { context: 'payments.portal' })
+      log.error({ err: error }, 'Failed to create portal session')
 
-    if (error.message === 'No active subscription found') {
-      return sendError(res, 404, 'No active subscription found.', ERROR_CODES.NOT_FOUND)
+      if (error.message === 'No active subscription found') {
+        return sendError(res, 404, 'No active subscription found.', ERROR_CODES.NOT_FOUND)
+      }
+      sendError(res, 500, 'Failed to create portal session.', ERROR_CODES.INTERNAL)
     }
-    sendError(res, 500, 'Failed to create portal session.', ERROR_CODES.INTERNAL)
-  }
-})
+  },
+)
 
 // ── GET /history ─────────────────────────────────────────────────────────
 
@@ -657,12 +685,17 @@ router.post('/subscription/sync', paymentReadLimiter, requireAuth, async (req, r
             'Sync: DB write failed for subscription',
           )
           // Surface the ACTUAL error to the user so we can debug
-          return res.status(500).json({
-            synced: false,
-            message: `Database write failed: ${syncErr.message}`,
-            hint: 'This usually means the Subscription table does not exist. Run: npx prisma migrate deploy',
-            customersFound: customerIds.size,
-          })
+          return sendError(
+            res,
+            500,
+            `Database write failed: ${syncErr.message}`,
+            ERROR_CODES.INTERNAL,
+            {
+              synced: false,
+              hint: 'This usually means the Subscription table does not exist. Run: npx prisma migrate deploy',
+              customersFound: customerIds.size,
+            },
+          )
         }
       }
       if (synced) break
@@ -722,7 +755,7 @@ router.get('/usage', requireAuth, paymentReadLimiter, async (req, res) => {
   } catch (err) {
     captureError(err, { context: 'payments.usage' })
     log.error({ err }, 'Failed to load usage data')
-    res.status(500).json({ error: 'Failed to load usage data.' })
+    sendError(res, 500, 'Failed to load usage data.', ERROR_CODES.INTERNAL)
   }
 })
 

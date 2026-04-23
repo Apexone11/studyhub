@@ -64,12 +64,15 @@ ${courseList}
         const sheet = await prisma.studySheet.findFirst({
           where: {
             id: parseInt(sheetMatch[1], 10),
-            OR: [
-              { userId },
-              { status: 'published' },
-            ],
+            OR: [{ userId }, { status: 'published' }],
           },
-          select: { title: true, description: true, content: true, contentFormat: true, course: { select: { code: true } } },
+          select: {
+            title: true,
+            description: true,
+            content: true,
+            contentFormat: true,
+            course: { select: { code: true } },
+          },
         })
         if (sheet) {
           const content = (sheet.content || '').slice(0, 6000)
@@ -94,10 +97,7 @@ ${content}
         const note = await prisma.note.findFirst({
           where: {
             id: parseInt(noteMatch[1], 10),
-            OR: [
-              { userId },
-              { visibility: 'public' },
-            ],
+            OR: [{ userId }, { visibility: 'public' }],
           },
           select: { title: true, content: true, course: { select: { code: true } } },
         })

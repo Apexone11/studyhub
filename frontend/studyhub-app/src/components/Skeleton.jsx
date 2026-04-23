@@ -13,8 +13,8 @@
  * @param {{ width?: string|number, height?: string|number, circle?: boolean, size?: number, borderRadius?: number, style?: object }} props
  */
 export function Skeleton({ width = '100%', height = 16, circle, size, borderRadius = 8, style }) {
-  const w = circle ? (size || height) : width
-  const h = circle ? (size || height) : height
+  const w = circle ? size || height : width
+  const h = circle ? size || height : height
   return (
     <div
       className="sh-skeleton"
@@ -31,7 +31,15 @@ export function Skeleton({ width = '100%', height = 16, circle, size, borderRadi
 /** Card-shaped skeleton with header row + content lines. */
 export function SkeletonCard({ style }) {
   return (
-    <div style={{ background: 'var(--sh-surface, #fff)', borderRadius: 16, border: '1px solid var(--sh-border, #e2e8f0)', padding: '20px 22px', ...style }}>
+    <div
+      style={{
+        background: 'var(--sh-surface, #fff)',
+        borderRadius: 16,
+        border: '1px solid var(--sh-border, #e2e8f0)',
+        padding: '20px 22px',
+        ...style,
+      }}
+    >
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
         <Skeleton circle size={36} />
         <div style={{ flex: 1 }}>
@@ -67,7 +75,15 @@ export function SkeletonList({ count = 4, gap = 12, style }) {
 export function SkeletonProfile() {
   return (
     <div>
-      <div style={{ background: 'var(--sh-surface, #fff)', borderRadius: 18, border: '1px solid var(--sh-border, #e2e8f0)', padding: 28, marginBottom: 20 }}>
+      <div
+        style={{
+          background: 'var(--sh-surface, #fff)',
+          borderRadius: 18,
+          border: '1px solid var(--sh-border, #e2e8f0)',
+          padding: 28,
+          marginBottom: 20,
+        }}
+      >
         <div style={{ display: 'flex', gap: 20, alignItems: 'flex-start' }}>
           <Skeleton circle size={72} />
           <div style={{ flex: 1 }}>

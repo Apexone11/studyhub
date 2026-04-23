@@ -22,7 +22,11 @@ function injectTermlyScript({ forceReload = false } = {}) {
   return script
 }
 
-export default function useTermlyEmbed(containerRef, dataId, { enabled, timeout = 15000, onLoad, onTimeout } = {}) {
+export default function useTermlyEmbed(
+  containerRef,
+  dataId,
+  { enabled, timeout = 15000, onLoad, onTimeout } = {},
+) {
   const [loadedId, setLoadedId] = useState(null)
   const [timedOutId, setTimedOutId] = useState(null)
   const onLoadRef = useRef(onLoad)

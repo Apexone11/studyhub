@@ -95,11 +95,12 @@ function GroupImageField({ name, groupImage }) {
 
         <div style={styles.imageFieldBody}>
           <div style={styles.imageFieldActions}>
-            <label
-              htmlFor={inputId}
-              style={styles.secondaryActionBtn}
-            >
-              {groupImage.uploading ? 'Uploading...' : previewUrl ? 'Replace Image' : 'Upload Image'}
+            <label htmlFor={inputId} style={styles.secondaryActionBtn}>
+              {groupImage.uploading
+                ? 'Uploading...'
+                : previewUrl
+                  ? 'Replace Image'
+                  : 'Upload Image'}
             </label>
             {previewUrl ? (
               <button
@@ -114,9 +115,9 @@ function GroupImageField({ name, groupImage }) {
           </div>
 
           <p style={styles.helperText}>
-            Square badge image — shows next to your group name on the directory
-            card and in the header. Square or near-square crops work best.
-            To change the banner behind the group header, use
+            Square badge image — shows next to your group name on the directory card and in the
+            header. Square or near-square crops work best. To change the banner behind the group
+            header, use
             <strong> Change background </strong>
             on the group page.
           </p>
@@ -132,7 +133,9 @@ function GroupImageField({ name, groupImage }) {
         </div>
       </div>
 
-      {groupImage.uploadError ? <div style={styles.inlineError}>{groupImage.uploadError}</div> : null}
+      {groupImage.uploadError ? (
+        <div style={styles.inlineError}>{groupImage.uploadError}</div>
+      ) : null}
     </div>
   )
 }

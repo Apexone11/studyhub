@@ -30,11 +30,18 @@ export function useNoteViewer() {
         if (active) setState((prev) => ({ ...prev, note: data, loading: false }))
       })
       .catch((err) => {
-        if (active) setState((prev) => ({ ...prev, error: err.message === 'not_found' ? 'not_found' : 'error', loading: false }))
+        if (active)
+          setState((prev) => ({
+            ...prev,
+            error: err.message === 'not_found' ? 'not_found' : 'error',
+            loading: false,
+          }))
       })
 
-    return () => { active = false }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      active = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id])
 
   // Report timing when note content arrives

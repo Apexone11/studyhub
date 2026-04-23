@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Base config enforces HTTPS for every production host (default for Android 9+).
+  The single domain-config exception whitelists cleartext HTTP to the Android
+  emulator's host alias (10.0.2.2) and loopback, so `npm run mobile:build`
+  with VITE_MOBILE_API_URL=http://10.0.2.2:4000 can reach the Docker
+  dev backend during local testing. Production builds hit Railway over HTTPS
+  and are unaffected.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- Emulator host aliases (AVD) -->
+        <domain includeSubdomains="false">10.0.2.2</domain>
+        <domain includeSubdomains="false">localhost</domain>
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <!-- Physical device on same Wi-Fi as the dev PC (host LAN IP) -->
+        <domain includeSubdomains="false">10.0.0.221</domain>
+    </domain-config>
+</network-security-config>

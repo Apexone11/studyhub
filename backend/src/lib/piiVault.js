@@ -2,7 +2,15 @@ const prisma = require('./prisma')
 const { encryptField, decryptField } = require('./kms/kmsEnvelope')
 const { recordAudit } = require('./auditLog')
 
-const REJECTED_FIELDS = new Set(['address', 'streetAddress', 'mailingAddress', 'homeAddress', 'billingAddress', 'shippingAddress', 'physicalAddress'])
+const REJECTED_FIELDS = new Set([
+  'address',
+  'streetAddress',
+  'mailingAddress',
+  'homeAddress',
+  'billingAddress',
+  'shippingAddress',
+  'physicalAddress',
+])
 
 /**
  * Strips address-related fields from the input object.

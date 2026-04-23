@@ -96,10 +96,17 @@ export default function LibraryPage() {
         throw new Error(data.error || 'Could not update shelf visibility.')
       }
 
-      setShelves((prev) => prev.map((shelf) => (
-        shelf.id === shelfId ? { ...shelf, visibility: data.visibility || visibility } : shelf
-      )))
-      showToast(visibility === 'profile' ? 'Shelf is now visible on your profile.' : 'Shelf is now private.', 'success')
+      setShelves((prev) =>
+        prev.map((shelf) =>
+          shelf.id === shelfId ? { ...shelf, visibility: data.visibility || visibility } : shelf,
+        ),
+      )
+      showToast(
+        visibility === 'profile'
+          ? 'Shelf is now visible on your profile.'
+          : 'Shelf is now private.',
+        'success',
+      )
     } catch (error) {
       showToast(error.message || 'Could not update shelf visibility.', 'error')
     } finally {
@@ -108,7 +115,10 @@ export default function LibraryPage() {
   }, [])
 
   const deleteShelf = useCallback(async (shelfId, shelfName) => {
-    if (typeof window !== 'undefined' && !window.confirm(`Delete "${shelfName}"? This removes the shelf and its saved books.`)) {
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(`Delete "${shelfName}"? This removes the shelf and its saved books.`)
+    ) {
       return
     }
 
@@ -178,7 +188,10 @@ export default function LibraryPage() {
       <Navbar />
       <div className="library-page">
         {/* Hero Section */}
-        <section ref={heroRef} className={`library-hero${artReveal ? ' library-hero--art-reveal' : ''}`}>
+        <section
+          ref={heroRef}
+          className={`library-hero${artReveal ? ' library-hero--art-reveal' : ''}`}
+        >
           <div className="library-hero__watermark">
             <IconBook size={280} />
           </div>
@@ -211,7 +224,11 @@ export default function LibraryPage() {
           */}
           <div className="library-hero__attribution" aria-label="Background artwork attribution">
             <strong>
-              <IconInfoCircle size={11} style={{ verticalAlign: '-1px', marginRight: 4 }} aria-hidden="true" />
+              <IconInfoCircle
+                size={11}
+                style={{ verticalAlign: '-1px', marginRight: 4 }}
+                aria-hidden="true"
+              />
               Girl Reading Under an Oak Tree
             </strong>
             Winslow Homer (1836–1910) · Public domain
@@ -289,7 +306,9 @@ export default function LibraryPage() {
                 onClick={() => setShowShelves((prev) => !prev)}
               >
                 <span className="library-shelves__toggle-label">My Bookshelves</span>
-                <span className="library-shelves__toggle-icon">{showShelves ? '\u25B2' : '\u25BC'}</span>
+                <span className="library-shelves__toggle-icon">
+                  {showShelves ? '\u25B2' : '\u25BC'}
+                </span>
               </button>
 
               {showShelves && (
@@ -308,9 +327,12 @@ export default function LibraryPage() {
                             <h3 className="library-shelf__name">{shelf.name}</h3>
                             <div className="library-shelf__meta">
                               <span className="library-shelf__count">
-                                {shelf._count?.books || 0} book{(shelf._count?.books || 0) === 1 ? '' : 's'}
+                                {shelf._count?.books || 0} book
+                                {(shelf._count?.books || 0) === 1 ? '' : 's'}
                               </span>
-                              <span className={`library-shelf__visibility-badge ${shelf.visibility === 'profile' ? 'library-shelf__visibility-badge--profile' : ''}`}>
+                              <span
+                                className={`library-shelf__visibility-badge ${shelf.visibility === 'profile' ? 'library-shelf__visibility-badge--profile' : ''}`}
+                              >
                                 {shelf.visibility === 'profile' ? 'Shown on profile' : 'Private'}
                               </span>
                             </div>
@@ -322,7 +344,9 @@ export default function LibraryPage() {
                                 className="library-shelf__visibility-select"
                                 value={shelf.visibility || 'private'}
                                 disabled={shelfActionId === shelf.id}
-                                onChange={(event) => updateShelfVisibility(shelf.id, event.target.value)}
+                                onChange={(event) =>
+                                  updateShelfVisibility(shelf.id, event.target.value)
+                                }
                               >
                                 <option value="private">Private</option>
                                 <option value="profile">Show on profile</option>

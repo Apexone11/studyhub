@@ -16,9 +16,8 @@ function BelowFoldFallback() {
 }
 
 // Schedule work after first paint when possible.
-const scheduleIdle = typeof requestIdleCallback === 'function'
-  ? requestIdleCallback
-  : (cb) => setTimeout(cb, 1)
+const scheduleIdle =
+  typeof requestIdleCallback === 'function' ? requestIdleCallback : (cb) => setTimeout(cb, 1)
 
 export default function HomePage() {
   usePageTitle('The GitHub of Studying')
@@ -32,8 +31,10 @@ export default function HomePage() {
   useEffect(() => {
     const id = scheduleIdle(() => {
       fetch(`${API}/api/public/platform-stats`)
-        .then((res) => res.ok ? res.json() : null)
-        .then((data) => { if (data) setPlatformStats(data) })
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data) setPlatformStats(data)
+        })
         .catch(() => {})
     })
     return () => {

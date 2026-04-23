@@ -10,6 +10,12 @@ export { FONT, usePreferences } from '../../pages/settings/settingsState'
 
 // Shared UI components
 export {
-  Input, Button, Message, FormField,
-  SectionCard, MsgList, Select, ToggleRow,
+  Input,
+  Button,
+  Message,
+  FormField,
+  SectionCard,
+  MsgList,
+  Select,
+  ToggleRow,
 } from '../../pages/settings/settingsShared'

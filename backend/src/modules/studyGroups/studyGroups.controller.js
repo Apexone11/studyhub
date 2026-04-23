@@ -88,9 +88,7 @@ async function listGroups(req, res) {
         // Phase 5: exclude soft-deleted groups everywhere.
         { deletedAt: null },
         // Phase 5: exclude groups this user reported.
-        hiddenGroupIds.size > 0
-          ? { id: { notIn: Array.from(hiddenGroupIds) } }
-          : {},
+        hiddenGroupIds.size > 0 ? { id: { notIn: Array.from(hiddenGroupIds) } } : {},
       ],
     }
 
@@ -288,7 +286,17 @@ async function updateGroup(req, res) {
       return res.status(403).json({ error: 'Admin access required.' })
     }
 
-    const { name, description, avatarUrl, privacy, maxMembers, backgroundUrl, backgroundCredit, memberListPrivate, requirePostApproval } = req.body
+    const {
+      name,
+      description,
+      avatarUrl,
+      privacy,
+      maxMembers,
+      backgroundUrl,
+      backgroundCredit,
+      memberListPrivate,
+      requirePostApproval,
+    } = req.body
     const updates = {}
 
     if (name !== undefined) {
@@ -308,7 +316,8 @@ async function updateGroup(req, res) {
     }
 
     if (avatarUrl !== undefined) {
-      updates.avatarUrl = typeof avatarUrl === 'string' && avatarUrl.trim() ? avatarUrl.trim() : null
+      updates.avatarUrl =
+        typeof avatarUrl === 'string' && avatarUrl.trim() ? avatarUrl.trim() : null
     }
 
     // Phase 4: owner-curated group background. Accept only the internal
@@ -321,10 +330,12 @@ async function updateGroup(req, res) {
       } else if (typeof backgroundUrl !== 'string') {
         return res.status(400).json({ error: 'backgroundUrl must be a string.' })
       } else if (
-        !backgroundUrl.startsWith('/uploads/group-media/')
-        && !backgroundUrl.startsWith('/art/')
+        !backgroundUrl.startsWith('/uploads/group-media/') &&
+        !backgroundUrl.startsWith('/art/')
       ) {
-        return res.status(400).json({ error: 'backgroundUrl must be an uploaded file or a curated gallery asset.' })
+        return res
+          .status(400)
+          .json({ error: 'backgroundUrl must be an uploaded file or a curated gallery asset.' })
       } else {
         updates.backgroundUrl = backgroundUrl
       }
@@ -336,7 +347,10 @@ async function updateGroup(req, res) {
         return res.status(400).json({ error: 'backgroundCredit must be a string.' })
       } else {
         // Sanitize: strip tags, cap length.
-        updates.backgroundCredit = backgroundCredit.replace(/<[^>]*>/g, '').trim().slice(0, 200)
+        updates.backgroundCredit = backgroundCredit
+          .replace(/<[^>]*>/g, '')
+          .trim()
+          .slice(0, 200)
       }
     }
 
@@ -476,7 +490,9 @@ async function joinGroup(req, res) {
       return res.status(404).json({ error: 'Group not found.' })
     }
     if (group.moderationStatus === 'locked') {
-      return res.status(403).json({ error: 'This group is currently locked and not accepting new members.' })
+      return res
+        .status(403)
+        .json({ error: 'This group is currently locked and not accepting new members.' })
     }
 
     // Phase 5: block check — blocked users see a generic error (no
@@ -537,9 +553,13 @@ async function joinGroup(req, res) {
     }
 
     // Phase 5: capture optional join message for private-group gate.
-    const joinMessage = typeof req.body?.joinMessage === 'string'
-      ? req.body.joinMessage.replace(/<[^>]*>/g, '').trim().slice(0, 500)
-      : ''
+    const joinMessage =
+      typeof req.body?.joinMessage === 'string'
+        ? req.body.joinMessage
+            .replace(/<[^>]*>/g, '')
+            .trim()
+            .slice(0, 500)
+        : ''
 
     const member = await prisma.studyGroupMember.create({
       data: {
@@ -590,14 +610,17 @@ async function joinGroup(req, res) {
           const messageText = joinMessage
             ? `${req.user.username} requested to join ${group.name}: "${joinMessage}"`
             : `${req.user.username} requested to join ${group.name}`
-          await createNotifications(prisma, Array.from(recipientIds).map((userId) => ({
-            userId,
-            type: 'group_join_request',
-            message: messageText,
-            actorId: req.user.userId,
-            linkPath: `/study-groups/${groupId}?tab=members`,
-            priority: 'medium',
-          })))
+          await createNotifications(
+            prisma,
+            Array.from(recipientIds).map((userId) => ({
+              userId,
+              type: 'group_join_request',
+              message: messageText,
+              actorId: req.user.userId,
+              linkPath: `/study-groups/${groupId}?tab=members`,
+              priority: 'medium',
+            })),
+          )
         }
       } catch (notifErr) {
         captureError(notifErr, { location: 'joinGroup/notifyPending', groupId })
@@ -697,9 +720,9 @@ async function listMembers(req, res) {
     }
 
     const canManageMembers = Boolean(
-      userMember
-      && userMember.status === 'active'
-      && (userMember.role === 'admin' || userMember.role === 'moderator')
+      userMember &&
+      userMember.status === 'active' &&
+      (userMember.role === 'admin' || userMember.role === 'moderator'),
     )
 
     const { limit = 20, offset = 0 } = req.query
@@ -749,12 +772,14 @@ async function listMembers(req, res) {
       status: m.status,
       joinedAt: m.joinedAt,
       // Phase 5 B.2 + B.4: mute + join-gate message visible to mods only
-      ...(canManageMembers ? {
-        mutedUntil: m.mutedUntil || null,
-        mutedReason: m.mutedReason || '',
-        joinMessage: m.joinMessage || '',
-        strikeCount: m.strikeCount || 0,
-      } : {}),
+      ...(canManageMembers
+        ? {
+            mutedUntil: m.mutedUntil || null,
+            mutedReason: m.mutedReason || '',
+            joinMessage: m.joinMessage || '',
+            strikeCount: m.strikeCount || 0,
+          }
+        : {}),
     }))
 
     res.json({ members: formatted, total, limit: limitNum, offset: offsetNum })

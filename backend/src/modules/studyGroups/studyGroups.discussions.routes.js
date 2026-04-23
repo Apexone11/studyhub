@@ -129,8 +129,12 @@ router.patch('/:postId/approve', writeLimiter, requireAuth, async (req, res) => 
     })
 
     await writeAuditLog({
-      groupId, actorId: req.user.userId,
-      action: 'post.approve', targetType: 'post', targetId: postId, req,
+      groupId,
+      actorId: req.user.userId,
+      action: 'post.approve',
+      targetType: 'post',
+      targetId: postId,
+      req,
     })
 
     res.json({ message: 'Post approved.' })
@@ -169,8 +173,12 @@ router.patch('/:postId/reject', writeLimiter, requireAuth, async (req, res) => {
     })
 
     await writeAuditLog({
-      groupId, actorId: req.user.userId,
-      action: 'post.reject', targetType: 'post', targetId: postId, req,
+      groupId,
+      actorId: req.user.userId,
+      action: 'post.reject',
+      targetType: 'post',
+      targetId: postId,
+      req,
     })
 
     res.json({ message: 'Post rejected.' })

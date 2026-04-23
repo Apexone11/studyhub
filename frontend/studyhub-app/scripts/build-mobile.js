@@ -47,6 +47,12 @@ function main() {
     process.exit(1)
   }
 
+  // DHCP lease renewals silently broke dev builds whenever the laptop got
+  // a new LAN IP. Sync the current IP into .env.mobile.local +
+  // network_security_config.xml before Vite reads them so tomorrow's build
+  // works without manual edits.
+  run('node', ['scripts/sync-mobile-lan-ip.js'])
+
   // Vite picks up `.env.<mode>.production` when run with `--mode mobile`.
   // The file is loaded before plugin resolution, so VITE_MOBILE_API_URL makes
   // it into the bundled config.js.

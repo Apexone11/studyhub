@@ -40,7 +40,11 @@ router.patch('/preferences', async (req, res) => {
       }
     }
     for (const [key, allowed] of Object.entries(PREF_ENUM_KEYS)) {
-      if (Object.hasOwn(req.body, key) && typeof req.body[key] === 'string' && allowed.includes(req.body[key])) {
+      if (
+        Object.hasOwn(req.body, key) &&
+        typeof req.body[key] === 'string' &&
+        allowed.includes(req.body[key])
+      ) {
         updates[key] = req.body[key]
       }
     }
@@ -79,7 +83,12 @@ router.patch('/courses', async (req, res) => {
     await validateCourseIds(parsedCourseIds, parsedSchoolId)
 
     await prisma.$transaction(async (tx) => {
-      const resolvedCourseIds = await resolveCourseIds(tx, parsedCourseIds, parsedCustomCourses, parsedSchoolId)
+      const resolvedCourseIds = await resolveCourseIds(
+        tx,
+        parsedCourseIds,
+        parsedCustomCourses,
+        parsedSchoolId,
+      )
       await tx.enrollment.deleteMany({ where: { userId: user.id } })
       if (resolvedCourseIds.length > 0) {
         await tx.enrollment.createMany({
@@ -91,7 +100,9 @@ router.patch('/courses', async (req, res) => {
 
     const updated = await getSettingsUser(user.id)
     return res.json({
-      message: updated?._count?.enrollments ? 'Courses updated successfully.' : 'Courses cleared successfully.',
+      message: updated?._count?.enrollments
+        ? 'Courses updated successfully.'
+        : 'Courses cleared successfully.',
       user: updated,
     })
   } catch (error) {

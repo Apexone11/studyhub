@@ -56,7 +56,9 @@ export function uploadGroupMedia(groupId, file, { onProgress } = {}) {
       let payload = {}
       try {
         payload = JSON.parse(xhr.responseText || '{}')
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
 
       if (xhr.status >= 200 && xhr.status < 300) {
         resolve(payload)

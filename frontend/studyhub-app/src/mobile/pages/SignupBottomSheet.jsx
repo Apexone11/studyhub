@@ -1,11 +1,13 @@
 // src/mobile/pages/SignupBottomSheet.jsx
-// Two-step mobile signup: Account fields -> Verify email code.
-// Delegates to the same backend endpoints as the web RegisterScreen.
+// Two-step mobile signup using Design Refresh v3 primitives.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import BottomSheet from '../components/BottomSheet'
+import MobileButton from '../components/MobileButton'
+import MobileInput from '../components/MobileInput'
 import MobileGoogleButton from '../components/MobileGoogleButton'
+import haptics from '../lib/haptics'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { CURRENT_LEGAL_VERSION } from '../../lib/legalVersions'
@@ -14,22 +16,42 @@ const USERNAME_RE = /^[a-zA-Z0-9_]{3,20}$/
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const PASSWORD_RE = /^(?=.*[A-Z])(?=.*\d).{8,}$/
 
-/**
- * @param {object} props
- * @param {boolean} props.open
- * @param {() => void} props.onClose
- * @param {() => void} props.onSwitchToSignin
- */
+function WarnIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+      <path
+        d="M12 3l10 18H2L12 3zM12 10v4M12 17.5v0.5"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  )
+}
+
+function ProgressDots({ count, active }) {
+  return (
+    <div className="sh-m-auth-progress" aria-hidden="true">
+      {Array.from({ length: count }).map((_, i) => (
+        <span
+          key={i}
+          className={`sh-m-auth-progress__dot ${i <= active ? 'sh-m-auth-progress__dot--active' : ''}`.trim()}
+        />
+      ))}
+    </div>
+  )
+}
+
 export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
   const navigate = useNavigate()
   const { completeAuthentication } = useSession()
 
-  const [step, setStep] = useState('account') // 'account' | 'verify'
+  const [step, setStep] = useState('account')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [verificationToken, setVerificationToken] = useState('')
   const [verificationCode, setVerificationCode] = useState('')
-
   const [form, setForm] = useState({
     username: '',
     email: '',
@@ -37,7 +59,6 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
     confirmPassword: '',
   })
 
-  // Reset on close
   useEffect(() => {
     if (!open) {
       setStep('account')
@@ -49,34 +70,41 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
     }
   }, [open])
 
-  const setField = useCallback((key, value) => {
-    setForm((prev) => ({ ...prev, [key]: value }))
-    setError('')
-  }, [])
+  const setField = useCallback(
+    (key, value) => {
+      setForm((prev) => ({ ...prev, [key]: value }))
+      if (error) setError('')
+    },
+    [error],
+  )
 
-  // ── Step 1: Create account ─────────────────────────────────────
   const handleCreateAccount = useCallback(
     async (e) => {
       e.preventDefault()
 
       if (!form.username.trim() || !form.email.trim() || !form.password || !form.confirmPassword) {
         setError('Please fill in all fields.')
+        haptics.warn()
         return
       }
       if (!USERNAME_RE.test(form.username.trim())) {
         setError('Username must be 3-20 characters: letters, numbers, or underscores.')
+        haptics.warn()
         return
       }
       if (!EMAIL_RE.test(form.email.trim())) {
         setError('Please enter a valid email address.')
+        haptics.warn()
         return
       }
       if (!PASSWORD_RE.test(form.password)) {
         setError('Password needs 8+ characters, a capital letter, and a number.')
+        haptics.warn()
         return
       }
       if (form.password !== form.confirmPassword) {
         setError('Passwords do not match.')
+        haptics.warn()
         return
       }
 
@@ -86,7 +114,12 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
       try {
         const res = await fetch(`${API}/api/auth/register/start`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            // Required so the backend's isMobileClient() returns true and
+            // issueAuthenticatedSession emits the bearer token for native.
+            'X-Client': 'mobile',
+          },
           credentials: 'include',
           body: JSON.stringify({
             username: form.username.trim(),
@@ -102,13 +135,16 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
 
         if (!res.ok) {
           setError(data.error || 'Registration failed. Please try again.')
+          haptics.warn()
           return
         }
 
+        haptics.tap()
         setVerificationToken(data.verificationToken || '')
         setStep('verify')
       } catch {
         setError('Connection error. Please check your network.')
+        haptics.warn()
       } finally {
         setLoading(false)
       }
@@ -116,12 +152,12 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
     [form],
   )
 
-  // ── Step 2: Verify email code ──────────────────────────────────
   const handleVerify = useCallback(
     async (e) => {
       e.preventDefault()
       if (!verificationCode.trim()) {
         setError('Enter the code sent to your email.')
+        haptics.warn()
         return
       }
 
@@ -131,7 +167,10 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
       try {
         const res = await fetch(`${API}/api/auth/register/verify`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Client': 'mobile',
+          },
           credentials: 'include',
           body: JSON.stringify({
             verificationToken,
@@ -142,21 +181,24 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
 
         if (!res.ok) {
           setError(data.error || 'Invalid code. Please try again.')
+          haptics.warn()
           return
         }
 
-        // If auto-completed, navigate to onboarding
         if (data.user) {
+          haptics.success()
           completeAuthentication(data.user)
           onClose()
           navigate('/m/onboarding/goals', { replace: true })
           return
         }
 
-        // Otherwise complete registration
         const completeRes = await fetch(`${API}/api/auth/register/complete`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Client': 'mobile',
+          },
           credentials: 'include',
           body: JSON.stringify({ verificationToken }),
         })
@@ -164,14 +206,17 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
 
         if (!completeRes.ok) {
           setError(completeData.error || 'Could not complete registration.')
+          haptics.warn()
           return
         }
 
+        haptics.success()
         completeAuthentication(completeData.user)
         onClose()
         navigate('/m/onboarding/goals', { replace: true })
       } catch {
         setError('Connection error. Please check your network.')
+        haptics.warn()
       } finally {
         setLoading(false)
       }
@@ -179,93 +224,71 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
     [verificationCode, verificationToken, completeAuthentication, navigate, onClose],
   )
 
-  const title = step === 'account' ? 'Create Account' : 'Verify Email'
+  const title = step === 'account' ? 'Create account' : 'Verify email'
+  const activeStep = useMemo(() => (step === 'account' ? 0 : 1), [step])
 
   return (
     <BottomSheet open={open} onClose={onClose} title={title} fullHeight>
+      <ProgressDots count={2} active={activeStep} />
+
       {error && (
-        <div role="alert" className="mob-auth-error">
-          {error}
+        <div role="alert" className="sh-m-auth-alert sh-m-auth-alert--error">
+          <WarnIcon />
+          <span>{error}</span>
         </div>
       )}
 
       {step === 'account' && (
         <>
-          <MobileGoogleButton mode="signup" />
-
-          <div className="mob-auth-or">
-            <span className="mob-auth-or-text">or</span>
+          <div className="sh-m-auth-google">
+            <MobileGoogleButton mode="signup" />
           </div>
 
-          <form onSubmit={handleCreateAccount}>
-            <div className="mob-auth-field">
-              <label className="mob-auth-label" htmlFor="mob-signup-username">
-                Username
-              </label>
-              <input
-                id="mob-signup-username"
-                className="mob-auth-input"
-                type="text"
-                placeholder="Choose a username"
-                autoComplete="username"
-                autoCapitalize="none"
-                value={form.username}
-                onChange={(e) => setField('username', e.target.value)}
-              />
-            </div>
+          <div className="sh-m-auth-or">
+            <span className="sh-m-auth-or-text">or</span>
+          </div>
 
-            <div className="mob-auth-field">
-              <label className="mob-auth-label" htmlFor="mob-signup-email">
-                Email
-              </label>
-              <input
-                id="mob-signup-email"
-                className="mob-auth-input"
-                type="email"
-                placeholder="your@university.edu"
-                autoComplete="email"
-                value={form.email}
-                onChange={(e) => setField('email', e.target.value)}
-              />
-            </div>
+          <form onSubmit={handleCreateAccount} className="sh-m-auth-form">
+            <MobileInput
+              label="Username"
+              autoComplete="username"
+              autoCapitalize="none"
+              value={form.username}
+              onChange={(e) => setField('username', e.target.value)}
+            />
 
-            <div className="mob-auth-field">
-              <label className="mob-auth-label" htmlFor="mob-signup-pw">
-                Password
-              </label>
-              <input
-                id="mob-signup-pw"
-                className="mob-auth-input"
-                type="password"
-                placeholder="Min 8 chars, 1 uppercase, 1 number"
-                autoComplete="new-password"
-                value={form.password}
-                onChange={(e) => setField('password', e.target.value)}
-              />
-            </div>
+            <MobileInput
+              label="Email"
+              type="email"
+              autoComplete="email"
+              inputMode="email"
+              value={form.email}
+              onChange={(e) => setField('email', e.target.value)}
+            />
 
-            <div className="mob-auth-field">
-              <label className="mob-auth-label" htmlFor="mob-signup-cpw">
-                Confirm Password
-              </label>
-              <input
-                id="mob-signup-cpw"
-                className="mob-auth-input"
-                type="password"
-                placeholder="Re-enter your password"
-                autoComplete="new-password"
-                value={form.confirmPassword}
-                onChange={(e) => setField('confirmPassword', e.target.value)}
-              />
-            </div>
+            <MobileInput
+              label="Password"
+              type="password"
+              autoComplete="new-password"
+              value={form.password}
+              onChange={(e) => setField('password', e.target.value)}
+            />
 
-            <button type="submit" className="mob-auth-submit" disabled={loading}>
-              {loading ? 'Creating account...' : 'Continue'}
-            </button>
+            <MobileInput
+              label="Confirm password"
+              type="password"
+              autoComplete="new-password"
+              value={form.confirmPassword}
+              onChange={(e) => setField('confirmPassword', e.target.value)}
+            />
 
-            <p className="mob-auth-switch">
+            <MobileButton type="submit" block size="l" loading={loading} hapticsKind="none">
+              Continue
+            </MobileButton>
+
+            <p className="sh-m-auth-switch">
               Already have an account?{' '}
-              <button type="button" className="mob-auth-switch-link" onClick={onSwitchToSignin}>
+              <button type="button" className="sh-m-auth-switch-link" onClick={onSwitchToSignin}>
                 Sign in
               </button>
             </p>
@@ -274,65 +297,38 @@ export default function SignupBottomSheet({ open, onClose, onSwitchToSignin }) {
       )}
 
       {step === 'verify' && (
-        <form onSubmit={handleVerify}>
-          <p
-            style={{
-              color: 'var(--sh-subtext)',
-              fontSize: 'var(--type-sm)',
-              marginBottom: 'var(--space-5)',
-              lineHeight: 1.5,
-            }}
-          >
+        <form onSubmit={handleVerify} className="sh-m-auth-form">
+          <p className="sh-m-auth-help">
             We sent a verification code to <strong>{form.email}</strong>. Check your inbox and enter
             it below.
           </p>
 
-          <div className="mob-auth-field">
-            <label className="mob-auth-label" htmlFor="mob-verify-code">
-              Verification Code
-            </label>
-            <input
-              id="mob-verify-code"
-              className="mob-auth-input"
-              type="text"
-              inputMode="numeric"
-              placeholder="Enter 6-digit code"
-              autoComplete="one-time-code"
-              maxLength={8}
-              value={verificationCode}
-              onChange={(e) => {
-                setVerificationCode(e.target.value)
-                setError('')
-              }}
-            />
-          </div>
-
-          {error && (
-            <p role="alert" className="mob-auth-error">
-              {error}
-            </p>
-          )}
-
-          <button type="submit" className="mob-auth-submit" disabled={loading}>
-            {loading ? 'Verifying...' : 'Verify and Create Account'}
-          </button>
-
-          <button
-            type="button"
-            className="mob-auth-switch-link"
-            style={{
-              display: 'block',
-              margin: 'var(--space-4) auto 0',
-              background: 'none',
-              border: 'none',
-              color: 'var(--sh-brand)',
-              fontSize: 'var(--type-sm)',
-              cursor: 'pointer',
+          <MobileInput
+            label="Verification code"
+            inputMode="numeric"
+            autoComplete="one-time-code"
+            maxLength={8}
+            value={verificationCode}
+            onChange={(e) => {
+              setVerificationCode(e.target.value)
+              if (error) setError('')
             }}
+          />
+
+          <MobileButton type="submit" block size="l" loading={loading} hapticsKind="none">
+            Verify and create account
+          </MobileButton>
+
+          <MobileButton
+            type="button"
+            variant="ghost"
+            size="m"
+            block
             onClick={() => setStep('account')}
+            hapticsKind="select"
           >
             Back to sign up
-          </button>
+          </MobileButton>
         </form>
       )}
     </BottomSheet>

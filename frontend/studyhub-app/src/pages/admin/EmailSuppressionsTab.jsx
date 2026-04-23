@@ -38,11 +38,22 @@ export default function EmailSuppressionsTab({
 }) {
   return (
     <>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 14 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 12,
+          flexWrap: 'wrap',
+          marginBottom: 14,
+        }}
+      >
         <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>
           {suppressionsState.total} total suppression records
         </div>
-        <form onSubmit={submitSuppressionSearch} style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <form
+          onSubmit={submitSuppressionSearch}
+          style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}
+        >
           <select
             value={suppressionStatus}
             onChange={(event) => {
@@ -84,7 +95,17 @@ export default function EmailSuppressionsTab({
       </div>
 
       {suppressionMessage ? (
-        <div style={{ color: 'var(--sh-success-text)', background: 'var(--sh-success-bg)', border: '1px solid var(--sh-success-border)', borderRadius: 12, padding: '10px 12px', fontSize: 12, marginBottom: 12 }}>
+        <div
+          style={{
+            color: 'var(--sh-success-text)',
+            background: 'var(--sh-success-bg)',
+            border: '1px solid var(--sh-success-border)',
+            borderRadius: 12,
+            padding: '10px 12px',
+            fontSize: 12,
+            marginBottom: 12,
+          }}
+        >
           {suppressionMessage}
         </div>
       ) : null}
@@ -94,7 +115,9 @@ export default function EmailSuppressionsTab({
           <thead>
             <tr style={{ background: 'var(--sh-soft)' }}>
               {['Email', 'Reason', 'Source', 'Updated', 'Status', 'Actions'].map((header) => (
-                <th key={header} style={tableHeadStyle}>{header}</th>
+                <th key={header} style={tableHeadStyle}>
+                  {header}
+                </th>
               ))}
             </tr>
           </thead>
@@ -108,12 +131,18 @@ export default function EmailSuppressionsTab({
                     {formatLabel(record.provider)} · {formatLabel(record.sourceEventType)}
                   </div>
                   {record.sourceMessageId ? (
-                    <div style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>msg: {record.sourceMessageId}</div>
+                    <div style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>
+                      msg: {record.sourceMessageId}
+                    </div>
                   ) : null}
                 </td>
-                <td style={tableCell}>{formatDateTime(record.updatedAt || record.lastSuppressedAt)}</td>
                 <td style={tableCell}>
-                  <span style={suppressionStatusPill(record.active)}>{record.active ? 'Active' : 'Inactive'}</span>
+                  {formatDateTime(record.updatedAt || record.lastSuppressedAt)}
+                </td>
+                <td style={tableCell}>
+                  <span style={suppressionStatusPill(record.active)}>
+                    {record.active ? 'Active' : 'Inactive'}
+                  </span>
                 </td>
                 <td style={{ ...tableCell, minWidth: 260 }}>
                   <div style={{ display: 'grid', gap: 8 }}>
@@ -154,7 +183,9 @@ export default function EmailSuppressionsTab({
                       />
                     ) : null}
                     {unsuppressErrorById[record.id] ? (
-                      <div style={{ fontSize: 12, color: 'var(--sh-danger)' }}>{unsuppressErrorById[record.id]}</div>
+                      <div style={{ fontSize: 12, color: 'var(--sh-danger)' }}>
+                        {unsuppressErrorById[record.id]}
+                      </div>
                     ) : null}
                   </div>
                 </td>
@@ -186,10 +217,29 @@ export default function EmailSuppressionsTab({
             background: 'var(--sh-soft)',
           }}
         >
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              gap: 12,
+              flexWrap: 'wrap',
+              marginBottom: 10,
+            }}
+          >
             <div>
-              <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 3 }}>Audit timeline</div>
-              <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>{auditState.suppression?.email || `Suppression #${auditState.suppressionId}`}</div>
+              <div
+                style={{
+                  fontSize: 14,
+                  fontWeight: 800,
+                  color: 'var(--sh-heading)',
+                  marginBottom: 3,
+                }}
+              >
+                Audit timeline
+              </div>
+              <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+                {auditState.suppression?.email || `Suppression #${auditState.suppressionId}`}
+              </div>
             </div>
             <button
               type="button"
@@ -201,7 +251,9 @@ export default function EmailSuppressionsTab({
           </div>
 
           {auditState.error ? (
-            <div style={{ color: 'var(--sh-danger)', fontSize: 12, marginBottom: 8 }}>{auditState.error}</div>
+            <div style={{ color: 'var(--sh-danger)', fontSize: 12, marginBottom: 8 }}>
+              {auditState.error}
+            </div>
           ) : null}
 
           {auditState.loading && !auditState.loaded ? (
@@ -209,12 +261,34 @@ export default function EmailSuppressionsTab({
           ) : auditState.entries.length ? (
             <div style={{ display: 'grid', gap: 8 }}>
               {auditState.entries.map((entry) => (
-                <div key={entry.id} style={{ border: '1px solid var(--sh-slate-300)', borderRadius: 10, padding: '10px 12px', background: 'var(--sh-surface)' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, flexWrap: 'wrap', marginBottom: 4 }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)' }}>{formatLabel(entry.action)}</div>
-                    <div style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>{formatDateTime(entry.createdAt)}</div>
+                <div
+                  key={entry.id}
+                  style={{
+                    border: '1px solid var(--sh-slate-300)',
+                    borderRadius: 10,
+                    padding: '10px 12px',
+                    background: 'var(--sh-surface)',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      gap: 10,
+                      flexWrap: 'wrap',
+                      marginBottom: 4,
+                    }}
+                  >
+                    <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-brand)' }}>
+                      {formatLabel(entry.action)}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>
+                      {formatDateTime(entry.createdAt)}
+                    </div>
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--sh-slate-600)', marginBottom: 4 }}>{entry.reason || 'No reason provided.'}</div>
+                  <div style={{ fontSize: 12, color: 'var(--sh-slate-600)', marginBottom: 4 }}>
+                    {entry.reason || 'No reason provided.'}
+                  </div>
                   <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
                     Actor: {entry.performedBy?.username || 'System'}
                   </div>
@@ -222,7 +296,9 @@ export default function EmailSuppressionsTab({
               ))}
             </div>
           ) : (
-            <div style={{ color: 'var(--sh-muted)', fontSize: 12 }}>No audit entries recorded yet.</div>
+            <div style={{ color: 'var(--sh-muted)', fontSize: 12 }}>
+              No audit entries recorded yet.
+            </div>
           )}
 
           {auditState.loaded ? (

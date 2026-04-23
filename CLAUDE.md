@@ -46,6 +46,35 @@ Backend:
 
 ## Architecture Notes
 
+### Pages and Routing Reality (READ BEFORE PLANNING ANY PAGE WORK)
+
+**There is no dedicated Dashboard page.** Planning against a phantom `/dashboard` page has burned previous agents. The truth, verified April 19, 2026 against `frontend/studyhub-app/src/App.jsx`:
+
+- **Authenticated landing page: `/feed` (`FeedPage.jsx`).** `getAuthenticatedHomePath` in `frontend/studyhub-app/src/lib/authNavigation.js` returns `/feed` for students, `/admin` for admins. This is where every non-admin user lands after login.
+- **`/dashboard` is a 2-line redirect**, not a page. `DashboardRedirect` at App.jsx ~line 100 forwards authenticated users to `/users/:username`. App.jsx line 20 comment: `/* DashboardPage removed — /dashboard now redirects to /users/:me via DashboardRedirect */`.
+- **The "personal overview" UX lives on `UserProfilePage.jsx`** at `/users/:username`. The same page serves both "my profile" (when viewing yourself) and "other user's profile" (when viewing someone else). It has Overview / Study / Sheets / Posts / Achievements tabs and already imports `DashboardWidgets` + hits `/api/dashboard/summary`.
+- **Admin landing: `/admin` (`AdminPage.jsx`).** Admins never land on `/feed` or `/dashboard`.
+- **Sidebar chrome is shared.** `AppSidebar.jsx` renders on every authenticated route. Changes to it affect every page.
+
+Authoritative list of real pages (check `App.jsx` Routes block, lines ~353–655, before trusting anything else):
+
+- Public: `/` (HomePage), `/login`, `/register`, `/signup/role`, `/login/challenge/:id`, `/terms`, `/privacy`, `/guidelines`, `/cookies`, `/disclaimer`, `/data-request`, `/about`, `/pricing`, `/supporters`, `/forgot-password`, `/reset-password`
+- Authenticated: `/feed`, `/sheets`, `/sheets/upload`, `/sheets/new/lab`, `/sheets/:id/edit`, `/sheets/:id/lab`, `/sheets/:id/plagiarism`, `/sheets/:id`, `/sheets/preview/html/:id`, `/preview/:scope/:id`, `/tests`, `/tests/:id`, `/notes`, `/notes/:id`, `/messages`, `/study-groups`, `/study-groups/:id`, `/ai`, `/library`, `/library/:volumeId/read`, `/library/:volumeId`, `/playground`, `/announcements`, `/submit`, `/my-courses`, `/invite`, `/review`, `/admin`, `/settings`, `/onboarding`, `/users/:username`
+- Redirect-only: `/dashboard` → `/users/:username`
+
+Dead / legacy code (do NOT plan features against these files, and remove them when safe):
+
+- `frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx` — not imported by App.jsx, not rendered anywhere
+- `frontend/studyhub-app/src/pages/profile/.fuse_hidden*` — filesystem artifacts from rename operations
+
+Live files inside `pages/dashboard/` (KEEP — imported by UserProfilePage):
+
+- `pages/dashboard/DashboardWidgets.jsx` — imported by `UserProfilePage.jsx`
+- `pages/dashboard/dashboardConstants.js` — imported by `UserProfilePage.jsx` and the features barrel
+- `pages/dashboard/useDashboardData.js` — verify usage before removing; currently re-exported by `features/dashboard/index.js`
+
+**Rule for future agents:** Before planning or editing a "dashboard" feature, run `grep -n "<FileName>" App.jsx` to confirm the file is actually mounted as a Route element. If it's not in App.jsx, it's dead code regardless of what the file contains or what other agents' docs claim.
+
 ### General
 
 - URL parameters are the source of truth for list/search/filter pages such as `SheetsPage` and `FeedPage`.
@@ -165,7 +194,7 @@ Backend:
 
 - Inline style colors must use CSS custom property tokens from `index.css`. Semantic tokens (`--sh-danger`, `--sh-success`, `--sh-warning`, `--sh-info` with `-bg`, `-border`, `-text` variants), slate scale (`--sh-slate-50` through `--sh-slate-900`), and surface tokens (`--sh-surface`, `--sh-soft`, `--sh-border`). Exceptions: dark-mode-always editor panels, unique per-metric palette colors, white text on colored buttons.
 - Modals inside animated containers must use `createPortal(jsx, document.body)`. Any ancestor with `transform` (e.g., anime.js `fadeInUp`) creates a new containing block that breaks `position: fixed` viewport centering.
-- Do not use emojis anywhere in code or UI text.
+- Emoji policy (decided April 19, 2026 as part of the v2 design refresh): emoji are permitted ONLY inside user-generated content (feed posts, messages, note bodies, group discussions, comments, profile bios). Emoji are NEVER permitted in UI chrome — no emoji in component copy, buttons, headings, labels, toasts, modals, empty states, nav items, tab labels, or placeholder text. When rendering user content that contains emoji, treat it as normal text; do not strip it. This supersedes the earlier "no emojis anywhere" rule.
 
 ### HTML Security Policy
 
@@ -212,9 +241,10 @@ Tables with migrations (safe to query):
 - Scan existing implementation patterns before editing. Follow the established style unless correctness requires a change.
 - Keep changes incremental and pattern-aligned.
 - Prefer fixing root causes over local patches.
-- After each beta implementation cycle, document changes and validation results in `docs/beta-v2.0.0-release-log.md`.
+- After each beta implementation cycle, document changes and validation results in `docs/internal/beta-v2.0.0-release-log.md`.
 - For frontend validation in this repo, `npm --prefix frontend/studyhub-app run lint` is the reliable full-lint command.
 - Use quoted paths in PowerShell because the workspace path contains spaces.
+- `.git-blame-ignore-revs` at the repo root lists commits skipped by `git blame`. Enable locally with `git config blame.ignoreRevsFile .git-blame-ignore-revs`. GitHub honors it automatically. Add new revs when landing mechanical commits (reformats, mass renames, codemods) that would otherwise pollute blame.
 
 ## UI / Design Conventions
 
@@ -299,7 +329,47 @@ When handling a new task:
 5. All frontend API calls must use `${API}/api/...` (never omit the `/api` prefix).
 6. Validate changes with the smallest relevant lint/test/build commands, then broader checks if the surface area is wider.
 7. Update the beta release log when a beta-cycle code change is completed.
-8. Do not use emojis in code, comments, or UI text.
+8. Do not put emoji in UI chrome (component copy, buttons, headings, labels, nav, empty states, toasts). Emoji are allowed only inside user-generated content surfaces (feed posts, messages, notes, comments, group discussions, profile bios). See "CSS and Styling" for the full policy.
 9. All inline style colors must use CSS custom property tokens (`var(--sh-*)`).
 10. Wrap any call to `getBlockedUserIds` or `getMutedUserIds` in try-catch for graceful degradation.
+
+## Active Design Refresh Cycle (v2, April 2026)
+
+Founder-approved design refresh in progress. Context for any agent picking up this work:
+
+- Web master plan, roles integration, week-2-to-5 execution log, scholar tier (web portion), cloud import, creator audit, sheet custom CSS — all consolidated into `docs/internal/web-master-plan.md` (sections 1-7). Read the relevant section before editing any page it covers.
+- Mobile companion plan is archived at `docs/internal/mobile-archive.md` — section 5 (v2 companion plan) + section 6 (dev-testing procedures: LAN IP auto-sync, firewall setup, APK build flow). Mobile work is paused as of 2026-04-23; do not start new mobile work unless Abdul explicitly reopens it.
+- Role model + OAuth picker flow (underlying the roles integration above): `docs/internal/roles-and-permissions-plan.md`.
+- **All internal planning docs live in `docs/internal/` and are gitignored.** Do not recreate planning docs at the `docs/` root. Do not reference them by the old root path.
+- Identity: stay "Campus Lab" (warm paper, `#f6f5f2`, ink typography, blue `#2563eb` accent). Gradients remain accent moments on hero/auth only; do NOT gradient-fill inner app pages.
+- Emoji policy (see above): user content only, never UI chrome. The mockup's "Welcome back, Jaden 👋" renders as "Welcome back, Jaden" in our implementation.
+- Sheets browse Grid/List toggle: default List for all users; may revisit default for new users later.
+- Sheet card preview: adding `previewText` column to `StudySheet` (server-extracted from sanitized HTML on create/update). New migration required per the Migration Rules.
+- Top nav: keep existing `NavBar` + `--sh-nav-bg` chrome. Spacing/search polish only.
+- Phase 1 target: `frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx` (authenticated personal overview, NOT the public profile page at `/u/:username`). Sidebar section labels (MAIN/PERSONAL/ACCOUNT), sidebar user card at bottom, dashboard welcome context line, Top Contributors mini-widget. Frontend-only, no migrations.
+- Later phases (do not start without founder approval): Upcoming Exams card (needs schema work), inline Hub AI suggestion card, Sheets Grid view (needs `previewText` migration + backfill), auth split layout + referral banner, onboarding polish, feed polish, home hero dial-up.
+- Hard rules for this cycle (with the v2.1 dependency exception carved out below):
+  - No auth logic changes without founder approval.
+  - No git commits without founder approval.
+  - No hardcoded colors — always use `var(--sh-*)` tokens.
+  - No ad-hoc npm dependency churn. Do not add unused packages "just in case". Do not swap one library for another because you prefer it.
+
+- **v2.1 dependency exception (updated April 22, 2026).** The earlier blanket ban on `package.json` and `package-lock.json` changes is relaxed in the following narrow circumstances. This exception exists because discovery during v2 implementation surfaced cases (like the missing `idb` install on `/notes`) where the alternatives — rewriting library internals from scratch, or shipping broken routes — waste more time than a clean, auditable dependency change. **Abuse the exception and it gets revoked.**
+  - **Allowed without prompting again:** running `npm install` at the root of a workspace when the package is already declared in `dependencies` / `devDependencies` (i.e., you are syncing `node_modules` and at most regenerating `package-lock.json` to match the existing declaration). This is not a "new dep" — it is an install step a new developer would run.
+  - **Allowed when it is the ONLY viable path** — e.g., the page is crash-broken because of a missing module, there is no realistic inline-rewrite option within a few hours, and there is no existing dep that already solves the same problem:
+    1. Add exactly one dependency at a time.
+    2. Pin to a specific `~` or `^` range that matches the repo's existing styling.
+    3. Update both `package.json` and `package-lock.json` in the same commit.
+    4. Do not add transitive helpers ("while I'm in here…"). One problem → one dep.
+    5. Log the add in `docs/internal/beta-v2.0.0-release-log.md` under a `### Dependency changes` subsection with: date, package name + version, why no existing dep solved the need, and a one-line rollback plan.
+  - **Still forbidden without an explicit founder "yes" in chat:**
+    - Major version bumps of React, React Router, Vite, Prisma, Express, Socket.io, Tailwind, or any auth/crypto library.
+    - Replacing a library the repo already uses with a competitor.
+    - Adding runtime deps for purely internal developer-experience wins (formatters, linters, test reporters). Those go in `devDependencies` only, and still need founder approval.
+    - Adding anything that pulls native binaries or postinstall scripts into CI (Capacitor plugins, sharp, canvas, puppeteer, etc.).
+  - **Preferred order of remediation when an import is missing:**
+    1. Check whether the package is already declared in `package.json`. If yes, it is a sync problem — run `npm install` at that workspace; no founder approval required.
+    2. If the code is using <50 LOC worth of the library (like `idb` was) and there is a first-party standard API that replaces it (IndexedDB, fetch, FormData, URL, Intl, crypto.subtle, etc.), rewrite inline with no new dep.
+    3. If neither option works, follow the "Allowed when it is the ONLY viable path" checklist above and log the exception.
+  - **`package-lock.json` rules specifically:** never hand-edit. Only regenerate via `npm install`. If `package-lock.json` changes because of a legitimate install, commit it with the matching `package.json` change in the same commit so bisect stays clean.
                                                                                                                                                                                                                                                                                       

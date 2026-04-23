@@ -145,6 +145,8 @@ model User {
   videoAppeals               VideoAppeal[]         @relation("VideoAppealUploader")
   videoAppealReviews         VideoAppeal[]         @relation("VideoAppealReviewer")
   sessions                   Session[]
+  trustedDevices             TrustedDevice[]
+  loginChallenges            LoginChallenge[]
   securityEvents             SecurityEvent[]
   studyStatuses              StudyStatus[]
   onboardingProgress         OnboardingProgress?
@@ -160,6 +162,10 @@ model User {
   enrollmentArchives         UserEnrollmentArchive[]
   hashtagFollows             HashtagFollow[]
   learningGoals              LearningGoal[]
+  courseExams                CourseExam[]
+  sectionsTaught             Section[]              @relation("SectionTeacher")
+  sectionEnrollments         SectionEnrollment[]    @relation("SectionEnrollmentUser")
+  materialsAuthored          Material[]             @relation("MaterialTeacher")
 
   @@index([role])
   @@index([emailHash])
@@ -264,6 +270,8 @@ model Course {
   notes       Note[]
   feedPosts   FeedPost[]
   studyGroups StudyGroup[]
+  courseExams CourseExam[]
+  sections    Section[]
 
   @@unique([schoolId, code])
 }
@@ -336,6 +344,7 @@ model StudySheet {
   pinnedBy              UserPinnedSheet[]
   aiReviewLogs          AiReviewLog[]
   studyStatuses         StudyStatus[]
+  materials             Material[]          @relation("MaterialSheet")
 
   @@index([createdAt(sort: Desc)])
   @@index([courseId, createdAt(sort: Desc)])
@@ -466,6 +475,7 @@ model Note {
   noteStars        NoteStar[]
   noteVersions     NoteVersion[]
   noteReactions    NoteReaction[]
+  materials        Material[]    @relation("MaterialNote")
   revision         Int           @default(0)
   lastSaveId       String?       @db.Uuid
 }
@@ -794,6 +804,9 @@ model UserPreferences {
   defaultContributions Boolean @default(true)
   theme                String  @default("system")
   fontSize             String  @default("medium")
+  alertOnNewCountry    Boolean @default(true)
+  alertOnNewCity       Boolean @default(false)
+  blockAnonymousIp     Boolean @default(false)
   user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -2141,22 +2154,80 @@ model AiReviewLog {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model Session {
-  id           String    @id @default(cuid())
-  userId       Int
-  jti          String    @unique
-  userAgent    String?   @db.VarChar(512)
-  ipAddress    String?   @db.VarChar(45)
-  deviceLabel  String?   @db.VarChar(100)
-  lastActiveAt DateTime  @default(now())
-  expiresAt    DateTime
-  revokedAt    DateTime?
-  createdAt    DateTime  @default(now())
+  id              String    @id @default(cuid())
+  userId          Int
+  jti             String    @unique
+  userAgent       String?   @db.VarChar(512)
+  ipAddress       String?   @db.VarChar(45)
+  deviceLabel     String?   @db.VarChar(100)
+  deviceKind      String?   @db.VarChar(16)
+  country         String?   @db.VarChar(2)
+  region          String?   @db.VarChar(10)
+  city            String?   @db.VarChar(128)
+  riskScore       Int?
+  trustedDeviceId String?
+  lastActiveAt    DateTime  @default(now())
+  expiresAt       DateTime
+  revokedAt       DateTime?
+  createdAt       DateTime  @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trustedDevice TrustedDevice? @relation(fields: [trustedDeviceId], references: [id])
 
   @@index([userId])
   @@index([jti])
   @@index([expiresAt])
+  @@index([trustedDeviceId])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// LoginChallenge — Pending email-code step-up challenge.
+// Created when a login lands in the "challenge" risk band (score >= 60).
+// ═══════════════════════════════════════════════════════════════════════════
+
+model LoginChallenge {
+  id              String    @id @default(cuid())
+  userId          Int
+  pendingDeviceId String
+  codeHash        String    @db.VarChar(128)
+  attempts        Int       @default(0)
+  expiresAt       DateTime
+  consumedAt      DateTime?
+  createdAt       DateTime  @default(now())
+  ipAddress       String?   @db.VarChar(45)
+  userAgent       String?   @db.VarChar(512)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// TrustedDevice — Stable device identity across sessions
+// Keyed by the httpOnly `sh_did` cookie. Survives logout so we can recognize
+// a returning device. Revoked devices are treated as new on next login.
+// ═══════════════════════════════════════════════════════════════════════════
+
+model TrustedDevice {
+  id          String    @id @default(cuid())
+  userId      Int
+  deviceId    String
+  label       String
+  firstSeenAt DateTime  @default(now())
+  lastSeenAt  DateTime  @default(now())
+  lastIp      String?   @db.VarChar(45)
+  lastCountry String?   @db.VarChar(2)
+  lastRegion  String?   @db.VarChar(10)
+  trustedAt   DateTime?
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  sessions Session[]
+
+  @@unique([userId, deviceId])
+  @@index([userId])
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -2344,4 +2415,115 @@ model LearningGoal {
 
   @@index([userId])
   @@index([userId, createdAt])
+}
+
+// Phase 2 of v2 design refresh — Upcoming Exams.
+// See docs/internal/design-refresh-v2-master-plan.md §5.
+// Private by default; future "course"-level visibility is a stretch item, not in Phase 2.
+model CourseExam {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  courseId   Int
+  title      String   @db.VarChar(120)
+  location   String?  @db.VarChar(120)
+  examDate   DateTime
+  visibility String   @default("private")
+  notes      String?  @db.VarChar(500)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
+
+  @@index([userId, examDate])
+  @@index([courseId, examDate])
+}
+
+// Section — teacher-owned cohort used for section-aware publishing.
+// Week 3 of Design Refresh v2 (see docs/internal/design-refresh-v2-
+// week2-to-week5-execution.md). A section is optionally tied to a
+// Course; a teacher can also create ad-hoc sections that span courses.
+// joinCode is what students enter to self-enroll from
+// /classes/join?code=XYZ.
+model Section {
+  id          Int      @id @default(autoincrement())
+  courseId    Int?
+  teacherId   Int
+  name        String
+  description String   @default("")
+  joinCode    String   @unique
+  archived    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  course      Course?              @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  teacher     User                 @relation("SectionTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  enrollments SectionEnrollment[]
+  assignments MaterialAssignment[]
+
+  @@index([teacherId, archived])
+  @@index([courseId])
+}
+
+// SectionEnrollment — a student's membership in a Section. Role is a
+// String so future "ta" (teaching assistant) roles can be added without
+// a schema migration.
+model SectionEnrollment {
+  id         Int      @id @default(autoincrement())
+  sectionId  Int
+  userId     Int
+  role       String   @default("student")
+  enrolledAt DateTime @default(now())
+
+  section Section @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  user    User    @relation("SectionEnrollmentUser", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sectionId, userId])
+  @@index([userId])
+}
+
+// Material — teacher-curated wrapper around an existing StudySheet or
+// Note. The wrapper exists so teachers can override the title, attach
+// per-class instructions, and group items by week without mutating the
+// underlying content. Exactly one of (sheetId, noteId) is expected to
+// be non-null; this invariant is enforced in the service layer because
+// Postgres CHECK constraints aren't first-class in Prisma.
+model Material {
+  id           Int      @id @default(autoincrement())
+  teacherId    Int
+  sheetId      Int?
+  noteId       Int?
+  title        String
+  instructions String   @default("")
+  week         Int?
+  archived     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  teacher     User                 @relation("MaterialTeacher", fields: [teacherId], references: [id], onDelete: Cascade)
+  sheet       StudySheet?          @relation("MaterialSheet", fields: [sheetId], references: [id], onDelete: SetNull)
+  note        Note?                @relation("MaterialNote", fields: [noteId], references: [id], onDelete: SetNull)
+  assignments MaterialAssignment[]
+
+  @@index([teacherId, archived])
+  @@index([sheetId])
+  @@index([noteId])
+}
+
+// MaterialAssignment — join between Material and Section with per-
+// assignment metadata (optional due date). Unique on (materialId,
+// sectionId) so the same material cannot be assigned to the same
+// section twice.
+model MaterialAssignment {
+  id         Int       @id @default(autoincrement())
+  materialId Int
+  sectionId  Int
+  dueAt      DateTime?
+  assignedAt DateTime  @default(now())
+
+  material Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  section  Section  @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@unique([materialId, sectionId])
+  @@index([sectionId, dueAt])
 }

@@ -28,7 +28,8 @@ function parseClamAvReply(replyText) {
   if (foundIndex > 0) {
     const prefix = message.slice(0, foundIndex)
     const colonIndex = prefix.indexOf(':')
-    const threat = (colonIndex >= 0 ? prefix.slice(colonIndex + 1) : prefix).trim() || 'Unknown threat'
+    const threat =
+      (colonIndex >= 0 ? prefix.slice(colonIndex + 1) : prefix).trim() || 'Unknown threat'
     return {
       status: 'infected',
       isClean: false,
@@ -48,7 +49,10 @@ function parseClamAvReply(replyText) {
 function scanBufferWithClamAv(buffer, options = {}) {
   const content = Buffer.isBuffer(buffer) ? buffer : Buffer.from(String(buffer || ''), 'utf8')
 
-  if (process.env.NODE_ENV === 'test' || String(process.env.CLAMAV_DISABLED || '').toLowerCase() === 'true') {
+  if (
+    process.env.NODE_ENV === 'test' ||
+    String(process.env.CLAMAV_DISABLED || '').toLowerCase() === 'true'
+  ) {
     return Promise.resolve({
       status: 'clean',
       isClean: true,
@@ -60,7 +64,9 @@ function scanBufferWithClamAv(buffer, options = {}) {
 
   const host = options.host || DEFAULT_CLAMAV_HOST
   const port = Number.isInteger(options.port) ? options.port : DEFAULT_CLAMAV_PORT
-  const timeoutMs = Number.isInteger(options.timeoutMs) ? options.timeoutMs : DEFAULT_CLAMAV_TIMEOUT_MS
+  const timeoutMs = Number.isInteger(options.timeoutMs)
+    ? options.timeoutMs
+    : DEFAULT_CLAMAV_TIMEOUT_MS
 
   return new Promise((resolve) => {
     let settled = false

@@ -96,7 +96,8 @@ router.get('/', optionalAuth, async (req, res) => {
       where.userId = req.user.userId
 
       const validStatuses = Object.values(SHEET_STATUS)
-      const statusParam = typeof req.query.status === 'string' ? req.query.status.trim().toLowerCase() : ''
+      const statusParam =
+        typeof req.query.status === 'string' ? req.query.status.trim().toLowerCase() : ''
       if (statusParam && validStatuses.includes(statusParam)) {
         where.status = statusParam
       }
@@ -141,9 +142,12 @@ router.get('/', optionalAuth, async (req, res) => {
         skip,
       })
       const starredSheetIds = [...new Set(starredRows.map((row) => row.sheetId))]
-      const totalStarred = await prisma.starredSheet.count({ where: { userId: req.user.userId, sheet: where } })
+      const totalStarred = await prisma.starredSheet.count({
+        where: { userId: req.user.userId, sheet: where },
+      })
 
-      const starredOrderBy = sortField === 'recommended' ? { createdAt: 'desc' } : { [sortField]: 'desc' }
+      const starredOrderBy =
+        sortField === 'recommended' ? { createdAt: 'desc' } : { [sortField]: 'desc' }
       const sheets = await prisma.studySheet.findMany({
         where: { id: { in: starredSheetIds } },
         include: {
@@ -163,15 +167,17 @@ router.get('/', optionalAuth, async (req, res) => {
 
       const comments = await prisma.comment.groupBy({
         by: ['sheetId'],
-        where: { sheetId: { in: starredSheetIds }, },
+        where: { sheetId: { in: starredSheetIds } },
         _count: { _all: true },
       })
       const commentCountBySheetId = new Map(comments.map((row) => [row.sheetId, row._count._all]))
 
-      const ordered = sheets.map((sheet) => serializeSheet(sheet, {
-        starred: true,
-        commentCount: commentCountBySheetId.get(sheet.id) || 0,
-      }))
+      const ordered = sheets.map((sheet) =>
+        serializeSheet(sheet, {
+          starred: true,
+          commentCount: commentCountBySheetId.get(sheet.id) || 0,
+        }),
+      )
 
       return res.json({ sheets: ordered, total: totalStarred, limit: take, offset: skip })
     }
@@ -191,23 +197,24 @@ router.get('/', optionalAuth, async (req, res) => {
       const ftsSheetIds = ftsResult.sheets.map((s) => s.id)
 
       /* Hydrate with full Prisma relations for consistent serialization */
-      const hydratedSheets = ftsSheetIds.length > 0
-        ? await prisma.studySheet.findMany({
-            where: { id: { in: ftsSheetIds } },
-            include: {
-              author: { select: AUTHOR_SELECT },
-              course: { include: { school: true } },
-              forkSource: {
-                select: {
-                  id: true,
-                  title: true,
-                  userId: true,
-                  author: { select: AUTHOR_SELECT },
+      const hydratedSheets =
+        ftsSheetIds.length > 0
+          ? await prisma.studySheet.findMany({
+              where: { id: { in: ftsSheetIds } },
+              include: {
+                author: { select: AUTHOR_SELECT },
+                course: { include: { school: true } },
+                forkSource: {
+                  select: {
+                    id: true,
+                    title: true,
+                    userId: true,
+                    author: { select: AUTHOR_SELECT },
+                  },
                 },
               },
-            },
-          })
-        : []
+            })
+          : []
 
       /* Preserve rank ordering from the FTS query */
       const hydratedById = new Map(hydratedSheets.map((s) => [s.id, s]))
@@ -223,7 +230,7 @@ router.get('/', optionalAuth, async (req, res) => {
         ftsSheetIds.length > 0
           ? prisma.comment.groupBy({
               by: ['sheetId'],
-              where: { sheetId: { in: ftsSheetIds }, },
+              where: { sheetId: { in: ftsSheetIds } },
               _count: { _all: true },
             })
           : [],
@@ -233,10 +240,12 @@ router.get('/', optionalAuth, async (req, res) => {
       const ftsCommentMap = new Map(ftsCommentRows.map((r) => [r.sheetId, r._count._all]))
 
       return res.json({
-        sheets: orderedSheets.map((sheet) => serializeSheet(sheet, {
-          starred: ftsStarredIds.has(sheet.id),
-          commentCount: ftsCommentMap.get(sheet.id) || 0,
-        })),
+        sheets: orderedSheets.map((sheet) =>
+          serializeSheet(sheet, {
+            starred: ftsStarredIds.has(sheet.id),
+            commentCount: ftsCommentMap.get(sheet.id) || 0,
+          }),
+        ),
         total: ftsResult.total,
         limit: take,
         offset: skip,
@@ -286,10 +295,8 @@ router.get('/', optionalAuth, async (req, res) => {
           const scored = sheets.map((sheet) => {
             const ageDays = Math.max(1, (now - new Date(sheet.createdAt).getTime()) / DAY_MS)
             const freshness = Math.max(0, 10 - Math.log2(ageDays))
-            const score = (sheet.stars || 0) * 3
-              + (sheet.forks || 0) * 2
-              + (sheet.downloads || 0)
-              + freshness
+            const score =
+              (sheet.stars || 0) * 3 + (sheet.forks || 0) * 2 + (sheet.downloads || 0) + freshness
             return { sheet, score }
           })
           scored.sort((a, b) => b.score - a.score)
@@ -309,7 +316,7 @@ router.get('/', optionalAuth, async (req, res) => {
       sheetIds.length > 0
         ? prisma.comment.groupBy({
             by: ['sheetId'],
-            where: { sheetId: { in: sheetIds }, },
+            where: { sheetId: { in: sheetIds } },
             _count: { _all: true },
           })
         : [],
@@ -319,10 +326,12 @@ router.get('/', optionalAuth, async (req, res) => {
     const commentCountBySheetId = new Map(commentRows.map((row) => [row.sheetId, row._count._all]))
 
     res.json({
-      sheets: finalSheets.map((sheet) => serializeSheet(sheet, {
-        starred: starredIds.has(sheet.id),
-        commentCount: commentCountBySheetId.get(sheet.id) || 0,
-      })),
+      sheets: finalSheets.map((sheet) =>
+        serializeSheet(sheet, {
+          starred: starredIds.has(sheet.id),
+          commentCount: commentCountBySheetId.get(sheet.id) || 0,
+        }),
+      ),
       total,
       limit: take,
       offset: skip,

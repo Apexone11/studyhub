@@ -187,13 +187,14 @@ function buildLegalStatus(user, documents, acceptances) {
   const missingRequiredDocuments = statusDocuments
     .filter((document) => document.requiredAtSignup && !document.isAccepted)
     .map((document) => document.slug)
-  const lastAcceptedAt = acceptedRequiredDocuments.length > 0
-    ? new Date(
-        Math.max(
-          ...acceptedRequiredDocuments.map((document) => new Date(document.acceptedAt).getTime()),
-        ),
-      )
-    : user?.termsAcceptedAt || null
+  const lastAcceptedAt =
+    acceptedRequiredDocuments.length > 0
+      ? new Date(
+          Math.max(
+            ...acceptedRequiredDocuments.map((document) => new Date(document.acceptedAt).getTime()),
+          ),
+        )
+      : user?.termsAcceptedAt || null
 
   return {
     currentVersion: CURRENT_LEGAL_VERSION,

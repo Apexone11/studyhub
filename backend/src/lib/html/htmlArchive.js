@@ -28,10 +28,9 @@ async function archiveExpiredOriginalVersions(prisma, options = {}) {
   let archived = 0
 
   for (const candidate of candidates) {
-    const compressed = await gzipAsync(
-      Buffer.from(candidate.content, 'utf8'),
-      { level: zlib.constants.Z_BEST_SPEED },
-    )
+    const compressed = await gzipAsync(Buffer.from(candidate.content, 'utf8'), {
+      level: zlib.constants.Z_BEST_SPEED,
+    })
 
     await prisma.$transaction([
       prisma.sheetHtmlVersion.update({

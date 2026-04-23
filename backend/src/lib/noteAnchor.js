@@ -14,7 +14,8 @@ const CONTEXT_CHARS = 60
 function buildAnchorContext(noteContent, anchorText, anchorOffset) {
   if (!noteContent || !anchorText || typeof anchorOffset !== 'number') return null
 
-  const idx = anchorOffset >= 0 ? noteContent.indexOf(anchorText, Math.max(0, anchorOffset - 10)) : -1
+  const idx =
+    anchorOffset >= 0 ? noteContent.indexOf(anchorText, Math.max(0, anchorOffset - 10)) : -1
   const resolvedIdx = idx >= 0 ? idx : noteContent.indexOf(anchorText)
   if (resolvedIdx < 0) return null
 
@@ -34,11 +35,12 @@ function validateAnchorInput(body) {
   const anchorText = typeof body.anchorText === 'string' ? body.anchorText.slice(0, 500) : null
   if (!anchorText || anchorText.trim().length === 0) return null
 
-  const anchorOffset = typeof body.anchorOffset === 'number'
-    && Number.isInteger(body.anchorOffset)
-    && body.anchorOffset >= 0
-    ? body.anchorOffset
-    : null
+  const anchorOffset =
+    typeof body.anchorOffset === 'number' &&
+    Number.isInteger(body.anchorOffset) &&
+    body.anchorOffset >= 0
+      ? body.anchorOffset
+      : null
 
   return { anchorText: anchorText.trim(), anchorOffset }
 }

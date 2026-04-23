@@ -9,7 +9,13 @@ const { createNotification } = require('../../lib/notify')
 const { validateHtmlForSubmission } = require('../../lib/html/htmlSecurity')
 const { cleanupAttachmentIfUnused } = require('../../lib/storage')
 const { computeLineDiff, addWordSegments } = require('../../lib/diff')
-const { SHEET_STATUS, AUTHOR_SELECT, contributionRateLimiter, contributionReviewLimiter, diffLimiter } = require('./sheets.constants')
+const {
+  SHEET_STATUS,
+  AUTHOR_SELECT,
+  contributionRateLimiter,
+  contributionReviewLimiter,
+  diffLimiter,
+} = require('./sheets.constants')
 const { serializeContribution } = require('./sheets.serializer')
 const { computeChecksum } = require('../sheetLab/sheetLab.constants')
 const { trackActivity } = require('../../lib/activityTracker')
@@ -25,241 +31,259 @@ function sanitizeText(text) {
   return text.replace(/<[^>]*>/g, '').trim()
 }
 
-router.patch('/contributions/:contributionId', contributionReviewLimiter, requireAuth, requireVerifiedEmail, async (req, res) => {
-  const contributionId = Number.parseInt(req.params.contributionId, 10)
-  const action = typeof req.body.action === 'string' ? req.body.action.trim().toLowerCase() : ''
-  const reviewComment = sanitizeText(typeof req.body.reviewComment === 'string' ? req.body.reviewComment.slice(0, 1000) : '')
+router.patch(
+  '/contributions/:contributionId',
+  contributionReviewLimiter,
+  requireAuth,
+  requireVerifiedEmail,
+  async (req, res) => {
+    const contributionId = Number.parseInt(req.params.contributionId, 10)
+    const action = typeof req.body.action === 'string' ? req.body.action.trim().toLowerCase() : ''
+    const reviewComment = sanitizeText(
+      typeof req.body.reviewComment === 'string' ? req.body.reviewComment.slice(0, 1000) : '',
+    )
 
-  if (!Number.isInteger(contributionId)) {
-    return res.status(400).json({ error: 'Contribution id must be an integer.' })
-  }
-  if (!['accept', 'reject'].includes(action)) {
-    return res.status(400).json({ error: 'Action must be "accept" or "reject".' })
-  }
+    if (!Number.isInteger(contributionId)) {
+      return res.status(400).json({ error: 'Contribution id must be an integer.' })
+    }
+    if (!['accept', 'reject'].includes(action)) {
+      return res.status(400).json({ error: 'Action must be "accept" or "reject".' })
+    }
 
-  try {
-    const contribution = await prisma.sheetContribution.findUnique({
-      where: { id: contributionId },
-      include: {
-        targetSheet: {
-          select: { id: true, userId: true, title: true, content: true, attachmentUrl: true },
-        },
-        forkSheet: {
-          select: {
-            id: true,
-            title: true,
-            description: true,
-            content: true,
-            contentFormat: true,
-            attachmentUrl: true,
-            attachmentType: true,
-            attachmentName: true,
-            allowDownloads: true,
+    try {
+      const contribution = await prisma.sheetContribution.findUnique({
+        where: { id: contributionId },
+        include: {
+          targetSheet: {
+            select: { id: true, userId: true, title: true, content: true, attachmentUrl: true },
           },
-        },
-        proposer: { select: AUTHOR_SELECT },
-      },
-    })
-
-    if (!contribution) {
-      return res.status(404).json({ error: 'Contribution not found.' })
-    }
-    if (contribution.status !== 'pending') {
-      return res.status(409).json({ error: 'This contribution has already been reviewed.' })
-    }
-    if (req.user.role !== 'admin' && req.user.userId !== contribution.targetSheet.userId) {
-      return sendForbidden(res, 'Only the original author can review this contribution.')
-    }
-
-    // Conflict detection: check if target sheet has diverged since contribution was created
-    let hasConflict = false
-    if (action === 'accept' && contribution.baseChecksum) {
-      const currentChecksum = computeChecksum(contribution.targetSheet.content || '')
-      hasConflict = currentChecksum !== contribution.baseChecksum
-    }
-
-    if (action === 'accept') {
-      if (contribution.forkSheet.contentFormat === 'html') {
-        const validation = validateHtmlForSubmission(contribution.forkSheet.content)
-        if (!validation.ok) {
-          return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
-        }
-      }
-
-      await prisma.studySheet.update({
-        where: { id: contribution.targetSheetId },
-        data: {
-          description: contribution.forkSheet.description,
-          content: contribution.forkSheet.content,
-          contentFormat: contribution.forkSheet.contentFormat || 'markdown',
-          status: SHEET_STATUS.PUBLISHED,
-          attachmentUrl: contribution.forkSheet.attachmentUrl,
-          attachmentType: contribution.forkSheet.attachmentType,
-          attachmentName: contribution.forkSheet.attachmentName,
-          allowDownloads: contribution.forkSheet.allowDownloads,
+          forkSheet: {
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              content: true,
+              contentFormat: true,
+              attachmentUrl: true,
+              attachmentType: true,
+              attachmentName: true,
+              allowDownloads: true,
+            },
+          },
+          proposer: { select: AUTHOR_SELECT },
         },
       })
 
-      if (contribution.targetSheet.attachmentUrl !== contribution.forkSheet.attachmentUrl) {
-        await cleanupAttachmentIfUnused(prisma, contribution.targetSheet.attachmentUrl, {
-          route: req.originalUrl,
-          contributionId,
-          targetSheetId: contribution.targetSheetId,
+      if (!contribution) {
+        return res.status(404).json({ error: 'Contribution not found.' })
+      }
+      if (contribution.status !== 'pending') {
+        return res.status(409).json({ error: 'This contribution has already been reviewed.' })
+      }
+      if (req.user.role !== 'admin' && req.user.userId !== contribution.targetSheet.userId) {
+        return sendForbidden(res, 'Only the original author can review this contribution.')
+      }
+
+      // Conflict detection: check if target sheet has diverged since contribution was created
+      let hasConflict = false
+      if (action === 'accept' && contribution.baseChecksum) {
+        const currentChecksum = computeChecksum(contribution.targetSheet.content || '')
+        hasConflict = currentChecksum !== contribution.baseChecksum
+      }
+
+      if (action === 'accept') {
+        if (contribution.forkSheet.contentFormat === 'html') {
+          const validation = validateHtmlForSubmission(contribution.forkSheet.content)
+          if (!validation.ok) {
+            return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
+          }
+        }
+
+        await prisma.studySheet.update({
+          where: { id: contribution.targetSheetId },
+          data: {
+            description: contribution.forkSheet.description,
+            content: contribution.forkSheet.content,
+            contentFormat: contribution.forkSheet.contentFormat || 'markdown',
+            status: SHEET_STATUS.PUBLISHED,
+            attachmentUrl: contribution.forkSheet.attachmentUrl,
+            attachmentType: contribution.forkSheet.attachmentType,
+            attachmentName: contribution.forkSheet.attachmentName,
+            allowDownloads: contribution.forkSheet.allowDownloads,
+          },
+        })
+
+        if (contribution.targetSheet.attachmentUrl !== contribution.forkSheet.attachmentUrl) {
+          await cleanupAttachmentIfUnused(prisma, contribution.targetSheet.attachmentUrl, {
+            route: req.originalUrl,
+            contributionId,
+            targetSheetId: contribution.targetSheetId,
+          })
+        }
+
+        // Create a merge commit on the target sheet
+        const latestCommit = await prisma.sheetCommit.findFirst({
+          where: { sheetId: contribution.targetSheetId },
+          orderBy: { createdAt: 'desc' },
+          select: { id: true },
+        })
+
+        await prisma.sheetCommit.create({
+          data: {
+            sheetId: contribution.targetSheetId,
+            userId: req.user.userId,
+            kind: 'merge',
+            message: `Merged contribution from ${contribution.proposer.username} (reviewed by ${req.user.username})`,
+            content: contribution.forkSheet.content,
+            contentFormat: contribution.forkSheet.contentFormat || 'markdown',
+            checksum: computeChecksum(contribution.forkSheet.content),
+            parentId: latestCommit ? latestCommit.id : null,
+          },
         })
       }
 
-      // Create a merge commit on the target sheet
-      const latestCommit = await prisma.sheetCommit.findFirst({
-        where: { sheetId: contribution.targetSheetId },
-        orderBy: { createdAt: 'desc' },
+      const updatedContribution = await prisma.sheetContribution.update({
+        where: { id: contribution.id },
+        data: {
+          status: action === 'accept' ? 'accepted' : 'rejected',
+          reviewerId: req.user.userId,
+          reviewedAt: new Date(),
+          reviewComment,
+        },
+        include: {
+          proposer: { select: AUTHOR_SELECT },
+          reviewer: { select: AUTHOR_SELECT },
+          forkSheet: {
+            select: {
+              id: true,
+              title: true,
+              updatedAt: true,
+              author: { select: AUTHOR_SELECT },
+            },
+          },
+        },
+      })
+
+      trackActivity(prisma, req.user.userId, 'reviews')
+      checkAndAwardBadges(prisma, req.user.userId)
+
+      await createNotification(prisma, {
+        userId: contribution.proposer.id,
+        type: 'contribution',
+        message:
+          action === 'accept'
+            ? `${req.user.username} accepted your contribution to "${contribution.targetSheet.title}".`
+            : `${req.user.username} requested changes on your contribution to "${contribution.targetSheet.title}".`,
+        actorId: req.user.userId,
+        sheetId: contribution.targetSheet.id,
+        linkPath: `/sheets/${contribution.targetSheet.id}`,
+      })
+
+      const responseData = {
+        message: action === 'accept' ? 'Contribution accepted.' : 'Contribution rejected.',
+        contribution: serializeContribution(updatedContribution),
+      }
+      if (hasConflict) {
+        responseData.conflictWarning =
+          'The target sheet was modified since this contribution was submitted. The merge overwrote those changes.'
+      }
+      res.json(responseData)
+    } catch (error) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+      res.status(500).json({ error: 'Server error.' })
+    }
+  },
+)
+
+router.post(
+  '/:id/contributions',
+  requireAuth,
+  requireVerifiedEmail,
+  contributionRateLimiter,
+  async (req, res) => {
+    const forkSheetId = Number.parseInt(req.params.id, 10)
+    const message = sanitizeText(
+      typeof req.body.message === 'string' ? req.body.message.slice(0, 500) : '',
+    )
+
+    try {
+      const forkSheet = await prisma.studySheet.findUnique({
+        where: { id: forkSheetId },
+        select: {
+          id: true,
+          title: true,
+          userId: true,
+          forkOf: true,
+        },
+      })
+
+      if (!forkSheet) return res.status(404).json({ error: 'Sheet not found.' })
+      if (!forkSheet.forkOf) {
+        return res.status(400).json({ error: 'Only forked sheets can be contributed back.' })
+      }
+      if (forkSheet.userId !== req.user.userId && req.user.role !== 'admin') {
+        return sendForbidden(res, 'Only the fork owner can contribute changes.')
+      }
+
+      const targetSheet = await prisma.studySheet.findUnique({
+        where: { id: forkSheet.forkOf },
+        select: { id: true, title: true, userId: true, content: true },
+      })
+      if (!targetSheet) return res.status(404).json({ error: 'Original sheet not found.' })
+      if (targetSheet.userId === req.user.userId) {
+        return res.status(400).json({ error: 'You cannot contribute back to your own sheet.' })
+      }
+
+      const pending = await prisma.sheetContribution.findFirst({
+        where: {
+          targetSheetId: targetSheet.id,
+          forkSheetId,
+          status: 'pending',
+        },
         select: { id: true },
       })
+      if (pending) {
+        return res.status(409).json({ error: 'This fork already has a pending contribution.' })
+      }
 
-      await prisma.sheetCommit.create({
+      const contribution = await prisma.sheetContribution.create({
         data: {
-          sheetId: contribution.targetSheetId,
-          userId: req.user.userId,
-          kind: 'merge',
-          message: `Merged contribution from ${contribution.proposer.username} (reviewed by ${req.user.username})`,
-          content: contribution.forkSheet.content,
-          contentFormat: contribution.forkSheet.contentFormat || 'markdown',
-          checksum: computeChecksum(contribution.forkSheet.content),
-          parentId: latestCommit ? latestCommit.id : null,
+          targetSheetId: targetSheet.id,
+          forkSheetId,
+          proposerId: req.user.userId,
+          message,
+          baseChecksum: computeChecksum(targetSheet.content || ''),
+        },
+        include: {
+          proposer: { select: AUTHOR_SELECT },
+          reviewer: { select: AUTHOR_SELECT },
+          forkSheet: {
+            select: {
+              id: true,
+              title: true,
+              updatedAt: true,
+              author: { select: AUTHOR_SELECT },
+            },
+          },
         },
       })
+
+      await createNotification(prisma, {
+        userId: targetSheet.userId,
+        type: 'contribution',
+        message: `${req.user.username} wants to contribute changes to "${targetSheet.title}".`,
+        actorId: req.user.userId,
+        sheetId: targetSheet.id,
+        linkPath: `/sheets/${targetSheet.id}`,
+      })
+
+      res.status(201).json({ contribution: serializeContribution(contribution) })
+    } catch (error) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+      res.status(500).json({ error: 'Server error.' })
     }
-
-    const updatedContribution = await prisma.sheetContribution.update({
-      where: { id: contribution.id },
-      data: {
-        status: action === 'accept' ? 'accepted' : 'rejected',
-        reviewerId: req.user.userId,
-        reviewedAt: new Date(),
-        reviewComment,
-      },
-      include: {
-        proposer: { select: AUTHOR_SELECT },
-        reviewer: { select: AUTHOR_SELECT },
-        forkSheet: {
-          select: {
-            id: true,
-            title: true,
-            updatedAt: true,
-            author: { select: AUTHOR_SELECT },
-          },
-        },
-      },
-    })
-
-    trackActivity(prisma, req.user.userId, 'reviews')
-    checkAndAwardBadges(prisma, req.user.userId)
-
-    await createNotification(prisma, {
-      userId: contribution.proposer.id,
-      type: 'contribution',
-      message: action === 'accept'
-        ? `${req.user.username} accepted your contribution to "${contribution.targetSheet.title}".`
-        : `${req.user.username} requested changes on your contribution to "${contribution.targetSheet.title}".`,
-      actorId: req.user.userId,
-      sheetId: contribution.targetSheet.id,
-      linkPath: `/sheets/${contribution.targetSheet.id}`,
-    })
-
-    const responseData = {
-      message: action === 'accept' ? 'Contribution accepted.' : 'Contribution rejected.',
-      contribution: serializeContribution(updatedContribution),
-    }
-    if (hasConflict) {
-      responseData.conflictWarning = 'The target sheet was modified since this contribution was submitted. The merge overwrote those changes.'
-    }
-    res.json(responseData)
-  } catch (error) {
-    captureError(error, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-})
-
-router.post('/:id/contributions', requireAuth, requireVerifiedEmail, contributionRateLimiter, async (req, res) => {
-  const forkSheetId = Number.parseInt(req.params.id, 10)
-  const message = sanitizeText(typeof req.body.message === 'string' ? req.body.message.slice(0, 500) : '')
-
-  try {
-    const forkSheet = await prisma.studySheet.findUnique({
-      where: { id: forkSheetId },
-      select: {
-        id: true,
-        title: true,
-        userId: true,
-        forkOf: true,
-      },
-    })
-
-    if (!forkSheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!forkSheet.forkOf) {
-      return res.status(400).json({ error: 'Only forked sheets can be contributed back.' })
-    }
-    if (forkSheet.userId !== req.user.userId && req.user.role !== 'admin') {
-      return sendForbidden(res, 'Only the fork owner can contribute changes.')
-    }
-
-    const targetSheet = await prisma.studySheet.findUnique({
-      where: { id: forkSheet.forkOf },
-      select: { id: true, title: true, userId: true, content: true },
-    })
-    if (!targetSheet) return res.status(404).json({ error: 'Original sheet not found.' })
-    if (targetSheet.userId === req.user.userId) {
-      return res.status(400).json({ error: 'You cannot contribute back to your own sheet.' })
-    }
-
-    const pending = await prisma.sheetContribution.findFirst({
-      where: {
-        targetSheetId: targetSheet.id,
-        forkSheetId,
-        status: 'pending',
-      },
-      select: { id: true },
-    })
-    if (pending) {
-      return res.status(409).json({ error: 'This fork already has a pending contribution.' })
-    }
-
-    const contribution = await prisma.sheetContribution.create({
-      data: {
-        targetSheetId: targetSheet.id,
-        forkSheetId,
-        proposerId: req.user.userId,
-        message,
-        baseChecksum: computeChecksum(targetSheet.content || ''),
-      },
-      include: {
-        proposer: { select: AUTHOR_SELECT },
-        reviewer: { select: AUTHOR_SELECT },
-        forkSheet: {
-          select: {
-            id: true,
-            title: true,
-            updatedAt: true,
-            author: { select: AUTHOR_SELECT },
-          },
-        },
-      },
-    })
-
-    await createNotification(prisma, {
-      userId: targetSheet.userId,
-      type: 'contribution',
-      message: `${req.user.username} wants to contribute changes to "${targetSheet.title}".`,
-      actorId: req.user.userId,
-      sheetId: targetSheet.id,
-      linkPath: `/sheets/${targetSheet.id}`,
-    })
-
-    res.status(201).json({ contribution: serializeContribution(contribution) })
-  } catch (error) {
-    captureError(error, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-})
+  },
+)
 
 router.get('/contributions/:contributionId/diff', requireAuth, diffLimiter, async (req, res) => {
   const contributionId = Number.parseInt(req.params.contributionId, 10)
@@ -287,7 +311,7 @@ router.get('/contributions/:contributionId/diff', requireAuth, diffLimiter, asyn
 
     const diff = computeLineDiff(
       contribution.targetSheet.content || '',
-      contribution.forkSheet.content || ''
+      contribution.forkSheet.content || '',
     )
     addWordSegments(diff.hunks)
 
@@ -366,11 +390,7 @@ router.get('/contributions/:contributionId/comments', requireAuth, async (req, r
     const comments = await prisma.contributionComment.findMany({
       where: { contributionId },
       include: { author: { select: AUTHOR_SELECT } },
-      orderBy: [
-        { hunkIndex: 'asc' },
-        { lineOffset: 'asc' },
-        { createdAt: 'asc' },
-      ],
+      orderBy: [{ hunkIndex: 'asc' }, { lineOffset: 'asc' }, { createdAt: 'asc' }],
     })
 
     return res.json({ comments: comments.map(serializeComment) })
@@ -394,13 +414,25 @@ router.post(
     const hunkIndex = Number.parseInt(req.body?.hunkIndex, 10)
     const lineOffset = Number.parseInt(req.body?.lineOffset, 10)
     const side = typeof req.body?.side === 'string' ? req.body.side.trim().toLowerCase() : 'new'
-    const body = sanitizeText(typeof req.body?.body === 'string' ? req.body.body.slice(0, MAX_COMMENT_BODY) : '')
+    const body = sanitizeText(
+      typeof req.body?.body === 'string' ? req.body.body.slice(0, MAX_COMMENT_BODY) : '',
+    )
 
     if (!Number.isInteger(hunkIndex) || hunkIndex < 0) {
-      return sendError(res, 400, 'hunkIndex must be a non-negative integer.', ERROR_CODES.VALIDATION)
+      return sendError(
+        res,
+        400,
+        'hunkIndex must be a non-negative integer.',
+        ERROR_CODES.VALIDATION,
+      )
     }
     if (!Number.isInteger(lineOffset) || lineOffset < 0) {
-      return sendError(res, 400, 'lineOffset must be a non-negative integer.', ERROR_CODES.VALIDATION)
+      return sendError(
+        res,
+        400,
+        'lineOffset must be a non-negative integer.',
+        ERROR_CODES.VALIDATION,
+      )
     }
     if (!['old', 'new'].includes(side)) {
       return sendError(res, 400, 'side must be "old" or "new".', ERROR_CODES.VALIDATION)
@@ -465,34 +497,38 @@ router.post(
   },
 )
 
-router.delete('/contributions/:contributionId/comments/:commentId', requireAuth, async (req, res) => {
-  const contributionId = Number.parseInt(req.params.contributionId, 10)
-  const commentId = Number.parseInt(req.params.commentId, 10)
-  if (!Number.isInteger(contributionId) || !Number.isInteger(commentId)) {
-    return sendError(res, 400, 'Invalid id.', ERROR_CODES.BAD_REQUEST)
-  }
-
-  try {
-    const comment = await prisma.contributionComment.findUnique({
-      where: { id: commentId },
-      select: { id: true, userId: true, contributionId: true },
-    })
-    if (!comment || comment.contributionId !== contributionId) {
-      return sendError(res, 404, 'Comment not found.', ERROR_CODES.NOT_FOUND)
+router.delete(
+  '/contributions/:contributionId/comments/:commentId',
+  requireAuth,
+  async (req, res) => {
+    const contributionId = Number.parseInt(req.params.contributionId, 10)
+    const commentId = Number.parseInt(req.params.commentId, 10)
+    if (!Number.isInteger(contributionId) || !Number.isInteger(commentId)) {
+      return sendError(res, 400, 'Invalid id.', ERROR_CODES.BAD_REQUEST)
     }
 
-    const isAuthor = req.user.userId === comment.userId
-    const isAdmin = req.user.role === 'admin'
-    if (!isAuthor && !isAdmin) {
-      return sendError(res, 404, 'Comment not found.', ERROR_CODES.NOT_FOUND)
-    }
+    try {
+      const comment = await prisma.contributionComment.findUnique({
+        where: { id: commentId },
+        select: { id: true, userId: true, contributionId: true },
+      })
+      if (!comment || comment.contributionId !== contributionId) {
+        return sendError(res, 404, 'Comment not found.', ERROR_CODES.NOT_FOUND)
+      }
 
-    await prisma.contributionComment.delete({ where: { id: commentId } })
-    return res.json({ message: 'Comment deleted.' })
-  } catch (error) {
-    captureError(error, { route: req.originalUrl, method: req.method })
-    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
-  }
-})
+      const isAuthor = req.user.userId === comment.userId
+      const isAdmin = req.user.role === 'admin'
+      if (!isAuthor && !isAdmin) {
+        return sendError(res, 404, 'Comment not found.', ERROR_CODES.NOT_FOUND)
+      }
+
+      await prisma.contributionComment.delete({ where: { id: commentId } })
+      return res.json({ message: 'Comment deleted.' })
+    } catch (error) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+      return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 module.exports = router

@@ -121,8 +121,14 @@ function normalizeLegalText(value) {
     .trim()
 
   text = text.replace(/([a-z0-9)\]])\.([A-Z])/g, '$1.\n\n$2')
-  text = text.replace(/([a-z0-9,)])([A-Z]{2,}(?:\s+[A-Z0-9][A-Z0-9'"/&(),:;-]{2,}){1,})(?=[A-Z][a-z])/g, '$1\n\n$2')
-  text = text.replace(/([A-Z][A-Z &'"/(),:;-]{6,})(Last updated\s+[A-Z][a-z]+\s+\d{2},\s+\d{4})/g, '$1\n$2')
+  text = text.replace(
+    /([a-z0-9,)])([A-Z]{2,}(?:\s+[A-Z0-9][A-Z0-9'"/&(),:;-]{2,}){1,})(?=[A-Z][a-z])/g,
+    '$1\n\n$2',
+  )
+  text = text.replace(
+    /([A-Z][A-Z &'"/(),:;-]{6,})(Last updated\s+[A-Z][a-z]+\s+\d{2},\s+\d{4})/g,
+    '$1\n$2',
+  )
   text = text.replace(/(Last updated\s+[A-Z][a-z]+\s+\d{2},\s+\d{4})([A-Z])/g, '$1\n\n$2')
   text = text.replace(/(TABLE OF CONTENTS)(\d+\.\s+)/g, '$1\n$2')
   text = text.replace(/([^\n])(\d+\.\s+[A-Z])/g, '$1\n$2')
@@ -150,9 +156,9 @@ function isTitleLine(line) {
 
 function isHeadingLine(line) {
   return (
-    /^\d+\.\s+[A-Z][A-Z0-9 &'"/(),:;?-]{4,}$/.test(line)
-    || /^[A-Z][A-Z0-9 &'"/(),:;?-]{5,}$/.test(line)
-    || /^[A-Z][a-z]+(?: [A-Z][a-z'"/()-]+){0,7}$/.test(line)
+    /^\d+\.\s+[A-Z][A-Z0-9 &'"/(),:;?-]{4,}$/.test(line) ||
+    /^[A-Z][A-Z0-9 &'"/(),:;?-]{5,}$/.test(line) ||
+    /^[A-Z][a-z]+(?: [A-Z][a-z'"/()-]+){0,7}$/.test(line)
   )
 }
 
@@ -206,7 +212,10 @@ export default function LegalDocumentText({ bodyText, variant = 'default' }) {
       )}
 
       {blocks.map((block, index) => {
-        const lines = block.split('\n').map((line) => line.trim()).filter(Boolean)
+        const lines = block
+          .split('\n')
+          .map((line) => line.trim())
+          .filter(Boolean)
         if (lines.length === 0) return null
 
         if (/^In Short:/i.test(block)) {
@@ -244,7 +253,11 @@ export default function LegalDocumentText({ bodyText, variant = 'default' }) {
           )
         }
 
-        if (lines.length > 1 && lines[0].endsWith(':') && lines.slice(1).every((line) => line.length <= 180)) {
+        if (
+          lines.length > 1 &&
+          lines[0].endsWith(':') &&
+          lines.slice(1).every((line) => line.length <= 180)
+        ) {
           const listType = getListType(lines.slice(1))
           const ListTag = listType === 'ordered' ? 'ol' : 'ul'
           return (

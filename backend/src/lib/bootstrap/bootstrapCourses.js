@@ -14,10 +14,10 @@ async function ensureCourses(prisma, schoolsByShort) {
 
     const targetCourses = COURSES[short] || COURSES.DEFAULT || []
     const existingCodes = new Set(
-      (currentSchool.courses || []).map((course) => String(course.code).toUpperCase())
+      (currentSchool.courses || []).map((course) => String(course.code).toUpperCase()),
     )
     const missingCourses = targetCourses.filter(
-      (course) => !existingCodes.has(String(course.code).toUpperCase())
+      (course) => !existingCodes.has(String(course.code).toUpperCase()),
     )
 
     if (missingCourses.length > 0) {

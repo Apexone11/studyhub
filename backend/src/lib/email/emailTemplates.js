@@ -520,6 +520,109 @@ async function sendReferralInvite(toEmail, inviterUsername, referralCode) {
   )
 }
 
+/**
+ * Alert that a new sign-in happened from an unusual location or device.
+ * Fires in the "notify" risk band (30-59). Includes a one-use revoke link
+ * so the user can kill the session + trusted device in one click.
+ */
+async function sendNewLoginLocation(toEmail, username, details) {
+  const { deviceLabel, city, region, country, ipAddress, when, revokeUrl, resetUrl } = details || {}
+  const prettyLocation = [city, region, country].filter(Boolean).join(', ') || 'Unknown location'
+  const prettyWhen = when ? new Date(when).toUTCString() : 'Just now'
+
+  const body = `
+    <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">New sign-in to your account</h2>
+    <p style="margin:0 0 20px;color:#6b7280;font-size:15px;">Hi <strong>${escapeHtml(username)}</strong>, we noticed a new sign-in from an unusual location or device. If this was you, no action is needed.</p>
+    <div style="background:#f0f4f8;border:1px solid #e5e7eb;border-radius:10px;padding:14px 18px;margin:0 0 20px;">
+      <p style="margin:0 0 6px;color:#6b7280;font-size:13px;">Device</p>
+      <p style="margin:0 0 12px;color:#1e3a5f;font-size:15px;font-weight:bold;">${escapeHtml(deviceLabel || 'Unknown device')}</p>
+      <p style="margin:0 0 6px;color:#6b7280;font-size:13px;">Location</p>
+      <p style="margin:0 0 12px;color:#1e3a5f;font-size:15px;">${escapeHtml(prettyLocation)}</p>
+      <p style="margin:0 0 6px;color:#6b7280;font-size:13px;">IP address</p>
+      <p style="margin:0 0 12px;color:#1e3a5f;font-size:14px;font-family:monospace;">${escapeHtml(ipAddress || 'Unknown')}</p>
+      <p style="margin:0 0 6px;color:#6b7280;font-size:13px;">When</p>
+      <p style="margin:0;color:#1e3a5f;font-size:14px;">${escapeHtml(prettyWhen)}</p>
+    </div>
+    ${
+      revokeUrl
+        ? `<div style="text-align:center;margin:0 0 16px;">
+      <a href="${escapeHtml(revokeUrl)}" style="display:inline-block;background:#dc2626;color:#ffffff;text-decoration:none;font-weight:bold;font-size:15px;padding:14px 28px;border-radius:8px;">This wasn't me — revoke this device</a>
+    </div>`
+        : ''
+    }
+    ${
+      resetUrl
+        ? `<p style="margin:0 0 8px;color:#6b7280;font-size:13px;">If you don't recognize this, also <a href="${escapeHtml(resetUrl)}" style="color:#2563eb;font-weight:600;">change your password</a> right away.</p>`
+        : ''
+    }
+    <p style="margin:16px 0 0;color:#9ca3af;font-size:12px;">You are receiving this because "Alert me on new country" is enabled in your Security settings. You can change this preference anytime.</p>
+  `
+
+  await deliverMail(
+    {
+      from: `"StudyHub" <${getFromAddress()}>`,
+      to: toEmail,
+      subject: `New sign-in from ${prettyLocation}`,
+      text: [
+        `Hi ${username},`,
+        '',
+        `New sign-in detected on your StudyHub account:`,
+        `  Device: ${deviceLabel || 'Unknown device'}`,
+        `  Location: ${prettyLocation}`,
+        `  IP: ${ipAddress || 'Unknown'}`,
+        `  When: ${prettyWhen}`,
+        '',
+        revokeUrl ? `This wasn't me — revoke: ${revokeUrl}` : '',
+        resetUrl ? `Change your password: ${resetUrl}` : '',
+      ]
+        .filter(Boolean)
+        .join('\n'),
+      html: htmlWrap('New sign-in to your StudyHub account', body),
+    },
+    'new-login-location',
+  )
+}
+
+/**
+ * Send a 6-digit step-up code for high-risk login attempts.
+ * Fires in the "challenge" risk band (score >= 60).
+ */
+async function sendLoginChallengeCode(toEmail, username, code, details = {}) {
+  const { city, region, country, ipAddress } = details
+  const prettyLocation = [city, region, country].filter(Boolean).join(', ') || 'an unusual location'
+
+  const body = `
+    <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Confirm it's really you</h2>
+    <p style="margin:0 0 20px;color:#6b7280;font-size:15px;">Hi <strong>${escapeHtml(username)}</strong>, we flagged a high-risk sign-in attempt from ${escapeHtml(prettyLocation)}${ipAddress ? ` (${escapeHtml(ipAddress)})` : ''}. Enter the code below to continue.</p>
+    <div style="text-align:center;margin:0 0 24px;">
+      <div style="display:inline-block;background:#f0f4f8;border:2px solid #e5e7eb;border-radius:12px;padding:20px 40px;">
+        <p style="margin:0 0 4px;color:#6b7280;font-size:13px;letter-spacing:0.5px;">YOUR CODE</p>
+        <p style="margin:0;color:#1e3a5f;font-size:32px;font-weight:bold;letter-spacing:8px;font-family:monospace;">${escapeHtml(code)}</p>
+      </div>
+    </div>
+    <p style="margin:0 0 8px;color:#6b7280;font-size:13px;">This code expires in <strong>15 minutes</strong>. If you didn't try to sign in, someone may be trying to access your account — change your password immediately and review your active sessions in Settings &raquo; Sessions.</p>
+  `
+
+  await deliverMail(
+    {
+      from: `"StudyHub" <${getFromAddress()}>`,
+      to: toEmail,
+      subject: 'Your StudyHub sign-in code',
+      text: [
+        `Hi ${username},`,
+        '',
+        `Someone is attempting to sign in to your StudyHub account from ${prettyLocation}.`,
+        `Enter this 6-digit code to continue: ${code}`,
+        '',
+        'This code expires in 15 minutes.',
+        'If you did not try to sign in, change your password immediately.',
+      ].join('\n'),
+      html: htmlWrap('Your StudyHub sign-in code', body),
+    },
+    'login-challenge-code',
+  )
+}
+
 module.exports = {
   sendEmailSmoke,
   sendPasswordReset,
@@ -530,4 +633,6 @@ module.exports = {
   sendCourseRequestNotice,
   sendHighRiskSheetAlert,
   sendReferralInvite,
+  sendNewLoginLocation,
+  sendLoginChallengeCode,
 }

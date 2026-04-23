@@ -125,7 +125,10 @@ describe('AnnouncementsPage', () => {
 
     await user.click(screen.getByRole('button', { name: /Post Announcement/i }))
     await user.type(screen.getByPlaceholderText('Announcement title'), 'Service update')
-    await user.type(screen.getByPlaceholderText('Write the announcement body…'), 'Beta stack is healthy again.')
+    await user.type(
+      screen.getByPlaceholderText('Write the announcement body...'),
+      'Beta stack is healthy again.',
+    )
     await user.click(screen.getByRole('button', { name: 'Post' }))
 
     await screen.findByText('Service update')

@@ -106,7 +106,14 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Moderator access required.' })
     }
 
-    const { title, description = '', location = '', scheduledAt, durationMins = 60, recurring } = req.body
+    const {
+      title,
+      description = '',
+      location = '',
+      scheduledAt,
+      durationMins = 60,
+      recurring,
+    } = req.body
 
     // Validate title
     const validTitle = validateTitle(title)
@@ -169,13 +176,16 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       })
 
       if (members.length > 0 && groupData) {
-        await createNotifications(prisma, members.map((member) => ({
+        await createNotifications(
+          prisma,
+          members.map((member) => ({
             userId: member.userId,
             type: 'group_session',
             message: `${req.user.username} scheduled a session in ${groupData.name}: ${validTitle}`,
             actorId: req.user.userId,
             linkPath: `/study-groups/${groupId}`,
-          })))
+          })),
+        )
       }
     } catch (notifErr) {
       // Fire-and-forget: don't fail the request

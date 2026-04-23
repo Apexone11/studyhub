@@ -12,5 +12,8 @@ export { useNoteComments } from '../../pages/notes/useNoteComments'
 
 // Constants & components
 export {
-  TOOLBAR_ACTIONS, applyToolbarAction, MarkdownPreview, wordCount,
+  TOOLBAR_ACTIONS,
+  applyToolbarAction,
+  MarkdownPreview,
+  wordCount,
 } from '../../pages/notes/notesConstants'

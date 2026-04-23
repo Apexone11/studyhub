@@ -25,9 +25,10 @@ function handleRouteError(res, error, { captureError, route, method } = {}) {
     captureError(error, { route, method })
   }
 
-  const code = typeof error.code === 'string' && error.code.trim()
-    ? error.code.trim()
-    : defaultErrorCode(statusCode)
+  const code =
+    typeof error.code === 'string' && error.code.trim()
+      ? error.code.trim()
+      : defaultErrorCode(statusCode)
 
   return sendError(res, statusCode, error.message || 'Server error.', code)
 }

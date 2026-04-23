@@ -58,8 +58,8 @@ describe('SearchModal', () => {
     await user.type(screen.getByPlaceholderText('Search sheets, notes, courses, users...'), 'cmsc')
 
     await user.click(
-      await screen.findByText((content, element) =>
-        element?.textContent === 'CMSC101 — Intro to Programming',
+      await screen.findByText(
+        (content, element) => element?.textContent === 'CMSC101 — Intro to Programming',
       ),
     )
 

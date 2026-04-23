@@ -31,7 +31,9 @@ export function HistorySection() {
     async function load() {
       setLoading(true)
       try {
-        const r = await fetch(`${API}/api/moderation/my-log?page=${page}`, { credentials: 'include' })
+        const r = await fetch(`${API}/api/moderation/my-log?page=${page}`, {
+          credentials: 'include',
+        })
         const data = await r.json()
         if (!cancelled) setLog(data)
       } catch {
@@ -41,10 +43,17 @@ export function HistorySection() {
       }
     }
     load()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [page])
 
-  if (loading) return <div style={{ padding: 24, textAlign: 'center', color: 'var(--sh-muted)' }}>Loading history...</div>
+  if (loading)
+    return (
+      <div style={{ padding: 24, textAlign: 'center', color: 'var(--sh-muted)' }}>
+        Loading history...
+      </div>
+    )
 
   if (!log.items || log.items.length === 0) {
     return (
@@ -84,9 +93,15 @@ export function HistorySection() {
             disabled={page <= 1}
             onClick={() => setPage((p) => Math.max(1, p - 1))}
             style={{
-              padding: '6px 14px', borderRadius: 8, border: '1px solid var(--sh-border)',
-              background: 'var(--sh-surface)', color: 'var(--sh-subtext)',
-              fontSize: 13, fontWeight: 700, cursor: page <= 1 ? 'not-allowed' : 'pointer', fontFamily: FONT,
+              padding: '6px 14px',
+              borderRadius: 8,
+              border: '1px solid var(--sh-border)',
+              background: 'var(--sh-surface)',
+              color: 'var(--sh-subtext)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: page <= 1 ? 'not-allowed' : 'pointer',
+              fontFamily: FONT,
             }}
           >
             Previous
@@ -99,9 +114,15 @@ export function HistorySection() {
             disabled={page >= log.totalPages}
             onClick={() => setPage((p) => Math.min(log.totalPages, p + 1))}
             style={{
-              padding: '6px 14px', borderRadius: 8, border: '1px solid var(--sh-border)',
-              background: 'var(--sh-surface)', color: 'var(--sh-subtext)',
-              fontSize: 13, fontWeight: 700, cursor: page >= log.totalPages ? 'not-allowed' : 'pointer', fontFamily: FONT,
+              padding: '6px 14px',
+              borderRadius: 8,
+              border: '1px solid var(--sh-border)',
+              background: 'var(--sh-surface)',
+              color: 'var(--sh-subtext)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: page >= log.totalPages ? 'not-allowed' : 'pointer',
+              fontFamily: FONT,
             }}
           >
             Next

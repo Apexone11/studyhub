@@ -24,6 +24,7 @@ const {
 const { serializeSheet } = require('./sheets.serializer')
 const log = require('../../lib/logger')
 
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 
 router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
@@ -35,9 +36,9 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
     user: req.user,
   })
 
-  if (!title?.trim()) return res.status(400).json({ error: 'Title is required.' })
-  if (!content?.trim()) return res.status(400).json({ error: 'Content is required.' })
-  if (!courseId) return res.status(400).json({ error: 'Course is required.' })
+  if (!title?.trim()) return sendError(res, 400, 'Title is required.', ERROR_CODES.BAD_REQUEST)
+  if (!content?.trim()) return sendError(res, 400, 'Content is required.', ERROR_CODES.BAD_REQUEST)
+  if (!courseId) return sendError(res, 400, 'Course is required.', ERROR_CODES.BAD_REQUEST)
 
   try {
     /* Check upload quota based on user tier (free/donor/pro) */
@@ -58,10 +59,12 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
         })
 
         if (monthlyCount >= limit) {
-          return res.status(403).json({
-            error: `Monthly upload limit reached (${limit}). Upgrade to Pro for unlimited uploads.`,
-            code: 'UPLOAD_LIMIT',
-          })
+          return sendError(
+            res,
+            403,
+            `Monthly upload limit reached (${limit}). Upgrade to Pro for unlimited uploads.`,
+            'UPLOAD_LIMIT',
+          )
         }
       } catch {
         // If quota check fails, gracefully degrade and allow the upload
@@ -71,14 +74,18 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
     if (contentFormat === 'html') {
       const killSwitch = await isHtmlUploadsEnabled()
       if (!killSwitch.enabled) {
-        return res.status(403).json({
-          error: 'HTML uploads are temporarily disabled. Please use Markdown instead.',
-          code: 'HTML_UPLOADS_DISABLED',
-        })
+        return sendError(
+          res,
+          403,
+          'HTML uploads are temporarily disabled. Please use Markdown instead.',
+          'HTML_UPLOADS_DISABLED',
+        )
       }
       const validation = validateHtmlForSubmission(content)
       if (!validation.ok) {
-        return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
+        return sendError(res, 400, validation.issues[0], ERROR_CODES.VALIDATION, {
+          issues: validation.issues,
+        })
       }
     }
 
@@ -233,7 +240,7 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

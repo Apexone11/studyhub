@@ -84,7 +84,12 @@ function redactHeaders(headers) {
   const cleaned = {}
   for (const [key, value] of Object.entries(headers)) {
     const lower = key.toLowerCase()
-    if (lower === 'cookie' || lower === 'set-cookie' || lower === 'authorization' || lower === 'x-csrf-token') {
+    if (
+      lower === 'cookie' ||
+      lower === 'set-cookie' ||
+      lower === 'authorization' ||
+      lower === 'x-csrf-token'
+    ) {
       cleaned[key] = REDACTED
     } else {
       cleaned[key] = value

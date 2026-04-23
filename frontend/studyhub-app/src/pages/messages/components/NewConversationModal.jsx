@@ -35,8 +35,9 @@ export function NewConversationModal({ isOpen, onClose, onCreate, currentUserId 
         )
         if (response.ok) {
           const data = await response.json()
-          const users = (data.results?.users || data.users || [])
-            .filter((u) => u.id !== currentUserId)
+          const users = (data.results?.users || data.users || []).filter(
+            (u) => u.id !== currentUserId,
+          )
           setSearchResults(users)
         } else {
           setSearchResults([])
@@ -80,7 +81,7 @@ export function NewConversationModal({ isOpen, onClose, onCreate, currentUserId 
   if (!isOpen) return null
 
   const canCreate = isGroup
-    ? (groupName.trim() && selectedUsers.length > 0)
+    ? groupName.trim() && selectedUsers.length > 0
     : selectedUsers.length > 0
 
   return createPortal(
@@ -102,16 +103,25 @@ export function NewConversationModal({ isOpen, onClose, onCreate, currentUserId 
       aria-modal="true"
       aria-label="Start a conversation"
     >
-      <div style={{
-        width: '90%',
-        maxWidth: 450,
-        background: 'var(--sh-surface)',
-        borderRadius: 'var(--radius-card)',
-        padding: 24,
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-        fontFamily: PAGE_FONT,
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
+      <div
+        style={{
+          width: '90%',
+          maxWidth: 450,
+          background: 'var(--sh-surface)',
+          borderRadius: 'var(--radius-card)',
+          padding: 24,
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          fontFamily: PAGE_FONT,
+        }}
+      >
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 20,
+          }}
+        >
           <h2 style={{ fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)' }}>
             Start a Conversation
           </h2>
@@ -131,7 +141,15 @@ export function NewConversationModal({ isOpen, onClose, onCreate, currentUserId 
         </div>
 
         <div style={{ marginBottom: 16 }}>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontSize: 13, marginBottom: 12 }}>
+          <label
+            style={{
+              display: 'flex',
+              gap: 8,
+              alignItems: 'center',
+              fontSize: 13,
+              marginBottom: 12,
+            }}
+          >
             <input type="radio" name="type" checked={!isGroup} onChange={() => setIsGroup(false)} />
             Direct Message
           </label>
@@ -180,59 +198,68 @@ export function NewConversationModal({ isOpen, onClose, onCreate, currentUserId 
           aria-label="Search users"
         />
 
-        <div style={{
-          maxHeight: 200,
-          overflowY: 'auto',
-          marginBottom: 16,
-          border: '1px solid var(--sh-border)',
-          borderRadius: 'var(--radius)',
-          padding: 8,
-        }}>
+        <div
+          style={{
+            maxHeight: 200,
+            overflowY: 'auto',
+            marginBottom: 16,
+            border: '1px solid var(--sh-border)',
+            borderRadius: 'var(--radius)',
+            padding: 8,
+          }}
+        >
           {loading && (
-            <div style={{ padding: 8, color: 'var(--sh-muted)', textAlign: 'center', fontSize: 13 }}>
+            <div
+              style={{ padding: 8, color: 'var(--sh-muted)', textAlign: 'center', fontSize: 13 }}
+            >
               Searching...
             </div>
           )}
 
           {!loading && searchResults.length === 0 && searchQuery && (
-            <div style={{ padding: 8, color: 'var(--sh-muted)', textAlign: 'center', fontSize: 13 }}>
+            <div
+              style={{ padding: 8, color: 'var(--sh-muted)', textAlign: 'center', fontSize: 13 }}
+            >
               No users found
             </div>
           )}
 
-          {!loading && searchResults.map((user) => (
-            <button
-              key={user.id}
-              onClick={() => handleUserSelect(user)}
-              style={{
-                width: '100%',
-                padding: '8px 12px',
-                background: selectedUsers.find((u) => u.id === user.id) ? 'var(--sh-brand-soft)' : 'transparent',
-                border: 'none',
-                textAlign: 'left',
-                cursor: 'pointer',
-                display: 'flex',
-                gap: 8,
-                alignItems: 'center',
-                fontSize: 13,
-                borderRadius: 'var(--radius-sm)',
-                transition: 'background 0.15s',
-              }}
-              onMouseEnter={(e) => {
-                if (!selectedUsers.find((u) => u.id === user.id)) {
-                  e.currentTarget.style.background = 'var(--sh-soft)'
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!selectedUsers.find((u) => u.id === user.id)) {
-                  e.currentTarget.style.background = 'transparent'
-                }
-              }}
-            >
-              <UserAvatar username={user.username} avatarUrl={user.avatarUrl} size={24} />
-              <span>{user.username}</span>
-            </button>
-          ))}
+          {!loading &&
+            searchResults.map((user) => (
+              <button
+                key={user.id}
+                onClick={() => handleUserSelect(user)}
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  background: selectedUsers.find((u) => u.id === user.id)
+                    ? 'var(--sh-brand-soft)'
+                    : 'transparent',
+                  border: 'none',
+                  textAlign: 'left',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  gap: 8,
+                  alignItems: 'center',
+                  fontSize: 13,
+                  borderRadius: 'var(--radius-sm)',
+                  transition: 'background 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  if (!selectedUsers.find((u) => u.id === user.id)) {
+                    e.currentTarget.style.background = 'var(--sh-soft)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!selectedUsers.find((u) => u.id === user.id)) {
+                    e.currentTarget.style.background = 'transparent'
+                  }
+                }}
+              >
+                <UserAvatar username={user.username} avatarUrl={user.avatarUrl} size={24} />
+                <span>{user.username}</span>
+              </button>
+            ))}
         </div>
 
         {selectedUsers.length > 0 && (

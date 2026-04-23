@@ -81,7 +81,9 @@ function authenticateSocketHandshake(socket, next) {
         ? socket.handshake.headers.origin.toLowerCase()
         : ''
     const isCapacitorOrigin =
-      originHeader === 'https://localhost' || originHeader === 'capacitor://localhost'
+      originHeader === 'http://localhost' ||
+      originHeader === 'https://localhost' ||
+      originHeader === 'capacitor://localhost'
 
     const token = cookieToken || (isCapacitorOrigin ? bearerToken || authHeaderToken : null)
 

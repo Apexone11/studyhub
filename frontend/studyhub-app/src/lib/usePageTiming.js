@@ -3,7 +3,9 @@ import { trackEvent } from './telemetry'
 
 /** Last reported timing — exposed for dev overlay. */
 let _lastTiming = null
-export function getLastPageTiming() { return _lastTiming }
+export function getLastPageTiming() {
+  return _lastTiming
+}
 
 /**
  * Lightweight page-load timing hook.
@@ -41,12 +43,20 @@ export function usePageTiming(pageName) {
 
   const markFetchStart = useCallback(() => {
     fetchStartRef.current = performance.now()
-    try { performance.mark(`${pageName}:fetch-start`) } catch { /* unsupported */ }
+    try {
+      performance.mark(`${pageName}:fetch-start`)
+    } catch {
+      /* unsupported */
+    }
   }, [pageName])
 
   const markFetchEnd = useCallback(() => {
     fetchEndRef.current = performance.now()
-    try { performance.mark(`${pageName}:fetch-end`) } catch { /* unsupported */ }
+    try {
+      performance.mark(`${pageName}:fetch-end`)
+    } catch {
+      /* unsupported */
+    }
   }, [pageName])
 
   const markContentVisible = useCallback(() => {
@@ -64,8 +74,14 @@ export function usePageTiming(pageName) {
 
     try {
       performance.mark(`${pageName}:content-visible`)
-      performance.measure(`${pageName}:time-to-content`, `${pageName}:fetch-start`, `${pageName}:content-visible`)
-    } catch { /* marks may not exist */ }
+      performance.measure(
+        `${pageName}:time-to-content`,
+        `${pageName}:fetch-start`,
+        `${pageName}:content-visible`,
+      )
+    } catch {
+      /* marks may not exist */
+    }
 
     trackEvent('page_timing', {
       page: pageName,
@@ -79,5 +95,8 @@ export function usePageTiming(pageName) {
     }
   }, [pageName])
 
-  return useMemo(() => ({ markFetchStart, markFetchEnd, markContentVisible }), [markFetchStart, markFetchEnd, markContentVisible])
+  return useMemo(
+    () => ({ markFetchStart, markFetchEnd, markContentVisible }),
+    [markFetchStart, markFetchEnd, markContentVisible],
+  )
 }

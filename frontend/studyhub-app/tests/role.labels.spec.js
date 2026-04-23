@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test'
 
 /**
- * Label-scan sweep (docs/roles-and-permissions-plan.md §12.4).
+ * Label-scan sweep (docs/internal/roles-and-permissions-plan.md §12.4).
  * For each role-aware surface, assert no literal "Other" or "Member" string
  * appears as a role label. The whitelist covers legitimate non-role uses
  * (report reasons, appeal categories, deletion reasons).

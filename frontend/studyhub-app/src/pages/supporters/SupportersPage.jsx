@@ -187,24 +187,38 @@ export default function SupportersPage() {
               </p>
 
               {anonymousSupport.donorCount > 0 && (
-                <div style={{
-                  marginBottom: 20,
-                  padding: '16px 18px',
-                  borderRadius: 18,
-                  border: '1px solid var(--sh-border)',
-                  background: 'linear-gradient(135deg, rgba(15, 23, 42, 0.04), rgba(14, 165, 233, 0.08))',
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  gap: 12,
-                  flexWrap: 'wrap',
-                  alignItems: 'center',
-                }}>
+                <div
+                  style={{
+                    marginBottom: 20,
+                    padding: '16px 18px',
+                    borderRadius: 18,
+                    border: '1px solid var(--sh-border)',
+                    background:
+                      'linear-gradient(135deg, rgba(15, 23, 42, 0.04), rgba(14, 165, 233, 0.08))',
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    gap: 12,
+                    flexWrap: 'wrap',
+                    alignItems: 'center',
+                  }}
+                >
                   <div>
-                    <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--sh-muted)', marginBottom: 4 }}>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        fontWeight: 800,
+                        letterSpacing: '0.08em',
+                        textTransform: 'uppercase',
+                        color: 'var(--sh-muted)',
+                        marginBottom: 4,
+                      }}
+                    >
                       Anonymous Support
                     </div>
                     <div style={{ fontSize: 15, color: 'var(--sh-text)', lineHeight: 1.5 }}>
-                      {anonymousSupport.donorCount} {anonymousSupport.donorCount === 1 ? 'supporter has' : 'supporters have'} chosen to stay private.
+                      {anonymousSupport.donorCount}{' '}
+                      {anonymousSupport.donorCount === 1 ? 'supporter has' : 'supporters have'}{' '}
+                      chosen to stay private.
                     </div>
                   </div>
                   <div style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)' }}>

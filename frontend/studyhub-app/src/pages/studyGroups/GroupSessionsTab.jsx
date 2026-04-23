@@ -1,20 +1,9 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  formatSessionTime,
-  formatDuration,
-  getSessionStatusLabel,
-} from './studyGroupsHelpers'
+import { formatSessionTime, formatDuration, getSessionStatusLabel } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 
-export function GroupSessionsTab({
-  groupId,
-  sessions,
-  onAdd,
-  onRsvp,
-  isAdminOrMod,
-  isMember,
-}) {
+export function GroupSessionsTab({ groupId, sessions, onAdd, onRsvp, isAdminOrMod, isMember }) {
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [formData, setFormData] = useState({
     title: '',
@@ -84,19 +73,19 @@ export function GroupSessionsTab({
     }
   }
 
-  const upcomingSessions = sessions?.filter(s => s.status === 'upcoming') || []
-  const completedSessions = sessions?.filter(s => s.status === 'completed') || []
+  const upcomingSessions = sessions?.filter((s) => s.status === 'upcoming') || []
+  const completedSessions = sessions?.filter((s) => s.status === 'completed') || []
 
   if (!sessions || (upcomingSessions.length === 0 && completedSessions.length === 0)) {
     return (
       <div style={styles.tabContainer}>
         <div style={styles.emptyState}>
-          <div style={styles.emptyIcon} aria-label="Calendar icon">Schedule</div>
+          <div style={styles.emptyIcon} aria-label="Calendar icon">
+            Schedule
+          </div>
           <div style={styles.emptyTitle}>No Sessions Scheduled</div>
           <p style={styles.emptyText}>
-            {isAdminOrMod
-              ? 'Schedule your first group session!'
-              : 'No sessions scheduled yet'}
+            {isAdminOrMod ? 'Schedule your first group session!' : 'No sessions scheduled yet'}
           </p>
           {isAdminOrMod && (
             <button
@@ -117,7 +106,9 @@ export function GroupSessionsTab({
                 aria-modal="true"
                 aria-labelledby="schedule-session-title-1"
               >
-                <h3 style={styles.sectionTitle} id="schedule-session-title-1">Schedule Session</h3>
+                <h3 style={styles.sectionTitle} id="schedule-session-title-1">
+                  Schedule Session
+                </h3>
                 {error && <div style={styles.error}>{error}</div>}
                 <form onSubmit={handleSubmit}>
                   <div style={styles.formGroup}>
@@ -149,7 +140,13 @@ export function GroupSessionsTab({
                     />
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 'var(--space-3)',
+                    }}
+                  >
                     <div style={styles.formGroup}>
                       <label htmlFor="session-date" style={styles.label}>
                         Date
@@ -177,7 +174,13 @@ export function GroupSessionsTab({
                     </div>
                   </div>
 
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: '1fr 1fr',
+                      gap: 'var(--space-3)',
+                    }}
+                  >
                     <div style={styles.formGroup}>
                       <label htmlFor="session-duration" style={styles.label}>
                         Duration (minutes)
@@ -245,7 +248,7 @@ export function GroupSessionsTab({
               </div>
             </div>
           ),
-          document.body
+          document.body,
         )}
       </div>
     )
@@ -276,18 +279,29 @@ export function GroupSessionsTab({
                   <div style={styles.sessionDetails}>
                     <span>{formatSessionTime(session.scheduledAt)}</span>
                     <span>{session.location || 'No location specified'}</span>
-                    <span>Duration: {formatDuration(parseInt(session.durationMins || session.duration, 10))}</span>
-                    <span>{session.rsvpCount || 0} going{session.rsvpMaybeCount ? `, ${session.rsvpMaybeCount} maybe` : ''}</span>
+                    <span>
+                      Duration:{' '}
+                      {formatDuration(parseInt(session.durationMins || session.duration, 10))}
+                    </span>
+                    <span>
+                      {session.rsvpCount || 0} going
+                      {session.rsvpMaybeCount ? `, ${session.rsvpMaybeCount} maybe` : ''}
+                    </span>
                   </div>
                 </div>
                 <span style={styles.badge}>{getSessionStatusLabel(session.status)}</span>
               </div>
 
               {isMember && (
-                <div style={{ marginTop: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)' }}>
+                <div
+                  style={{ marginTop: 'var(--space-3)', display: 'flex', gap: 'var(--space-2)' }}
+                >
                   {['going', 'maybe', 'not_going'].map((status) => {
                     const isSelected = session.userRsvpStatus === status
-                    const label = status === 'not_going' ? 'Not Going' : status.charAt(0).toUpperCase() + status.slice(1)
+                    const label =
+                      status === 'not_going'
+                        ? 'Not Going'
+                        : status.charAt(0).toUpperCase() + status.slice(1)
                     return (
                       <button
                         key={status}
@@ -296,7 +310,11 @@ export function GroupSessionsTab({
                           ...styles.button,
                           ...styles.buttonSmall,
                           ...(isSelected
-                            ? { backgroundColor: 'var(--sh-brand)', color: 'white', border: '1px solid var(--sh-brand)' }
+                            ? {
+                                backgroundColor: 'var(--sh-brand)',
+                                color: 'white',
+                                border: '1px solid var(--sh-brand)',
+                              }
                             : styles.buttonSecondary),
                         }}
                       >
@@ -341,7 +359,9 @@ export function GroupSessionsTab({
               aria-modal="true"
               aria-labelledby="schedule-session-title-2"
             >
-              <h3 style={styles.sectionTitle} id="schedule-session-title-2">Schedule Session</h3>
+              <h3 style={styles.sectionTitle} id="schedule-session-title-2">
+                Schedule Session
+              </h3>
               {error && <div style={styles.error}>{error}</div>}
               <form onSubmit={handleSubmit}>
                 <div style={styles.formGroup}>
@@ -373,7 +393,9 @@ export function GroupSessionsTab({
                   />
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                <div
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}
+                >
                   <div style={styles.formGroup}>
                     <label htmlFor="session-date" style={styles.label}>
                       Date
@@ -401,7 +423,9 @@ export function GroupSessionsTab({
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}>
+                <div
+                  style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 'var(--space-3)' }}
+                >
                   <div style={styles.formGroup}>
                     <label htmlFor="session-duration" style={styles.label}>
                       Duration (minutes)
@@ -470,7 +494,7 @@ export function GroupSessionsTab({
             </div>
           </div>
         ),
-        document.body
+        document.body,
       )}
     </div>
   )

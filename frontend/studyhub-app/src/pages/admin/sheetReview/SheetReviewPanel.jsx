@@ -14,7 +14,13 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { API } from '../../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
 import { FONT, overlayStyle, panelStyle, closeBtnStyle } from './sheetReviewConstants'
-import { SanitizedPreview, InteractivePreview, RawHtmlView, FindingsPanel, ReviewActionBar } from './SheetReviewDetails'
+import {
+  SanitizedPreview,
+  InteractivePreview,
+  RawHtmlView,
+  FindingsPanel,
+  ReviewActionBar,
+} from './SheetReviewDetails'
 
 export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete }) {
   const [state, setState] = useState({ loading: true, error: '', detail: null })
@@ -25,7 +31,11 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
   const [activeTab, setActiveTab] = useState('preview') // 'preview' | 'interactive' | 'raw' | 'findings'
   const [aiReviewing, setAiReviewing] = useState(false)
   const [scrollToLine, setScrollToLine] = useState(0)
-  const [interactiveState, setInteractiveState] = useState({ loading: false, error: '', runtimeUrl: '' })
+  const [interactiveState, setInteractiveState] = useState({
+    loading: false,
+    error: '',
+    runtimeUrl: '',
+  })
   // `attempted` tracked via ref so mutating it does not re-fire the effect
   // and cancel its own in-flight fetch (the bug that left the tab stuck on
   // "Loading interactive preview...").
@@ -46,7 +56,11 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
 
       setState({ loading: false, error: '', detail: data })
     } catch (err) {
-      setState({ loading: false, error: err.message || 'Could not load review detail.', detail: null })
+      setState({
+        loading: false,
+        error: err.message || 'Could not load review detail.',
+        detail: null,
+      })
     }
   }, [sheetId])
 
@@ -58,7 +72,8 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
   }, [loadDetail])
 
   useEffect(() => {
-    if (!state.detail || state.detail.contentFormat !== 'html' || activeTab !== 'interactive') return
+    if (!state.detail || state.detail.contentFormat !== 'html' || activeTab !== 'interactive')
+      return
     if (interactiveAttemptedRef.current) return
 
     interactiveAttemptedRef.current = true
@@ -82,14 +97,20 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
         setInteractiveState({ loading: false, error: '', runtimeUrl: data.runtimeUrl || '' })
       } catch (err) {
         if (cancelled) return
-        setInteractiveState({ loading: false, error: err.message || 'Could not load interactive preview.', runtimeUrl: '' })
+        setInteractiveState({
+          loading: false,
+          error: err.message || 'Could not load interactive preview.',
+          runtimeUrl: '',
+        })
         // Reset so user can retry by flipping tabs
         interactiveAttemptedRef.current = false
       }
     }
 
     void loadInteractivePreview()
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [activeTab, sheetId, state.detail])
 
   async function handleReview(action, quickReason) {
@@ -173,7 +194,9 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
     return (
       <div style={overlayStyle}>
         <div style={panelStyle}>
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--sh-muted)', fontSize: 14 }}>Loading review detail...</div>
+          <div style={{ padding: 40, textAlign: 'center', color: 'var(--sh-muted)', fontSize: 14 }}>
+            Loading review detail...
+          </div>
         </div>
       </div>
     )
@@ -184,8 +207,12 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
       <div style={overlayStyle}>
         <div style={panelStyle}>
           <div style={{ padding: 24 }}>
-            <div style={{ color: 'var(--sh-danger)', fontSize: 14, marginBottom: 16 }}>{state.error}</div>
-            <button type="button" onClick={onClose} style={closeBtnStyle}>Close</button>
+            <div style={{ color: 'var(--sh-danger)', fontSize: 14, marginBottom: 16 }}>
+              {state.error}
+            </div>
+            <button type="button" onClick={onClose} style={closeBtnStyle}>
+              Close
+            </button>
           </div>
         </div>
       </div>
@@ -194,12 +221,17 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
 
   const d = state.detail
   const findings = [
-    ...(d.validationIssues || []).map((msg) => ({ source: 'policy', severity: 'error', message: msg })),
+    ...(d.validationIssues || []).map((msg) => ({
+      source: 'policy',
+      severity: 'error',
+      message: msg,
+    })),
     ...(Array.isArray(d.htmlScanFindings) ? d.htmlScanFindings : []),
   ]
   const isHtml = d.contentFormat === 'html'
   const runtimeValidation = d.runtimeValidation || null
-  const highlightedLines = runtimeValidation?.enrichedIssues?.map((i) => i.line).filter(Boolean) || []
+  const highlightedLines =
+    runtimeValidation?.enrichedIssues?.map((i) => i.line).filter(Boolean) || []
 
   function handleJumpToLine(line) {
     setActiveTab('raw')
@@ -212,30 +244,74 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
       <div style={panelStyle}>
         {/* ── Header ──────────────────────────────────────────────── */}
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--sh-border)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: 10,
+            }}
+          >
             <div>
               <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)' }}>
                 Review: {d.title}
               </h2>
               <div style={{ marginTop: 4, fontSize: 12, color: 'var(--sh-muted)' }}>
-                {d.course?.code || 'No course'} · by {d.author?.username || 'unknown'} · {d.contentFormat} · {d.status}
+                {d.course?.code || 'No course'} · by {d.author?.username || 'unknown'} ·{' '}
+                {d.contentFormat} · {d.status}
               </div>
             </div>
-            <button type="button" onClick={onClose} style={closeBtnStyle}>Close</button>
+            <button type="button" onClick={onClose} style={closeBtnStyle}>
+              Close
+            </button>
           </div>
           {/* Risk summary bar */}
           {isHtml && (d.htmlRiskTier > 0 || d.liveRiskTier > 0) && (
-            <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 11 }}>
+            <div
+              style={{
+                marginTop: 10,
+                display: 'flex',
+                gap: 8,
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                fontSize: 11,
+              }}
+            >
               {d.htmlRiskTier > 0 && (
-                <span style={{ fontWeight: 700, padding: '3px 10px', borderRadius: 6, background: d.htmlRiskTier >= 3 ? 'var(--sh-danger-bg)' : d.htmlRiskTier >= 2 ? 'var(--sh-warning-bg)' : 'var(--sh-warning-bg)', color: d.htmlRiskTier >= 3 ? 'var(--sh-danger)' : 'var(--sh-warning-text)', border: `1px solid ${d.htmlRiskTier >= 3 ? 'var(--sh-danger-border)' : 'var(--sh-warning-border)'}` }}>
-                  Tier {d.htmlRiskTier}: {['Clean', 'Flagged', 'High Risk', 'Quarantined'][d.htmlRiskTier] || 'Unknown'}
+                <span
+                  style={{
+                    fontWeight: 700,
+                    padding: '3px 10px',
+                    borderRadius: 6,
+                    background:
+                      d.htmlRiskTier >= 3
+                        ? 'var(--sh-danger-bg)'
+                        : d.htmlRiskTier >= 2
+                          ? 'var(--sh-warning-bg)'
+                          : 'var(--sh-warning-bg)',
+                    color: d.htmlRiskTier >= 3 ? 'var(--sh-danger)' : 'var(--sh-warning-text)',
+                    border: `1px solid ${d.htmlRiskTier >= 3 ? 'var(--sh-danger-border)' : 'var(--sh-warning-border)'}`,
+                  }}
+                >
+                  Tier {d.htmlRiskTier}:{' '}
+                  {['Clean', 'Flagged', 'High Risk', 'Quarantined'][d.htmlRiskTier] || 'Unknown'}
                 </span>
               )}
               {d.riskSummary && (
                 <span style={{ color: 'var(--sh-subtext)', fontWeight: 600 }}>{d.riskSummary}</span>
               )}
               {d.htmlScanAcknowledgedAt && (
-                <span style={{ fontWeight: 600, color: 'var(--sh-info-text)', background: 'var(--sh-info-bg)', border: '1px solid var(--sh-info-border)', padding: '2px 8px', borderRadius: 6 }}>
+                <span
+                  style={{
+                    fontWeight: 600,
+                    color: 'var(--sh-info-text)',
+                    background: 'var(--sh-info-bg)',
+                    border: '1px solid var(--sh-info-border)',
+                    padding: '2px 8px',
+                    borderRadius: 6,
+                  }}
+                >
                   User acknowledged
                 </span>
               )}
@@ -248,15 +324,39 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
           )}
           {/* AI review badge + re-review button */}
           {isHtml && (
-            <div style={{ marginTop: 10, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div
+              style={{
+                marginTop: 10,
+                display: 'flex',
+                gap: 8,
+                alignItems: 'center',
+                flexWrap: 'wrap',
+              }}
+            >
               {d.aiReviewDecision && (
-                <span style={{
-                  fontSize: 11, fontWeight: 700, padding: '3px 10px', borderRadius: 6,
-                  background: d.aiReviewDecision === 'approve' ? 'var(--sh-success-bg)' : d.aiReviewDecision === 'reject' ? 'var(--sh-danger-bg)' : 'var(--sh-warning-bg)',
-                  color: d.aiReviewDecision === 'approve' ? 'var(--sh-success-text)' : d.aiReviewDecision === 'reject' ? 'var(--sh-danger-text)' : 'var(--sh-warning-text)',
-                  border: `1px solid ${d.aiReviewDecision === 'approve' ? 'var(--sh-success-border)' : d.aiReviewDecision === 'reject' ? 'var(--sh-danger-border)' : 'var(--sh-warning-border)'}`,
-                }}>
-                  AI: {d.aiReviewDecision}{d.aiReviewConfidence ? ` (${d.aiReviewConfidence}%)` : ''}
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    padding: '3px 10px',
+                    borderRadius: 6,
+                    background:
+                      d.aiReviewDecision === 'approve'
+                        ? 'var(--sh-success-bg)'
+                        : d.aiReviewDecision === 'reject'
+                          ? 'var(--sh-danger-bg)'
+                          : 'var(--sh-warning-bg)',
+                    color:
+                      d.aiReviewDecision === 'approve'
+                        ? 'var(--sh-success-text)'
+                        : d.aiReviewDecision === 'reject'
+                          ? 'var(--sh-danger-text)'
+                          : 'var(--sh-warning-text)',
+                    border: `1px solid ${d.aiReviewDecision === 'approve' ? 'var(--sh-success-border)' : d.aiReviewDecision === 'reject' ? 'var(--sh-danger-border)' : 'var(--sh-warning-border)'}`,
+                  }}
+                >
+                  AI: {d.aiReviewDecision}
+                  {d.aiReviewConfidence ? ` (${d.aiReviewConfidence}%)` : ''}
                 </span>
               )}
               <button
@@ -264,9 +364,15 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
                 onClick={handleAiReReview}
                 disabled={aiReviewing}
                 style={{
-                  padding: '4px 12px', borderRadius: 6, border: '1px solid var(--sh-border)',
-                  background: 'var(--sh-surface)', color: 'var(--sh-subtext)', fontSize: 11,
-                  fontWeight: 700, cursor: aiReviewing ? 'wait' : 'pointer', fontFamily: FONT,
+                  padding: '4px 12px',
+                  borderRadius: 6,
+                  border: '1px solid var(--sh-border)',
+                  background: 'var(--sh-surface)',
+                  color: 'var(--sh-subtext)',
+                  fontSize: 11,
+                  fontWeight: 700,
+                  cursor: aiReviewing ? 'wait' : 'pointer',
+                  fontFamily: FONT,
                 }}
               >
                 {aiReviewing ? 'Running AI Review...' : 'AI Re-Review'}
@@ -277,17 +383,35 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
 
         {/* ── Tab bar ─────────────────────────────────────────────── */}
         {isHtml && (
-          <div style={{ display: 'flex', gap: 0, borderBottom: '1px solid var(--sh-border)', padding: '0 20px' }}>
-            {[['preview', 'Safe Preview'], ['interactive', 'Interactive Preview'], ['raw', 'Raw HTML (text)'], ['findings', `Findings (${findings.length})`]].map(([key, label]) => (
+          <div
+            style={{
+              display: 'flex',
+              gap: 0,
+              borderBottom: '1px solid var(--sh-border)',
+              padding: '0 20px',
+            }}
+          >
+            {[
+              ['preview', 'Safe Preview'],
+              ['interactive', 'Interactive Preview'],
+              ['raw', 'Raw HTML (text)'],
+              ['findings', `Findings (${findings.length})`],
+            ].map(([key, label]) => (
               <button
                 key={key}
                 type="button"
                 onClick={() => setActiveTab(key)}
                 style={{
-                  padding: '10px 16px', border: 'none', background: 'none',
-                  fontSize: 12, fontWeight: 700, fontFamily: FONT, cursor: 'pointer',
+                  padding: '10px 16px',
+                  border: 'none',
+                  background: 'none',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  fontFamily: FONT,
+                  cursor: 'pointer',
                   color: activeTab === key ? 'var(--sh-link)' : 'var(--sh-muted)',
-                  borderBottom: activeTab === key ? '2px solid var(--sh-brand)' : '2px solid transparent',
+                  borderBottom:
+                    activeTab === key ? '2px solid var(--sh-brand)' : '2px solid transparent',
                 }}
               >
                 {label}
@@ -298,11 +422,11 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
 
         {/* ── Content area ────────────────────────────────────────── */}
         <div style={{ flex: 1, overflow: 'auto', minHeight: 0 }}>
-          {(activeTab === 'preview' && isHtml) && (
+          {activeTab === 'preview' && isHtml && (
             <SanitizedPreview iframeRef={iframeRef} sheetId={sheetId} />
           )}
 
-          {(activeTab === 'interactive' && isHtml) && (
+          {activeTab === 'interactive' && isHtml && (
             <InteractivePreview
               loading={interactiveState.loading}
               error={interactiveState.error}
@@ -311,12 +435,21 @@ export default function SheetReviewPanel({ sheetId, onClose, onReviewComplete })
             />
           )}
 
-          {(activeTab === 'raw' && isHtml) && (
-            <RawHtmlView rawHtml={d.rawHtml} highlightedLines={highlightedLines} scrollToLine={scrollToLine} />
+          {activeTab === 'raw' && isHtml && (
+            <RawHtmlView
+              rawHtml={d.rawHtml}
+              highlightedLines={highlightedLines}
+              scrollToLine={scrollToLine}
+            />
           )}
 
           {(activeTab === 'findings' || !isHtml) && (
-            <FindingsPanel findings={findings} detail={d} runtimeValidation={runtimeValidation} onJumpToLine={handleJumpToLine} />
+            <FindingsPanel
+              findings={findings}
+              detail={d}
+              runtimeValidation={runtimeValidation}
+              onJumpToLine={handleJumpToLine}
+            />
           )}
         </div>
 

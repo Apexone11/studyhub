@@ -27,7 +27,9 @@ export default function RelatedSheetsPanel({ sheet, relatedSheets }) {
               color: 'var(--sh-text)',
             }}
           >
-            <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 2 }}>
+            <div
+              style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 2 }}
+            >
               {related.title}
             </div>
             <div style={{ fontSize: 12, color: 'var(--sh-muted)', display: 'flex', gap: 12 }}>
@@ -43,7 +45,12 @@ export default function RelatedSheetsPanel({ sheet, relatedSheets }) {
           {sheet?.course?.id ? (
             <Link
               to={`/sheets?courseId=${sheet.course.id}`}
-              style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-brand)', textDecoration: 'none' }}
+              style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: 'var(--sh-brand)',
+                textDecoration: 'none',
+              }}
             >
               Browse all {sheet.course.code} sheets →
             </Link>

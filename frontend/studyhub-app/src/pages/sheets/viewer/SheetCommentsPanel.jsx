@@ -107,9 +107,16 @@ export default function SheetCommentsPanel({
         type="button"
         onClick={() => setCommentsExpanded((v) => !v)}
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          width: '100%', background: 'none', border: 'none', cursor: 'pointer',
-          padding: 0, margin: '0 0 12px', fontFamily: FONT,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          width: '100%',
+          background: 'none',
+          border: 'none',
+          cursor: 'pointer',
+          padding: 0,
+          margin: '0 0 12px',
+          fontFamily: FONT,
         }}
       >
         <h2 style={{ margin: 0, fontSize: 18, color: 'var(--sh-heading)' }}>
@@ -123,7 +130,10 @@ export default function SheetCommentsPanel({
       {commentsExpanded && (
         <>
           {user ? (
-            <form onSubmit={submitComment} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 16 }}>
+            <form
+              onSubmit={submitComment}
+              style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 16 }}
+            >
               <UserAvatar
                 username={user.username}
                 avatarUrl={user.avatarUrl}
@@ -150,13 +160,22 @@ export default function SheetCommentsPanel({
                   }}
                 />
                 {showGifPicker ? (
-                  <GifSearchPanel onSelect={handleGifSelect} onClose={() => setShowGifPicker(false)} maxHeight={320} previewHeight={96} />
+                  <GifSearchPanel
+                    onSelect={handleGifSelect}
+                    onClose={() => setShowGifPicker(false)}
+                    maxHeight={320}
+                    previewHeight={96}
+                  />
                 ) : null}
                 {commentAttachments.length > 0 ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
                     {commentAttachments.map((attachment) => (
                       <div key={attachment.url} style={composerGifCardStyle}>
-                        <img src={attachment.url} alt={attachment.name || 'GIF preview'} style={composerGifImageStyle} />
+                        <img
+                          src={attachment.url}
+                          alt={attachment.name || 'GIF preview'}
+                          style={composerGifImageStyle}
+                        />
                         <button
                           type="button"
                           onClick={() => setCommentAttachments([])}
@@ -191,7 +210,10 @@ export default function SheetCommentsPanel({
                       borderRadius: 10,
                       border: '1px solid var(--sh-border)',
                       background: 'transparent',
-                      color: showGifPicker || commentAttachments.length > 0 ? 'var(--sh-brand)' : 'var(--sh-text)',
+                      color:
+                        showGifPicker || commentAttachments.length > 0
+                          ? 'var(--sh-brand)'
+                          : 'var(--sh-text)',
                       fontWeight: 700,
                       fontSize: 12,
                       padding: '9px 12px',
@@ -208,8 +230,12 @@ export default function SheetCommentsPanel({
                     style={{
                       borderRadius: 10,
                       border: 'none',
-                      background: canSubmit && !commentSaving ? 'var(--sh-btn-primary-bg)' : 'var(--sh-soft)',
-                      color: canSubmit && !commentSaving ? 'var(--sh-btn-primary-text)' : 'var(--sh-muted)',
+                      background:
+                        canSubmit && !commentSaving ? 'var(--sh-btn-primary-bg)' : 'var(--sh-soft)',
+                      color:
+                        canSubmit && !commentSaving
+                          ? 'var(--sh-btn-primary-text)'
+                          : 'var(--sh-muted)',
                       fontWeight: 800,
                       fontSize: 13,
                       padding: '10px 14px',
@@ -228,22 +254,49 @@ export default function SheetCommentsPanel({
               </div>
             </form>
           ) : (
-            <div style={{
-              textAlign: 'center', padding: '16px 12px',
-              borderRadius: 12, border: '1px solid var(--sh-border)',
-              background: 'var(--sh-soft)', marginBottom: 16,
-            }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 4 }}>
+            <div
+              style={{
+                textAlign: 'center',
+                padding: '16px 12px',
+                borderRadius: 12,
+                border: '1px solid var(--sh-border)',
+                background: 'var(--sh-soft)',
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--sh-heading)',
+                  marginBottom: 4,
+                }}
+              >
                 Join the conversation
               </div>
-              <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5, marginBottom: 10 }}>
+              <div
+                style={{
+                  fontSize: 12,
+                  color: 'var(--sh-muted)',
+                  lineHeight: 1.5,
+                  marginBottom: 10,
+                }}
+              >
                 Sign in to leave comments, corrections, and study tips.
               </div>
-              <Link to="/login" style={{
-                display: 'inline-block', padding: '7px 16px', borderRadius: 8,
-                background: 'var(--sh-brand)', color: 'var(--sh-btn-primary-text)',
-                fontSize: 12, fontWeight: 700, textDecoration: 'none',
-              }}>
+              <Link
+                to="/login"
+                style={{
+                  display: 'inline-block',
+                  padding: '7px 16px',
+                  borderRadius: 8,
+                  background: 'var(--sh-brand)',
+                  color: 'var(--sh-btn-primary-text)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                  textDecoration: 'none',
+                }}
+              >
                 Sign in
               </Link>
             </div>
@@ -253,15 +306,28 @@ export default function SheetCommentsPanel({
             <SkeletonCard style={{ padding: 16, minHeight: 60 }} />
           ) : commentsState.comments.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '16px 12px' }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 4 }}>No comments yet</div>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--sh-heading)',
+                  marginBottom: 4,
+                }}
+              >
+                No comments yet
+              </div>
               <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5 }}>
-                Be the first to leave feedback -- corrections, study tips, and clarifications help everyone.
+                Be the first to leave feedback -- corrections, study tips, and clarifications help
+                everyone.
               </div>
             </div>
           ) : (
             <div style={{ display: 'grid', gap: 12 }}>
               {commentsState.comments.map((comment) => (
-                <div key={comment.id} style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                <div
+                  key={comment.id}
+                  style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}
+                >
                   <Link to={`/users/${comment.author?.username}`} style={{ flexShrink: 0 }}>
                     <UserAvatar
                       username={comment.author?.username}
@@ -272,11 +338,13 @@ export default function SheetCommentsPanel({
                     />
                   </Link>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{
-                      background: 'var(--sh-soft)',
-                      borderRadius: 16,
-                      padding: '10px 14px',
-                    }}>
+                    <div
+                      style={{
+                        background: 'var(--sh-soft)',
+                        borderRadius: 16,
+                        padding: '10px 14px',
+                      }}
+                    >
                       <Link
                         to={`/users/${comment.author?.username}`}
                         style={{
@@ -289,13 +357,15 @@ export default function SheetCommentsPanel({
                       >
                         {comment.author?.username || 'Unknown'}
                       </Link>
-                      <div style={{
-                        fontSize: 13,
-                        color: 'var(--sh-subtext)',
-                        lineHeight: 1.7,
-                        whiteSpace: 'pre-wrap',
-                        marginTop: 2,
-                      }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: 'var(--sh-subtext)',
+                          lineHeight: 1.7,
+                          whiteSpace: 'pre-wrap',
+                          marginTop: 2,
+                        }}
+                      >
                         <MentionText text={comment.content} />
                       </div>
                       {comment.attachments && comment.attachments.length > 0 ? (
@@ -311,13 +381,15 @@ export default function SheetCommentsPanel({
                         </div>
                       ) : null}
                     </div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 10,
-                      marginTop: 4,
-                      paddingLeft: 4,
-                    }}>
+                    <div
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 10,
+                        marginTop: 4,
+                        paddingLeft: 4,
+                      }}
+                    >
                       {user && onReactToComment ? (
                         <CommentReactionsSheet
                           commentId={comment.id}

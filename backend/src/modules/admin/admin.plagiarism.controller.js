@@ -11,7 +11,8 @@ function checkScanRate() {
   const now = Date.now()
   const lastScan = scanLimiter.get('lastFullScan') || 0
   const timeSinceLastScan = now - lastScan
-  if (timeSinceLastScan < 60000) { // 60 seconds
+  if (timeSinceLastScan < 60000) {
+    // 60 seconds
     return { allowed: false, retryAfter: Math.ceil((60000 - timeSinceLastScan) / 1000) }
   }
   scanLimiter.set('lastFullScan', now)
@@ -51,7 +52,10 @@ router.get('/plagiarism/check/:sheetId', async (req, res) => {
     }
 
     if (!sheet.contentSimhash) {
-      return res.status(400).json({ error: 'Sheet has no fingerprint. It may have been created before plagiarism detection was enabled.' })
+      return res.status(400).json({
+        error:
+          'Sheet has no fingerprint. It may have been created before plagiarism detection was enabled.',
+      })
     }
 
     /* Find similar sheets */
@@ -111,9 +115,12 @@ router.get('/plagiarism/scan', async (req, res) => {
       totalSheetsScanned: totalSheets,
       clustersFound: clusters.length,
       sheetsInClusters: clusters.reduce((sum, c) => sum + c.clusterSize, 0),
-      avgClusterSize: clusters.length > 0
-        ? Math.round((clusters.reduce((sum, c) => sum + c.clusterSize, 0) / clusters.length) * 100) / 100
-        : 0,
+      avgClusterSize:
+        clusters.length > 0
+          ? Math.round(
+              (clusters.reduce((sum, c) => sum + c.clusterSize, 0) / clusters.length) * 100,
+            ) / 100
+          : 0,
       threshold,
       scanTimestamp: new Date().toISOString(),
     }
@@ -135,11 +142,7 @@ router.get('/plagiarism/scan', async (req, res) => {
 router.get('/plagiarism/stats', async (req, res) => {
   try {
     /* Count sheets by status and fingerprint coverage */
-    const [
-      publishedWithFingerprint,
-      publishedTotal,
-      moderationCasesCount,
-    ] = await Promise.all([
+    const [publishedWithFingerprint, publishedTotal, moderationCasesCount] = await Promise.all([
       prisma.studySheet.count({
         where: {
           status: 'published',
@@ -202,9 +205,10 @@ router.get('/plagiarism/stats', async (req, res) => {
       coverage: {
         publishedSheetsWithFingerprint: publishedWithFingerprint,
         publishedSheetsTotal: publishedTotal,
-        fingerprintCoveragePercent: publishedTotal > 0
-          ? Math.round((publishedWithFingerprint / publishedTotal) * 10000) / 100
-          : 0,
+        fingerprintCoveragePercent:
+          publishedTotal > 0
+            ? Math.round((publishedWithFingerprint / publishedTotal) * 10000) / 100
+            : 0,
       },
       moderation: {
         plagiarismCasesCount: moderationCasesCount,

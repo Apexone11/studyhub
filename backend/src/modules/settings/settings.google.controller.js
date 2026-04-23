@@ -34,7 +34,9 @@ router.post('/google/link', twoFaLimiter, async (req, res) => {
 
     const existingGoogleUser = await findUserByGoogleId(googlePayload.googleId)
     if (existingGoogleUser) {
-      return res.status(409).json({ error: 'That Google account is already linked to another user.' })
+      return res
+        .status(409)
+        .json({ error: 'That Google account is already linked to another user.' })
     }
 
     await linkGoogleToUser(user.id, googlePayload.googleId)
@@ -61,7 +63,8 @@ router.patch('/google/unlink', twoFaLimiter, async (req, res) => {
 
     if (user.authProvider === 'google') {
       return res.status(400).json({
-        error: 'Set a password before unlinking Google. Your account was created with Google and has no password.',
+        error:
+          'Set a password before unlinking Google. Your account was created with Google and has no password.',
       })
     }
 

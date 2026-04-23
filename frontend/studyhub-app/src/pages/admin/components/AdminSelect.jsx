@@ -6,7 +6,9 @@ export default function AdminSelect({ label, options, className = '', ...props }
       {label && <span className="admin-field__label">{label}</span>}
       <select className="admin-field__select" {...props}>
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>{opt.label}</option>
+          <option key={opt.value} value={opt.value}>
+            {opt.label}
+          </option>
         ))}
       </select>
     </label>

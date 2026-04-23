@@ -20,15 +20,10 @@ const ALLOWED_STYLESHEET_HOSTS = new Set([
   'cdnjs.cloudflare.com',
   'cdn.jsdelivr.net',
 ])
-const ALLOWED_FONT_HOSTS = new Set([
-  'fonts.gstatic.com',
-])
+const ALLOWED_FONT_HOSTS = new Set(['fonts.gstatic.com'])
 
 // CDN hosts that require path to end in .css (blocks .js loaded via <link>)
-const CSS_PATH_REQUIRED_HOSTS = new Set([
-  'cdnjs.cloudflare.com',
-  'cdn.jsdelivr.net',
-])
+const CSS_PATH_REQUIRED_HOSTS = new Set(['cdnjs.cloudflare.com', 'cdn.jsdelivr.net'])
 
 /**
  * Check if a URL is from an allowed remote stylesheet/font host.
@@ -190,9 +185,9 @@ function containsDangerousHrefOrSrc(value) {
         if (rawValue) {
           const normalized = stripAsciiWhitespace(rawValue).trim().toLowerCase()
           if (
-            normalized.startsWith('javascript:')
-            || normalized.startsWith('vbscript:')
-            || normalized.startsWith('data:')
+            normalized.startsWith('javascript:') ||
+            normalized.startsWith('vbscript:') ||
+            normalized.startsWith('data:')
           ) {
             return true
           }
@@ -209,7 +204,9 @@ function containsDangerousHrefOrSrc(value) {
 }
 
 function normalizeContentFormat(value) {
-  const normalized = String(value || '').trim().toLowerCase()
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
   if (normalized === 'html') return 'html'
   if (normalized === 'richtext') return 'richtext'
   return 'markdown'
@@ -222,7 +219,12 @@ function indexToLineCol(value, index) {
   let line = 1
   let col = 1
   for (let i = 0; i < index && i < value.length; i += 1) {
-    if (value[i] === '\n') { line += 1; col = 1 } else { col += 1 }
+    if (value[i] === '\n') {
+      line += 1
+      col = 1
+    } else {
+      col += 1
+    }
   }
   return { line, column: col }
 }
@@ -285,7 +287,12 @@ function validateHtmlForRuntime(html) {
   const enrichedIssues = []
 
   // Reject <script src="...">
-  const scriptSrcMatches = collectMatches(value, /<\s*script[^>]+\bsrc\s*=/gi, 'External script — use inline scripts only.', 'src')
+  const scriptSrcMatches = collectMatches(
+    value,
+    /<\s*script[^>]+\bsrc\s*=/gi,
+    'External script — use inline scripts only.',
+    'src',
+  )
   if (scriptSrcMatches.length > 0) {
     issues.push('External scripts (<script src="...">) are not allowed. Use inline scripts only.')
     enrichedIssues.push(...scriptSrcMatches)
@@ -299,7 +306,11 @@ function validateHtmlForRuntime(html) {
   }
 
   // Reject <meta http-equiv="refresh">
-  const metaRefreshMatches = collectMatches(value, /<\s*meta[^>]+http-equiv\s*=\s*["']?\s*refresh/gi, '<meta http-equiv="refresh"> is not allowed.')
+  const metaRefreshMatches = collectMatches(
+    value,
+    /<\s*meta[^>]+http-equiv\s*=\s*["']?\s*refresh/gi,
+    '<meta http-equiv="refresh"> is not allowed.',
+  )
   if (metaRefreshMatches.length > 0) {
     issues.push('<meta http-equiv="refresh"> is not allowed.')
     enrichedIssues.push(...metaRefreshMatches)
@@ -307,16 +318,33 @@ function validateHtmlForRuntime(html) {
 
   // Reject remote URLs (http/https) in src, href, srcset attributes
   // EXCEPT: allowlisted stylesheet/font domains (e.g. Google Fonts)
-  const remoteAttrMatchesRaw = collectMatches(value, /\b(?:src|href|srcset)\s*=\s*["']?\s*https?:\/\/[^\s"'>)]+/gi, 'Remote asset — use inline content or data: URLs.', 'src/href/srcset')
+  const remoteAttrMatchesRaw = collectMatches(
+    value,
+    /\b(?:src|href|srcset)\s*=\s*["']?\s*https?:\/\/[^\s"'>)]+/gi,
+    'Remote asset — use inline content or data: URLs.',
+    'src/href/srcset',
+  )
   const remoteAttrMatches = remoteAttrMatchesRaw.filter((m) => !isAllowedRemoteUrl(m.url))
   if (remoteAttrMatches.length > 0) {
-    issues.push('Remote assets (http/https URLs in src, href, or srcset) are not allowed. Use inline content or data: URLs.')
+    issues.push(
+      'Remote assets (http/https URLs in src, href, or srcset) are not allowed. Use inline content or data: URLs.',
+    )
     enrichedIssues.push(...remoteAttrMatches)
   }
 
   // Reject remote URLs in CSS url() or @import (allow allowlisted hosts)
-  const cssUrlMatchesRaw = collectMatches(lowered, /url\s*\(\s*["']?\s*https?:\/\/[^\s"'>)]+/gi, 'Remote CSS url() — use inline styles or data: URLs.', 'css')
-  const cssImportMatchesRaw = collectMatches(lowered, /@import\s+["']?\s*https?:\/\/[^\s"'>)]+/gi, 'Remote @import — use inline styles.', 'css')
+  const cssUrlMatchesRaw = collectMatches(
+    lowered,
+    /url\s*\(\s*["']?\s*https?:\/\/[^\s"'>)]+/gi,
+    'Remote CSS url() — use inline styles or data: URLs.',
+    'css',
+  )
+  const cssImportMatchesRaw = collectMatches(
+    lowered,
+    /@import\s+["']?\s*https?:\/\/[^\s"'>)]+/gi,
+    'Remote @import — use inline styles.',
+    'css',
+  )
   const cssUrlMatches = cssUrlMatchesRaw.filter((m) => !isAllowedRemoteUrl(m.url))
   const cssImportMatches = cssImportMatchesRaw.filter((m) => !isAllowedRemoteUrl(m.url))
   if (cssUrlMatches.length > 0 || cssImportMatches.length > 0) {
@@ -357,7 +385,10 @@ function scanInlineJsRisk(html) {
     { pattern: /\beval\s*\(/gi, label: 'eval() call detected' },
     { pattern: /\bFunction\s*\(/gi, label: 'Function() constructor detected' },
     { pattern: /\bsetTimeout\s*\(\s*["'`]/gi, label: 'setTimeout() with string argument detected' },
-    { pattern: /\bsetInterval\s*\(\s*["'`]/gi, label: 'setInterval() with string argument detected' },
+    {
+      pattern: /\bsetInterval\s*\(\s*["'`]/gi,
+      label: 'setInterval() with string argument detected',
+    },
     { pattern: /\batob\s*\(/gi, label: 'atob() (base64 decode) detected' },
     { pattern: /\\x[0-9a-f]{2}/gi, label: 'Hex-encoded string escape detected' },
     { pattern: /\\u00[0-9a-f]{2}/gi, label: 'Unicode escape obfuscation detected' },

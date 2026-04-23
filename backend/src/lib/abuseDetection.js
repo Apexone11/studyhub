@@ -89,11 +89,7 @@ setInterval(() => {
  */
 function fingerprint(text) {
   if (!text || typeof text !== 'string') return ''
-  return text
-    .toLowerCase()
-    .replace(/\s+/g, ' ')
-    .trim()
-    .slice(0, 200)
+  return text.toLowerCase().replace(/\s+/g, ' ').trim().slice(0, 200)
 }
 
 /* ── Core detection checks ─────────────────────────────────── */

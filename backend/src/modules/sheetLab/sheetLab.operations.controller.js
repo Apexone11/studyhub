@@ -4,7 +4,12 @@ const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { captureError } = require('../../monitoring/sentry')
 const { computeLineDiff, addWordSegments, generateChangeSummary } = require('../../lib/diff')
 const prisma = require('../../lib/prisma')
-const { optionalAuth, canReadSheet, parsePositiveInt, computeChecksum } = require('./sheetLab.constants')
+const {
+  optionalAuth,
+  canReadSheet,
+  parsePositiveInt,
+  computeChecksum,
+} = require('./sheetLab.constants')
 const { diffLimiter } = require('../sheets/sheets.constants')
 
 const router = express.Router()
@@ -23,21 +28,25 @@ router.post('/:id/lab/sync-upstream', requireAuth, async (req, res) => {
 
     if (!fork) return res.status(404).json({ error: 'Sheet not found.' })
     if (!fork.forkOf) return res.status(400).json({ error: 'This sheet is not a fork.' })
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: fork.userId,
-      message: 'Only the fork owner can sync from the original.',
-      targetType: 'sheet-lab',
-      targetId: sheetId,
-    })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: fork.userId,
+        message: 'Only the fork owner can sync from the original.',
+        targetType: 'sheet-lab',
+        targetId: sheetId,
+      })
+    )
+      return
 
     const original = await prisma.studySheet.findUnique({
       where: { id: fork.forkOf },
       select: { id: true, title: true, content: true, contentFormat: true },
     })
 
-    if (!original) return res.status(404).json({ error: 'Original sheet not found or was deleted.' })
+    if (!original)
+      return res.status(404).json({ error: 'Original sheet not found or was deleted.' })
 
     // Check if content is already identical
     if (fork.content === original.content) {
@@ -117,7 +126,8 @@ router.get('/:id/lab/compare-upstream', optionalAuth, diffLimiter, async (req, r
       select: { id: true, title: true, content: true },
     })
 
-    if (!original) return res.status(404).json({ error: 'Original sheet not found or was deleted.' })
+    if (!original)
+      return res.status(404).json({ error: 'Original sheet not found or was deleted.' })
 
     const upstreamContent = original.content || ''
     const forkContent = fork.content || ''
@@ -160,14 +170,17 @@ router.get('/:id/lab/uncommitted-diff', requireAuth, diffLimiter, async (req, re
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: sheet.userId,
-      message: 'Only the sheet owner can view uncommitted changes.',
-      targetType: 'sheet-lab',
-      targetId: sheetId,
-    })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: sheet.userId,
+        message: 'Only the sheet owner can view uncommitted changes.',
+        targetType: 'sheet-lab',
+        targetId: sheetId,
+      })
+    )
+      return
 
     const latestCommit = await prisma.sheetCommit.findFirst({
       where: { sheetId },
@@ -190,11 +203,13 @@ router.get('/:id/lab/uncommitted-diff', requireAuth, diffLimiter, async (req, re
       hasChanges: true,
       diff,
       summary,
-      lastCommit: latestCommit ? {
-        id: latestCommit.id,
-        message: latestCommit.message,
-        createdAt: latestCommit.createdAt,
-      } : null,
+      lastCommit: latestCommit
+        ? {
+            id: latestCommit.id,
+            message: latestCommit.message,
+            createdAt: latestCommit.createdAt,
+          }
+        : null,
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
@@ -216,14 +231,17 @@ router.post('/:id/lab/restore/:commitId', requireAuth, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: sheet.userId,
-      message: 'Only the sheet owner can restore commits.',
-      targetType: 'sheet-lab',
-      targetId: sheetId,
-    })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: sheet.userId,
+        message: 'Only the sheet owner can restore commits.',
+        targetType: 'sheet-lab',
+        targetId: sheetId,
+      })
+    )
+      return
 
     const targetCommit = await prisma.sheetCommit.findFirst({
       where: { id: commitId, sheetId },
@@ -343,14 +361,17 @@ router.get('/:id/lab/auto-summary', requireAuth, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: sheet.userId,
-      message: 'Only the sheet owner can get the auto-summary.',
-      targetType: 'sheet-lab',
-      targetId: sheetId,
-    })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: sheet.userId,
+        message: 'Only the sheet owner can get the auto-summary.',
+        targetType: 'sheet-lab',
+        targetId: sheetId,
+      })
+    )
+      return
 
     const latestCommit = await prisma.sheetCommit.findFirst({
       where: { sheetId },
@@ -382,14 +403,17 @@ router.get('/:id/lab/restore-preview/:commitId', requireAuth, async (req, res) =
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: sheet.userId,
-      message: 'Only the sheet owner can preview restores.',
-      targetType: 'sheet-lab',
-      targetId: sheetId,
-    })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: sheet.userId,
+        message: 'Only the sheet owner can preview restores.',
+        targetType: 'sheet-lab',
+        targetId: sheetId,
+      })
+    )
+      return
 
     const targetCommit = await prisma.sheetCommit.findFirst({
       where: { id: commitId, sheetId },

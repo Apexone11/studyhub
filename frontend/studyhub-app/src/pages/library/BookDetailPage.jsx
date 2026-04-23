@@ -32,9 +32,10 @@ export default function BookDetailPage() {
 
   const { book, loading, error, shelves, progress, addToShelf, createShelf } =
     useBookDetail(volumeId)
-  const descriptionHtml = DOMPurify.sanitize(book?.description || '', {
-    USE_PROFILES: { html: true },
-  }).trim() || 'No description available for this book.'
+  const descriptionHtml =
+    DOMPurify.sanitize(book?.description || '', {
+      USE_PROFILES: { html: true },
+    }).trim() || 'No description available for this book.'
 
   const handleAddToShelf = async (shelfId) => {
     const success = await addToShelf(shelfId)
@@ -139,7 +140,8 @@ export default function BookDetailPage() {
                     <div
                       className="book-detail__cover-fallback"
                       style={{
-                        background: 'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent))',
+                        background:
+                          'linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent))',
                       }}
                     >
                       <div className="book-detail__cover-fallback-text">{book.title}</div>

@@ -146,28 +146,31 @@ async function formatGroup(group, currentUserId = null) {
     upcomingSessionCount,
     discussionPostCount,
     userMembershipResult,
-  ] =
-    await Promise.all([
-      prisma.studyGroupMember.count({
-        where: { groupId: group.id, status: 'active' },
-      }),
-      prisma.studyGroupMember.count({
-        where: { groupId: group.id, status: 'pending' },
-      }),
-      prisma.studyGroupMember.count({
-        where: { groupId: group.id, status: 'invited' },
-      }),
-      prisma.groupResource.count({
-        where: { groupId: group.id },
-      }),
-      prisma.groupSession.count({
-        where: { groupId: group.id, scheduledAt: { gte: new Date() }, status: { in: ['upcoming', 'in_progress'] } },
-      }),
-      prisma.groupDiscussionPost.count({
-        where: { groupId: group.id },
-      }),
-      currentUserId ? requireGroupMember(group.id, currentUserId) : Promise.resolve(null),
-    ])
+  ] = await Promise.all([
+    prisma.studyGroupMember.count({
+      where: { groupId: group.id, status: 'active' },
+    }),
+    prisma.studyGroupMember.count({
+      where: { groupId: group.id, status: 'pending' },
+    }),
+    prisma.studyGroupMember.count({
+      where: { groupId: group.id, status: 'invited' },
+    }),
+    prisma.groupResource.count({
+      where: { groupId: group.id },
+    }),
+    prisma.groupSession.count({
+      where: {
+        groupId: group.id,
+        scheduledAt: { gte: new Date() },
+        status: { in: ['upcoming', 'in_progress'] },
+      },
+    }),
+    prisma.groupDiscussionPost.count({
+      where: { groupId: group.id },
+    }),
+    currentUserId ? requireGroupMember(group.id, currentUserId) : Promise.resolve(null),
+  ])
 
   const userMembership = userMembershipResult
 
@@ -236,12 +239,14 @@ async function formatGroup(group, currentUserId = null) {
     discussionPostCount,
     isMember: !!isMember,
     userRole,
-    userMembership: userMembership ? {
-      id: userMembership.id,
-      role: userMembership.role,
-      status: userMembership.status,
-      joinedAt: userMembership.joinedAt,
-    } : null,
+    userMembership: userMembership
+      ? {
+          id: userMembership.id,
+          role: userMembership.role,
+          status: userMembership.status,
+          joinedAt: userMembership.joinedAt,
+        }
+      : null,
     // Phase 5 trust & safety surface
     moderationStatus: group.moderationStatus ?? 'active',
     warnedUntil: group.warnedUntil ?? null,

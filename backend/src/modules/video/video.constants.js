@@ -5,11 +5,11 @@
 // ── Upload limits ────────────────────────────────────────────────────────
 // Duration limits by subscription tier (seconds)
 const VIDEO_DURATION_LIMITS = {
-  free: 30 * 60,        // 30 minutes
+  free: 30 * 60, // 30 minutes
   pro_monthly: 60 * 60, // 1 hour
-  pro_yearly: 60 * 60,  // 1 hour
-  donor: 45 * 60,       // 45 minutes
-  admin: 2 * 60 * 60,   // 2 hours
+  pro_yearly: 60 * 60, // 1 hour
+  donor: 45 * 60, // 45 minutes
+  admin: 2 * 60 * 60, // 2 hours
 }
 
 // Default fallback (for unknown plans)
@@ -17,9 +17,9 @@ const MAX_VIDEO_DURATION = VIDEO_DURATION_LIMITS.free
 
 // File size limits by subscription tier (bytes)
 const VIDEO_SIZE_LIMITS = {
-  free: 500 * 1024 * 1024,       // 500 MB
+  free: 500 * 1024 * 1024, // 500 MB
   pro_monthly: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
-  pro_yearly: 1.5 * 1024 * 1024 * 1024,  // 1.5 GB
+  pro_yearly: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
   donor: 1 * 1024 * 1024 * 1024, // 1 GB
   admin: 2 * 1024 * 1024 * 1024, // 2 GB
 }

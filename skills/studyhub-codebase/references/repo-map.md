@@ -4,7 +4,7 @@
 
 - `README.md` - public project overview
 - `docker-compose.yml` - local dev stack
-- `docs/railway-deployment-checklist.md` - hosted deployment notes
+- `docs/internal/railway-deployment-checklist.md` - hosted deployment notes
 
 ## Backend
 
@@ -69,7 +69,7 @@
 - `frontend/studyhub-app/src/pages/home/HomePage.jsx` - marketing and landing page
 - `frontend/studyhub-app/src/pages/auth/LoginPage.jsx` - login and 2FA entry
 - `frontend/studyhub-app/src/pages/auth/RegisterScreen.jsx` - registration flow
-- `frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx` - student dashboard
+- `frontend/studyhub-app/src/pages/profile/UserProfilePage.jsx` - personal overview / "dashboard" rendered at `/users/:username`; `/dashboard` redirects here via `DashboardRedirect` in `App.jsx`. Reuses widgets from `pages/dashboard/DashboardWidgets.jsx`.
 - `frontend/studyhub-app/src/pages/feed/FeedPage.jsx` - feed posts and reactions
 - `frontend/studyhub-app/src/pages/sheets/SheetsPage.jsx` - sheet directory and browse
 - `frontend/studyhub-app/src/pages/sheets/SheetViewerPage.jsx` - sheet detail, downloads, fork and contribution review

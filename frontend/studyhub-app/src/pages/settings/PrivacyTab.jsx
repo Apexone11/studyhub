@@ -33,7 +33,9 @@ function ActivityLogDownload() {
       a.href = url
       const disposition = res.headers.get('Content-Disposition') || ''
       const match = disposition.match(/filename="?([^"]+)"?/)
-      a.download = match ? match[1] : `my-activity-log-${new Date().toISOString().slice(0, 10)}.json`
+      a.download = match
+        ? match[1]
+        : `my-activity-log-${new Date().toISOString().slice(0, 10)}.json`
       document.body.appendChild(a)
       a.click()
       a.remove()
@@ -51,11 +53,7 @@ function ActivityLogDownload() {
       title="Activity Log"
       subtitle="Download a copy of your activity on StudyHub. This includes actions like logins, sheet creation, comments, and settings changes. No IP addresses or internal data are included."
     >
-      <Button
-        onClick={handleDownload}
-        disabled={downloading}
-        secondary
-      >
+      <Button onClick={handleDownload} disabled={downloading} secondary>
         {downloading ? 'Downloading...' : 'Download My Activity Log'}
       </Button>
     </SectionCard>
@@ -85,8 +83,11 @@ function PrivateAccountToggle() {
       })
       const data = await res.json()
       if (res.ok) {
-        setSessionUser((u) => u ? { ...u, isPrivate: newValue } : u)
-        showToast(newValue ? 'Your account is now private.' : 'Your account is now public.', 'success')
+        setSessionUser((u) => (u ? { ...u, isPrivate: newValue } : u))
+        showToast(
+          newValue ? 'Your account is now private.' : 'Your account is now public.',
+          'success',
+        )
       } else {
         setIsPrivate(!newValue) // revert
         showToast(data.error || 'Could not update privacy setting.', 'error')
@@ -112,16 +113,18 @@ function PrivateAccountToggle() {
         disabled={saving}
       />
       {isPrivate && (
-        <div style={{
-          marginTop: 8,
-          padding: '10px 14px',
-          borderRadius: 8,
-          background: 'var(--sh-info-bg)',
-          border: '1px solid var(--sh-info-border)',
-          fontSize: 12,
-          color: 'var(--sh-info-text)',
-          lineHeight: 1.5,
-        }}>
+        <div
+          style={{
+            marginTop: 8,
+            padding: '10px 14px',
+            borderRadius: 8,
+            background: 'var(--sh-info-bg)',
+            border: '1px solid var(--sh-info-border)',
+            fontSize: 12,
+            color: 'var(--sh-info-text)',
+            lineHeight: 1.5,
+          }}
+        >
           New followers will need your approval. Your existing followers will not be affected.
         </div>
       )}
@@ -144,14 +147,21 @@ function UserListSection({ title, subtitle, endpoint, emptyText, actionLabel, ac
       .finally(() => setLoading(false))
   }, [endpoint])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+  }, [load])
 
   async function handleRemove(user) {
     setBusyId(user.id)
     try {
-      const res = await fetch(`${API}/api/users/${user.username}/${endpoint === 'blocked' ? 'block' : 'mute'}`, {
-        method: 'DELETE', headers: authHeaders(), credentials: 'include',
-      })
+      const res = await fetch(
+        `${API}/api/users/${user.username}/${endpoint === 'blocked' ? 'block' : 'mute'}`,
+        {
+          method: 'DELETE',
+          headers: authHeaders(),
+          credentials: 'include',
+        },
+      )
       if (res.ok) {
         setUsers((prev) => prev.filter((u) => u.id !== user.id))
         showToast(`${actionDoneLabel} ${user.username}`, 'success')
@@ -178,8 +188,11 @@ function UserListSection({ title, subtitle, endpoint, emptyText, actionLabel, ac
             <div
               key={user.id}
               style={{
-                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                padding: '12px 0', borderBottom: '1px solid var(--sh-soft)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                padding: '12px 0',
+                borderBottom: '1px solid var(--sh-soft)',
               }}
             >
               <Link
@@ -188,7 +201,9 @@ function UserListSection({ title, subtitle, endpoint, emptyText, actionLabel, ac
               >
                 <UserAvatar username={user.username} avatarUrl={user.avatarUrl} size={32} />
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sh-heading)' }}>{user.username}</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sh-heading)' }}>
+                    {user.username}
+                  </div>
                   {user.createdAt && (
                     <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
                       Since {new Date(user.createdAt).toLocaleDateString()}
@@ -200,9 +215,14 @@ function UserListSection({ title, subtitle, endpoint, emptyText, actionLabel, ac
                 onClick={() => handleRemove(user)}
                 disabled={busyId === user.id}
                 style={{
-                  padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600,
-                  fontFamily: FONT, cursor: busyId === user.id ? 'wait' : 'pointer',
-                  border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
+                  padding: '6px 14px',
+                  borderRadius: 8,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  fontFamily: FONT,
+                  cursor: busyId === user.id ? 'wait' : 'pointer',
+                  border: '1px solid var(--sh-border)',
+                  background: 'var(--sh-soft)',
                   color: 'var(--sh-text)',
                 }}
               >
@@ -220,14 +240,23 @@ export default function PrivacyTab() {
   const { prefs, setPrefs, loading, saving, msg, loadError, toggle, save, retry } = usePreferences()
 
   if (loading) {
-    return <SectionCard title="Privacy"><div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div></SectionCard>
+    return (
+      <SectionCard title="Privacy">
+        <div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div>
+      </SectionCard>
+    )
   }
 
   if (!prefs) {
     return (
-      <SectionCard title="Privacy" subtitle="StudyHub could not load your privacy preferences right now.">
+      <SectionCard
+        title="Privacy"
+        subtitle="StudyHub could not load your privacy preferences right now."
+      >
         <MsgList msg={{ type: 'error', text: loadError || 'Could not load preferences.' }} />
-        <Button secondary onClick={retry}>Retry</Button>
+        <Button secondary onClick={retry}>
+          Retry
+        </Button>
       </SectionCard>
     )
   }
@@ -236,7 +265,10 @@ export default function PrivacyTab() {
     <>
       <PrivateAccountToggle />
 
-      <SectionCard title="Profile Visibility" subtitle="Control who can see your profile page and activity.">
+      <SectionCard
+        title="Profile Visibility"
+        subtitle="Control who can see your profile page and activity."
+      >
         <FormField label="Who can view your profile">
           <Select
             value={prefs.profileVisibility}
@@ -249,7 +281,10 @@ export default function PrivacyTab() {
         </FormField>
       </SectionCard>
 
-      <SectionCard title="Default Permissions" subtitle="Defaults for new sheets you upload. You can override per sheet.">
+      <SectionCard
+        title="Default Permissions"
+        subtitle="Defaults for new sheets you upload. You can override per sheet."
+      >
         <ToggleRow
           label="Allow downloads"
           description="Let others download your sheets by default"
@@ -265,10 +300,15 @@ export default function PrivacyTab() {
       </SectionCard>
 
       <MsgList msg={msg} />
-      <Button disabled={saving} onClick={() => save(
-        ['profileVisibility', 'defaultDownloads', 'defaultContributions'],
-        'Privacy preferences saved.',
-      )}>
+      <Button
+        disabled={saving}
+        onClick={() =>
+          save(
+            ['profileVisibility', 'defaultDownloads', 'defaultContributions'],
+            'Privacy preferences saved.',
+          )
+        }
+      >
         {saving ? 'Saving...' : 'Save Privacy Preferences'}
       </Button>
 

@@ -79,15 +79,33 @@ router.post('/schools/:id/logo', logoUpload.single('logo'), async (req, res) => 
       const svgCheck = validateSvgContent(req.file.path)
       if (!svgCheck.safe) {
         const fs = require('node:fs')
-        try { fs.unlinkSync(req.file.path) } catch { /* ignore */ }
-        return sendError(res, 400, 'SVG file contains unsafe content and was rejected.', ERROR_CODES.UPLOAD_INVALID)
+        try {
+          fs.unlinkSync(req.file.path)
+        } catch {
+          /* ignore */
+        }
+        return sendError(
+          res,
+          400,
+          'SVG file contains unsafe content and was rejected.',
+          ERROR_CODES.UPLOAD_INVALID,
+        )
       }
     } else {
       const magicCheck = validateMagicBytes(req.file.path, req.file.mimetype)
       if (!magicCheck.valid) {
         const fs = require('node:fs')
-        try { fs.unlinkSync(req.file.path) } catch { /* ignore */ }
-        return sendError(res, 400, 'File content does not match its declared type.', ERROR_CODES.UPLOAD_INVALID)
+        try {
+          fs.unlinkSync(req.file.path)
+        } catch {
+          /* ignore */
+        }
+        return sendError(
+          res,
+          400,
+          'File content does not match its declared type.',
+          ERROR_CODES.UPLOAD_INVALID,
+        )
       }
     }
 
@@ -106,7 +124,9 @@ router.post('/schools/:id/logo', logoUpload.single('logo'), async (req, res) => 
         const fs = require('node:fs')
         const oldPath = path.join(SCHOOL_LOGOS_DIR, path.basename(school.logoUrl))
         if (fs.existsSync(oldPath)) fs.unlinkSync(oldPath)
-      } catch { /* ignore cleanup errors */ }
+      } catch {
+        /* ignore cleanup errors */
+      }
     }
 
     const logoUrl = `/uploads/school-logos/${req.file.filename}`
@@ -148,7 +168,9 @@ router.delete('/schools/:id/logo', async (req, res) => {
         const fs = require('node:fs')
         const filePath = path.join(SCHOOL_LOGOS_DIR, path.basename(school.logoUrl))
         if (fs.existsSync(filePath)) fs.unlinkSync(filePath)
-      } catch { /* ignore cleanup errors */ }
+      } catch {
+        /* ignore cleanup errors */
+      }
     }
 
     await prisma.school.update({

@@ -2,7 +2,13 @@ import { API } from '../../config'
 import { Pager } from './AdminWidgets'
 import { tableHeadStyle, tableCell, tableCellStrong, pillButton } from './adminConstants'
 
-export default function UsersTab({ usersState, currentUserId, patchRole, deleteUser, loadPagedData }) {
+export default function UsersTab({
+  usersState,
+  currentUserId,
+  patchRole,
+  deleteUser,
+  loadPagedData,
+}) {
   async function handleTrustLevelChange(userId, trustLevel) {
     try {
       await fetch(`${API}/api/admin/users/${userId}/trust-level`, {
@@ -12,7 +18,9 @@ export default function UsersTab({ usersState, currentUserId, patchRole, deleteU
         body: JSON.stringify({ trustLevel }),
       })
       void loadPagedData('users', usersState.page)
-    } catch { /* silent */ }
+    } catch {
+      /* silent */
+    }
   }
 
   return (
@@ -24,14 +32,29 @@ export default function UsersTab({ usersState, currentUserId, patchRole, deleteU
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ background: 'var(--sh-soft)' }}>
-              {['Username', 'Email', 'Role', 'Trust', 'Sheets', 'Joined', 'Staff Verified', 'Actions'].map((header) => (
-                <th key={header} style={tableHeadStyle}>{header}</th>
+              {[
+                'Username',
+                'Email',
+                'Role',
+                'Trust',
+                'Sheets',
+                'Joined',
+                'Staff Verified',
+                'Actions',
+              ].map((header) => (
+                <th key={header} style={tableHeadStyle}>
+                  {header}
+                </th>
               ))}
             </tr>
           </thead>
           <tbody>
             {usersState.items.length === 0 && (
-              <tr><td colSpan={8} className="admin-empty">No users found.</td></tr>
+              <tr>
+                <td colSpan={8} className="admin-empty">
+                  No users found.
+                </td>
+              </tr>
             )}
             {usersState.items.map((record) => (
               <tr key={record.id} style={{ borderBottom: '1px solid var(--sh-border)' }}>
@@ -42,7 +65,12 @@ export default function UsersTab({ usersState, currentUserId, patchRole, deleteU
                   <select
                     value={record.trustLevel || 'new'}
                     onChange={(e) => void handleTrustLevelChange(record.id, e.target.value)}
-                    style={{ fontSize: 12, padding: '2px 4px', borderRadius: 4, border: '1px solid var(--sh-border)' }}
+                    style={{
+                      fontSize: 12,
+                      padding: '2px 4px',
+                      borderRadius: 4,
+                      border: '1px solid var(--sh-border)',
+                    }}
                   >
                     <option value="new">New</option>
                     <option value="trusted">Trusted</option>
@@ -64,23 +92,42 @@ export default function UsersTab({ usersState, currentUserId, patchRole, deleteU
                           body: JSON.stringify({ isStaffVerified: !record.isStaffVerified }),
                         })
                         loadPagedData('users', usersState.page)
-                      } catch { /* swallow */ }
+                      } catch {
+                        /* swallow */
+                      }
                     }}
-                    style={{ cursor: 'pointer', width: 16, height: 16, accentColor: 'var(--sh-brand)' }}
+                    style={{
+                      cursor: 'pointer',
+                      width: 16,
+                      height: 16,
+                      accentColor: 'var(--sh-brand)',
+                    }}
                   />
                 </td>
                 <td style={{ ...tableCell, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                   {record.role === 'student' ? (
-                    <button type="button" onClick={() => void patchRole(record.id, 'admin')} style={pillButton('#eff6ff', '#1d4ed8', '#bfdbfe')}>
+                    <button
+                      type="button"
+                      onClick={() => void patchRole(record.id, 'admin')}
+                      style={pillButton('#eff6ff', '#1d4ed8', '#bfdbfe')}
+                    >
                       Make admin
                     </button>
                   ) : (
-                    <button type="button" onClick={() => void patchRole(record.id, 'student')} style={pillButton('#fef2f2', '#dc2626', '#fecaca')}>
+                    <button
+                      type="button"
+                      onClick={() => void patchRole(record.id, 'student')}
+                      style={pillButton('#fef2f2', '#dc2626', '#fecaca')}
+                    >
                       Revoke admin
                     </button>
                   )}
                   {record.id !== currentUserId ? (
-                    <button type="button" onClick={() => void deleteUser(record.id)} style={pillButton('#fef2f2', '#dc2626', '#fecaca')}>
+                    <button
+                      type="button"
+                      onClick={() => void deleteUser(record.id)}
+                      style={pillButton('#fef2f2', '#dc2626', '#fecaca')}
+                    >
                       Delete
                     </button>
                   ) : null}
@@ -90,7 +137,11 @@ export default function UsersTab({ usersState, currentUserId, patchRole, deleteU
           </tbody>
         </table>
       </div>
-      <Pager page={usersState.page} total={usersState.total} onChange={(page) => void loadPagedData('users', page)} />
+      <Pager
+        page={usersState.page}
+        total={usersState.total}
+        onChange={(page) => void loadPagedData('users', page)}
+      />
     </>
   )
 }

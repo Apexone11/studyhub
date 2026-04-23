@@ -31,9 +31,12 @@ export function EmailVerificationInline({ visible }) {
         lineHeight: 1.6,
       }}
     >
-      <strong>Email verification required.</strong>{' '}
-      Verify your email to upload sheets, post comments, and access all features.{' '}
-      <Link to="/settings?tab=account" style={{ color: 'var(--sh-link, #2563eb)', fontWeight: 700, textDecoration: 'underline' }}>
+      <strong>Email verification required.</strong> Verify your email to upload sheets, post
+      comments, and access all features.{' '}
+      <Link
+        to="/settings?tab=account"
+        style={{ color: 'var(--sh-link, #2563eb)', fontWeight: 700, textDecoration: 'underline' }}
+      >
         Verify now
       </Link>
     </div>

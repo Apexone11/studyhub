@@ -14,20 +14,18 @@ const IV_BYTES = 12
  */
 async function encryptField(plaintext) {
   const keyArn = process.env.KMS_KEY_ARN
-  if (!keyArn || !keyArn.startsWith('arn:aws:kms:')) throw new Error('KMS_KEY_ARN is not configured or invalid')
+  if (!keyArn || !keyArn.startsWith('arn:aws:kms:'))
+    throw new Error('KMS_KEY_ARN is not configured or invalid')
 
   const kms = getKmsClient()
   const { Plaintext, CiphertextBlob } = await kms.send(
-    new GenerateDataKeyCommand({ KeyId: keyArn, KeySpec: 'AES_256' })
+    new GenerateDataKeyCommand({ KeyId: keyArn, KeySpec: 'AES_256' }),
   )
 
   const iv = crypto.randomBytes(IV_BYTES)
   const cipher = crypto.createCipheriv(ALG, Buffer.from(Plaintext), iv)
 
-  const encrypted = Buffer.concat([
-    cipher.update(Buffer.from(plaintext, 'utf8')),
-    cipher.final(),
-  ])
+  const encrypted = Buffer.concat([cipher.update(Buffer.from(plaintext, 'utf8')), cipher.final()])
   const tag = cipher.getAuthTag()
 
   // Zero out the plaintext key from memory as soon as possible
@@ -59,13 +57,13 @@ async function decryptField(payload) {
   const { Plaintext } = await kms.send(
     new DecryptCommand({
       CiphertextBlob: Buffer.from(payload.encryptedDataKey, 'base64'),
-    })
+    }),
   )
 
   const decipher = crypto.createDecipheriv(
     payload.alg || ALG,
     Buffer.from(Plaintext),
-    Buffer.from(payload.iv, 'base64')
+    Buffer.from(payload.iv, 'base64'),
   )
   decipher.setAuthTag(Buffer.from(payload.tag, 'base64'))
 

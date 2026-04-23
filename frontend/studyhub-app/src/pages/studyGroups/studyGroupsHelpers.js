@@ -11,24 +11,24 @@ import { API } from '../../config'
  * @returns {string} Relative time string
  */
 export function formatRelativeTime(dateStr) {
-  if (!dateStr) return '';
+  if (!dateStr) return ''
 
-  const now = new Date();
-  const date = new Date(dateStr);
-  const diffMs = now - date;
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffSecs / 60);
-  const diffHours = Math.floor(diffMins / 60);
-  const diffDays = Math.floor(diffHours / 24);
-  const diffWeeks = Math.floor(diffDays / 7);
+  const now = new Date()
+  const date = new Date(dateStr)
+  const diffMs = now - date
+  const diffSecs = Math.floor(diffMs / 1000)
+  const diffMins = Math.floor(diffSecs / 60)
+  const diffHours = Math.floor(diffMins / 60)
+  const diffDays = Math.floor(diffHours / 24)
+  const diffWeeks = Math.floor(diffDays / 7)
 
-  if (diffSecs < 60) return 'just now';
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  if (diffWeeks < 4) return `${diffWeeks}w ago`;
+  if (diffSecs < 60) return 'just now'
+  if (diffMins < 60) return `${diffMins}m ago`
+  if (diffHours < 24) return `${diffHours}h ago`
+  if (diffDays < 7) return `${diffDays}d ago`
+  if (diffWeeks < 4) return `${diffWeeks}w ago`
 
-  return date.toLocaleDateString();
+  return date.toLocaleDateString()
 }
 
 /**
@@ -37,9 +37,9 @@ export function formatRelativeTime(dateStr) {
  * @returns {string} Formatted date and time
  */
 export function formatSessionTime(dateStr) {
-  if (!dateStr) return '';
+  if (!dateStr) return ''
 
-  const date = new Date(dateStr);
+  const date = new Date(dateStr)
   const options = {
     month: 'short',
     day: 'numeric',
@@ -47,9 +47,9 @@ export function formatSessionTime(dateStr) {
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
-  };
+  }
 
-  return date.toLocaleDateString('en-US', options);
+  return date.toLocaleDateString('en-US', options)
 }
 
 /**
@@ -58,15 +58,15 @@ export function formatSessionTime(dateStr) {
  * @returns {string} Formatted duration (e.g., "1h", "1h 30m", "30m")
  */
 export function formatDuration(mins) {
-  if (!mins || mins < 0) return '0m';
+  if (!mins || mins < 0) return '0m'
 
-  const hours = Math.floor(mins / 60);
-  const minutes = mins % 60;
+  const hours = Math.floor(mins / 60)
+  const minutes = mins % 60
 
-  if (hours === 0) return `${minutes}m`;
-  if (minutes === 0) return `${hours}h`;
+  if (hours === 0) return `${minutes}m`
+  if (minutes === 0) return `${hours}h`
 
-  return `${hours}h ${minutes}m`;
+  return `${hours}h ${minutes}m`
 }
 
 /**
@@ -79,9 +79,9 @@ export function getPrivacyLabel(privacy) {
     public: 'Public',
     private: 'Private',
     invite_only: 'Invite Only',
-  };
+  }
 
-  return labels[privacy] || privacy;
+  return labels[privacy] || privacy
 }
 
 /**
@@ -94,9 +94,9 @@ export function getRoleLabel(role) {
     admin: 'Admin',
     moderator: 'Moderator',
     member: 'Member',
-  };
+  }
 
-  return labels[role] || role;
+  return labels[role] || role
 }
 
 /**
@@ -110,9 +110,9 @@ export function getStatusLabel(status) {
     pending: 'Pending',
     invited: 'Invited',
     banned: 'Banned',
-  };
+  }
 
-  return labels[status] || status;
+  return labels[status] || status
 }
 
 /**
@@ -121,9 +121,9 @@ export function getStatusLabel(status) {
  * @returns {string} Two-character initials
  */
 export function getMemberInitials(username) {
-  if (!username || username.length === 0) return 'XX';
+  if (!username || username.length === 0) return 'XX'
 
-  return username.substring(0, 2).toUpperCase();
+  return username.substring(0, 2).toUpperCase()
 }
 
 /**
@@ -137,9 +137,9 @@ export function getSessionStatusLabel(status) {
     in_progress: 'In Progress',
     completed: 'Completed',
     cancelled: 'Cancelled',
-  };
+  }
 
-  return labels[status] || status;
+  return labels[status] || status
 }
 
 /**
@@ -153,9 +153,9 @@ export function getPostTypeLabel(type) {
     question: 'Question',
     announcement: 'Announcement',
     poll: 'Poll',
-  };
+  }
 
-  return labels[type] || type;
+  return labels[type] || type
 }
 
 /**
@@ -165,10 +165,10 @@ export function getPostTypeLabel(type) {
  * @returns {string} Truncated text with "..." if needed
  */
 export function truncateText(text, maxLen) {
-  if (!text) return '';
-  if (text.length <= maxLen) return text;
+  if (!text) return ''
+  if (text.length <= maxLen) return text
 
-  return text.substring(0, maxLen) + '...';
+  return text.substring(0, maxLen) + '...'
 }
 
 /**
@@ -179,4 +179,35 @@ export function truncateText(text, maxLen) {
 export function resolveGroupImageUrl(avatarUrl) {
   if (!avatarUrl) return ''
   return avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`
+}
+
+/**
+ * Role-aware subtitle for the study groups list header.
+ *
+ * Added in Design Refresh v2 Week 2 (brainstorm §10) to replace the dead
+ * "All study groups" copy with something that reflects the viewer's role
+ * and current filter. Kept pure (no React, no session access) so it can be
+ * unit-tested directly — see studyGroupsHelpers.test.js.
+ *
+ * @param {{ mineOnly?: boolean, accountType?: string | null | undefined }} args
+ *   mineOnly: true when the "My groups" filter is active.
+ *   accountType: the viewer's accountType from useSession().user, or null
+ *     when the viewer is unauthenticated.
+ * @returns {string} Subtitle copy (two lines max on mobile).
+ */
+export function getGroupListSubtitle({ mineOnly = false, accountType = null } = {}) {
+  if (mineOnly) {
+    return 'The groups you are in. Tap one to see what is new since last visit.'
+  }
+  if (!accountType) {
+    return 'Find classmates to study with. Public groups open to anyone.'
+  }
+  if (accountType === 'teacher') {
+    return 'Groups for your students. Create one to seed discussion.'
+  }
+  if (accountType === 'other') {
+    return 'Topic groups across the network. No course required.'
+  }
+  // student + any unknown authenticated role falls back to the student voice.
+  return 'Better grades usually hide in these rooms. Start or join one.'
 }

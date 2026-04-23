@@ -43,7 +43,9 @@ function getCsrfToken() {
       const parsed = JSON.parse(stored)
       return parsed.csrfToken || ''
     }
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
   return ''
 }
 
@@ -94,9 +96,7 @@ export async function registerPasskey(name) {
         clientDataJSON: bufferToBase64url(credential.response.clientDataJSON),
         attestationObject: bufferToBase64url(credential.response.attestationObject),
       },
-      transports: credential.response.getTransports
-        ? credential.response.getTransports()
-        : [],
+      transports: credential.response.getTransports ? credential.response.getTransports() : [],
       name: name || undefined,
     }),
   })

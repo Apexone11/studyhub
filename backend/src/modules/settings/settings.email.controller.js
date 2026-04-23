@@ -68,7 +68,8 @@ router.patch('/email', twoFaLimiter, async (req, res) => {
     const updated = await getSettingsUser(user.id)
 
     return res.json({
-      message: 'Email update started. Enter the verification code sent to your inbox to finish setup.',
+      message:
+        'Email update started. Enter the verification code sent to your inbox to finish setup.',
       verificationRequired: true,
       user: updated,
       pendingEmailVerification: updated?.pendingEmailVerification || null,
@@ -87,7 +88,10 @@ router.post('/email/verify', twoFaLimiter, async (req, res) => {
   }
 
   try {
-    const activeChallenge = await getUserActiveChallenge(req.user.userId, VERIFICATION_PURPOSE.SETTINGS_EMAIL)
+    const activeChallenge = await getUserActiveChallenge(
+      req.user.userId,
+      VERIFICATION_PURPOSE.SETTINGS_EMAIL,
+    )
     if (!activeChallenge) {
       return res.status(400).json({ error: 'No email verification is currently in progress.' })
     }
@@ -148,7 +152,9 @@ router.post('/email/resend-verification', twoFaLimiter, async (req, res) => {
       code = refreshed.code
     } else {
       if (!user.email) {
-        return res.status(400).json({ error: 'Add an email address before requesting a verification code.' })
+        return res
+          .status(400)
+          .json({ error: 'Add an email address before requesting a verification code.' })
       }
       if (user.emailVerified) {
         return res.status(400).json({ error: 'Your email is already verified.' })
@@ -175,7 +181,8 @@ router.post('/email/resend-verification', twoFaLimiter, async (req, res) => {
     const updated = await getSettingsUser(user.id)
     return res.json({
       message: 'A new verification code has been sent to your email.',
-      pendingEmailVerification: updated?.pendingEmailVerification || serializePendingEmailVerification(challenge),
+      pendingEmailVerification:
+        updated?.pendingEmailVerification || serializePendingEmailVerification(challenge),
       user: updated,
     })
   } catch (error) {

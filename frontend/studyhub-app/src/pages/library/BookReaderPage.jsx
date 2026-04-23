@@ -35,8 +35,15 @@ export default function BookReaderPage() {
   const [saving, setSaving] = useState(false)
 
   const {
-    book, bookmarks, progress, loading, error,
-    bookmarkError, saveProgress, addBookmark, removeBookmark,
+    book,
+    bookmarks,
+    progress,
+    loading,
+    error,
+    bookmarkError,
+    saveProgress,
+    addBookmark,
+    removeBookmark,
   } = useBookReader(volumeId)
 
   // Save reading progress when the page is visited
@@ -84,7 +91,10 @@ export default function BookReaderPage() {
         <div className="book-reader-error__content">
           <h2>Error loading book</h2>
           <p>{error}</p>
-          <button onClick={() => navigate(`/library/${volumeId}`)} className="book-reader-error__button">
+          <button
+            onClick={() => navigate(`/library/${volumeId}`)}
+            className="book-reader-error__button"
+          >
             Back to Book
           </button>
         </div>
@@ -100,11 +110,20 @@ export default function BookReaderPage() {
           <h2>Preview not available</h2>
           <p>This book does not have an online preview. You can view it on Google Books instead.</p>
           <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-            <button onClick={() => navigate(`/library/${volumeId}`)} className="book-reader-error__button">
+            <button
+              onClick={() => navigate(`/library/${volumeId}`)}
+              className="book-reader-error__button"
+            >
               Back to Book
             </button>
             {getPreviewLink(book) && (
-              <a href={getPreviewLink(book)} target="_blank" rel="noopener noreferrer" className="book-reader-error__button" style={{ textDecoration: 'none' }}>
+              <a
+                href={getPreviewLink(book)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="book-reader-error__button"
+                style={{ textDecoration: 'none' }}
+              >
                 Open on Google Books
               </a>
             )}
@@ -129,7 +148,11 @@ export default function BookReaderPage() {
         <>
           {/* Toolbar */}
           <div className="reader-toolbar">
-            <button onClick={() => navigate(`/library/${volumeId}`)} className="reader-toolbar__back-btn" aria-label="Back to book details">
+            <button
+              onClick={() => navigate(`/library/${volumeId}`)}
+              className="reader-toolbar__back-btn"
+              aria-label="Back to book details"
+            >
               <IconArrowLeft size={20} />
             </button>
 
@@ -144,7 +167,13 @@ export default function BookReaderPage() {
                 Bookmarks ({bookmarks.length})
               </button>
               {book.previewLink && (
-                <a href={book.previewLink} target="_blank" rel="noopener noreferrer" className="reader-toolbar__btn" aria-label="Open in Google Books">
+                <a
+                  href={book.previewLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="reader-toolbar__btn"
+                  aria-label="Open in Google Books"
+                >
                   Book Link
                 </a>
               )}
@@ -152,79 +181,100 @@ export default function BookReaderPage() {
           </div>
 
           {/* Bookmark Panel (portal to avoid iframe z-index issues) */}
-          {showBookmarkPanel && createPortal(
-            <div className="reader-bookmark-overlay" onClick={(e) => { if (e.target === e.currentTarget) setShowBookmarkPanel(false) }}>
-              <div className="reader-bookmark-panel">
-                <div className="reader-bookmark-panel__header">
-                  <h3 className="reader-bookmark-panel__title">Bookmarks</h3>
-                  <button className="reader-bookmark-panel__close" onClick={() => setShowBookmarkPanel(false)} aria-label="Close">x</button>
-                </div>
+          {showBookmarkPanel &&
+            createPortal(
+              <div
+                className="reader-bookmark-overlay"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) setShowBookmarkPanel(false)
+                }}
+              >
+                <div className="reader-bookmark-panel">
+                  <div className="reader-bookmark-panel__header">
+                    <h3 className="reader-bookmark-panel__title">Bookmarks</h3>
+                    <button
+                      className="reader-bookmark-panel__close"
+                      onClick={() => setShowBookmarkPanel(false)}
+                      aria-label="Close"
+                    >
+                      x
+                    </button>
+                  </div>
 
-                {/* Add bookmark form */}
-                <div className="reader-bookmark-panel__form">
-                  <input
-                    type="text"
-                    value={bookmarkLabel}
-                    onChange={(e) => setBookmarkLabel(e.target.value)}
-                    placeholder="Bookmark label (e.g. Chapter 3)"
-                    className="reader-bookmark-panel__input"
-                    maxLength={100}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleAddBookmark() }}
-                  />
-                  <textarea
-                    value={bookmarkNote}
-                    onChange={(e) => setBookmarkNote(e.target.value)}
-                    placeholder="Optional note..."
-                    className="reader-bookmark-panel__textarea"
-                    rows={2}
-                    maxLength={500}
-                  />
-                  <button
-                    className="reader-bookmark-panel__add-btn"
-                    onClick={handleAddBookmark}
-                    disabled={saving || !bookmarkLabel.trim()}
-                  >
-                    {saving ? 'Saving...' : 'Add Bookmark'}
-                  </button>
-                  {bookmarkError && (
-                    <div className="reader-bookmark-panel__error">{bookmarkError}</div>
-                  )}
-                </div>
+                  {/* Add bookmark form */}
+                  <div className="reader-bookmark-panel__form">
+                    <input
+                      type="text"
+                      value={bookmarkLabel}
+                      onChange={(e) => setBookmarkLabel(e.target.value)}
+                      placeholder="Bookmark label (e.g. Chapter 3)"
+                      className="reader-bookmark-panel__input"
+                      maxLength={100}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleAddBookmark()
+                      }}
+                    />
+                    <textarea
+                      value={bookmarkNote}
+                      onChange={(e) => setBookmarkNote(e.target.value)}
+                      placeholder="Optional note..."
+                      className="reader-bookmark-panel__textarea"
+                      rows={2}
+                      maxLength={500}
+                    />
+                    <button
+                      className="reader-bookmark-panel__add-btn"
+                      onClick={handleAddBookmark}
+                      disabled={saving || !bookmarkLabel.trim()}
+                    >
+                      {saving ? 'Saving...' : 'Add Bookmark'}
+                    </button>
+                    {bookmarkError && (
+                      <div className="reader-bookmark-panel__error">{bookmarkError}</div>
+                    )}
+                  </div>
 
-                {/* Bookmark list */}
-                <div className="reader-bookmark-panel__list">
-                  {bookmarks.length === 0 ? (
-                    <div className="reader-bookmark-panel__empty">
-                      No bookmarks yet. Add one to save your reading progress.
-                    </div>
-                  ) : (
-                    bookmarks.map((bm) => (
-                      <div key={bm.id} className="reader-bookmark-panel__item">
-                        <div className="reader-bookmark-panel__item-content">
-                          <strong className="reader-bookmark-panel__item-label">{bm.label}</strong>
-                          {bm.pageSnippet && (
-                            <span className="reader-bookmark-panel__item-note">{bm.pageSnippet}</span>
-                          )}
-                        </div>
-                        <button
-                          className="reader-bookmark-panel__delete-btn"
-                          onClick={() => removeBookmark(bm.id)}
-                          aria-label={`Delete bookmark: ${bm.label}`}
-                        >
-                          x
-                        </button>
+                  {/* Bookmark list */}
+                  <div className="reader-bookmark-panel__list">
+                    {bookmarks.length === 0 ? (
+                      <div className="reader-bookmark-panel__empty">
+                        No bookmarks yet. Add one to save your reading progress.
                       </div>
-                    ))
-                  )}
+                    ) : (
+                      bookmarks.map((bm) => (
+                        <div key={bm.id} className="reader-bookmark-panel__item">
+                          <div className="reader-bookmark-panel__item-content">
+                            <strong className="reader-bookmark-panel__item-label">
+                              {bm.label}
+                            </strong>
+                            {bm.pageSnippet && (
+                              <span className="reader-bookmark-panel__item-note">
+                                {bm.pageSnippet}
+                              </span>
+                            )}
+                          </div>
+                          <button
+                            className="reader-bookmark-panel__delete-btn"
+                            onClick={() => removeBookmark(bm.id)}
+                            aria-label={`Delete bookmark: ${bm.label}`}
+                          >
+                            x
+                          </button>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            </div>,
-            document.body,
-          )}
+              </div>,
+              document.body,
+            )}
 
           {/* Iframe loading indicator */}
           {!iframeLoaded && !iframeError && (
-            <div className="book-reader-loading" style={{ position: 'absolute', inset: 0, top: 56, zIndex: 1 }}>
+            <div
+              className="book-reader-loading"
+              style={{ position: 'absolute', inset: 0, top: 56, zIndex: 1 }}
+            >
               <div style={{ width: '100%', height: '100%', padding: 24 }}>
                 <Skeleton height="100%" width="100%" />
               </div>
@@ -236,7 +286,14 @@ export default function BookReaderPage() {
             src={getEmbedUrl(volumeId)}
             title={`Read ${book.title || 'book'}`}
             className="reader-content"
-            style={{ flex: 1, width: '100%', minHeight: 500, border: 'none', opacity: iframeLoaded ? 1 : 0, transition: 'opacity 0.3s ease' }}
+            style={{
+              flex: 1,
+              width: '100%',
+              minHeight: 500,
+              border: 'none',
+              opacity: iframeLoaded ? 1 : 0,
+              transition: 'opacity 0.3s ease',
+            }}
             allow="fullscreen"
             sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
             onLoad={handleIframeLoad}
@@ -249,10 +306,23 @@ export default function BookReaderPage() {
               <div className="book-reader-error__content">
                 <h2>Could not load the reader</h2>
                 <p>The book viewer failed to load. Try opening it directly on Google Books.</p>
-                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
-                  <button onClick={() => navigate(`/library/${volumeId}`)} className="book-reader-error__button">Back to Book</button>
+                <div
+                  style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}
+                >
+                  <button
+                    onClick={() => navigate(`/library/${volumeId}`)}
+                    className="book-reader-error__button"
+                  >
+                    Back to Book
+                  </button>
                   {getPreviewLink(book) && (
-                    <a href={getPreviewLink(book)} target="_blank" rel="noopener noreferrer" className="book-reader-error__button" style={{ textDecoration: 'none' }}>
+                    <a
+                      href={getPreviewLink(book)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="book-reader-error__button"
+                      style={{ textDecoration: 'none' }}
+                    >
                       Open on Google Books
                     </a>
                   )}
@@ -264,10 +334,15 @@ export default function BookReaderPage() {
           {/* Bottom Progress Bar */}
           {progress && progress.percentage > 0 && (
             <div className="reader-bottom-bar">
-              <div className="reader-bottom-bar__progress">{Math.round(progress.percentage)}% complete</div>
+              <div className="reader-bottom-bar__progress">
+                {Math.round(progress.percentage)}% complete
+              </div>
               <div className="reader-bottom-bar__controls">
                 <div className="reader-bottom-bar__progress-bar">
-                  <div className="reader-bottom-bar__progress-fill" style={{ width: `${progress.percentage}%` }} />
+                  <div
+                    className="reader-bottom-bar__progress-fill"
+                    style={{ width: `${progress.percentage}%` }}
+                  />
                 </div>
               </div>
             </div>

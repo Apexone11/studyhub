@@ -62,7 +62,10 @@ function verifyAuthentication(credential, expectedCredential, userId) {
     return { verified: false, error: 'Challenge mismatch.' }
   }
   if (clientData.origin !== ORIGIN) {
-    return { verified: false, error: `Origin mismatch: expected ${ORIGIN}, got ${clientData.origin}.` }
+    return {
+      verified: false,
+      error: `Origin mismatch: expected ${ORIGIN}, got ${clientData.origin}.`,
+    }
   }
 
   // 3. Parse authenticatorData

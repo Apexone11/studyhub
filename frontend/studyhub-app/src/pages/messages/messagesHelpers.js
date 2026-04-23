@@ -45,7 +45,11 @@ export function formatDateSeparator(date) {
   if (isToday) return 'Today'
   if (isYesterday) return 'Yesterday'
 
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined })
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: d.getFullYear() !== today.getFullYear() ? 'numeric' : undefined,
+  })
 }
 
 export function groupMessagesByDate(messages) {
@@ -53,7 +57,7 @@ export function groupMessagesByDate(messages) {
 
   const groups = {}
 
-  messages.forEach(msg => {
+  messages.forEach((msg) => {
     const dateStr = msg.createdAt || msg.timestamp
     if (!dateStr) return
     const d = new Date(dateStr)

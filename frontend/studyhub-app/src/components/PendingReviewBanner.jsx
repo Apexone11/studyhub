@@ -16,7 +16,8 @@ export default function PendingReviewBanner({ updated = false }) {
         {updated ? 'Updated, still pending review' : 'Pending review'}
       </strong>
       {' \u2014 '}
-      not visible to others yet. Your account is new; public content may require a brief review to keep StudyHub safe.
+      not visible to others yet. Your account is new; public content may require a brief review to
+      keep StudyHub safe.
     </div>
   )
 }

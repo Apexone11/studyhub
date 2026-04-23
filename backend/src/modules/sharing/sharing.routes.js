@@ -57,7 +57,16 @@ router.post('/links', requireAuth, mutateLimiter, async (req, res) => {
       return res.status(404).json({ error: `${contentType} not found.` })
     }
 
-    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: content.userId, message: 'Only owner can create share links.', targetType: contentType, targetId: contentIdInt })) {
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: content.userId,
+        message: 'Only owner can create share links.',
+        targetType: contentType,
+        targetId: contentIdInt,
+      })
+    ) {
       return
     }
 
@@ -171,7 +180,16 @@ router.delete('/links/:id', requireAuth, mutateLimiter, async (req, res) => {
       return res.status(404).json({ error: 'Share link not found.' })
     }
 
-    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: link.createdById, message: 'Only creator can revoke this link.', targetType: 'shareLink', targetId: linkId })) {
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: link.createdById,
+        message: 'Only creator can revoke this link.',
+        targetType: 'shareLink',
+        targetId: linkId,
+      })
+    ) {
       return
     }
 
@@ -244,12 +262,18 @@ router.get('/access/:token', optionalAuth, readLimiter, async (req, res) => {
     if (shareLink.contentType === 'sheet') {
       content = await prisma.studySheet.findUnique({
         where: { id: shareLink.contentId },
-        include: { author: { select: { id: true, username: true } }, course: { select: { id: true, code: true } } },
+        include: {
+          author: { select: { id: true, username: true } },
+          course: { select: { id: true, code: true } },
+        },
       })
     } else {
       content = await prisma.note.findUnique({
         where: { id: shareLink.contentId },
-        include: { author: { select: { id: true, username: true } }, course: { select: { id: true, code: true } } },
+        include: {
+          author: { select: { id: true, username: true } },
+          course: { select: { id: true, code: true } },
+        },
       })
     }
 
@@ -460,7 +484,16 @@ router.post('/direct', requireAuth, mutateLimiter, async (req, res) => {
       return res.status(404).json({ error: `${contentType} not found.` })
     }
 
-    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: content.userId, message: 'Only owner can share this content.', targetType: contentType, targetId: contentIdInt })) {
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: content.userId,
+        message: 'Only owner can share this content.',
+        targetType: contentType,
+        targetId: contentIdInt,
+      })
+    ) {
       return
     }
 
@@ -523,7 +556,7 @@ router.get('/shared-with-me', requireAuth, readLimiter, async (req, res) => {
         permission: share.permission,
         sharedBy: share.sharedBy,
         createdAt: share.createdAt,
-      }))
+      })),
     )
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -548,7 +581,16 @@ router.delete('/direct/:id', requireAuth, mutateLimiter, async (req, res) => {
       return res.status(404).json({ error: 'Share not found.' })
     }
 
-    if (!assertOwnerOrAdmin({ res, user: req.user, ownerId: share.sharedById, message: 'Only sharer can revoke this.', targetType: 'contentShare', targetId: shareId })) {
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: share.sharedById,
+        message: 'Only sharer can revoke this.',
+        targetType: 'contentShare',
+        targetId: shareId,
+      })
+    ) {
       return
     }
 

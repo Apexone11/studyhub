@@ -36,74 +36,74 @@ export const FEATURES = [
     Icon: IconSheets,
     title: 'Study Sheets',
     desc: 'Community-built guides for every course. Fork any sheet and make it your own.',
-    toneClass: 'home-feature--blue'
+    toneClass: 'home-feature--blue',
   },
   {
     Icon: IconTests,
     title: 'Practice Tests',
     desc: 'Take student-made tests right in your browser. Download anytime for offline use.',
-    toneClass: 'home-feature--green'
+    toneClass: 'home-feature--green',
   },
   {
     Icon: IconAnnouncements,
     title: 'Announcements',
     desc: 'Real-time course updates from instructors. Never miss a deadline or change.',
-    toneClass: 'home-feature--amber'
+    toneClass: 'home-feature--amber',
   },
   {
     Icon: IconSpark,
     title: 'Hub AI',
     desc: 'Stuck on a concept? Get instant explanations and AI-generated study sheets tailored to your courses.',
-    toneClass: 'home-feature--purple'
+    toneClass: 'home-feature--purple',
   },
   {
     Icon: IconPen,
     title: 'Personal Notes',
     desc: 'Keep private notes tied to any course. Share with classmates when you are ready.',
-    toneClass: 'home-feature--rose'
+    toneClass: 'home-feature--rose',
   },
   {
     Icon: IconFork,
     title: 'Fork and Contribute',
     desc: 'Like GitHub: fork any study sheet, improve it, and contribute it back.',
-    toneClass: 'home-feature--teal'
+    toneClass: 'home-feature--teal',
   },
   {
     Icon: IconSchool,
     title: 'Multi-School',
     desc: 'All 30+ Maryland schools. Every subject, every course. Expanding nationwide.',
-    toneClass: 'home-feature--orange'
+    toneClass: 'home-feature--orange',
   },
   {
     Icon: IconDownload,
     title: 'Download Anything',
     desc: 'Save any study material to your device. Works offline when you need it.',
-    toneClass: 'home-feature--slate'
+    toneClass: 'home-feature--slate',
   },
   {
     Icon: IconCheck,
     title: 'Free to Start',
     desc: 'Core study tools are free. Sign up, share, and collaborate with your classmates today.',
-    toneClass: 'home-feature--green'
+    toneClass: 'home-feature--green',
   },
   {
     Icon: IconStar,
     title: 'BookHub Library',
     desc: 'Browse Google Books-powered titles, open available previews, save shelves, and keep your place with bookmarks while you study.',
-    toneClass: 'home-feature--indigo'
+    toneClass: 'home-feature--indigo',
   },
   {
     Icon: IconUsers,
     title: 'Study Groups',
     desc: 'Create groups, schedule study sessions, share resources, and discuss topics with classmates.',
-    toneClass: 'home-feature--cyan'
+    toneClass: 'home-feature--cyan',
   },
   {
     Icon: IconMessages,
     title: 'StudyHub Connect',
     desc: 'Real-time DMs and group chats with classmates. Connect instantly with built-in messaging.',
-    toneClass: 'home-feature--pink'
-  }
+    toneClass: 'home-feature--pink',
+  },
 ]
 
 export const STEPS = [
@@ -124,7 +124,7 @@ export const STEPS = [
     title: 'Access everything',
     desc: 'Study sheets, tests, and announcements organized and ready for your courses.',
     icon: IconStar,
-  }
+  },
 ]
 
 export const TESTIMONIALS = [
@@ -148,7 +148,7 @@ export const TESTIMONIALS = [
     school: 'Morgan State University',
     initial: 'A',
     color: HOME_AVATAR_COLORS[2],
-  }
+  },
 ]
 
 export const PROOF_ITEMS = [

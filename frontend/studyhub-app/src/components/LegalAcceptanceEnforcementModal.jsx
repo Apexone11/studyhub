@@ -110,23 +110,37 @@ export default function LegalAcceptanceEnforcementModal() {
 
   return createPortal(
     <div style={styles.overlay} role="presentation">
-      <div ref={trapRef} style={styles.modal} role="alertdialog" aria-modal="true" aria-labelledby="legal-enforcement-title">
+      <div
+        ref={trapRef}
+        style={styles.modal}
+        role="alertdialog"
+        aria-modal="true"
+        aria-labelledby="legal-enforcement-title"
+      >
         <span style={styles.badge}>Action Required</span>
         <h2 id="legal-enforcement-title" style={styles.title}>
           Review the latest StudyHub legal documents to continue
         </h2>
         <p style={styles.body}>
-          Your account is missing acceptance for the current StudyHub legal version. Open Settings &gt; Legal and accept the latest documents to keep using the platform.
+          Your account is missing acceptance for the current StudyHub legal version. Open Settings
+          &gt; Legal and accept the latest documents to keep using the platform.
         </p>
-        {Array.isArray(legalAcceptance?.missingRequiredDocuments) && legalAcceptance.missingRequiredDocuments.length > 0 && (
-          <ul style={styles.list}>
-            {legalAcceptance.missingRequiredDocuments.map((slug) => (
-              <li key={slug}>{getDocumentLabel(slug)}</li>
-            ))}
-          </ul>
-        )}
+        {Array.isArray(legalAcceptance?.missingRequiredDocuments) &&
+          legalAcceptance.missingRequiredDocuments.length > 0 && (
+            <ul style={styles.list}>
+              {legalAcceptance.missingRequiredDocuments.map((slug) => (
+                <li key={slug}>{getDocumentLabel(slug)}</li>
+              ))}
+            </ul>
+          )}
         <div style={styles.actions}>
-          <button type="button" onClick={() => { void signOut() }} style={styles.secondaryButton}>
+          <button
+            type="button"
+            onClick={() => {
+              void signOut()
+            }}
+            style={styles.secondaryButton}
+          >
             Sign out
           </button>
           <button

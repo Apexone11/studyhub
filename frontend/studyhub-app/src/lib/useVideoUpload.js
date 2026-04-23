@@ -108,7 +108,9 @@ export default function useVideoUpload() {
       }
 
       if (file.size > MAX_VIDEO_SIZE_DEFAULT) {
-        setError(`File too large. Maximum upload size is ${Math.round(MAX_VIDEO_SIZE_DEFAULT / (1024 * 1024))} MB.`)
+        setError(
+          `File too large. Maximum upload size is ${Math.round(MAX_VIDEO_SIZE_DEFAULT / (1024 * 1024))} MB.`,
+        )
         setStatus(STATUS.ERROR)
         return null
       }

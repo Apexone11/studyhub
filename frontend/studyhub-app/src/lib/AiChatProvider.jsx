@@ -17,9 +17,5 @@ import { AiChatContext } from './aiChatContext'
 
 export function AiChatProvider({ children }) {
   const chat = useAiChat()
-  return (
-    <AiChatContext.Provider value={chat}>
-      {children}
-    </AiChatContext.Provider>
-  )
+  return <AiChatContext.Provider value={chat}>{children}</AiChatContext.Provider>
 }

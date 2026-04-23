@@ -38,7 +38,9 @@ export default function AppearanceTab() {
 
   function resetAllTutorials() {
     try {
-      const keys = Object.keys(localStorage).filter((k) => k.startsWith('tutorial_') && k.endsWith('_seen'))
+      const keys = Object.keys(localStorage).filter(
+        (k) => k.startsWith('tutorial_') && k.endsWith('_seen'),
+      )
       for (const key of keys) localStorage.removeItem(key)
       // Also re-enable tutorials if they were disabled
       localStorage.removeItem('studyhub_tutorials_disabled')
@@ -61,21 +63,33 @@ export default function AppearanceTab() {
   }, [currentFontSize])
 
   if (loading) {
-    return <SectionCard title="Appearance"><div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading preferences...</div></SectionCard>
+    return (
+      <SectionCard title="Appearance">
+        <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading preferences...</div>
+      </SectionCard>
+    )
   }
 
   if (!prefs) {
     return (
-      <SectionCard title="Appearance" subtitle="StudyHub could not load your appearance preferences right now.">
+      <SectionCard
+        title="Appearance"
+        subtitle="StudyHub could not load your appearance preferences right now."
+      >
         <MsgList msg={{ type: 'error', text: loadError || 'Could not load preferences.' }} />
-        <Button secondary onClick={retry}>Retry</Button>
+        <Button secondary onClick={retry}>
+          Retry
+        </Button>
       </SectionCard>
     )
   }
 
   return (
     <>
-      <SectionCard title="Theme" subtitle="Choose how StudyHub looks for you. System follows your OS setting.">
+      <SectionCard
+        title="Theme"
+        subtitle="Choose how StudyHub looks for you. System follows your OS setting."
+      >
         <FormField label="Color theme">
           <Select
             value={prefs.theme}
@@ -89,9 +103,27 @@ export default function AppearanceTab() {
 
         <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
           {[
-            { value: 'light', label: 'Light', bg: 'var(--sh-surface)', border: 'var(--sh-border)', text: 'var(--sh-heading)' },
-            { value: 'dark', label: 'Dark', bg: 'var(--sh-slate-900)', border: 'var(--sh-slate-700)', text: 'var(--sh-slate-50)' },
-            { value: 'system', label: 'System', bg: 'linear-gradient(135deg, var(--sh-surface) 50%, var(--sh-slate-900) 50%)', border: 'var(--sh-slate-400)', text: 'var(--sh-slate-600)' },
+            {
+              value: 'light',
+              label: 'Light',
+              bg: 'var(--sh-surface)',
+              border: 'var(--sh-border)',
+              text: 'var(--sh-heading)',
+            },
+            {
+              value: 'dark',
+              label: 'Dark',
+              bg: 'var(--sh-slate-900)',
+              border: 'var(--sh-slate-700)',
+              text: 'var(--sh-slate-50)',
+            },
+            {
+              value: 'system',
+              label: 'System',
+              bg: 'linear-gradient(135deg, var(--sh-surface) 50%, var(--sh-slate-900) 50%)',
+              border: 'var(--sh-slate-400)',
+              text: 'var(--sh-slate-600)',
+            },
           ].map((opt) => (
             <button
               key={opt.value}
@@ -129,12 +161,23 @@ export default function AppearanceTab() {
           </Select>
         </FormField>
 
-        <div style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)', fontSize: prefs.fontSize === 'small' ? 13 : prefs.fontSize === 'large' ? 17 : 15 }}>
+        <div
+          style={{
+            padding: '14px 16px',
+            borderRadius: 12,
+            background: 'var(--sh-soft)',
+            border: '1px solid var(--sh-border)',
+            fontSize: prefs.fontSize === 'small' ? 13 : prefs.fontSize === 'large' ? 17 : 15,
+          }}
+        >
           This is a preview of your selected font size. Adjust to your preference.
         </div>
       </SectionCard>
 
-      <SectionCard title="Tutorials" subtitle="Control whether page tutorials appear automatically when you visit new features.">
+      <SectionCard
+        title="Tutorials"
+        subtitle="Control whether page tutorials appear automatically when you visit new features."
+      >
         <ToggleRow
           label="Show tutorials"
           description="When enabled, brief tutorial popups appear the first time you visit each page."
@@ -166,16 +209,22 @@ export default function AppearanceTab() {
       </SectionCard>
 
       <MsgList msg={msg} />
-      <Button disabled={saving} onClick={async () => {
-        const saved = await save(['theme', 'fontSize'], 'Appearance preferences saved.')
+      <Button
+        disabled={saving}
+        onClick={async () => {
+          const saved = await save(['theme', 'fontSize'], 'Appearance preferences saved.')
 
-        if (!saved) {
-          return
-        }
+          if (!saved) {
+            return
+          }
 
-        writeCachedAppearancePreferences({ theme: prefs.theme, fontSize: prefs.fontSize }, user?.id)
-        writeGlobalTheme(prefs.theme)
-      }}>
+          writeCachedAppearancePreferences(
+            { theme: prefs.theme, fontSize: prefs.fontSize },
+            user?.id,
+          )
+          writeGlobalTheme(prefs.theme)
+        }}
+      >
         {saving ? 'Saving...' : 'Save Appearance Preferences'}
       </Button>
     </>

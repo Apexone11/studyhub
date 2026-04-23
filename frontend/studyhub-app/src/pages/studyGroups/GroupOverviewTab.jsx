@@ -7,20 +7,45 @@ import {
 import { styles } from './GroupDetailTabs.styles'
 import UserAvatar from '../../components/UserAvatar'
 
-export function GroupOverviewTab({ group, activities, activitiesLoading, upcomingSessions, isAdminOrMod }) {
+export function GroupOverviewTab({
+  group,
+  activities,
+  activitiesLoading,
+  upcomingSessions,
+  isAdminOrMod,
+}) {
   if (!group) {
     return <div style={styles.loading}>Loading group information...</div>
   }
 
   const stats = [
-    { label: 'Members', value: group.memberCount || 0, icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2' },
-    { label: 'Resources', value: group.resourceCount || 0, icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' },
-    { label: 'Upcoming Sessions', value: group.upcomingSessionCount || 0, icon: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z' },
-    { label: 'Discussions', value: group.discussionPostCount || 0, icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z' },
+    {
+      label: 'Members',
+      value: group.memberCount || 0,
+      icon: 'M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2',
+    },
+    {
+      label: 'Resources',
+      value: group.resourceCount || 0,
+      icon: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z',
+    },
+    {
+      label: 'Upcoming Sessions',
+      value: group.upcomingSessionCount || 0,
+      icon: 'M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z',
+    },
+    {
+      label: 'Discussions',
+      value: group.discussionPostCount || 0,
+      icon: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+    },
   ]
 
   if (group.maxMembers) {
-    stats.push({ label: 'Open Seats', value: group.availableSeats ?? Math.max(0, group.maxMembers - (group.memberCount || 0)) })
+    stats.push({
+      label: 'Open Seats',
+      value: group.availableSeats ?? Math.max(0, group.maxMembers - (group.memberCount || 0)),
+    })
   }
 
   if (isAdminOrMod) {
@@ -43,7 +68,14 @@ export function GroupOverviewTab({ group, activities, activitiesLoading, upcomin
           {group.description || 'No description available.'}
         </p>
         {group.courseName && (
-          <div style={{ marginTop: 'var(--space-3)', display: 'flex', alignItems: 'center', gap: 'var(--space-2)' }}>
+          <div
+            style={{
+              marginTop: 'var(--space-3)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+            }}
+          >
             <span style={{ ...styles.badge, ...styles.badgeGreen }}>{group.courseName}</span>
           </div>
         )}
@@ -66,26 +98,51 @@ export function GroupOverviewTab({ group, activities, activitiesLoading, upcomin
         <section style={styles.section}>
           <h2 style={styles.sectionTitle}>Management Snapshot</h2>
           <div style={{ display: 'grid', gap: 'var(--space-3)' }}>
-            <div style={{
-              padding: 'var(--space-3) var(--space-4)',
-              borderRadius: 'var(--radius)',
-              border: '1px solid var(--sh-border)',
-              background: 'var(--sh-soft)',
-              fontSize: 'var(--type-sm)',
-              color: 'var(--sh-text)',
-              lineHeight: 1.6,
-            }}>
-              <strong style={{ color: 'var(--sh-heading)' }}>{group.availableSeats ?? Math.max(0, group.maxMembers - (group.memberCount || 0))}</strong>
-              {' '}open seat{(group.availableSeats ?? Math.max(0, group.maxMembers - (group.memberCount || 0))) === 1 ? '' : 's'} remaining out of {group.maxMembers}.
+            <div
+              style={{
+                padding: 'var(--space-3) var(--space-4)',
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--sh-border)',
+                background: 'var(--sh-soft)',
+                fontSize: 'var(--type-sm)',
+                color: 'var(--sh-text)',
+                lineHeight: 1.6,
+              }}
+            >
+              <strong style={{ color: 'var(--sh-heading)' }}>
+                {group.availableSeats ?? Math.max(0, group.maxMembers - (group.memberCount || 0))}
+              </strong>{' '}
+              open seat
+              {(group.availableSeats ??
+                Math.max(0, group.maxMembers - (group.memberCount || 0))) === 1
+                ? ''
+                : 's'}{' '}
+              remaining out of {group.maxMembers}.
             </div>
             {(group.pendingMemberCount || 0) > 0 ? (
-              <div style={{ ...styles.alertCard, borderColor: 'var(--sh-warning-border)', background: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)' }}>
-                {group.pendingMemberCount} pending request{group.pendingMemberCount === 1 ? '' : 's'} waiting in the Members tab.
+              <div
+                style={{
+                  ...styles.alertCard,
+                  borderColor: 'var(--sh-warning-border)',
+                  background: 'var(--sh-warning-bg)',
+                  color: 'var(--sh-warning-text)',
+                }}
+              >
+                {group.pendingMemberCount} pending request
+                {group.pendingMemberCount === 1 ? '' : 's'} waiting in the Members tab.
               </div>
             ) : null}
             {(group.invitedMemberCount || 0) > 0 ? (
-              <div style={{ ...styles.alertCard, borderColor: 'var(--sh-info-border)', background: 'var(--sh-info-bg)', color: 'var(--sh-info-text)' }}>
-                {group.invitedMemberCount} invitation{group.invitedMemberCount === 1 ? '' : 's'} still outstanding.
+              <div
+                style={{
+                  ...styles.alertCard,
+                  borderColor: 'var(--sh-info-border)',
+                  background: 'var(--sh-info-bg)',
+                  color: 'var(--sh-info-text)',
+                }}
+              >
+                {group.invitedMemberCount} invitation{group.invitedMemberCount === 1 ? '' : 's'}{' '}
+                still outstanding.
               </div>
             ) : null}
           </div>
@@ -98,21 +155,42 @@ export function GroupOverviewTab({ group, activities, activitiesLoading, upcomin
           <h2 style={styles.sectionTitle}>Upcoming Sessions</h2>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-3)' }}>
             {upcomingSessions.map((s) => (
-              <div key={s.id} style={{
-                padding: 'var(--space-3) var(--space-4)',
-                background: 'var(--sh-soft)',
-                borderRadius: 'var(--radius)',
-                border: '1px solid var(--sh-border)',
-                display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-              }}>
+              <div
+                key={s.id}
+                style={{
+                  padding: 'var(--space-3) var(--space-4)',
+                  background: 'var(--sh-soft)',
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--sh-border)',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                }}
+              >
                 <div>
-                  <div style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-heading)' }}>{s.title}</div>
-                  <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginTop: 'var(--space-1)' }}>
+                  <div
+                    style={{
+                      fontSize: 'var(--type-sm)',
+                      fontWeight: 600,
+                      color: 'var(--sh-heading)',
+                    }}
+                  >
+                    {s.title}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 'var(--type-xs)',
+                      color: 'var(--sh-muted)',
+                      marginTop: 'var(--space-1)',
+                    }}
+                  >
                     {formatSessionTime(s.scheduledAt)}
                     {s.location ? ` -- ${s.location}` : ''}
                   </div>
                 </div>
-                <span style={{ ...styles.badge, ...styles.badgeGreen }}>{getSessionStatusLabel(s.status)}</span>
+                <span style={{ ...styles.badge, ...styles.badgeGreen }}>
+                  {getSessionStatusLabel(s.status)}
+                </span>
               </div>
             ))}
           </div>
@@ -127,15 +205,22 @@ export function GroupOverviewTab({ group, activities, activitiesLoading, upcomin
         ) : !activities || activities.length === 0 ? (
           <div style={styles.emptyState}>
             <div style={styles.emptyTitle}>No activity yet</div>
-            <div style={styles.emptyText}>Activity will appear here as members post, share resources, and join.</div>
+            <div style={styles.emptyText}>
+              Activity will appear here as members post, share resources, and join.
+            </div>
           </div>
         ) : (
           <div style={styles.recentActivityList}>
             {activities.map((activity, idx) => (
-              <div key={idx} style={{
-                ...styles.activityItem,
-                display: 'flex', alignItems: 'center', gap: 'var(--space-3)',
-              }}>
+              <div
+                key={idx}
+                style={{
+                  ...styles.activityItem,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 'var(--space-3)',
+                }}
+              >
                 <UserAvatar
                   username={activity.actor?.username || 'Unknown'}
                   avatarUrl={activity.actor?.avatarUrl}
@@ -143,10 +228,18 @@ export function GroupOverviewTab({ group, activities, activitiesLoading, upcomin
                 />
                 <div style={{ flex: 1 }}>
                   <div style={{ fontSize: 'var(--type-sm)' }}>
-                    <strong style={{ color: 'var(--sh-heading)' }}>{activity.actor?.username || 'Unknown'}</strong>
-                    {' '}{activityTypeLabels[activity.type] || activity.type}
+                    <strong style={{ color: 'var(--sh-heading)' }}>
+                      {activity.actor?.username || 'Unknown'}
+                    </strong>{' '}
+                    {activityTypeLabels[activity.type] || activity.type}
                     {activity.title && activity.type !== 'member_joined' ? (
-                      <> -- <span style={{ color: 'var(--sh-heading)' }}>{truncateText(activity.title, 40)}</span></>
+                      <>
+                        {' '}
+                        --{' '}
+                        <span style={{ color: 'var(--sh-heading)' }}>
+                          {truncateText(activity.title, 40)}
+                        </span>
+                      </>
                     ) : null}
                   </div>
                   <div style={styles.activityTime}>{formatRelativeTime(activity.timestamp)}</div>
@@ -158,7 +251,14 @@ export function GroupOverviewTab({ group, activities, activitiesLoading, upcomin
       </section>
 
       {/* Created date */}
-      <div style={{ textAlign: 'center', color: 'var(--sh-muted)', fontSize: 'var(--type-xs)', padding: 'var(--space-4)' }}>
+      <div
+        style={{
+          textAlign: 'center',
+          color: 'var(--sh-muted)',
+          fontSize: 'var(--type-xs)',
+          padding: 'var(--space-4)',
+        }}
+      >
         Created {formatRelativeTime(group.createdAt)}
       </div>
     </div>

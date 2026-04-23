@@ -23,7 +23,10 @@ function assertResendAllowed(challenge) {
 
   const resendAvailableAt = getResendAvailableAt(challenge.lastSentAt)
   if (challenge.sendCount >= VERIFICATION_MAX_SENDS) {
-    throw new VerificationError(429, 'You have requested too many verification codes. Please start again.')
+    throw new VerificationError(
+      429,
+      'You have requested too many verification codes. Please start again.',
+    )
   }
   if (resendAvailableAt > new Date()) {
     throw new VerificationError(429, 'Please wait before requesting another verification code.')
@@ -59,9 +62,14 @@ async function verifyChallengeCode(token, purpose, code, db = prisma) {
   })
 }
 
-async function createSignupChallenge({ username, email, passwordHash, accountType, payload }, db = prisma) {
+async function createSignupChallenge(
+  { username, email, passwordHash, accountType, payload },
+  db = prisma,
+) {
   const normalizedUsername = String(username || '').trim()
-  const normalizedEmail = String(email || '').trim().toLowerCase()
+  const normalizedEmail = String(email || '')
+    .trim()
+    .toLowerCase()
   if (!normalizedUsername || !normalizedEmail || !passwordHash) {
     throw new VerificationError(400, 'Username, email, and password are required.')
   }
@@ -70,10 +78,7 @@ async function createSignupChallenge({ username, email, passwordHash, accountTyp
   await db.verificationChallenge.deleteMany({
     where: {
       purpose: VERIFICATION_PURPOSE.SIGNUP,
-      OR: [
-        { username: normalizedUsername },
-        { email: normalizedEmail },
-      ],
+      OR: [{ username: normalizedUsername }, { email: normalizedEmail }],
     },
   })
 
@@ -101,7 +106,10 @@ async function createSignupChallenge({ username, email, passwordHash, accountTyp
 async function resendSignupChallenge(token, db = prisma) {
   const challenge = await findChallengeByToken(token, VERIFICATION_PURPOSE.SIGNUP, db)
   if (challenge.verifiedAt) {
-    throw new VerificationError(400, 'This email is already verified. Continue to course selection.')
+    throw new VerificationError(
+      400,
+      'This email is already verified. Continue to course selection.',
+    )
   }
   assertResendAllowed(challenge)
   return refreshChallengeCode(challenge.id, db)
@@ -138,7 +146,11 @@ async function createOrRefreshLoginChallenge({ user, email }, db = prisma) {
         sendCount: canSendImmediately ? 1 : 0,
       },
     })
-    return { challenge, code: canSendImmediately ? nextCode.code : null, didSend: canSendImmediately }
+    return {
+      challenge,
+      code: canSendImmediately ? nextCode.code : null,
+      didSend: canSendImmediately,
+    }
   }
 
   if (normalizedEmail && normalizedEmail !== existing.email) {
@@ -178,7 +190,10 @@ async function sendOrRefreshLoginChallenge(token, email, db = prisma) {
   const challenge = await findChallengeByToken(token, VERIFICATION_PURPOSE.LOGIN_EMAIL, db)
   const normalizedEmail = email ? String(email).trim().toLowerCase() : challenge.email
   if (!normalizedEmail) {
-    throw new VerificationError(400, 'Enter an email address before requesting a verification code.')
+    throw new VerificationError(
+      400,
+      'Enter an email address before requesting a verification code.',
+    )
   }
   assertResendAllowed(challenge)
 
@@ -201,7 +216,9 @@ async function sendOrRefreshLoginChallenge(token, email, db = prisma) {
 
 async function createSettingsEmailChallenge({ user, email }, db = prisma) {
   await clearExpiredChallenges(db)
-  const normalizedEmail = String(email || '').trim().toLowerCase()
+  const normalizedEmail = String(email || '')
+    .trim()
+    .toLowerCase()
   const nextCode = createChallengeCode()
 
   await db.verificationChallenge.deleteMany({

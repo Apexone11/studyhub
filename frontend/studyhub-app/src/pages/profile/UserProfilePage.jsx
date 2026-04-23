@@ -7,7 +7,9 @@
  * Other profile tabs: Overview | Sheets | Achievements
  *
  * The Overview tab for own profile is the "Student Cockpit" — a two-column
- * layout merging former DashboardPage widgets with profile identity.
+ * layout combining personal-overview widgets with profile identity. The
+ * widgets live in pages/dashboard/DashboardWidgets.jsx (kept after the
+ * legacy DashboardPage was removed in v2.0; /dashboard now redirects here).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
@@ -74,6 +76,9 @@ import ProfileStatsWidget from './ProfileStatsWidget'
 import FollowSuggestions from './FollowSuggestions'
 import FeedCard from '../feed/FeedCard'
 import FollowRequestsList from './FollowRequestsList'
+import TopContributors from '../../components/TopContributors'
+import UpcomingExamsCard from '../../features/exams/UpcomingExamsCard'
+import { useDesignV2Flags } from '../../lib/designV2Flags'
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
 
@@ -134,6 +139,11 @@ export default function UserProfilePage() {
 
   /* ── Dashboard state (own profile only) ────────────────────────────── */
   const [dashboardSummary, setDashboardSummary] = useState(null)
+  const [topContributors, setTopContributors] = useState([])
+  const [topContributorsLoading, setTopContributorsLoading] = useState(false)
+  const v2Flags = useDesignV2Flags()
+  const phase1On = v2Flags.phase1Dashboard
+  const upcomingExamsOn = v2Flags.upcomingExams
   const { recentlyViewed } = useRecentlyViewed()
   const {
     statuses: allStudyStatuses,
@@ -255,6 +265,40 @@ export default function UserProfilePage() {
       .then((data) => setDashboardSummary(data))
       .catch(() => {})
   }, [isOwnProfile, profile])
+
+  /* ── Phase 1: top contributors mini-widget (own profile only) ──────── */
+  useEffect(() => {
+    if (!isOwnProfile || !profile || !phase1On) return
+    let cancelled = false
+    setTopContributorsLoading(true)
+    fetch(`${API}/api/sheets/leaderboard?type=contributors`, {
+      headers: authHeaders(),
+      credentials: 'include',
+    })
+      .then((r) => (r.ok ? r.json() : []))
+      .then((data) => {
+        if (cancelled) return
+        const list = Array.isArray(data) ? data : []
+        // Map backend shape { username, avatarUrl, count } into the widget's prop shape.
+        setTopContributors(
+          list.map((c) => ({
+            username: c.username,
+            displayName: c.displayName || c.username,
+            avatarUrl: c.avatarUrl || null,
+            contributionCount: typeof c.count === 'number' ? c.count : c.contributionCount,
+          })),
+        )
+      })
+      .catch(() => {
+        if (!cancelled) setTopContributors([])
+      })
+      .finally(() => {
+        if (!cancelled) setTopContributorsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [isOwnProfile, profile, phase1On])
 
   /* ── Follow toggle ─────────────────────────────────────────────────── */
   async function handleFollowToggle() {
@@ -1073,6 +1117,11 @@ export default function UserProfilePage() {
                     badges={badges}
                     followers={followers}
                     loadFollowList={loadFollowList}
+                    viewerAccountType={viewerAccountType}
+                    phase1On={phase1On}
+                    upcomingExamsOn={upcomingExamsOn}
+                    topContributors={topContributors}
+                    topContributorsLoading={topContributorsLoading}
                   />
                 ) : (
                   <OtherOverviewTab profile={profile} activityData={activityData} badges={badges} />
@@ -1162,12 +1211,18 @@ function OwnOverviewTab({
   badges,
   followers,
   loadFollowList,
+  viewerAccountType,
+  phase1On,
+  upcomingExamsOn,
+  topContributors,
+  topContributorsLoading,
 }) {
   return (
     <div className="profile-cockpit">
       {/* Left column: action / study */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <ResumeStudying entries={recentlyViewed} />
+        {upcomingExamsOn && !isSelfLearner(viewerAccountType) ? <UpcomingExamsCard /> : null}
         <StudyNudges toReview={studyToReview} studying={studyStudying} done={studyDone} />
         <StudyQueue counts={studyQueueCounts} toReview={studyToReview} studying={studyStudying} />
         <DashboardRecentSheets recentSheets={dashboardRecentSheets} />
@@ -1185,6 +1240,13 @@ function OwnOverviewTab({
           </div>
         )}
         <BadgesSection badges={badges} />
+        {phase1On ? (
+          <TopContributors
+            contributors={topContributors}
+            accountType={viewerAccountType}
+            loading={topContributorsLoading}
+          />
+        ) : null}
         <FollowSuggestions />
         {/* Followers / Following summary */}
         <div style={cardStyle}>

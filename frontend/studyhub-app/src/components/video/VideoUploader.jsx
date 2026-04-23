@@ -25,10 +25,10 @@ const ACCEPT = '.mp4,.webm,.mov,video/mp4,video/webm,video/quicktime'
 
 // Tier-specific limits
 const TIER_LIMITS = {
-  free:        { sizeMb: 500,  durationMin: 30 },
-  donor:       { sizeMb: 1024, durationMin: 45 },
+  free: { sizeMb: 500, durationMin: 30 },
+  donor: { sizeMb: 1024, durationMin: 45 },
   pro_monthly: { sizeMb: 1536, durationMin: 60 },
-  pro_yearly:  { sizeMb: 1536, durationMin: 60 },
+  pro_yearly: { sizeMb: 1536, durationMin: 60 },
 }
 
 function getTierLabel(tier) {
@@ -44,7 +44,7 @@ export default function VideoUploader({
   compact = false,
 }) {
   const { user } = useSession()
-  const userTier = (user?.plan && user.plan !== 'free') ? user.plan : (user?.isDonor ? 'donor' : 'free')
+  const userTier = user?.plan && user.plan !== 'free' ? user.plan : user?.isDonor ? 'donor' : 'free'
   const limits = TIER_LIMITS[userTier] || TIER_LIMITS.free
   const maxSize = maxSizeProp || limits.sizeMb * 1024 * 1024
   const fileInputRef = useRef(null)
@@ -71,7 +71,11 @@ export default function VideoUploader({
         const limitMb = Math.round(maxSize / (1024 * 1024))
         setValidationError(
           `File is ${sizeMb} MB, which exceeds your ${getTierLabel(userTier)} limit of ${limitMb} MB. ` +
-          (userTier === 'free' ? 'Upgrade to Pro or donate to increase your limit.' : userTier === 'donor' ? 'Upgrade to Pro for 1.5 GB uploads.' : '')
+            (userTier === 'free'
+              ? 'Upgrade to Pro or donate to increase your limit.'
+              : userTier === 'donor'
+                ? 'Upgrade to Pro for 1.5 GB uploads.'
+                : ''),
         )
         return
       }
@@ -93,7 +97,11 @@ export default function VideoUploader({
         if (durationMin > limits.durationMin) {
           setValidationError(
             `Video is ${Math.round(durationMin)} minutes, which exceeds your ${getTierLabel(userTier)} limit of ${limits.durationMin} minutes. ` +
-            (userTier === 'free' ? 'Upgrade to Pro or donate to increase your limit.' : userTier === 'donor' ? 'Upgrade to Pro for 60-minute uploads.' : '')
+              (userTier === 'free'
+                ? 'Upgrade to Pro or donate to increase your limit.'
+                : userTier === 'donor'
+                  ? 'Upgrade to Pro for 60-minute uploads.'
+                  : ''),
           )
         }
       }
@@ -271,11 +279,17 @@ export default function VideoUploader({
 
       {/* ── Validation error (shown when file rejected before selection) */}
       {!file && validationError && (
-        <div style={{
-          padding: '10px 14px', borderRadius: 8,
-          background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)',
-          color: 'var(--sh-danger-text)', fontSize: 'var(--type-sm)', fontWeight: 600,
-        }}>
+        <div
+          style={{
+            padding: '10px 14px',
+            borderRadius: 8,
+            background: 'var(--sh-danger-bg)',
+            border: '1px solid var(--sh-danger-border)',
+            color: 'var(--sh-danger-text)',
+            fontSize: 'var(--type-sm)',
+            fontWeight: 600,
+          }}
+        >
           {validationError}
         </div>
       )}
@@ -323,7 +337,11 @@ export default function VideoUploader({
             or click to browse -- MP4, WebM, MOV
           </p>
           <p style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-xs)', marginTop: 6 }}>
-            {getTierLabel(userTier)} plan: up to {limits.sizeMb >= 1024 ? `${(limits.sizeMb / 1024).toFixed(1)} GB` : `${limits.sizeMb} MB`}, {limits.durationMin} min max
+            {getTierLabel(userTier)} plan: up to{' '}
+            {limits.sizeMb >= 1024
+              ? `${(limits.sizeMb / 1024).toFixed(1)} GB`
+              : `${limits.sizeMb} MB`}
+            , {limits.durationMin} min max
           </p>
         </div>
       )}
@@ -388,16 +406,29 @@ export default function VideoUploader({
           <p style={{ color: 'var(--sh-muted)', fontSize: 'var(--type-xs)' }}>
             {file.name} -- {(file.size / (1024 * 1024)).toFixed(1)} MB
             {videoDuration != null && <span> -- {videoDuration} min</span>}
-            <span> | {getTierLabel(userTier)} limit: {limits.sizeMb >= 1024 ? `${(limits.sizeMb / 1024).toFixed(1)} GB` : `${limits.sizeMb} MB`}, {limits.durationMin} min</span>
+            <span>
+              {' '}
+              | {getTierLabel(userTier)} limit:{' '}
+              {limits.sizeMb >= 1024
+                ? `${(limits.sizeMb / 1024).toFixed(1)} GB`
+                : `${limits.sizeMb} MB`}
+              , {limits.durationMin} min
+            </span>
           </p>
 
           {/* Validation error */}
           {validationError && (
-            <div style={{
-              padding: '10px 14px', borderRadius: 8,
-              background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)',
-              color: 'var(--sh-danger-text)', fontSize: 'var(--type-sm)', fontWeight: 600,
-            }}>
+            <div
+              style={{
+                padding: '10px 14px',
+                borderRadius: 8,
+                background: 'var(--sh-danger-bg)',
+                border: '1px solid var(--sh-danger-border)',
+                color: 'var(--sh-danger-text)',
+                fontSize: 'var(--type-sm)',
+                fontWeight: 600,
+              }}
+            >
               {validationError}
             </div>
           )}
@@ -405,7 +436,11 @@ export default function VideoUploader({
           {/* Action buttons */}
           <div style={{ display: 'flex', gap: '10px' }}>
             <button
-              style={{ ...btnPrimary, opacity: validationError ? 0.5 : 1, cursor: validationError ? 'not-allowed' : 'pointer' }}
+              style={{
+                ...btnPrimary,
+                opacity: validationError ? 0.5 : 1,
+                cursor: validationError ? 'not-allowed' : 'pointer',
+              }}
               onClick={handleUpload}
               disabled={!!validationError}
             >
@@ -631,8 +666,23 @@ function VideoProcessingProgress({ videoId }) {
       )}
 
       {step === 'blocked' && (
-        <div style={{ marginTop: 12, padding: '12px 16px', background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)', borderRadius: 8 }}>
-          <p style={{ color: 'var(--sh-warning-text)', fontSize: 'var(--type-sm)', fontWeight: 600, margin: '0 0 8px' }}>
+        <div
+          style={{
+            marginTop: 12,
+            padding: '12px 16px',
+            background: 'var(--sh-warning-bg)',
+            border: '1px solid var(--sh-warning-border)',
+            borderRadius: 8,
+          }}
+        >
+          <p
+            style={{
+              color: 'var(--sh-warning-text)',
+              fontSize: 'var(--type-sm)',
+              fontWeight: 600,
+              margin: '0 0 8px',
+            }}
+          >
             This video appears to belong to another user. Upload has been blocked.
           </p>
           <p style={{ color: 'var(--sh-warning-text)', fontSize: 'var(--type-xs)', margin: 0 }}>

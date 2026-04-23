@@ -3,20 +3,23 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import VirtualFeedList from './VirtualFeedList'
 
-afterEach(() => { cleanup() })
+afterEach(() => {
+  cleanup()
+})
 
-const makeItems = (n) => Array.from({ length: n }, (_, i) => ({
-  id: i + 1,
-  feedKey: `sheet-${i + 1}`,
-  type: 'sheet',
-  title: `Sheet ${i + 1}`,
-  body: 'content',
-  createdAt: new Date().toISOString(),
-  author: { id: 1, username: 'alice' },
-  stars: 0,
-  starred: false,
-  reactions: { likes: 0, dislikes: 0, userReaction: null },
-}))
+const makeItems = (n) =>
+  Array.from({ length: n }, (_, i) => ({
+    id: i + 1,
+    feedKey: `sheet-${i + 1}`,
+    type: 'sheet',
+    title: `Sheet ${i + 1}`,
+    body: 'content',
+    createdAt: new Date().toISOString(),
+    author: { id: 1, username: 'alice' },
+    stars: 0,
+    starred: false,
+    reactions: { likes: 0, dislikes: 0, userReaction: null },
+  }))
 
 const noop = () => {}
 

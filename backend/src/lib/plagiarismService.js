@@ -18,7 +18,7 @@ const { captureError } = require('../monitoring/sentry')
 const prisma = require('./prisma')
 const { fingerprint, similarity } = require('./contentFingerprint')
 
-const SIMILARITY_THRESHOLD = 0.70
+const SIMILARITY_THRESHOLD = 0.7
 const LIKELY_COPY_THRESHOLD = 0.85
 
 /**
@@ -68,12 +68,26 @@ async function findSimilarContent({ contentType, contentId, limit = 10 }) {
     if (contentType === 'sheet') {
       reported = await prisma.studySheet.findUnique({
         where: { id: contentId },
-        select: { id: true, userId: true, content: true, contentHash: true, contentSimhash: true, createdAt: true },
+        select: {
+          id: true,
+          userId: true,
+          content: true,
+          contentHash: true,
+          contentSimhash: true,
+          createdAt: true,
+        },
       })
     } else if (contentType === 'note') {
       reported = await prisma.note.findUnique({
         where: { id: contentId },
-        select: { id: true, userId: true, content: true, contentHash: true, contentSimhash: true, createdAt: true },
+        select: {
+          id: true,
+          userId: true,
+          content: true,
+          contentHash: true,
+          contentSimhash: true,
+          createdAt: true,
+        },
       })
     }
 
@@ -101,7 +115,11 @@ async function findSimilarContent({ contentType, contentId, limit = 10 }) {
           NOT: contentType === 'sheet' ? { id: contentId } : undefined,
         },
         select: {
-          id: true, title: true, userId: true, createdAt: true, contentSimhash: true,
+          id: true,
+          title: true,
+          userId: true,
+          createdAt: true,
+          contentSimhash: true,
           author: { select: { id: true, username: true } },
         },
         take: 20,
@@ -113,7 +131,11 @@ async function findSimilarContent({ contentType, contentId, limit = 10 }) {
           NOT: contentType === 'note' ? { id: contentId } : undefined,
         },
         select: {
-          id: true, title: true, userId: true, createdAt: true, contentSimhash: true,
+          id: true,
+          title: true,
+          userId: true,
+          createdAt: true,
+          contentSimhash: true,
           author: { select: { id: true, username: true } },
         },
         take: 20,
@@ -158,7 +180,12 @@ async function findSimilarContent({ contentType, contentId, limit = 10 }) {
           ],
         },
         select: {
-          id: true, title: true, userId: true, createdAt: true, contentSimhash: true, contentHash: true,
+          id: true,
+          title: true,
+          userId: true,
+          createdAt: true,
+          contentSimhash: true,
+          contentHash: true,
           author: { select: { id: true, username: true } },
         },
         take: 500, // scan up to 500 sheets
@@ -173,7 +200,12 @@ async function findSimilarContent({ contentType, contentId, limit = 10 }) {
           ],
         },
         select: {
-          id: true, title: true, userId: true, createdAt: true, contentSimhash: true, contentHash: true,
+          id: true,
+          title: true,
+          userId: true,
+          createdAt: true,
+          contentSimhash: true,
+          contentHash: true,
           author: { select: { id: true, username: true } },
         },
         take: 500,

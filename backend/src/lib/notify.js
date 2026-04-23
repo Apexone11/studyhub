@@ -217,7 +217,7 @@ async function createNotification(
     return null
   }
 
-  // Role-aware gate (docs/roles-and-permissions-plan.md §10.1). Callers can
+  // Role-aware gate (docs/internal/roles-and-permissions-plan.md §10.1). Callers can
   // opt into the filter by passing { schoolId, courseId, hashtagId } in
   // eventContext plus a scoped `type` (e.g. 'school.announcement.created').
   if (eventContext && typeof eventContext === 'object') {

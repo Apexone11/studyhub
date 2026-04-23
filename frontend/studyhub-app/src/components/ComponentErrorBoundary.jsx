@@ -33,26 +33,32 @@ export default class ComponentErrorBoundary extends Component {
   render() {
     if (this.state.hasError) {
       return (
-        <div style={{
-          padding: '24px 20px',
-          borderRadius: 14,
-          border: '1px solid var(--sh-danger-border)',
-          background: 'var(--sh-danger-bg)',
-          textAlign: 'center',
-        }}>
-          <div style={{
-            fontSize: 14,
-            fontWeight: 700,
-            color: 'var(--sh-danger-text)',
-            marginBottom: 6,
-          }}>
+        <div
+          style={{
+            padding: '24px 20px',
+            borderRadius: 14,
+            border: '1px solid var(--sh-danger-border)',
+            background: 'var(--sh-danger-bg)',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: 'var(--sh-danger-text)',
+              marginBottom: 6,
+            }}
+          >
             {this.props.name ? `${this.props.name} failed to load` : 'Something went wrong'}
           </div>
-          <div style={{
-            fontSize: 12,
-            color: 'var(--sh-muted)',
-            marginBottom: 14,
-          }}>
+          <div
+            style={{
+              fontSize: 12,
+              color: 'var(--sh-muted)',
+              marginBottom: 14,
+            }}
+          >
             An unexpected error occurred. You can try reloading this section.
           </div>
           <button

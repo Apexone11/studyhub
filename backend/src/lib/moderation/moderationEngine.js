@@ -89,7 +89,10 @@ async function callClaudeModeration(text) {
     })
 
     const rawText = response.content[0]?.text || ''
-    const cleaned = rawText.replace(/^```(?:json)?\n?/gm, '').replace(/\n?```$/gm, '').trim()
+    const cleaned = rawText
+      .replace(/^```(?:json)?\n?/gm, '')
+      .replace(/\n?```$/gm, '')
+      .trim()
     const result = JSON.parse(cleaned)
 
     // Map Claude response to the same format as before
@@ -182,7 +185,14 @@ async function scanContent({ contentType, contentId, text, userId }) {
       },
     })
 
-    logModerationEvent({ userId: modCase.userId, action: 'case_opened', caseId: modCase.id, contentType, contentId, reason: `Auto-detected: ${topCategory}` })
+    logModerationEvent({
+      userId: modCase.userId,
+      action: 'case_opened',
+      caseId: modCase.id,
+      contentType,
+      contentId,
+      reason: `Auto-detected: ${topCategory}`,
+    })
 
     /* Hide flagged content from public until admin review */
     try {
@@ -242,7 +252,14 @@ async function issueStrike({ userId, reason, caseId }) {
     },
   })
 
-  logModerationEvent({ userId, action: 'strike_issued', caseId, strikeId: strike.id, reason, performedBy: null })
+  logModerationEvent({
+    userId,
+    action: 'strike_issued',
+    caseId,
+    strikeId: strike.id,
+    reason,
+    performedBy: null,
+  })
 
   const activeStrikes = await countActiveStrikes(userId)
   let restricted = false
@@ -269,7 +286,12 @@ async function issueStrike({ userId, reason, caseId }) {
     })
     restricted = !!created
     if (restricted) {
-      logModerationEvent({ userId, action: 'restriction_applied', reason: `Auto-restricted: ${activeStrikes} active strikes`, performedBy: null })
+      logModerationEvent({
+        userId,
+        action: 'restriction_applied',
+        reason: `Auto-restricted: ${activeStrikes} active strikes`,
+        performedBy: null,
+      })
     }
   }
 
@@ -283,7 +305,9 @@ async function issueStrike({ userId, reason, caseId }) {
       linkPath: '/settings?tab=moderation',
       priority: 'high',
     })
-  } catch { /* notification failures are non-fatal */ }
+  } catch {
+    /* notification failures are non-fatal */
+  }
 
   /* If auto-restriction was triggered, send a separate high-priority notification */
   if (restricted) {
@@ -296,7 +320,9 @@ async function issueStrike({ userId, reason, caseId }) {
         linkPath: '/settings?tab=moderation',
         priority: 'high',
       })
-    } catch { /* notification failures are non-fatal */ }
+    } catch {
+      /* notification failures are non-fatal */
+    }
   }
 
   return { strike, activeStrikes, restricted }
@@ -326,7 +352,12 @@ const CONTENT_MODEL_MAP = {
 
 /* Content types that support moderationStatus field */
 const HAS_MODERATION_STATUS = new Set([
-  'note', 'note_comment', 'post', 'feed_post', 'post_comment', 'sheet_comment',
+  'note',
+  'note_comment',
+  'post',
+  'feed_post',
+  'post_comment',
+  'sheet_comment',
 ])
 
 /* ── Case review ─────────────────────────────────────────────────────────── */
@@ -356,9 +387,21 @@ async function reviewCase({ caseId, reviewedBy, action, reviewNote }) {
   })
 
   if (action === 'confirm') {
-    logModerationEvent({ userId: modCase.userId, action: 'case_confirmed', caseId, contentType: modCase.contentType, contentId: modCase.contentId, performedBy: reviewedBy })
+    logModerationEvent({
+      userId: modCase.userId,
+      action: 'case_confirmed',
+      caseId,
+      contentType: modCase.contentType,
+      contentId: modCase.contentId,
+      performedBy: reviewedBy,
+    })
   } else {
-    logModerationEvent({ userId: modCase.userId, action: 'case_dismissed', caseId, performedBy: reviewedBy })
+    logModerationEvent({
+      userId: modCase.userId,
+      action: 'case_dismissed',
+      caseId,
+      performedBy: reviewedBy,
+    })
   }
 
   const { contentType, contentId } = modCase
@@ -379,10 +422,14 @@ async function reviewCase({ caseId, reviewedBy, action, reviewNote }) {
 
     /* For sheets: confirmed → mark status as 'removed_by_moderation' */
     if (contentType === 'sheet') {
-      await prisma.studySheet.update({
-        where: { id: contentId },
-        data: { status: action === 'dismiss' ? 'published' : 'removed_by_moderation' },
-      }).catch(() => { /* sheet may not exist */ })
+      await prisma.studySheet
+        .update({
+          where: { id: contentId },
+          data: { status: action === 'dismiss' ? 'published' : 'removed_by_moderation' },
+        })
+        .catch(() => {
+          /* sheet may not exist */
+        })
     }
 
     /* On confirm: create a snapshot for potential restore on appeal */
@@ -446,7 +493,9 @@ async function restoreContent(caseId) {
     const modelName = CONTENT_MODEL_MAP[contentType]
 
     if (!modelName) {
-      console.error(`[restoreContent] Unknown content type: caseId=${caseId}, contentType=${contentType}`)
+      console.error(
+        `[restoreContent] Unknown content type: caseId=${caseId}, contentType=${contentType}`,
+      )
       return { success: false, error: 'Unknown content type' }
     }
 

@@ -14,10 +14,14 @@ const router = express.Router()
 router.post('/forgot-password', forgotLimiter, async (req, res) => {
   const body = req.body || {}
   // Accept either { identifier } (new) or { username } (legacy compat)
-  const rawIdentifier = typeof body.identifier === 'string' ? body.identifier.trim()
-    : typeof body.username === 'string' ? body.username.trim()
-      : ''
-  const GENERIC_MESSAGE = 'If an account exists with that username or email, a reset link has been sent.'
+  const rawIdentifier =
+    typeof body.identifier === 'string'
+      ? body.identifier.trim()
+      : typeof body.username === 'string'
+        ? body.username.trim()
+        : ''
+  const GENERIC_MESSAGE =
+    'If an account exists with that username or email, a reset link has been sent.'
 
   if (!rawIdentifier) {
     return res.json({ message: GENERIC_MESSAGE })
@@ -62,10 +66,14 @@ router.post('/reset-password', forgotLimiter, async (req, res) => {
     return res.status(400).json({ error: 'Token and new password are required.' })
   }
   if (newPassword.length < PASSWORD_MIN_LENGTH) {
-    return res.status(400).json({ error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` })
+    return res
+      .status(400)
+      .json({ error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` })
   }
   if (!/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
-    return res.status(400).json({ error: 'Password must include at least one capital letter and one number.' })
+    return res
+      .status(400)
+      .json({ error: 'Password must include at least one capital letter and one number.' })
   }
 
   try {
@@ -76,7 +84,9 @@ router.post('/reset-password', forgotLimiter, async (req, res) => {
     })
 
     if (!resetToken || resetToken.expiresAt < new Date()) {
-      return res.status(400).json({ error: 'Reset link is invalid or has expired. Please request a new one.' })
+      return res
+        .status(400)
+        .json({ error: 'Reset link is invalid or has expired. Please request a new one.' })
     }
 
     // Phase 5: check against HIBP before allowing password reset
@@ -89,7 +99,9 @@ router.post('/reset-password', forgotLimiter, async (req, res) => {
           code: 'BREACHED_PASSWORD',
         })
       }
-    } catch { /* HIBP unreachable — allow reset to proceed */ }
+    } catch {
+      /* HIBP unreachable — allow reset to proceed */
+    }
 
     const passwordHash = await bcrypt.hash(newPassword, 12)
     await prisma.user.update({

@@ -16,41 +16,49 @@ describe('uploadSheetWorkflow', () => {
 
   it('requires metadata and respects tier-based scan rules', () => {
     // Tier 0 (default): always submittable regardless of scan status
-    expect(canSubmitHtmlReview({
-      scanStatus: 'passed',
-      title: 'My HTML sheet',
-      courseId: '101',
-      description: 'ready to publish',
-      html: '<main><h1>Ready</h1></main>',
-    })).toBe(true)
+    expect(
+      canSubmitHtmlReview({
+        scanStatus: 'passed',
+        title: 'My HTML sheet',
+        courseId: '101',
+        description: 'ready to publish',
+        html: '<main><h1>Ready</h1></main>',
+      }),
+    ).toBe(true)
 
-    expect(canSubmitHtmlReview({
-      scanStatus: 'failed',
-      tier: 0,
-      title: 'My HTML sheet',
-      courseId: '101',
-      description: 'ready to publish',
-      html: '<main><h1>Ready</h1></main>',
-    })).toBe(true)
+    expect(
+      canSubmitHtmlReview({
+        scanStatus: 'failed',
+        tier: 0,
+        title: 'My HTML sheet',
+        courseId: '101',
+        description: 'ready to publish',
+        html: '<main><h1>Ready</h1></main>',
+      }),
+    ).toBe(true)
 
     // Tier 3: never submittable (quarantined)
-    expect(canSubmitHtmlReview({
-      scanStatus: 'passed',
-      tier: 3,
-      title: 'My HTML sheet',
-      courseId: '101',
-      description: 'ready to publish',
-      html: '<main><h1>Ready</h1></main>',
-    })).toBe(false)
+    expect(
+      canSubmitHtmlReview({
+        scanStatus: 'passed',
+        tier: 3,
+        title: 'My HTML sheet',
+        courseId: '101',
+        description: 'ready to publish',
+        html: '<main><h1>Ready</h1></main>',
+      }),
+    ).toBe(false)
 
     // Missing required metadata rejects
-    expect(canSubmitHtmlReview({
-      scanStatus: 'passed',
-      title: '',
-      courseId: '101',
-      description: 'ready to publish',
-      html: '<main><h1>Ready</h1></main>',
-    })).toBe(false)
+    expect(
+      canSubmitHtmlReview({
+        scanStatus: 'passed',
+        title: '',
+        courseId: '101',
+        description: 'ready to publish',
+        html: '<main><h1>Ready</h1></main>',
+      }),
+    ).toBe(false)
   })
 
   it('merges scan-state patches predictably for polling UI', () => {

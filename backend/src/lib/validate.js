@@ -93,16 +93,22 @@ const sortOrder = z.enum(['asc', 'desc']).default('desc')
 const safeEmail = z.string().trim().toLowerCase().email()
 
 /** Username: 3-20 chars, alphanumeric + underscores */
-const username = z.string().trim().regex(
-  /^[a-zA-Z0-9_]{3,20}$/,
-  'Username must be 3-20 characters using only letters, numbers, and underscores.',
-)
+const username = z
+  .string()
+  .trim()
+  .regex(
+    /^[a-zA-Z0-9_]{3,20}$/,
+    'Username must be 3-20 characters using only letters, numbers, and underscores.',
+  )
 
 /** Password: min 8 chars, at least one uppercase and one digit */
-const strongPassword = z.string().min(8, 'Password must be at least 8 characters.').refine(
-  (val) => /[A-Z]/.test(val) && /\d/.test(val),
-  'Password must include at least one capital letter and one number.',
-)
+const strongPassword = z
+  .string()
+  .min(8, 'Password must be at least 8 characters.')
+  .refine(
+    (val) => /[A-Z]/.test(val) && /\d/.test(val),
+    'Password must include at least one capital letter and one number.',
+  )
 
 /** Pagination query schema -- reuse in any list endpoint */
 const paginationQuery = z.object({

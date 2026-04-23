@@ -16,7 +16,7 @@ import ContributionCommentsPanel from './ContributionCommentsPanel'
 export default function SheetLabReviews({ sheet, onReviewed }) {
   const { user: currentUser } = useSession()
   const [reviewing, setReviewing] = useState(null)
-  const [diffData, setDiffData] = useState({})       // { [contributionId]: diff }
+  const [diffData, setDiffData] = useState({}) // { [contributionId]: diff }
   const [conflictFlags, setConflictFlags] = useState({}) // { [contributionId]: boolean }
   const [loadingDiff, setLoadingDiff] = useState(null)
   const [reviewComments, setReviewComments] = useState({}) // { [contributionId]: string }
@@ -39,7 +39,8 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
         body: JSON.stringify({ action, reviewComment: comment }),
       })
       const data = await readJsonSafely(response, {})
-      if (!response.ok) throw new Error(getApiErrorMessage(data, `Could not ${action} contribution.`))
+      if (!response.ok)
+        throw new Error(getApiErrorMessage(data, `Could not ${action} contribution.`))
       if (data.conflictWarning) {
         showToast(data.conflictWarning, 'warning')
       }
@@ -47,7 +48,7 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
         action === 'accept'
           ? 'Contribution accepted! Your sheet has been updated.'
           : 'Contribution rejected.',
-        action === 'accept' ? 'success' : 'info'
+        action === 'accept' ? 'success' : 'info',
       )
       if (onReviewed) onReviewed()
     } catch (err) {
@@ -97,7 +98,9 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
   if (incoming.length === 0) {
     return (
       <div style={emptyStyle}>
-        <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: 'var(--sh-heading)' }}>No contributions yet</p>
+        <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: 'var(--sh-heading)' }}>
+          No contributions yet
+        </p>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--sh-muted)' }}>
           When someone forks your sheet and submits changes, they'll appear here for you to review.
         </p>
@@ -111,7 +114,18 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
       {pending.length > 0 ? (
         <div style={{ display: 'grid', gap: 10 }}>
           <div style={attentionBannerStyle}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" role="img" aria-label="Attention" aria-hidden="true">
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+              role="img"
+              aria-label="Attention"
+              aria-hidden="true"
+            >
               <circle cx="12" cy="12" r="10" />
               <line x1="12" y1="8" x2="12" y2="12" />
               <line x1="12" y1="16" x2="12.01" y2="16" />
@@ -132,7 +146,9 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
               onToggleDiff={toggleDiff}
               hasConflict={conflictFlags[c.id] || false}
               reviewComment={reviewComments[c.id] || ''}
-              onReviewCommentChange={(val) => setReviewComments((prev) => ({ ...prev, [c.id]: val }))}
+              onReviewCommentChange={(val) =>
+                setReviewComments((prev) => ({ ...prev, [c.id]: val }))
+              }
               currentUser={currentUser}
               selectedLine={selectedLines[c.id] || null}
               onSelectLine={(coord) => setSelectedLines((prev) => ({ ...prev, [c.id]: coord }))}
@@ -144,9 +160,7 @@ export default function SheetLabReviews({ sheet, onReviewed }) {
       {/* Reviewed contributions */}
       {reviewed.length > 0 ? (
         <div style={{ display: 'grid', gap: 10 }}>
-          <h4 style={sectionHeadingStyle}>
-            Previously reviewed ({reviewed.length})
-          </h4>
+          <h4 style={sectionHeadingStyle}>Previously reviewed ({reviewed.length})</h4>
           {reviewed.map((c) => (
             <ContributionCard
               key={c.id}
@@ -190,19 +204,38 @@ function ContributionCard({
       {/* Conflict warning banner */}
       {hasConflict && showActions ? (
         <div style={conflictBannerStyle}>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden="true">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            aria-hidden="true"
+          >
             <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
             <line x1="12" y1="9" x2="12" y2="13" />
             <line x1="12" y1="17" x2="12.01" y2="17" />
           </svg>
           <div>
-            <strong>Potential conflict detected.</strong> The original sheet has been modified since this contribution was submitted. Accepting will overwrite those changes with the fork&apos;s content. Review the diff carefully before merging.
+            <strong>Potential conflict detected.</strong> The original sheet has been modified since
+            this contribution was submitted. Accepting will overwrite those changes with the
+            fork&apos;s content. Review the diff carefully before merging.
           </div>
         </div>
       ) : null}
 
       {/* Top row: status + proposer + date */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <StatusBadge status={c.status} />
           <span style={{ fontSize: 13, color: 'var(--sh-heading)', fontWeight: 600 }}>
@@ -211,7 +244,11 @@ function ContributionCard({
           {c.forkSheet ? (
             <Link
               to={`/sheets/${c.forkSheet.id}`}
-              style={{ fontSize: 12, color: 'var(--sh-brand, #6366f1)', textDecoration: 'underline' }}
+              style={{
+                fontSize: 12,
+                color: 'var(--sh-brand, #6366f1)',
+                textDecoration: 'underline',
+              }}
             >
               View fork
             </Link>
@@ -231,13 +268,29 @@ function ContributionCard({
 
       {/* Reviewer info + saved review comment */}
       {c.reviewer ? (
-        <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)' }}>
+        <div
+          style={{
+            marginTop: 8,
+            padding: '8px 12px',
+            borderRadius: 10,
+            background: 'var(--sh-soft)',
+            border: '1px solid var(--sh-border)',
+          }}
+        >
           <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
-            {c.status === 'accepted' ? 'Accepted' : 'Rejected'} by <strong>{c.reviewer.username}</strong>
+            {c.status === 'accepted' ? 'Accepted' : 'Rejected'} by{' '}
+            <strong>{c.reviewer.username}</strong>
             {c.reviewedAt ? ` on ${new Date(c.reviewedAt).toLocaleDateString()}` : ''}
           </div>
           {c.reviewComment ? (
-            <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--sh-heading)', lineHeight: 1.5 }}>
+            <p
+              style={{
+                margin: '6px 0 0',
+                fontSize: 13,
+                color: 'var(--sh-heading)',
+                lineHeight: 1.5,
+              }}
+            >
               {c.reviewComment}
             </p>
           ) : null}
@@ -270,7 +323,11 @@ function ContributionCard({
               style={hasConflict ? conflictAcceptButtonStyle : acceptButtonStyle}
               aria-label={`Accept contribution from ${c.proposer?.username || 'unknown user'}${hasConflict ? ' (conflict detected)' : ''}`}
             >
-              {reviewing === c.id ? 'Merging...' : hasConflict ? 'Accept & Merge (conflict)' : 'Accept & Merge'}
+              {reviewing === c.id
+                ? 'Merging...'
+                : hasConflict
+                  ? 'Accept & Merge (conflict)'
+                  : 'Accept & Merge'}
             </button>
             <button
               type="button"
@@ -294,7 +351,15 @@ function ContributionCard({
         <div style={{ marginTop: 10 }}>
           <label
             htmlFor={`review-comment-${c.id}`}
-            style={{ display: 'block', fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4 }}
+            style={{
+              display: 'block',
+              fontSize: 11,
+              fontWeight: 700,
+              color: 'var(--sh-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.3px',
+              marginBottom: 4,
+            }}
           >
             Review comment (optional)
           </label>
@@ -314,9 +379,15 @@ function ContributionCard({
       {diffData[c.id] ? (
         <div style={{ marginTop: 12 }}>
           {diffData[c.id].additions != null ? (
-            <div style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 12, fontWeight: 700 }}>
-              <span style={{ color: 'var(--sh-success)' }}>+{diffData[c.id].additions} additions</span>
-              <span style={{ color: 'var(--sh-danger)' }}>&minus;{diffData[c.id].deletions} deletions</span>
+            <div
+              style={{ display: 'flex', gap: 12, marginBottom: 8, fontSize: 12, fontWeight: 700 }}
+            >
+              <span style={{ color: 'var(--sh-success)' }}>
+                +{diffData[c.id].additions} additions
+              </span>
+              <span style={{ color: 'var(--sh-danger)' }}>
+                &minus;{diffData[c.id].deletions} deletions
+              </span>
             </div>
           ) : null}
           <DiffViewer
@@ -350,8 +421,13 @@ function StatusBadge({ status }) {
     <span
       role="status"
       style={{
-        display: 'inline-flex', fontSize: 11, fontWeight: 700, padding: '2px 8px',
-        borderRadius: 6, textTransform: 'capitalize', ...s,
+        display: 'inline-flex',
+        fontSize: 11,
+        fontWeight: 700,
+        padding: '2px 8px',
+        borderRadius: 6,
+        textTransform: 'capitalize',
+        ...s,
       }}
       aria-label={`Contribution status: ${status}`}
     >
@@ -363,60 +439,107 @@ function StatusBadge({ status }) {
 /* ── Styles ────────────────────────────────────────────────── */
 
 const attentionBannerStyle = {
-  display: 'flex', alignItems: 'center', gap: 8,
-  padding: '10px 14px', borderRadius: 12, fontSize: 13, fontWeight: 700,
+  display: 'flex',
+  alignItems: 'center',
+  gap: 8,
+  padding: '10px 14px',
+  borderRadius: 12,
+  fontSize: 13,
+  fontWeight: 700,
   background: 'var(--sh-warning-bg, #fffbeb)',
   border: '1px solid var(--sh-warning-border, #fde68a)',
   color: 'var(--sh-warning-text, #92400e)',
 }
 
 const sectionHeadingStyle = {
-  margin: 0, fontSize: 13, fontWeight: 700,
-  color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.3px',
+  margin: 0,
+  fontSize: 13,
+  fontWeight: 700,
+  color: 'var(--sh-muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.3px',
 }
 
 const cardStyle = {
-  padding: '14px 16px', borderRadius: 14,
-  background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
+  padding: '14px 16px',
+  borderRadius: 14,
+  background: 'var(--sh-surface)',
+  border: '1px solid var(--sh-border)',
 }
 
 const diffToggleStyle = {
-  padding: '7px 12px', borderRadius: 8, minHeight: 32,
-  border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
-  color: 'var(--sh-muted)', fontSize: 11, fontWeight: 700,
-  cursor: 'pointer', fontFamily: 'inherit',
+  padding: '7px 12px',
+  borderRadius: 8,
+  minHeight: 32,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)',
+  color: 'var(--sh-muted)',
+  fontSize: 11,
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const acceptButtonStyle = {
-  padding: '7px 14px', borderRadius: 8, border: 'none', minHeight: 32,
-  background: '#16a34a', color: '#fff',
-  fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+  padding: '7px 14px',
+  borderRadius: 8,
+  border: 'none',
+  minHeight: 32,
+  background: '#16a34a',
+  color: '#fff',
+  fontSize: 11,
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const conflictAcceptButtonStyle = {
-  padding: '7px 14px', borderRadius: 8, border: '1px solid var(--sh-warning-border, #fde68a)', minHeight: 32,
-  background: 'var(--sh-warning-bg, #fffbeb)', color: 'var(--sh-warning-text, #92400e)',
-  fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+  padding: '7px 14px',
+  borderRadius: 8,
+  border: '1px solid var(--sh-warning-border, #fde68a)',
+  minHeight: 32,
+  background: 'var(--sh-warning-bg, #fffbeb)',
+  color: 'var(--sh-warning-text, #92400e)',
+  fontSize: 11,
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const rejectButtonStyle = {
-  padding: '7px 14px', borderRadius: 8, minHeight: 32,
+  padding: '7px 14px',
+  borderRadius: 8,
+  minHeight: 32,
   border: '1px solid var(--sh-danger-border, #fecaca)',
   background: 'var(--sh-danger-bg, #fef2f2)',
   color: 'var(--sh-danger-text, #dc2626)',
-  fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+  fontSize: 11,
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const reviewCommentTextareaStyle = {
-  width: '100%', boxSizing: 'border-box', padding: '8px 10px',
-  borderRadius: 8, border: '1px solid var(--sh-border)',
-  background: 'var(--sh-soft)', color: 'var(--sh-heading)',
-  fontSize: 12, fontFamily: 'inherit', resize: 'vertical',
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '8px 10px',
+  borderRadius: 8,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)',
+  color: 'var(--sh-heading)',
+  fontSize: 12,
+  fontFamily: 'inherit',
+  resize: 'vertical',
 }
 
 const conflictBannerStyle = {
-  display: 'flex', alignItems: 'flex-start', gap: 8,
-  padding: '10px 14px', borderRadius: 10, fontSize: 12, lineHeight: 1.5,
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 8,
+  padding: '10px 14px',
+  borderRadius: 10,
+  fontSize: 12,
+  lineHeight: 1.5,
   background: 'var(--sh-danger-bg, #fef2f2)',
   border: '1px solid var(--sh-danger-border, #fecaca)',
   color: 'var(--sh-danger-text, #dc2626)',
@@ -424,7 +547,9 @@ const conflictBannerStyle = {
 }
 
 const emptyStyle = {
-  textAlign: 'center', padding: '48px 24px',
-  background: 'var(--sh-surface)', border: '1px dashed var(--sh-border)',
+  textAlign: 'center',
+  padding: '48px 24px',
+  background: 'var(--sh-surface)',
+  border: '1px dashed var(--sh-border)',
   borderRadius: 14,
 }

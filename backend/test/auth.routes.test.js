@@ -261,8 +261,9 @@ describe('auth routes', () => {
     })
 
     expect(response.status).toBe(503)
-    expect(response.body).toEqual({
+    expect(response.body).toMatchObject({
       error: 'We could not send your verification code right now. Please try again later.',
+      code: 'INTERNAL',
     })
     expect(mocks.verification.consumeChallenge).toHaveBeenCalledWith(901)
     expect(mocks.sentry.captureError).toHaveBeenCalledWith(

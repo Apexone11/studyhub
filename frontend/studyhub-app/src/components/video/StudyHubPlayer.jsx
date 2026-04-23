@@ -48,11 +48,19 @@ export default function StudyHubPlayer({
 
   // ── Restore persisted preferences from localStorage ───────────────
   function readStorage(key, fallback) {
-    try { const v = localStorage.getItem(key); return v !== null ? JSON.parse(v) : fallback }
-    catch { return fallback }
+    try {
+      const v = localStorage.getItem(key)
+      return v !== null ? JSON.parse(v) : fallback
+    } catch {
+      return fallback
+    }
   }
   function writeStorage(key, value) {
-    try { localStorage.setItem(key, JSON.stringify(value)) } catch { /* quota or private mode */ }
+    try {
+      localStorage.setItem(key, JSON.stringify(value))
+    } catch {
+      /* quota or private mode */
+    }
   }
 
   // UI state
@@ -60,7 +68,7 @@ export default function StudyHubPlayer({
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [buffered, setBuffered] = useState(0)
-  const [volume, setVolume] = useState(() => muted ? 0 : readStorage('studyhub_player_volume', 1))
+  const [volume, setVolume] = useState(() => (muted ? 0 : readStorage('studyhub_player_volume', 1)))
   const [isMuted, setIsMuted] = useState(() => muted || readStorage('studyhub_player_muted', false))
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [showControls, setShowControls] = useState(true)

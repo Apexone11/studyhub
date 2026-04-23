@@ -6,7 +6,6 @@
  *   1. Image dimension validation
  *   2. File size anomaly detection
  *   3. Skin-tone pixel ratio heuristic (basic, not a classifier)
- *   4. Integration point for future TF.js/NSFWJS model loading
  *
  * For production NSFW detection, the server-side OpenAI moderation
  * (backend/src/lib/moderationEngine.js) is authoritative.
@@ -116,20 +115,6 @@ async function estimateSkinToneRatio(file) {
   }
 
   return totalPixels > 0 ? skinPixels / totalPixels : 0
-}
-
-/**
- * Integration point for future TF.js NSFWJS model.
- * When @tensorflow/tfjs and nsfwjs are installed, this function can be
- * upgraded to load the real model and return ML-based predictions.
- * Until then, it falls back to the heuristic check above.
- */
-export async function checkImageWithModel(file) {
-  // TODO: Load NSFWJS model when @tensorflow/tfjs is available
-  // const model = await nsfwjs.load()
-  // const predictions = await model.classify(img)
-  // return predictions
-  return checkImageSafety(file)
 }
 
 /**

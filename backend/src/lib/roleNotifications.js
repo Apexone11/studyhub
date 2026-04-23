@@ -9,7 +9,7 @@
  *   - topic.activity — sent only if the viewer follows the hashtag.
  *
  * Anything not listed is role-agnostic and returns true. See
- * docs/roles-and-permissions-plan.md §10.1.
+ * docs/internal/roles-and-permissions-plan.md §10.1.
  */
 
 const SELF_LEARNER = 'other'

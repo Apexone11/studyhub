@@ -6,7 +6,12 @@
  *   ./htmlDraftValidation.js — scan logic, tier mapping, findings
  */
 
-const { RISK_TIER, generateRiskSummary, generateTierExplanation, groupFindingsByCategory } = require('./htmlSecurity')
+const {
+  RISK_TIER,
+  generateRiskSummary,
+  generateTierExplanation,
+  groupFindingsByCategory,
+} = require('./htmlSecurity')
 const { sendHighRiskSheetAlert } = require('../email/email')
 const { createNotification } = require('../notify')
 const { reviewSheetAndUpdateStatus, isAiReviewEnabled } = require('../../modules/sheetReviewer')
@@ -23,13 +28,12 @@ const {
   upsertDraftSheet,
 } = require('./htmlDraftStorage')
 
-const {
-  normalizeFindings,
-  runHtmlScanNow,
-  scheduleHtmlScan,
-} = require('./htmlDraftValidation')
+const { normalizeFindings, runHtmlScanNow, scheduleHtmlScan } = require('./htmlDraftValidation')
 
-async function importHtmlDraft(prisma, { sheetId, user, title, courseId, description, allowDownloads, html, sourceName }) {
+async function importHtmlDraft(
+  prisma,
+  { sheetId, user, title, courseId, description, allowDownloads, html, sourceName },
+) {
   const content = String(html || '')
   if (!content.trim()) {
     const error = new Error('HTML file content is required.')
@@ -68,7 +72,10 @@ async function importHtmlDraft(prisma, { sheetId, user, title, courseId, descrip
   return draft.id
 }
 
-async function updateWorkingHtmlDraft(prisma, { sheetId, user, title, courseId, description, allowDownloads, html }) {
+async function updateWorkingHtmlDraft(
+  prisma,
+  { sheetId, user, title, courseId, description, allowDownloads, html },
+) {
   const content = String(html || '')
   if (!content.trim()) {
     const error = new Error('HTML content cannot be empty.')
@@ -186,7 +193,9 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
     case RISK_TIER.FLAGGED:
       // Tier 1: auto-publish but require acknowledgement
       if (!sheet.htmlScanAcknowledgedAt) {
-        const error = new Error('This sheet contains flagged HTML features. Acknowledge the findings before publishing.')
+        const error = new Error(
+          'This sheet contains flagged HTML features. Acknowledge the findings before publishing.',
+        )
         error.statusCode = 409
         error.findings = scan.findings
         error.tier = tier
@@ -217,9 +226,12 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
       sheetTitle: sheet.title,
       username,
       flags: scan.findings.map((f) => f.message),
-    }).catch((err) => console.error('[htmlDraftWorkflow] Failed to send high-risk alert:', err.message))
+    }).catch((err) =>
+      console.error('[htmlDraftWorkflow] Failed to send high-risk alert:', err.message),
+    )
 
-    prisma.user.findMany({ where: { role: 'admin' }, select: { id: true } })
+    prisma.user
+      .findMany({ where: { role: 'admin' }, select: { id: true } })
       .then((admins) => {
         for (const admin of admins) {
           createNotification(prisma, {
@@ -250,8 +262,16 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
 
   // Fire-and-forget AI review for Tier 1-2 sheets
   if ((tier === RISK_TIER.FLAGGED || tier === RISK_TIER.HIGH_RISK) && isAiReviewEnabled()) {
-    reviewSheetAndUpdateStatus(sheetId, sheet.content, scan.findings, tier, sheet.title, sheet.description)
-      .catch((err) => console.error('[htmlDraftWorkflow] AI review failed for sheet', sheetId, err.message))
+    reviewSheetAndUpdateStatus(
+      sheetId,
+      sheet.content,
+      scan.findings,
+      tier,
+      sheet.title,
+      sheet.description,
+    ).catch((err) =>
+      console.error('[htmlDraftWorkflow] AI review failed for sheet', sheetId, err.message),
+    )
   }
 
   return updated
