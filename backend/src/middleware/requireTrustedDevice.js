@@ -16,6 +16,7 @@
 
 const prisma = require('../lib/prisma')
 const { sendError, ERROR_CODES } = require('./errorEnvelope')
+const { captureError } = require('../monitoring/sentry')
 
 module.exports = async function requireTrustedDevice(req, res, next) {
   if (!req.user) {
@@ -41,8 +42,17 @@ module.exports = async function requireTrustedDevice(req, res, next) {
       )
     }
     return next()
-  } catch {
-    // Fail open — a transient Prisma error must not brick settings.
+  } catch (err) {
+    // Fail open — a transient Prisma error must not brick settings — BUT
+    // loudly: every fail-open is a (temporary) bypass of the reauth gate,
+    // and an extended outage here would be an invisible security regression
+    // if we swallowed it silently. Send to Sentry so ops sees it.
+    captureError(err, {
+      route: 'requireTrustedDevice',
+      userId: req.user?.userId || null,
+      sessionJti: req.sessionJti,
+      reason: 'fail-open',
+    })
     return next()
   }
 }

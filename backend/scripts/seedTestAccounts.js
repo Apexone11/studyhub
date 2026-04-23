@@ -9,9 +9,27 @@
 //   docker compose exec backend node scripts/seedTestAccounts.js
 //
 // Safe to re-run — upserts by username.
+//
+// PRODUCTION GUARDRAIL: refuses to run when NODE_ENV=production unless
+// ALLOW_SEED_TEST_ACCOUNTS=true is also set explicitly. The passwords
+// are predictable ("Password123") and the accounts bypass email
+// verification — they must never land in a production database by
+// accident (e.g., if someone docker-execs the wrong container).
 
 const bcrypt = require('bcryptjs')
 const prisma = require('../src/lib/prisma')
+
+if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED_TEST_ACCOUNTS !== 'true') {
+  console.error(
+    '[seedTestAccounts] refusing to run in production without ALLOW_SEED_TEST_ACCOUNTS=true.',
+  )
+  console.error(
+    '  These test accounts have predictable passwords ("Password123") and skip email verification.',
+  )
+  console.error('  If you really mean to seed them in production (you almost never do): set both')
+  console.error('    NODE_ENV=production ALLOW_SEED_TEST_ACCOUNTS=true')
+  process.exit(1)
+}
 
 const PASSWORD = 'Password123'
 

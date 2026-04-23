@@ -31,7 +31,14 @@ const DEFAULT_INACTIVE_DAYS = 30
 
 function isEnabled() {
   const flag = process.env.ENABLE_INACTIVE_SESSION_SWEEP
-  if (flag === undefined || flag === '') return true // default on, backwards compatible
+  if (flag === undefined || flag === '') {
+    // Default: enabled in dev/test/staging (single-node convenience);
+    // DISABLED in production unless explicitly opted in. Production is
+    // where horizontal scaling creates the risk of every replica
+    // hammering the DB with the same idempotent sweep, so the safer
+    // default there is "off — pick one worker and set ENABLE=true".
+    return process.env.NODE_ENV !== 'production'
+  }
   return flag !== 'false' && flag !== '0'
 }
 

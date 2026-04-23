@@ -29,6 +29,26 @@ function normalizeOrigin(value) {
   }
 }
 
+/**
+ * True when the origin is a Capacitor-native or localhost-on-any-port
+ * origin. Port is part of a URL origin, so `http://localhost:8100` does
+ * not equal `http://localhost` — but for native WebViews and local dev
+ * we want to accept any port. `capacitor://localhost` (iOS) is allowed
+ * explicitly; `http://localhost` / `https://localhost` match with or
+ * without a port.
+ */
+function isLocalhostOrigin(origin) {
+  if (!origin) return false
+  if (origin === 'capacitor://localhost') return true
+  try {
+    const parsed = new URL(origin)
+    if (parsed.hostname !== 'localhost' && parsed.hostname !== '127.0.0.1') return false
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 // Capacitor on-device origins. The Android WebView serves the bundled app
 // from https://localhost (or http://localhost for cleartext dev); the
 // iOS WebView uses capacitor://localhost. These are trusted-by-device,
@@ -94,7 +114,14 @@ function originAllowlist({ rebuildPerRequest = false } = {}) {
 
     const trustedOrigins = cachedTrustedOrigins || buildTrustedOrigins()
     const currentHostOrigin = normalizeOrigin(`${req.protocol}://${req.get('host')}`)
-    if (trustedOrigins.has(requestOrigin) || requestOrigin === currentHostOrigin) {
+    if (
+      trustedOrigins.has(requestOrigin) ||
+      requestOrigin === currentHostOrigin ||
+      // Localhost on any port (web dev servers + Capacitor native WebViews
+      // that may advertise http://localhost:8100 etc.). Exact-match alone
+      // would 403 those callers.
+      isLocalhostOrigin(requestOrigin)
+    ) {
       return next()
     }
 
