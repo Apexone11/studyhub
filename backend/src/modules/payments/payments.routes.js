@@ -197,7 +197,7 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
 
   if (!webhookSecret) {
     log.error('STRIPE_WEBHOOK_SECRET is not configured')
-    return res.status(500).json({ error: 'Webhook not configured' })
+    return sendError(res, 500, 'Webhook not configured', ERROR_CODES.INTERNAL)
   }
 
   // Defense in depth: constructEvent needs the raw body Buffer to verify the
@@ -207,7 +207,7 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
   // would throw an opaque error. Fail fast with a clear signal instead.
   if (!Buffer.isBuffer(req.body)) {
     log.error('Stripe webhook received non-Buffer body — raw middleware not applied')
-    return res.status(400).json({ error: 'Invalid webhook payload' })
+    return sendError(res, 400, 'Invalid webhook payload', ERROR_CODES.BAD_REQUEST)
   }
 
   let event
@@ -215,7 +215,7 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret)
   } catch (err) {
     log.warn({ err: err.message }, 'Stripe webhook signature verification failed')
-    return res.status(400).json({ error: 'Webhook signature verification failed' })
+    return sendError(res, 400, 'Webhook signature verification failed', ERROR_CODES.BAD_REQUEST)
   }
 
   log.info({ type: event.type, id: event.id }, 'Stripe webhook received')
@@ -252,7 +252,9 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
     log.error({ err: error, eventType: event.type }, 'Error processing Stripe webhook')
     console.error('[stripe:webhook] Handler failed for', event.type, '-', error.message)
     // Return 500 so Stripe retries the webhook (up to ~3 days)
-    return res.status(500).json({ error: 'Webhook handler failed', eventType: event.type })
+    return sendError(res, 500, 'Webhook handler failed', ERROR_CODES.INTERNAL, {
+      eventType: event.type,
+    })
   }
 
   res.json({ received: true, handled })
@@ -305,7 +307,7 @@ router.get(
           : 'Subscription table does not exist. Run: npx prisma migrate deploy',
       })
     } catch (error) {
-      res.status(500).json({ error: error.message })
+      sendError(res, 500, error.message, ERROR_CODES.INTERNAL)
     }
   },
 )
@@ -683,12 +685,17 @@ router.post('/subscription/sync', paymentReadLimiter, requireAuth, async (req, r
             'Sync: DB write failed for subscription',
           )
           // Surface the ACTUAL error to the user so we can debug
-          return res.status(500).json({
-            synced: false,
-            message: `Database write failed: ${syncErr.message}`,
-            hint: 'This usually means the Subscription table does not exist. Run: npx prisma migrate deploy',
-            customersFound: customerIds.size,
-          })
+          return sendError(
+            res,
+            500,
+            `Database write failed: ${syncErr.message}`,
+            ERROR_CODES.INTERNAL,
+            {
+              synced: false,
+              hint: 'This usually means the Subscription table does not exist. Run: npx prisma migrate deploy',
+              customersFound: customerIds.size,
+            },
+          )
         }
       }
       if (synced) break
@@ -748,7 +755,7 @@ router.get('/usage', requireAuth, paymentReadLimiter, async (req, res) => {
   } catch (err) {
     captureError(err, { context: 'payments.usage' })
     log.error({ err }, 'Failed to load usage data')
-    res.status(500).json({ error: 'Failed to load usage data.' })
+    sendError(res, 500, 'Failed to load usage data.', ERROR_CODES.INTERNAL)
   }
 })
 

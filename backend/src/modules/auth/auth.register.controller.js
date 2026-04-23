@@ -24,6 +24,7 @@ const {
   LEGAL_ACCEPTANCE_SOURCES,
   recordCurrentRequiredLegalAcceptancesTx,
 } = require('../legal/legal.service')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 
 const router = express.Router()
 
@@ -40,13 +41,13 @@ router.post('/register', registerLimiter, async (req, res) => {
       select: { id: true },
     })
     if (existingUsername) {
-      return res.status(409).json({ error: 'That username is already taken.' })
+      return sendError(res, 409, 'That username is already taken.', ERROR_CODES.CONFLICT)
     }
 
     if (email) {
       const existingEmail = await prisma.user.findUnique({ where: { email }, select: { id: true } })
       if (existingEmail) {
-        return res.status(409).json({ error: 'That email is already in use.' })
+        return sendError(res, 409, 'That email is already in use.', ERROR_CODES.CONFLICT)
       }
     }
 
@@ -56,10 +57,12 @@ router.post('/register', registerLimiter, async (req, res) => {
       const { checkPasswordBreach } = require('../../lib/passwordSafety')
       const breach = await checkPasswordBreach(password)
       if (breach.breached) {
-        return res.status(400).json({
-          error: `This password has appeared in ${breach.count.toLocaleString()} data breaches. Please choose a different password.`,
-          code: 'BREACHED_PASSWORD',
-        })
+        return sendError(
+          res,
+          400,
+          `This password has appeared in ${breach.count.toLocaleString()} data breaches. Please choose a different password.`,
+          'BREACHED_PASSWORD',
+        )
       }
     } catch {
       // HIBP unreachable — allow registration to proceed
@@ -119,9 +122,12 @@ router.post('/register/start', registerLimiter, async (req, res) => {
     const { username, email, password, accountType } = validateRegistrationInput(req.body || {})
 
     if (!email) {
-      return res
-        .status(400)
-        .json({ error: 'Email is required for the verified registration flow.' })
+      return sendError(
+        res,
+        400,
+        'Email is required for the verified registration flow.',
+        ERROR_CODES.VALIDATION,
+      )
     }
 
     const [existingUsername, existingEmail] = await Promise.all([
@@ -130,10 +136,10 @@ router.post('/register/start', registerLimiter, async (req, res) => {
     ])
 
     if (existingUsername) {
-      return res.status(409).json({ error: 'That username is already taken.' })
+      return sendError(res, 409, 'That username is already taken.', ERROR_CODES.CONFLICT)
     }
     if (existingEmail) {
-      return res.status(409).json({ error: 'That email is already in use.' })
+      return sendError(res, 409, 'That email is already in use.', ERROR_CODES.CONFLICT)
     }
 
     const passwordHash = await bcrypt.hash(password, 12)

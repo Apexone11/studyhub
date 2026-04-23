@@ -4,6 +4,7 @@ const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 
 router.use(requireAuth)
@@ -54,41 +55,94 @@ router.get('/summary', async (req, res) => {
     })
 
     if (!user) {
-      return res.status(404).json({ error: 'User not found.' })
+      return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
     }
 
     const enrolledCourseIds = user.enrollments.map((enrollment) => enrollment.courseId)
 
-    const [starCount, recentSheets, forkCount, feedPostCount, noteCount, groupMembershipCount] =
-      await Promise.all([
-        prisma.starredSheet.count({
-          where: { userId: user.id },
-        }),
-        prisma.studySheet.findMany({
-          where: enrolledCourseIds.length > 0 ? { courseId: { in: enrolledCourseIds } } : undefined,
-          take: 6,
-          orderBy: { createdAt: 'desc' },
-          include: {
-            author: { select: { id: true, username: true } },
-            course: {
-              select: {
-                id: true,
-                code: true,
-                name: true,
-                school: { select: { id: true, name: true, short: true } },
-              },
+    const [
+      starCount,
+      recentSheets,
+      forkCount,
+      feedPostCount,
+      noteCount,
+      groupMembershipCount,
+      topContributors,
+    ] = await Promise.all([
+      prisma.starredSheet.count({
+        where: { userId: user.id },
+      }),
+      prisma.studySheet.findMany({
+        where: enrolledCourseIds.length > 0 ? { courseId: { in: enrolledCourseIds } } : undefined,
+        take: 6,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          author: { select: { id: true, username: true } },
+          course: {
+            select: {
+              id: true,
+              code: true,
+              name: true,
+              school: { select: { id: true, name: true, short: true } },
             },
           },
-        }),
-        // Count sheets this user has forked (i.e., has a forkOf reference)
-        prisma.studySheet.count({ where: { userId: user.id, NOT: [{ forkOf: null }] } }),
-        // Count feed posts made by this user
-        prisma.feedPost.count({ where: { userId: user.id } }),
-        // Notes authored by this user — used by the self-learner checklist
-        prisma.note.count({ where: { userId: user.id } }),
-        // Active study-group memberships — used by the self-learner checklist
-        prisma.studyGroupMember.count({ where: { userId: user.id, status: 'active' } }),
-      ])
+        },
+      }),
+      // Count sheets this user has forked (i.e., has a forkOf reference)
+      prisma.studySheet.count({ where: { userId: user.id, NOT: [{ forkOf: null }] } }),
+      // Count feed posts made by this user
+      prisma.feedPost.count({ where: { userId: user.id } }),
+      // Notes authored by this user — used by the self-learner checklist
+      prisma.note.count({ where: { userId: user.id } }),
+      // Active study-group memberships — used by the self-learner checklist
+      prisma.studyGroupMember.count({ where: { userId: user.id, status: 'active' } }),
+      // Top contributors — users with the most accepted SheetContribution
+      // proposals in the past 30 days, scoped to sheets in the calling
+      // user's enrolled courses (so teachers / self-learners see their
+      // course community; if no enrollments, fall back to platform-wide).
+      // Capped at 5. Empty array on any error (widget handles empty gracefully).
+      (async () => {
+        try {
+          const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+          const sheetWhere =
+            enrolledCourseIds.length > 0 ? { courseId: { in: enrolledCourseIds } } : undefined
+
+          const grouped = await prisma.sheetContribution.groupBy({
+            by: ['proposerId'],
+            where: {
+              status: 'accepted',
+              createdAt: { gte: thirtyDaysAgo },
+              ...(sheetWhere ? { targetSheet: sheetWhere } : {}),
+            },
+            _count: { proposerId: true },
+            orderBy: { _count: { proposerId: 'desc' } },
+            take: 5,
+          })
+
+          if (grouped.length === 0) return []
+          const users = await prisma.user.findMany({
+            where: { id: { in: grouped.map((g) => g.proposerId) } },
+            select: { id: true, username: true, avatarUrl: true },
+          })
+          const byId = new Map(users.map((u) => [u.id, u]))
+          return grouped
+            .map((g) => {
+              const u = byId.get(g.proposerId)
+              if (!u) return null
+              return {
+                userId: u.id,
+                username: u.username,
+                avatarUrl: u.avatarUrl,
+                contributionCount: g._count.proposerId,
+              }
+            })
+            .filter(Boolean)
+        } catch (err) {
+          captureError(err, { route: 'dashboard.summary.topContributors', userId: user.id })
+          return []
+        }
+      })(),
+    ])
 
     // ── Activation checklist ──────────────────────────────────────────────
     // Role-aware onboarding: student, teacher, and self-learner each see a
@@ -298,6 +352,7 @@ router.get('/summary', async (req, res) => {
       },
       courses: user.enrollments.map((enrollment) => enrollment.course),
       recentSheets,
+      topContributors,
       activation: {
         isNewUser,
         completedCount,
@@ -308,7 +363,7 @@ router.get('/summary', async (req, res) => {
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

@@ -338,7 +338,8 @@ describe('Fix 2 — Stripe webhook rejects non-Buffer body', () => {
       .send({ type: 'checkout.session.completed', data: { object: {} } })
 
     expect(response.status).toBe(400)
-    expect(response.body).toEqual({ error: 'Invalid webhook payload' })
+    // Error envelope (sendError) adds a `code` field alongside `error`; assert both.
+    expect(response.body).toMatchObject({ error: 'Invalid webhook payload', code: 'BAD_REQUEST' })
     expect(fix2Mocks.stripeWebhooks.constructEvent).not.toHaveBeenCalled()
   })
 })

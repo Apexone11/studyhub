@@ -1,7 +1,6 @@
 const express = require('express')
 const compression = require('compression')
 const cors = require('cors')
-const rateLimit = require('express-rate-limit')
 const helmet = require('helmet')
 const http = require('http')
 const path = require('node:path')
@@ -269,14 +268,7 @@ app.use((req, res, next) => {
   return sendError(res, 403, 'Origin not allowed.', ERROR_CODES.FORBIDDEN)
 })
 
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 1000,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) =>
-    req.path === '/' || req.path === '/health' || req.path.startsWith('/uploads/avatars/'),
-})
+const { globalLimiter } = require('./lib/rateLimiters')
 
 app.use(globalLimiter)
 

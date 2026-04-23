@@ -14,6 +14,7 @@ const {
 } = require('../../lib/rateLimiters')
 const { getAuthenticatedUser, buildSessionUserPayload } = require('./auth.service')
 const prisma = require('../../lib/prisma')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 
 const router = express.Router()
 
@@ -39,12 +40,12 @@ router.post('/logout', logoutLimiter, (req, res) => {
 router.get('/me', requireAuth, async (req, res) => {
   try {
     const user = await getAuthenticatedUser(req.user.userId)
-    if (!user) return res.status(404).json({ error: 'User not found.' })
+    if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     return res.json(await buildSessionUserPayload(user))
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    return res.status(500).json({ error: 'Server error.' })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -73,7 +74,7 @@ router.get('/sessions', requireAuth, sessionListLimiter, async (req, res) => {
     return res.json({ sessions: mapped })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    return res.status(500).json({ error: 'Could not load sessions.' })
+    return sendError(res, 500, 'Could not load sessions.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -81,12 +82,12 @@ router.delete('/sessions/:sessionId', requireAuth, sessionRevokeLimiter, async (
   try {
     const { revokeSession } = require('./session.service')
     const revoked = await revokeSession(req.params.sessionId, req.user.userId)
-    if (!revoked) return res.status(404).json({ error: 'Session not found.' })
+    if (!revoked) return sendError(res, 404, 'Session not found.', ERROR_CODES.NOT_FOUND)
 
     return res.json({ message: 'Session revoked.' })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    return res.status(500).json({ error: 'Could not revoke session.' })
+    return sendError(res, 500, 'Could not revoke session.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -137,17 +138,19 @@ router.get('/security/login-activity', requireAuth, loginActivityLimiter, async 
     return res.json({ events: shaped })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    return res.status(500).json({ error: 'Could not load login activity.' })
+    return sendError(res, 500, 'Could not load login activity.', ERROR_CODES.INTERNAL)
   }
 })
 
 router.delete('/sessions', requireAuth, sessionRevokeLimiter, async (req, res) => {
   try {
     if (!req.sessionJti) {
-      return res.status(400).json({
-        error:
-          'Current session does not support device management. Please log out and log in again.',
-      })
+      return sendError(
+        res,
+        400,
+        'Current session does not support device management. Please log out and log in again.',
+        ERROR_CODES.BAD_REQUEST,
+      )
     }
     const { revokeAllOtherSessions } = require('./session.service')
     await revokeAllOtherSessions(req.user.userId, req.sessionJti)
@@ -155,7 +158,7 @@ router.delete('/sessions', requireAuth, sessionRevokeLimiter, async (req, res) =
     return res.json({ message: 'All other sessions revoked.' })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    return res.status(500).json({ error: 'Could not revoke sessions.' })
+    return sendError(res, 500, 'Could not revoke sessions.', ERROR_CODES.INTERNAL)
   }
 })
 

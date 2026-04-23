@@ -18,6 +18,7 @@ const {
   recordCurrentRequiredLegalAcceptancesTx,
 } = require('../legal/legal.service')
 const { markTokenUsed } = require('../../lib/usedTokenCache')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 
 const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
 const TEMP_TOKEN_EXPIRES_IN = '15m'
@@ -101,10 +102,10 @@ router.post('/google', googleLimiter, async (req, res) => {
   const { credential } = req.body || {}
 
   if (!credential) {
-    return res.status(400).json({ error: 'Google credential is required.' })
+    return sendError(res, 400, 'Google credential is required.', ERROR_CODES.BAD_REQUEST)
   }
   if (!isGoogleOAuthEnabled()) {
-    return res.status(503).json({ error: 'Google sign-in is not available right now.' })
+    return sendError(res, 503, 'Google sign-in is not available right now.', ERROR_CODES.INTERNAL)
   }
 
   try {
@@ -137,7 +138,7 @@ router.post('/google', googleLimiter, async (req, res) => {
         existingByEmail.authProvider === 'google'
           ? 'An account with this email already exists. Try signing in with your original Google account.'
           : 'An account with this email already exists. Log in with your password, then link Google from Settings > Security.'
-      return res.status(409).json({ error: msg })
+      return sendError(res, 409, msg, ERROR_CODES.CONFLICT)
     }
 
     // New user → do NOT create the row yet. Return a tempToken + profile
@@ -165,29 +166,43 @@ router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
   const { tempToken, accountType, legalAccepted, legalVersion } = req.body || {}
 
   if (!tempToken) {
-    return res.status(400).json({ error: 'Signup session missing. Start Google sign-in again.' })
+    return sendError(
+      res,
+      400,
+      'Signup session missing. Start Google sign-in again.',
+      ERROR_CODES.BAD_REQUEST,
+    )
   }
   if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
-    return res.status(400).json({
-      error: `accountType must be one of: ${VALID_ACCOUNT_TYPES.join(', ')}`,
-    })
+    return sendError(
+      res,
+      400,
+      `accountType must be one of: ${VALID_ACCOUNT_TYPES.join(', ')}`,
+      ERROR_CODES.VALIDATION,
+    )
   }
   if (!legalAccepted || legalVersion !== CURRENT_LEGAL_VERSION) {
-    return res.status(400).json({
-      error: 'Please review and accept the latest StudyHub legal documents before continuing.',
-    })
+    return sendError(
+      res,
+      400,
+      'Please review and accept the latest StudyHub legal documents before continuing.',
+      ERROR_CODES.VALIDATION,
+    )
   }
   if (!isGoogleOAuthEnabled()) {
-    return res.status(503).json({ error: 'Google sign-in is not available right now.' })
+    return sendError(res, 503, 'Google sign-in is not available right now.', ERROR_CODES.INTERNAL)
   }
 
   let pending
   try {
     pending = verifyGoogleTempToken(tempToken)
   } catch {
-    return res.status(400).json({
-      error: 'Signup session expired. Start Google sign-in again.',
-    })
+    return sendError(
+      res,
+      400,
+      'Signup session expired. Start Google sign-in again.',
+      ERROR_CODES.BAD_REQUEST,
+    )
   }
 
   // Enforce single-use on the tempToken. Even though the token is signed and
@@ -199,17 +214,23 @@ router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
   if (!pending.jti) {
     // Legacy tokens issued before this guard was added will not have a jti.
     // Fail closed — the user can restart Google sign-in to get a fresh token.
-    return res.status(400).json({
-      error: 'Signup session is missing a required field. Start Google sign-in again.',
-    })
+    return sendError(
+      res,
+      400,
+      'Signup session is missing a required field. Start Google sign-in again.',
+      ERROR_CODES.BAD_REQUEST,
+    )
   }
   try {
     markTokenUsed(pending.jti, TEMP_TOKEN_EXPIRES_MS)
   } catch (err) {
     if (err?.code === 'TOKEN_ALREADY_USED') {
-      return res.status(400).json({
-        error: 'This signup session has already been used. Start Google sign-in again.',
-      })
+      return sendError(
+        res,
+        400,
+        'This signup session has already been used. Start Google sign-in again.',
+        ERROR_CODES.BAD_REQUEST,
+      )
     }
     throw err
   }
@@ -228,10 +249,12 @@ router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
 
     const existingByEmail = await findUserByEmail(pending.email)
     if (existingByEmail) {
-      return res.status(409).json({
-        error:
-          'An account with this email already exists. Log in with your password, then link Google from Settings > Security.',
-      })
+      return sendError(
+        res,
+        409,
+        'An account with this email already exists. Log in with your password, then link Google from Settings > Security.',
+        ERROR_CODES.CONFLICT,
+      )
     }
 
     const randomPassword = crypto.randomBytes(32).toString('hex')
@@ -280,15 +303,20 @@ router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
         const targets = getP2002Targets(error)
         if (targets.includes('username')) continue
         if (targets.includes('email')) {
-          return res.status(409).json({
-            error:
-              'An account with this email already exists. Try signing in with your original Google account.',
-          })
+          return sendError(
+            res,
+            409,
+            'An account with this email already exists. Try signing in with your original Google account.',
+            ERROR_CODES.CONFLICT,
+          )
         }
         if (targets.includes('googleId')) {
-          return res.status(409).json({
-            error: 'This Google account is already linked to another user.',
-          })
+          return sendError(
+            res,
+            409,
+            'This Google account is already linked to another user.',
+            ERROR_CODES.CONFLICT,
+          )
         }
         throw error
       }
@@ -323,10 +351,15 @@ router.post('/google/code', googleLimiter, async (req, res) => {
   const { code, redirectUri } = req.body || {}
 
   if (!code || !redirectUri) {
-    return res.status(400).json({ error: 'Authorization code and redirectUri are required.' })
+    return sendError(
+      res,
+      400,
+      'Authorization code and redirectUri are required.',
+      ERROR_CODES.BAD_REQUEST,
+    )
   }
   if (!isGoogleOAuthEnabled()) {
-    return res.status(503).json({ error: 'Google sign-in is not available right now.' })
+    return sendError(res, 503, 'Google sign-in is not available right now.', ERROR_CODES.INTERNAL)
   }
 
   // Defense-in-depth: validate redirect_uri against server-side allowlist.
@@ -355,7 +388,7 @@ router.post('/google/code', googleLimiter, async (req, res) => {
     }
   })()
   if (!uriOrigin || !allowedOriginSet.has(uriOrigin)) {
-    return res.status(400).json({ error: 'Invalid redirect URI.' })
+    return sendError(res, 400, 'Invalid redirect URI.', ERROR_CODES.VALIDATION)
   }
 
   try {
@@ -407,7 +440,7 @@ router.post('/google/code', googleLimiter, async (req, res) => {
         existingByEmail.authProvider === 'google'
           ? 'An account with this email already exists. Try signing in with your original Google account.'
           : 'An account with this email already exists. Log in with your password, then link Google from Settings > Security.'
-      return res.status(409).json({ error: msg })
+      return sendError(res, 409, msg, ERROR_CODES.CONFLICT)
     }
 
     const tempToken = signGoogleTempToken(googlePayload)

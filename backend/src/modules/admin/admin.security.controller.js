@@ -8,6 +8,7 @@
 const express = require('express')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 
 const router = express.Router()
 
@@ -80,7 +81,7 @@ router.get('/security/stats', async (req, res) => {
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -91,7 +92,8 @@ router.get('/security/stats', async (req, res) => {
 router.post('/security/unlock/:userId', async (req, res) => {
   try {
     const userId = Number.parseInt(req.params.userId, 10)
-    if (!Number.isInteger(userId)) return res.status(400).json({ error: 'Invalid user ID.' })
+    if (!Number.isInteger(userId))
+      return sendError(res, 400, 'Invalid user ID.', ERROR_CODES.VALIDATION)
 
     await prisma.user.update({
       where: { id: userId },
@@ -101,7 +103,7 @@ router.post('/security/unlock/:userId', async (req, res) => {
     res.json({ message: 'Account unlocked.' })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

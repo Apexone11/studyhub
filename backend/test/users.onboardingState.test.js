@@ -149,7 +149,8 @@ describe('GET /api/users/me/onboarding-state', () => {
     const res = makeResponse()
     await controller.getOnboardingState(req, res)
     expect(res.statusCode).toBe(401)
-    expect(res.jsonBody).toEqual({ error: 'Not authenticated' })
+    // Error envelope now adds a `code` field alongside `error`.
+    expect(res.jsonBody).toMatchObject({ error: 'Not authenticated', code: 'UNAUTHORIZED' })
   })
 
   it('returns the full shape with zeros when the user is brand new', async () => {

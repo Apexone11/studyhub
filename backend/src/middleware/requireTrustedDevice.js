@@ -15,10 +15,11 @@
  */
 
 const prisma = require('../lib/prisma')
+const { sendError, ERROR_CODES } = require('./errorEnvelope')
 
 module.exports = async function requireTrustedDevice(req, res, next) {
   if (!req.user) {
-    return res.status(401).json({ error: 'Unauthorized', code: 'UNAUTHORIZED' })
+    return sendError(res, 401, 'Unauthorized', ERROR_CODES.UNAUTHORIZED)
   }
   if (!req.sessionJti) {
     // Legacy session without a JTI — pre-migration cookies. Fail open so we
@@ -32,10 +33,12 @@ module.exports = async function requireTrustedDevice(req, res, next) {
     })
     const trustedAt = session?.trustedDevice?.trustedAt
     if (!trustedAt) {
-      return res.status(403).json({
-        error: 'This action requires device verification. Check your email for a code.',
-        code: 'REAUTH_REQUIRED',
-      })
+      return sendError(
+        res,
+        403,
+        'This action requires device verification. Check your email for a code.',
+        'REAUTH_REQUIRED',
+      )
     }
     return next()
   } catch {

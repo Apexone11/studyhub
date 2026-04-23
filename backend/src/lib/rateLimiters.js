@@ -18,6 +18,23 @@ const {
 // ── CATEGORY: Generic Base Limiters ────────────────────────────────────────
 
 /**
+ * Global app limiter — applied to every request from backend/src/index.js.
+ * 1000 requests per 15 minutes per IP.
+ * Skips: '/', '/health', '/uploads/avatars/*'.
+ *
+ * Extracted here because CLAUDE.md requires rate limiters to live in this
+ * file and not inline in route files.
+ */
+const globalLimiter = rateLimit({
+  windowMs: WINDOW_15_MIN,
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) =>
+    req.path === '/' || req.path === '/health' || req.path.startsWith('/uploads/avatars/'),
+})
+
+/**
  * Generic auth endpoints — strict limits.
  * 15 requests per 15-minute window per IP.
  */
@@ -998,6 +1015,7 @@ const examReadLimiter = rateLimit({
 
 module.exports = {
   // Base limiters
+  globalLimiter,
   authLimiter,
   writeLimiter,
   readLimiter,

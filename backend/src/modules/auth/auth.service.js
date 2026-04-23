@@ -11,6 +11,7 @@ const prisma = require('../../lib/prisma')
 const { enrichUserWithBadges } = require('../../lib/userBadges')
 const { USERNAME_REGEX, PASSWORD_MIN_LENGTH, COURSE_CODE_REGEX } = require('./auth.constants')
 const { getSessionLegalAcceptanceState } = require('../legal/legal.service')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 
 class AppError extends Error {
   constructor(statusCode, message) {
@@ -466,14 +467,28 @@ function loginVerificationResponse(challenge, overrides = {}) {
 
 function handleAuthError(req, res, error) {
   if (error instanceof AppError || error instanceof VerificationError) {
-    return res.status(error.statusCode).json({ error: error.message })
+    const code =
+      error.statusCode === 401
+        ? ERROR_CODES.UNAUTHORIZED
+        : error.statusCode === 403
+          ? ERROR_CODES.FORBIDDEN
+          : error.statusCode === 404
+            ? ERROR_CODES.NOT_FOUND
+            : error.statusCode === 409
+              ? ERROR_CODES.CONFLICT
+              : error.statusCode === 429
+                ? ERROR_CODES.RATE_LIMITED
+                : error.statusCode >= 500
+                  ? ERROR_CODES.INTERNAL
+                  : ERROR_CODES.BAD_REQUEST
+    return sendError(res, error.statusCode, error.message, code)
   }
   if (error && error.code === 'P2002') {
-    return res.status(409).json({ error: 'That username or email is already taken.' })
+    return sendError(res, 409, 'That username or email is already taken.', ERROR_CODES.CONFLICT)
   }
   captureError(error, { route: req.originalUrl, method: req.method })
   console.error(error)
-  return res.status(500).json({ error: 'Server error. Please try again.' })
+  return sendError(res, 500, 'Server error. Please try again.', ERROR_CODES.INTERNAL)
 }
 
 module.exports = {

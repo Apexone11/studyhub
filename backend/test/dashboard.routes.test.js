@@ -27,6 +27,9 @@ const mocks = vi.hoisted(() => {
     studyGroupMember: {
       count: vi.fn(),
     },
+    sheetContribution: {
+      groupBy: vi.fn(),
+    },
   }
 
   return {
@@ -115,6 +118,7 @@ beforeEach(() => {
   mocks.prisma.feedPost.count.mockResolvedValue(0)
   mocks.prisma.note.count.mockResolvedValue(0)
   mocks.prisma.studyGroupMember.count.mockResolvedValue(0)
+  mocks.prisma.sheetContribution.groupBy.mockResolvedValue([])
   mocks.prisma.studySheet.findMany.mockResolvedValue([
     {
       id: 900,
@@ -249,7 +253,7 @@ describe('dashboard routes', () => {
  *   - docs/internal/design-refresh-v2-roles-integration.md
  *   - frontend/studyhub-app/src/components/TopContributors.jsx
  */
-describe.skip('dashboard summary — topContributors (Phase 1, pending backend)', () => {
+describe('dashboard summary — topContributors (Phase 1)', () => {
   it('returns topContributors as an array of at most 5 entries', async () => {
     const response = await request(app).get('/summary')
     expect(response.status).toBe(200)
