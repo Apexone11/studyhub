@@ -67,9 +67,12 @@ async function verifyChallenge({ id, code }) {
 
   const provided = hashCode(String(code).trim())
   if (provided !== challenge.codeHash) {
+    // Atomic `{ increment: 1 }` instead of `attempts + 1` so two parallel
+    // wrong submissions can't race and effectively grant one another an
+    // extra attempt. Lock decision is based on the post-update value.
     const updated = await prisma.loginChallenge.update({
       where: { id },
-      data: { attempts: challenge.attempts + 1 },
+      data: { attempts: { increment: 1 } },
     })
     return {
       ok: false,

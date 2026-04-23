@@ -21,32 +21,36 @@ const prisma = require('../../lib/prisma')
 async function findOrCreateDevice({ userId, deviceId, label, ip, country, region }) {
   if (!userId || !deviceId) return null
 
-  const existing = await prisma.trustedDevice.findUnique({
+  // Use upsert to avoid a read-then-create race: two concurrent logins from
+  // the same browser (e.g., rapid double-click on the sign-in button, or a
+  // tab that retries a stalled request) would otherwise both miss the
+  // findUnique() and then hit the unique constraint on (userId, deviceId),
+  // intermittently failing one of the logins with P2002.
+  const normalizedLabel = label ? String(label).slice(0, 200) : null
+  const normalizedIp = ip ? String(ip).slice(0, 45) : null
+  const normalizedCountry = country ? String(country).slice(0, 2) : null
+  const normalizedRegion = region ? String(region).slice(0, 10) : null
+
+  return prisma.trustedDevice.upsert({
     where: { userId_deviceId: { userId, deviceId } },
-  })
-
-  if (existing) {
-    return prisma.trustedDevice.update({
-      where: { id: existing.id },
-      data: {
-        lastSeenAt: new Date(),
-        lastIp: ip || existing.lastIp,
-        lastCountry: country || existing.lastCountry,
-        lastRegion: region || existing.lastRegion,
-        label: label || existing.label,
-        revokedAt: null,
-      },
-    })
-  }
-
-  return prisma.trustedDevice.create({
-    data: {
+    update: {
+      lastSeenAt: new Date(),
+      // Only overwrite existing metadata when the caller provided a fresh
+      // value. Prisma treats `undefined` as "leave column alone", so we
+      // send undefined (not null) when the caller didn't supply the field.
+      lastIp: normalizedIp ?? undefined,
+      lastCountry: normalizedCountry ?? undefined,
+      lastRegion: normalizedRegion ?? undefined,
+      label: normalizedLabel ?? undefined,
+      revokedAt: null,
+    },
+    create: {
       userId,
       deviceId,
-      label: (label || 'Unknown device').slice(0, 200),
-      lastIp: ip ? String(ip).slice(0, 45) : null,
-      lastCountry: country ? String(country).slice(0, 2) : null,
-      lastRegion: region ? String(region).slice(0, 10) : null,
+      label: normalizedLabel || 'Unknown device',
+      lastIp: normalizedIp,
+      lastCountry: normalizedCountry,
+      lastRegion: normalizedRegion,
     },
   })
 }

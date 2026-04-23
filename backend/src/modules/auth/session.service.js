@@ -37,13 +37,14 @@ function parseDeviceLabel(ua) {
 
 /**
  * Classify a user-agent into a coarse device type.
- * Returns one of: "laptop" | "desktop" | "mobile" | "tablet" | "watch" | "unknown".
+ * Returns one of: "laptop" | "mobile" | "tablet" | "watch" | "unknown".
  * Used by the sessions UI to pick the right device icon.
  *
  * We can't reliably distinguish desktop vs laptop from a UA alone, so all
  * non-mobile / non-tablet / non-watch Windows/Mac/Linux/CrOS UAs get "laptop"
- * as a sensible default. Callers can still surface the "Chrome on Windows"
- * deviceLabel alongside the icon.
+ * as a single sensible default — the function never returns "desktop".
+ * Callers that need finer-grained detection can parse `deviceLabel` ("Chrome
+ * on Windows") instead of relying on deviceKind.
  */
 function deriveDeviceKind(ua) {
   if (!ua || typeof ua !== 'string') return 'unknown'

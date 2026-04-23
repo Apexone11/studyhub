@@ -29,11 +29,22 @@ function normalizeOrigin(value) {
   }
 }
 
+// Capacitor on-device origins. The Android WebView serves the bundled app
+// from https://localhost (or http://localhost for cleartext dev); the
+// iOS WebView uses capacitor://localhost. These are trusted-by-device,
+// not remote, so they must be on the allowlist in BOTH prod and dev —
+// otherwise native callers get a 403 on any write route this middleware
+// guards. Mobile work is paused as of 2026-04-23, but keeping these in
+// so the Android APK still works when/if a build gets deployed.
+const CAPACITOR_NATIVE_ORIGINS = ['capacitor://localhost', 'http://localhost', 'https://localhost']
+
 function buildTrustedOrigins() {
   const isProd = process.env.NODE_ENV === 'production'
   const base = isProd
-    ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_ALT, 'https://localhost'].filter(Boolean)
-    : ['http://localhost:5173', 'http://localhost:4173', 'https://localhost']
+    ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_ALT, ...CAPACITOR_NATIVE_ORIGINS].filter(
+        Boolean,
+      )
+    : ['http://localhost:5173', 'http://localhost:4173', ...CAPACITOR_NATIVE_ORIGINS]
 
   // In production, also allow www / non-www variants automatically.
   if (isProd) {

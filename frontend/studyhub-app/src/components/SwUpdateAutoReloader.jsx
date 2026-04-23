@@ -29,7 +29,6 @@ import {
   hasReloadBeenTriggered,
   isSwUpdateAvailable,
   markReloadTriggered,
-  subscribeSwUpdate,
   swUpdatePendingAgeMs,
 } from '../lib/swUpdateState'
 
@@ -96,21 +95,20 @@ export default function SwUpdateAutoReloader() {
       }
     }, 60 * 1000)
 
-    // Also listen for the update being flagged after the component
-    // mounts, in case the user happens to be mid-focus at that moment —
-    // a quick reload fire-and-forget once the grace period passes.
-    const unsubscribe = subscribeSwUpdate((available) => {
-      if (!available) return
-      setTimeout(() => {
-        if (document.visibilityState === 'visible') maybeReload()
-      }, INITIAL_GRACE_MS + 100)
-    })
+    // NOTE: we deliberately do NOT subscribe to subscribeSwUpdate here.
+    // An earlier revision did — it scheduled a reload ~2s after the SW
+    // flagged an update if the tab was visible — but that contradicted
+    // this component's own contract (the three safe-moment rules in the
+    // header comment) and could interrupt a user mid-action. The three
+    // documented triggers (route change / tab return / 30-min idle) are
+    // authoritative. A user sitting on a single page gets their reload
+    // from the idle timer above; anyone actively navigating picks it up
+    // from the location-change effect.
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleFocus)
       clearInterval(idleCheckTimer)
-      unsubscribe()
     }
   }, [])
 
