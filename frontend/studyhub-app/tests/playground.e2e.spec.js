@@ -21,7 +21,7 @@ async function disableTutorials(page) {
   })
 }
 
-test.describe.skip('Playground Page @e2e', () => {
+test.describe('Playground Page @e2e', () => {
   test('playground page loads with heading', async ({ page }) => {
     await disableTutorials(page)
 

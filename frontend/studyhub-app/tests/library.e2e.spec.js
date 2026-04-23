@@ -15,6 +15,10 @@ async function disableTutorials(page) {
 // route.respond() instead of route.fulfill(), and wrong API routes/selectors.
 // Needs full rewrite to match the house mock pattern. See sheets.fork-contribute.spec.js
 // for the correct pattern.
+//
+// Deferred per tech-debt handoff 2026-04-23 §"Founder decisions outstanding" #3 —
+// founder to choose: time-box rewrite at 2 hours, or delete the file and start fresh.
+// Until that call lands, this suite stays skipped.
 test.describe.skip('Library Page — NEEDS REWRITE', () => {
   test.beforeEach(async ({ page }) => {
     await disableTutorials(page)
