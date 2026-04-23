@@ -26,7 +26,9 @@ function readEntries() {
 function writeEntries(entries) {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(entries))
-  } catch { /* quota exceeded or private browsing — silently ignore */ }
+  } catch {
+    /* quota exceeded or private browsing — silently ignore */
+  }
 }
 
 /**

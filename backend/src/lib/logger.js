@@ -25,7 +25,7 @@ const isTest = process.env.NODE_ENV === 'test'
 
 const logger = pino({
   // In production: info and above. In test: silent. In dev: debug.
-  level: isTest ? 'silent' : (isProd ? 'info' : 'debug'),
+  level: isTest ? 'silent' : isProd ? 'info' : 'debug',
 
   // Attach service name for multi-service environments
   base: { service: 'studyhub-api' },
@@ -34,12 +34,13 @@ const logger = pino({
   timestamp: pino.stdTimeFunctions.isoTime,
 
   // Pretty-print in development for human readability
-  transport: !isProd && !isTest
-    ? {
-        target: 'pino/file',
-        options: { destination: 1 }, // stdout
-      }
-    : undefined,
+  transport:
+    !isProd && !isTest
+      ? {
+          target: 'pino/file',
+          options: { destination: 1 }, // stdout
+        }
+      : undefined,
 
   // Redact sensitive fields from ever appearing in logs
   redact: {

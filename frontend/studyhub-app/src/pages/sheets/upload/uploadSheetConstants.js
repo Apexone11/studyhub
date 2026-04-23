@@ -10,7 +10,13 @@
 export const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
 /* Allowed attachment types — validated on both client and server */
-export const ATTACH_ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp']
+export const ATTACH_ALLOWED_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+]
 export const ATTACH_ALLOWED_EXT = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp']
 export const ATTACH_MAX_BYTES = 10 * 1024 * 1024 // 10 MB
 

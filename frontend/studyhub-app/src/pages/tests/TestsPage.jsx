@@ -17,11 +17,18 @@ export default function TestsPage() {
   const [browseTab, setBrowseTab] = useState('all')
 
   return (
-    <PageShell nav={<Navbar crumbs={[{ label: 'Practice Tests', to: '/tests' }]} hideTabs />} sidebar={<AppSidebar />}>
+    <PageShell
+      nav={<Navbar crumbs={[{ label: 'Practice Tests', to: '/tests' }]} hideTabs />}
+      sidebar={<AppSidebar />}
+    >
       {/* Page header with tab bar */}
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 4 }}>Practice Tests</h1>
-        <p style={{ fontSize: 13, color: 'var(--sh-muted)', marginBottom: 14 }}>Course-linked tests with instant scoring. Planned for Version 2.</p>
+        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 4 }}>
+          Practice Tests
+        </h1>
+        <p style={{ fontSize: 13, color: 'var(--sh-muted)', marginBottom: 14 }}>
+          Course-linked tests with instant scoring. Planned for Version 2.
+        </p>
         <div style={{ display: 'flex', gap: 6 }}>
           {[
             ['all', 'All Tests'],
@@ -81,10 +88,29 @@ export default function TestsPage() {
       </div>
 
       {/* Version 2 promo banner */}
-      <div style={{ background: 'linear-gradient(135deg,#0f172a,#1e3a5f)', borderRadius: 16, padding: '24px 28px', marginTop: 20, textAlign: 'center' }}>
-        <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 8 }}>AI-Generated Tests in Version 2</div>
-        <div style={{ fontSize: 13, color: '#94a3b8', maxWidth: 400, margin: '0 auto', lineHeight: 1.7 }}>
-          Claude AI will read your study sheets and automatically generate practice questions with instant scoring and detailed explanations.
+      <div
+        style={{
+          background: 'linear-gradient(135deg,#0f172a,#1e3a5f)',
+          borderRadius: 16,
+          padding: '24px 28px',
+          marginTop: 20,
+          textAlign: 'center',
+        }}
+      >
+        <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 8 }}>
+          AI-Generated Tests in Version 2
+        </div>
+        <div
+          style={{
+            fontSize: 13,
+            color: '#94a3b8',
+            maxWidth: 400,
+            margin: '0 auto',
+            lineHeight: 1.7,
+          }}
+        >
+          Claude AI will read your study sheets and automatically generate practice questions with
+          instant scoring and detailed explanations.
         </div>
       </div>
     </PageShell>

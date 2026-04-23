@@ -19,11 +19,26 @@ export default function ActionBlockedModal({ open, reason, onClose }) {
 
   return (
     <div style={styles.overlay} onClick={onClose} role="presentation">
-      <div ref={trapRef} style={styles.modal} onClick={(e) => e.stopPropagation()} role="alertdialog" aria-modal="true">
+      <div
+        ref={trapRef}
+        style={styles.modal}
+        onClick={(e) => e.stopPropagation()}
+        role="alertdialog"
+        aria-modal="true"
+      >
         <div style={styles.iconWrap}>
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--sh-danger-text)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="10"/>
-            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/>
+          <svg
+            width="28"
+            height="28"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="var(--sh-danger-text)"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
+            <circle cx="12" cy="12" r="10" />
+            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
           </svg>
         </div>
 
@@ -34,7 +49,15 @@ export default function ActionBlockedModal({ open, reason, onClose }) {
 
         {reason && (
           <div style={styles.reasonBox}>
-            <strong style={{ display: 'block', fontSize: 11, fontWeight: 700, marginBottom: 4, color: 'var(--sh-muted)' }}>
+            <strong
+              style={{
+                display: 'block',
+                fontSize: 11,
+                fontWeight: 700,
+                marginBottom: 4,
+                color: 'var(--sh-muted)',
+              }}
+            >
               Reason
             </strong>
             {reason}
@@ -51,7 +74,10 @@ export default function ActionBlockedModal({ open, reason, onClose }) {
           </button>
           <button
             type="button"
-            onClick={() => { onClose?.(); navigate('/settings?tab=moderation') }}
+            onClick={() => {
+              onClose?.()
+              navigate('/settings?tab=moderation')
+            }}
             style={styles.primaryBtn}
           >
             View moderation status

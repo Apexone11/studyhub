@@ -13,7 +13,8 @@ const LEGAL_DOCUMENT_SEEDS = [
     version: CURRENT_LEGAL_VERSION,
     title: 'Terms and Conditions',
     summary: 'The legal terms that govern your access to and use of StudyHub.',
-    intro: 'These legal terms explain how StudyHub works, what is expected from users, and the rules that apply when you use the platform.',
+    intro:
+      'These legal terms explain how StudyHub works, what is expected from users, and the rules that apply when you use the platform.',
     updatedLabel: 'Last updated April 08, 2026',
     requiredAtSignup: true,
     termlyEmbedId: '84ea6e72-ac97-4827-ba6d-c34900aea542',
@@ -25,7 +26,8 @@ const LEGAL_DOCUMENT_SEEDS = [
     version: CURRENT_LEGAL_VERSION,
     title: 'Privacy Policy',
     summary: 'How StudyHub collects, uses, stores, and protects personal information.',
-    intro: 'This privacy notice explains what data StudyHub collects, why it is processed, and the rights users have over their information.',
+    intro:
+      'This privacy notice explains what data StudyHub collects, why it is processed, and the rights users have over their information.',
     updatedLabel: 'Last updated April 08, 2026',
     requiredAtSignup: true,
     termlyEmbedId: 'af795fa7-a5b0-41e4-b342-8797a0194d55',
@@ -37,7 +39,8 @@ const LEGAL_DOCUMENT_SEEDS = [
     version: CURRENT_LEGAL_VERSION,
     title: 'Community Guidelines',
     summary: 'The shared standards that keep StudyHub useful, respectful, and safe for students.',
-    intro: 'StudyHub is built for students. These guidelines define the platform norms that apply to publishing, collaboration, and communication.',
+    intro:
+      'StudyHub is built for students. These guidelines define the platform norms that apply to publishing, collaboration, and communication.',
     updatedLabel: 'Last updated April 08, 2026',
     requiredAtSignup: true,
     termlyEmbedId: null,
@@ -48,8 +51,10 @@ const LEGAL_DOCUMENT_SEEDS = [
     slug: 'cookies',
     version: CURRENT_LEGAL_VERSION,
     title: 'Cookie Policy',
-    summary: 'How StudyHub uses cookies, analytics, advertising technologies, and related preference controls.',
-    intro: 'This cookie policy explains the cookies and similar technologies used across StudyHub and how users can manage their choices.',
+    summary:
+      'How StudyHub uses cookies, analytics, advertising technologies, and related preference controls.',
+    intro:
+      'This cookie policy explains the cookies and similar technologies used across StudyHub and how users can manage their choices.',
     updatedLabel: 'Last updated April 08, 2026',
     requiredAtSignup: false,
     termlyEmbedId: '49c5d88c-ee36-4bbb-bde7-6c641a540268',
@@ -61,7 +66,8 @@ const LEGAL_DOCUMENT_SEEDS = [
     version: CURRENT_LEGAL_VERSION,
     title: 'Disclaimer',
     summary: 'Important limitations and liability notices for the StudyHub website and services.',
-    intro: 'This disclaimer explains the limits of the information published on StudyHub and the extent of our liability for its use.',
+    intro:
+      'This disclaimer explains the limits of the information published on StudyHub and the extent of our liability for its use.',
     updatedLabel: 'Last updated April 08, 2026',
     requiredAtSignup: false,
     termlyEmbedId: '55c02c39-21be-41cf-a1aa-a8ae0181e69b',
@@ -76,10 +82,14 @@ function normalizeLegalBodyText(value) {
   const formFeed = String.fromCharCode(12)
   const nonBreakingSpace = String.fromCharCode(160)
   const normalized = String(value || '')
-    .split(bell).join('')
-    .split(verticalTab).join('\n')
-    .split(formFeed).join('\n')
-    .split(nonBreakingSpace).join(' ')
+    .split(bell)
+    .join('')
+    .split(verticalTab)
+    .join('\n')
+    .split(formFeed)
+    .join('\n')
+    .split(nonBreakingSpace)
+    .join(' ')
 
   return Array.from(normalized)
     .filter((character) => {
@@ -99,7 +109,10 @@ function normalizeLegalBodyText(value) {
     .replace(/(TABLE OF CONTENTS)(\d+\.\s+)/g, '$1\n$2')
     .replace(/([^\n])(\d+\.\s+[A-Z])/g, '$1\n$2')
     .replace(/([a-z0-9)\]])\.([A-Z])/g, '$1.\n\n$2')
-    .replace(/([a-z0-9,)])([A-Z]{2,}(?:\s+[A-Z0-9][A-Z0-9'"/&(),:;-]{2,}){1,})(?=[A-Z][a-z])/g, '$1\n\n$2')
+    .replace(
+      /([a-z0-9,)])([A-Z]{2,}(?:\s+[A-Z0-9][A-Z0-9'"/&(),:;-]{2,}){1,})(?=[A-Z][a-z])/g,
+      '$1\n\n$2',
+    )
     .replace(/(In Short:)([A-Z])/g, '$1 $2')
     .replace(/(following:)([A-Za-z])/gi, '$1\n$2')
     .replace(

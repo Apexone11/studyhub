@@ -37,7 +37,9 @@ router.patch('/password', twoFaLimiter, async (req, res) => {
     return res.status(400).json({ error: 'New password must be at least 8 characters.' })
   }
   if (!/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
-    return res.status(400).json({ error: 'New password must include at least one capital letter and one number.' })
+    return res
+      .status(400)
+      .json({ error: 'New password must include at least one capital letter and one number.' })
   }
   if (currentPassword === newPassword) {
     return res.status(400).json({ error: 'New password must be different from current password.' })
@@ -68,7 +70,9 @@ router.patch('/username', async (req, res) => {
 
   const trimmed = newUsername.trim()
   if (!USERNAME_REGEX.test(trimmed)) {
-    return res.status(400).json({ error: 'Username must be 3-20 characters (letters, numbers, underscores only).' })
+    return res
+      .status(400)
+      .json({ error: 'Username must be 3-20 characters (letters, numbers, underscores only).' })
   }
 
   try {
@@ -78,7 +82,9 @@ router.patch('/username', async (req, res) => {
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return res.status(401).json({ error: 'Password is incorrect.' })
     if (trimmed === user.username) {
-      return res.status(400).json({ error: 'New username must be different from current username.' })
+      return res
+        .status(400)
+        .json({ error: 'New username must be different from current username.' })
     }
 
     const updatedTokenUser = await prisma.user.update({
@@ -129,7 +135,11 @@ router.patch('/profile', async (req, res) => {
     const hasLocationUpdate = Object.hasOwn(body, 'location')
     const hasSensitiveProfileUpdate = hasAgeUpdate || hasLocationUpdate
 
-    if (!hasVisibilityUpdate && !hasSensitiveProfileUpdate && Object.keys(userUpdates).length === 0) {
+    if (
+      !hasVisibilityUpdate &&
+      !hasSensitiveProfileUpdate &&
+      Object.keys(userUpdates).length === 0
+    ) {
       throw new AppError(400, 'No valid profile fields were provided.')
     }
 
@@ -149,12 +159,13 @@ router.patch('/profile', async (req, res) => {
     }
 
     if (hasSensitiveProfileUpdate && kmsConfigured) {
-      const existingPii = (await getUserPII(user.id, {
-        id: req.user.userId,
-        role: req.user.role,
-        route: req.originalUrl,
-        method: req.method,
-      }).catch(() => null)) || {}
+      const existingPii =
+        (await getUserPII(user.id, {
+          id: req.user.userId,
+          role: req.user.role,
+          route: req.originalUrl,
+          method: req.method,
+        }).catch(() => null)) || {}
 
       const nextPii = { ...existingPii }
       if (hasAgeUpdate) nextPii.age = sanitizeAge(body.age)
@@ -231,7 +242,8 @@ router.patch('/account-type', async (req, res) => {
 
 router.delete('/account', twoFaLimiter, async (req, res) => {
   const { password, reason, details } = req.body || {}
-  if (!password) return res.status(400).json({ error: 'Password is required to delete your account.' })
+  if (!password)
+    return res.status(400).json({ error: 'Password is required to delete your account.' })
   if (!reason) return res.status(400).json({ error: 'Please select a reason for leaving.' })
 
   try {

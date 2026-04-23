@@ -31,7 +31,7 @@ export default function GifSearchPanel({
 
       try {
         const response = await fetch(
-          `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(trimmedQuery)}&key=${encodeURIComponent(TENOR_API_KEY)}&client_key=studyhub&limit=12&media_filter=tinygif,gif`
+          `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(trimmedQuery)}&key=${encodeURIComponent(TENOR_API_KEY)}&client_key=studyhub&limit=12&media_filter=tinygif,gif`,
         )
 
         if (response.ok && !cancelled) {
@@ -71,7 +71,9 @@ export default function GifSearchPanel({
         gap: 6,
       }}
     >
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+      <div
+        style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}
+      >
         <span
           style={{
             fontSize: 12,
@@ -128,13 +130,29 @@ export default function GifSearchPanel({
         }}
       >
         {displayLoading ? (
-          <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 12, padding: 10 }}>
+          <div
+            style={{
+              gridColumn: '1 / -1',
+              textAlign: 'center',
+              color: 'var(--sh-muted)',
+              fontSize: 12,
+              padding: 10,
+            }}
+          >
             Searching...
           </div>
         ) : null}
 
         {!displayLoading && displayResults.length === 0 && trimmedQuery ? (
-          <div style={{ gridColumn: '1 / -1', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 12, padding: 10 }}>
+          <div
+            style={{
+              gridColumn: '1 / -1',
+              textAlign: 'center',
+              color: 'var(--sh-muted)',
+              fontSize: 12,
+              padding: 10,
+            }}
+          >
             No GIFs found
           </div>
         ) : null}
@@ -169,7 +187,9 @@ export default function GifSearchPanel({
         ))}
       </div>
 
-      <div style={{ textAlign: 'right', fontSize: 9, color: 'var(--sh-muted)', fontFamily: PAGE_FONT }}>
+      <div
+        style={{ textAlign: 'right', fontSize: 9, color: 'var(--sh-muted)', fontFamily: PAGE_FONT }}
+      >
         Powered by Tenor
       </div>
     </div>

@@ -51,9 +51,8 @@ router.post('/register/verify', webauthnLimiter, requireAuth, requireAdmin, asyn
       return res.status(400).json({ error: result.error || 'Registration verification failed.' })
     }
 
-    const passKeyName = typeof name === 'string' && name.trim()
-      ? name.trim().slice(0, 60)
-      : 'Passkey'
+    const passKeyName =
+      typeof name === 'string' && name.trim() ? name.trim().slice(0, 60) : 'Passkey'
 
     const credential = await prisma.webAuthnCredential.create({
       data: {
@@ -106,7 +105,9 @@ router.post('/authenticate/options', webauthnLimiter, async (req, res) => {
 
     if (!user || user.role !== 'admin') {
       // Do not reveal whether the user exists — return a generic error
-      return res.status(400).json({ error: 'Passkey authentication is not available for this account.' })
+      return res
+        .status(400)
+        .json({ error: 'Passkey authentication is not available for this account.' })
     }
 
     const credentials = await prisma.webAuthnCredential.findMany({
@@ -115,7 +116,9 @@ router.post('/authenticate/options', webauthnLimiter, async (req, res) => {
     })
 
     if (credentials.length === 0) {
-      return res.status(400).json({ error: 'Passkey authentication is not available for this account.' })
+      return res
+        .status(400)
+        .json({ error: 'Passkey authentication is not available for this account.' })
     }
 
     const options = generateAuthenticationOptions(user.id, credentials)
@@ -128,13 +131,7 @@ router.post('/authenticate/options', webauthnLimiter, async (req, res) => {
 
 // POST /api/webauthn/authenticate/verify
 router.post('/authenticate/verify', webauthnLimiter, async (req, res) => {
-  const {
-    id,
-    rawId,
-    type,
-    response: credentialResponse,
-    username,
-  } = req.body || {}
+  const { id, rawId, type, response: credentialResponse, username } = req.body || {}
 
   if (!id || !rawId || type !== 'public-key' || !credentialResponse || !username) {
     return res.status(400).json({ error: 'Invalid authentication payload.' })

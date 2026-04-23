@@ -1,10 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import MediaComposer from './MediaComposer'
-import {
-  formatRelativeTime,
-  getPostTypeLabel,
-} from './studyGroupsHelpers'
+import { formatRelativeTime, getPostTypeLabel } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 
 function DiscussionPostItem({
@@ -27,11 +24,12 @@ function DiscussionPostItem({
   const isResolved = post.resolved || post.isResolved
   const isPendingApproval = post.status === 'pending_approval'
   const isRemoved = post.status === 'removed'
-  const badgeStyle = post.type === 'question'
-    ? styles.badgeOrange
-    : post.type === 'announcement'
-      ? styles.badgeRed
-      : {}
+  const badgeStyle =
+    post.type === 'question'
+      ? styles.badgeOrange
+      : post.type === 'announcement'
+        ? styles.badgeRed
+        : {}
 
   return (
     <div
@@ -44,23 +42,38 @@ function DiscussionPostItem({
     >
       <div style={styles.discussionHeader}>
         <div style={{ flex: 1 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-2)', marginBottom: 'var(--space-1)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 'var(--space-2)',
+              marginBottom: 'var(--space-1)',
+            }}
+          >
             <div style={styles.discussionTitle}>{post.title}</div>
             {isResolved && post.type === 'question' && (
-              <span style={{ ...styles.badge, ...styles.badgeGreen }}>
-                Resolved
-              </span>
+              <span style={{ ...styles.badge, ...styles.badgeGreen }}>Resolved</span>
             )}
-            <span style={{ ...styles.badge, ...badgeStyle }}>
-              {getPostTypeLabel(post.type)}
-            </span>
+            <span style={{ ...styles.badge, ...badgeStyle }}>{getPostTypeLabel(post.type)}</span>
             {isPendingApproval ? (
-              <span style={{ ...styles.badge, background: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)' }}>
+              <span
+                style={{
+                  ...styles.badge,
+                  background: 'var(--sh-warning-bg)',
+                  color: 'var(--sh-warning-text)',
+                }}
+              >
                 Pending Approval
               </span>
             ) : null}
             {isRemoved ? (
-              <span style={{ ...styles.badge, background: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)' }}>
+              <span
+                style={{
+                  ...styles.badge,
+                  background: 'var(--sh-danger-bg)',
+                  color: 'var(--sh-danger-text)',
+                }}
+              >
                 Removed
               </span>
             ) : null}
@@ -69,17 +82,38 @@ function DiscussionPostItem({
 
         {onUpvote && (
           <button
-            onClick={(e) => { e.stopPropagation(); onUpvote(post.id) }}
+            onClick={(e) => {
+              e.stopPropagation()
+              onUpvote(post.id)
+            }}
             style={{
-              background: 'none', border: '1px solid var(--sh-border)',
-              borderRadius: 'var(--radius-control)', padding: '4px 10px',
-              cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 4,
+              background: 'none',
+              border: '1px solid var(--sh-border)',
+              borderRadius: 'var(--radius-control)',
+              padding: '4px 10px',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4,
               color: post.userHasUpvoted ? 'var(--sh-brand)' : 'var(--sh-muted)',
-              fontFamily: 'inherit', fontSize: 'var(--type-xs)', fontWeight: 600,
+              fontFamily: 'inherit',
+              fontSize: 'var(--type-xs)',
+              fontWeight: 600,
               transition: 'all 0.15s',
             }}
           >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill={post.userHasUpvoted ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 19V5M5 12l7-7 7 7" /></svg>
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill={post.userHasUpvoted ? 'currentColor' : 'none'}
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            >
+              <path d="M12 19V5M5 12l7-7 7 7" />
+            </svg>
             {post.upvoteCount || 0}
           </button>
         )}
@@ -87,21 +121,44 @@ function DiscussionPostItem({
 
       <div style={styles.discussionMeta}>
         {post.author?.avatarUrl ? (
-          <img src={post.author.avatarUrl} alt="" style={{ width: 16, height: 16, borderRadius: '50%', verticalAlign: 'middle' }} />
+          <img
+            src={post.author.avatarUrl}
+            alt=""
+            style={{ width: 16, height: 16, borderRadius: '50%', verticalAlign: 'middle' }}
+          />
         ) : null}
         <span>{authorName}</span>
         <span> -- {formatRelativeTime(post.createdAt)}</span>
         <span> -- {post.replyCount || 0} replies</span>
-        {(post.upvoteCount || 0) > 0 && <span> -- {post.upvoteCount} upvote{post.upvoteCount !== 1 ? 's' : ''}</span>}
+        {(post.upvoteCount || 0) > 0 && (
+          <span>
+            {' '}
+            -- {post.upvoteCount} upvote{post.upvoteCount !== 1 ? 's' : ''}
+          </span>
+        )}
       </div>
 
       {expanded && (
         <div style={styles.expandedContent} onClick={(e) => e.stopPropagation()}>
-          <p style={{ fontSize: 'var(--type-sm)', color: 'var(--sh-text)', lineHeight: '1.6', marginBottom: 'var(--space-4)' }}>
+          <p
+            style={{
+              fontSize: 'var(--type-sm)',
+              color: 'var(--sh-text)',
+              lineHeight: '1.6',
+              marginBottom: 'var(--space-4)',
+            }}
+          >
             {post.content}
           </p>
 
-          <div style={{ display: 'flex', gap: 'var(--space-2)', marginBottom: 'var(--space-4)', flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 'var(--space-2)',
+              marginBottom: 'var(--space-4)',
+              flexWrap: 'wrap',
+            }}
+          >
             {/* Phase 5: Approve/Reject buttons for posts in the approval queue */}
             {isPendingApproval && isAdminOrMod && onApprove && (
               <button
@@ -162,7 +219,9 @@ function DiscussionPostItem({
             <div style={styles.repliesList}>
               {post.replies.map((reply) => (
                 <div key={reply.id} style={styles.reply}>
-                  <div style={styles.replyAuthor}>{reply.author?.username || reply.authorName || 'Unknown'}</div>
+                  <div style={styles.replyAuthor}>
+                    {reply.author?.username || reply.authorName || 'Unknown'}
+                  </div>
                   <div style={styles.replyContent}>{reply.content}</div>
                   <div style={styles.replyTime}>{formatRelativeTime(reply.createdAt)}</div>
                 </div>
@@ -170,17 +229,12 @@ function DiscussionPostItem({
             </div>
           )}
 
-          <form
-            onSubmit={(e) => onReplySubmit(post.id, e)}
-            style={{ marginTop: 'var(--space-4)' }}
-          >
+          <form onSubmit={(e) => onReplySubmit(post.id, e)} style={{ marginTop: 'var(--space-4)' }}>
             <div style={styles.formGroup}>
               <textarea
                 style={styles.textarea}
                 value={replyFormData[post.id] || ''}
-                onChange={(e) =>
-                  setReplyFormData({ ...replyFormData, [post.id]: e.target.value })
-                }
+                onChange={(e) => setReplyFormData({ ...replyFormData, [post.id]: e.target.value })}
                 maxLength={1000}
                 placeholder="Write a reply..."
               />
@@ -283,23 +337,24 @@ export function GroupDiscussionsTab({
     }
   }
 
-  const filteredDiscussions = typeFilter === 'all'
-    ? discussions || []
-    : (discussions || []).filter(d => d.type === typeFilter)
+  const filteredDiscussions =
+    typeFilter === 'all'
+      ? discussions || []
+      : (discussions || []).filter((d) => d.type === typeFilter)
 
-  const pinnedDiscussions = filteredDiscussions.filter(d => d.isPinned)
-  const regularDiscussions = filteredDiscussions.filter(d => !d.isPinned)
+  const pinnedDiscussions = filteredDiscussions.filter((d) => d.isPinned)
+  const regularDiscussions = filteredDiscussions.filter((d) => !d.isPinned)
 
   if (!discussions || discussions.length === 0) {
     return (
       <div style={styles.tabContainer}>
         <div style={styles.emptyState}>
-          <div style={styles.emptyIcon} aria-label="Comments icon">Discussions</div>
+          <div style={styles.emptyIcon} aria-label="Comments icon">
+            Discussions
+          </div>
           <div style={styles.emptyTitle}>No Discussions Yet</div>
           <p style={styles.emptyText}>
-            {isMember
-              ? 'Start the conversation!'
-              : 'Join the group to participate'}
+            {isMember ? 'Start the conversation!' : 'Join the group to participate'}
           </p>
           {isMember && (
             <button
@@ -320,7 +375,9 @@ export function GroupDiscussionsTab({
                 aria-modal="true"
                 aria-labelledby="new-post-title"
               >
-                <h3 style={styles.sectionTitle} id="new-post-title">New Discussion Post</h3>
+                <h3 style={styles.sectionTitle} id="new-post-title">
+                  New Discussion Post
+                </h3>
                 {error && <div style={styles.error}>{error}</div>}
                 <form onSubmit={handleSubmit}>
                   <div style={styles.formGroup}>
@@ -399,7 +456,7 @@ export function GroupDiscussionsTab({
               </div>
             </div>
           ),
-          document.body
+          document.body,
         )}
       </div>
     )
@@ -495,10 +552,7 @@ export function GroupDiscussionsTab({
       {createPortal(
         newPostModalOpen && (
           <div style={styles.modalOverlay} onClick={() => setNewPostModalOpen(false)}>
-            <div
-              style={styles.modalContent}
-              onClick={(e) => e.stopPropagation()}
-            >
+            <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
               <h3 style={styles.sectionTitle}>New Discussion Post</h3>
               {error && <div style={styles.error}>{error}</div>}
               <form onSubmit={handleSubmit}>
@@ -577,7 +631,7 @@ export function GroupDiscussionsTab({
             </div>
           </div>
         ),
-        document.body
+        document.body,
       )}
     </div>
   )

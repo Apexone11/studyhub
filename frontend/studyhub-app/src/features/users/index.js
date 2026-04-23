@@ -7,7 +7,12 @@
 
 // Constants
 export {
-  FONT, authHeaders, fmtDate,
-  pageWrapStyle, containerStyle, cardStyle,
-  sectionHeadingStyle, pillStyle,
+  FONT,
+  authHeaders,
+  fmtDate,
+  pageWrapStyle,
+  containerStyle,
+  cardStyle,
+  sectionHeadingStyle,
+  pillStyle,
 } from '../../pages/profile/profileConstants'

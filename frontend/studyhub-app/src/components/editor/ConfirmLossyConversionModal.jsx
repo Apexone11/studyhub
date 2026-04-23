@@ -48,9 +48,9 @@ export default function ConfirmLossyConversionModal({ open, report, onConfirm, o
           Switching to Rich Text will strip some HTML
         </h2>
         <p style={bodyStyle}>
-          Rich Text mode uses a visual editor that cannot represent every HTML
-          construct. You can always switch back to HTML/Code later, but the
-          stripped content will not come back automatically.
+          Rich Text mode uses a visual editor that cannot represent every HTML construct. You can
+          always switch back to HTML/Code later, but the stripped content will not come back
+          automatically.
         </p>
 
         {hasTags ? (
@@ -69,7 +69,9 @@ export default function ConfirmLossyConversionModal({ open, report, onConfirm, o
             <div style={sectionLabelStyle}>Attributes that will be removed</div>
             <div style={codeListStyle}>
               {report.strippedAttributes.map((attr) => (
-                <code key={attr} style={codeChipStyle}>{attr}</code>
+                <code key={attr} style={codeChipStyle}>
+                  {attr}
+                </code>
               ))}
             </div>
           </div>

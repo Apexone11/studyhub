@@ -14,12 +14,7 @@ import { useSession } from './session-context'
  */
 export function useProtectedPage() {
   const navigate = useNavigate()
-  const {
-    user,
-    error,
-    isBootstrapping,
-    isAuthenticated,
-  } = useSession()
+  const { user, error, isBootstrapping, isAuthenticated } = useSession()
 
   useEffect(() => {
     if (!isBootstrapping && !isAuthenticated) {

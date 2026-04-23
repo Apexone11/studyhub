@@ -31,10 +31,17 @@ export default function ForkTreePanel({ sheetId }) {
       })
       .catch((err) => {
         if (cancelled) return
-        setState({ loading: false, root: null, count: 0, error: err.message || 'Could not load fork tree.' })
+        setState({
+          loading: false,
+          root: null,
+          count: 0,
+          error: err.message || 'Could not load fork tree.',
+        })
       })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [sheetId])
 
   // Only render when there's genuinely a tree worth showing (root + at least
@@ -43,10 +50,21 @@ export default function ForkTreePanel({ sheetId }) {
 
   return (
     <section style={panelStyle()}>
-      <h2 style={{ margin: '0 0 10px', fontSize: 15, color: 'var(--sh-heading)', display: 'flex', alignItems: 'center', gap: 8 }}>
+      <h2
+        style={{
+          margin: '0 0 10px',
+          fontSize: 15,
+          color: 'var(--sh-heading)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8,
+        }}
+      >
         <IconFork size={14} />
         Fork tree
-        <span style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600 }}>
+        <span
+          style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600 }}
+        >
           {state.count} {state.count === 1 ? 'sheet' : 'sheets'}
         </span>
       </h2>

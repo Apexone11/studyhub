@@ -36,7 +36,8 @@ export function pageShell(widthKey, top = 24, bottom = 60) {
 export function resolveAppLayout(width) {
   const safeWidth = Number.isFinite(width) ? width : 1440
   const isPhone = safeWidth <= layoutBreakpoints.phoneMax
-  const isTablet = safeWidth > layoutBreakpoints.phoneMax && safeWidth <= layoutBreakpoints.tabletMax
+  const isTablet =
+    safeWidth > layoutBreakpoints.phoneMax && safeWidth <= layoutBreakpoints.tabletMax
   const isCompact = isPhone || isTablet
 
   return {

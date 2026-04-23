@@ -175,7 +175,10 @@ function computeWordSegments(lineA, lineB) {
   const wordsB = (lineB || '').split(/(\s+)/)
 
   if (wordsA.length > 200 || wordsB.length > 200) {
-    return { oldSegments: [{ type: 'remove', text: lineA }], newSegments: [{ type: 'add', text: lineB }] }
+    return {
+      oldSegments: [{ type: 'remove', text: lineA }],
+      newSegments: [{ type: 'add', text: lineB }],
+    }
   }
 
   const dp = lcsTable(wordsA, wordsB)
@@ -224,7 +227,7 @@ function addWordSegments(hunks) {
         for (let p = 0; p < pairCount; p++) {
           const { oldSegments, newSegments } = computeWordSegments(
             removes[p].content,
-            adds[p].content
+            adds[p].content,
           )
           removes[p].segments = oldSegments
           adds[p].segments = newSegments

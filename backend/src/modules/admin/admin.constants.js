@@ -7,7 +7,9 @@ function parsePage(value, defaultValue = 1) {
 }
 
 function parseSuppressionStatus(rawStatus) {
-  const value = String(rawStatus || 'active').trim().toLowerCase()
+  const value = String(rawStatus || 'active')
+    .trim()
+    .toLowerCase()
   if (value === 'all' || value === 'inactive') return value
   return 'active'
 }

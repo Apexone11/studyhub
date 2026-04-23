@@ -51,7 +51,9 @@ export default function ReportGroupModal({ open, onClose, groupId, groupName, on
   // Escape closes.
   useEffect(() => {
     if (!open) return
-    const handler = (event) => { if (event.key === 'Escape') onClose?.() }
+    const handler = (event) => {
+      if (event.key === 'Escape') onClose?.()
+    }
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose])
@@ -89,31 +91,44 @@ export default function ReportGroupModal({ open, onClose, groupId, groupName, on
       aria-modal="true"
       aria-labelledby="report-group-title"
       style={overlayStyle}
-      onClick={(event) => { if (event.target === event.currentTarget) onClose?.() }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose?.()
+      }}
     >
       <form onSubmit={handleSubmit} style={dialogStyle}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-          <div style={{
-            width: 36, height: 36, borderRadius: 10,
-            background: 'var(--sh-danger-bg)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
+          <div
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 10,
+              background: 'var(--sh-danger-bg)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
             <IconFlag size={18} style={{ color: 'var(--sh-danger)' }} />
           </div>
           <div>
-            <h2 id="report-group-title" style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--sh-heading)' }}>
+            <h2
+              id="report-group-title"
+              style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--sh-heading)' }}
+            >
               Report group
             </h2>
             {groupName ? (
-              <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 2 }}>{groupName}</div>
+              <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 2 }}>
+                {groupName}
+              </div>
             ) : null}
           </div>
         </div>
 
         <p style={{ margin: '0 0 14px', fontSize: 13, lineHeight: 1.6, color: 'var(--sh-text)' }}>
           Our team will review your report. The group owner will be notified that their group is
-          under review but will <strong>not</strong> be told who filed the report.
-          You will stop seeing this group in your feed after you submit.
+          under review but will <strong>not</strong> be told who filed the report. You will stop
+          seeing this group in your feed after you submit.
         </p>
 
         <label style={labelStyle}>
@@ -124,9 +139,13 @@ export default function ReportGroupModal({ open, onClose, groupId, groupName, on
             required
             style={selectStyle}
           >
-            <option value="" disabled>Select a reason</option>
+            <option value="" disabled>
+              Select a reason
+            </option>
             {REASONS.map((r) => (
-              <option key={r.value} value={r.value}>{r.label}</option>
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
             ))}
           </select>
         </label>
@@ -144,12 +163,7 @@ export default function ReportGroupModal({ open, onClose, groupId, groupName, on
         </label>
 
         <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
-          <button
-            type="button"
-            onClick={onClose}
-            disabled={submitting}
-            style={cancelBtnStyle}
-          >
+          <button type="button" onClick={onClose} disabled={submitting} style={cancelBtnStyle}>
             Cancel
           </button>
           <button
@@ -157,8 +171,8 @@ export default function ReportGroupModal({ open, onClose, groupId, groupName, on
             disabled={!reason || submitting}
             style={{
               ...submitBtnStyle,
-              opacity: (!reason || submitting) ? 0.5 : 1,
-              cursor: (!reason || submitting) ? 'not-allowed' : 'pointer',
+              opacity: !reason || submitting ? 0.5 : 1,
+              cursor: !reason || submitting ? 'not-allowed' : 'pointer',
             }}
           >
             {submitting ? 'Submitting...' : 'Submit report'}
@@ -172,49 +186,84 @@ export default function ReportGroupModal({ open, onClose, groupId, groupName, on
 }
 
 const overlayStyle = {
-  position: 'fixed', inset: 0,
+  position: 'fixed',
+  inset: 0,
   background: 'rgba(15, 23, 42, 0.55)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
-  zIndex: 10000, padding: 16,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 10000,
+  padding: 16,
 }
 
 const dialogStyle = {
-  background: 'var(--sh-surface)', color: 'var(--sh-heading)',
-  borderRadius: 14, border: '1px solid var(--sh-border)',
-  padding: '20px 22px', maxWidth: 480, width: '100%',
-  maxHeight: '85vh', overflowY: 'auto',
+  background: 'var(--sh-surface)',
+  color: 'var(--sh-heading)',
+  borderRadius: 14,
+  border: '1px solid var(--sh-border)',
+  padding: '20px 22px',
+  maxWidth: 480,
+  width: '100%',
+  maxHeight: '85vh',
+  overflowY: 'auto',
   boxShadow: '0 20px 50px rgba(15, 23, 42, 0.3)',
 }
 
 const labelStyle = {
-  display: 'grid', gap: 4, fontSize: 12, fontWeight: 700,
-  color: 'var(--sh-muted)', textTransform: 'uppercase',
-  letterSpacing: '0.3px', marginBottom: 12,
+  display: 'grid',
+  gap: 4,
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'var(--sh-muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.3px',
+  marginBottom: 12,
 }
 
 const selectStyle = {
-  width: '100%', padding: '10px 12px', borderRadius: 10,
-  border: '1px solid var(--sh-border)', background: 'var(--sh-surface)',
-  color: 'var(--sh-heading)', fontSize: 13, fontFamily: 'inherit',
+  width: '100%',
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-surface)',
+  color: 'var(--sh-heading)',
+  fontSize: 13,
+  fontFamily: 'inherit',
 }
 
 const textareaStyle = {
-  width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-  borderRadius: 10, border: '1px solid var(--sh-border)',
-  background: 'var(--sh-surface)', color: 'var(--sh-heading)',
-  fontSize: 13, fontFamily: 'inherit', resize: 'vertical',
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-surface)',
+  color: 'var(--sh-heading)',
+  fontSize: 13,
+  fontFamily: 'inherit',
+  resize: 'vertical',
   minHeight: 72,
 }
 
 const cancelBtnStyle = {
-  padding: '8px 16px', borderRadius: 8,
-  border: '1px solid var(--sh-border)', background: 'var(--sh-surface)',
-  color: 'var(--sh-heading)', fontSize: 12, fontWeight: 700,
-  cursor: 'pointer', fontFamily: 'inherit',
+  padding: '8px 16px',
+  borderRadius: 8,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-surface)',
+  color: 'var(--sh-heading)',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const submitBtnStyle = {
-  padding: '8px 16px', borderRadius: 8, border: 'none',
-  background: 'var(--sh-danger)', color: '#fff',
-  fontSize: 12, fontWeight: 700, fontFamily: 'inherit',
+  padding: '8px 16px',
+  borderRadius: 8,
+  border: 'none',
+  background: 'var(--sh-danger)',
+  color: '#fff',
+  fontSize: 12,
+  fontWeight: 700,
+  fontFamily: 'inherit',
 }

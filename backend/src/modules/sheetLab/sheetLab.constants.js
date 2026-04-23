@@ -17,7 +17,10 @@ function parsePositiveInt(value, fallback) {
 }
 
 function computeChecksum(content) {
-  return crypto.createHash('sha256').update(content || '', 'utf8').digest('hex')
+  return crypto
+    .createHash('sha256')
+    .update(content || '', 'utf8')
+    .digest('hex')
 }
 
 module.exports = {

@@ -44,35 +44,43 @@ export default function useSheetsData() {
     }
   }, [sheetsState.loading, sheetsState.sheets.length])
 
-  const setQueryParam = useCallback((key, value) => {
-    const next = new URLSearchParams(searchParams)
-    if (value) next.set(key, value)
-    else next.delete(key)
-    setSearchParams(next, { replace: true })
-  }, [searchParams, setSearchParams])
+  const setQueryParam = useCallback(
+    (key, value) => {
+      const next = new URLSearchParams(searchParams)
+      if (value) next.set(key, value)
+      else next.delete(key)
+      setSearchParams(next, { replace: true })
+    },
+    [searchParams, setSearchParams],
+  )
 
-  const handleSchoolChange = useCallback((value) => {
-    const next = new URLSearchParams(searchParams)
-    if (value) next.set('schoolId', value)
-    else next.delete('schoolId')
+  const handleSchoolChange = useCallback(
+    (value) => {
+      const next = new URLSearchParams(searchParams)
+      if (value) next.set('schoolId', value)
+      else next.delete('schoolId')
 
-    if (!value) {
-      next.delete('courseId')
-    } else {
-      const selectedSchool = catalog.find((school) => String(school.id) === String(value))
-      const currentCourseId = next.get('courseId')
-      const hasCourse = (selectedSchool?.courses || []).some((course) => String(course.id) === String(currentCourseId))
-      if (currentCourseId && !hasCourse) {
+      if (!value) {
         next.delete('courseId')
+      } else {
+        const selectedSchool = catalog.find((school) => String(school.id) === String(value))
+        const currentCourseId = next.get('courseId')
+        const hasCourse = (selectedSchool?.courses || []).some(
+          (course) => String(course.id) === String(currentCourseId),
+        )
+        if (currentCourseId && !hasCourse) {
+          next.delete('courseId')
+        }
       }
-    }
 
-    setSearchParams(next, { replace: true })
-  }, [catalog, searchParams, setSearchParams])
+      setSearchParams(next, { replace: true })
+    },
+    [catalog, searchParams, setSearchParams],
+  )
 
   const allCourses = useMemo(
-    () => catalog.flatMap((school) =>
-      (school.courses || []).map((course) => ({ ...course, school }))),
+    () =>
+      catalog.flatMap((school) => (school.courses || []).map((course) => ({ ...course, school }))),
     [catalog],
   )
 
@@ -115,7 +123,9 @@ export default function useSheetsData() {
     if (!courseId || !selectedCourse) return
     try {
       setRecentCourses((current) => recordRecentCourse(current, selectedCourse))
-    } catch { /* localStorage unavailable */ }
+    } catch {
+      /* localStorage unavailable */
+    }
   }, [courseId, selectedCourse])
 
   const subtitle = useMemo(() => {
@@ -130,7 +140,14 @@ export default function useSheetsData() {
   }, [activeSchool, selectedCourse])
 
   const hasActiveFilters = Boolean(
-    search || schoolId || courseId || mine || starred || statusFilter || formatValue !== 'all' || sortValue !== 'recommended',
+    search ||
+    schoolId ||
+    courseId ||
+    mine ||
+    starred ||
+    statusFilter ||
+    formatValue !== 'all' ||
+    sortValue !== 'recommended',
   )
 
   useEffect(() => {
@@ -184,66 +201,69 @@ export default function useSheetsData() {
     }
   }, [])
 
-  const loadSheets = useCallback(async ({ signal, startTransition } = {}) => {
-    const apply = startTransition || ((fn) => fn())
-    const params = new URLSearchParams({ limit: '24', sort: sortValue })
+  const loadSheets = useCallback(
+    async ({ signal, startTransition } = {}) => {
+      const apply = startTransition || ((fn) => fn())
+      const params = new URLSearchParams({ limit: '24', sort: sortValue })
 
-    if (search) params.set('search', search)
-    if (schoolId) params.set('schoolId', schoolId)
-    if (courseId) params.set('courseId', courseId)
-    if (mine) params.set('mine', '1')
-    if (mine && statusFilter) params.set('status', statusFilter)
-    if (starred) params.set('starred', '1')
-    if (formatValue !== 'all') params.set('format', formatValue)
+      if (search) params.set('search', search)
+      if (schoolId) params.set('schoolId', schoolId)
+      if (courseId) params.set('courseId', courseId)
+      if (mine) params.set('mine', '1')
+      if (mine && statusFilter) params.set('status', statusFilter)
+      if (starred) params.set('starred', '1')
+      if (formatValue !== 'all') params.set('format', formatValue)
 
-    try {
-      const response = await fetch(`${API}/api/sheets?${params.toString()}`, {
-        headers: authHeaders(),
-        credentials: 'include',
-        signal,
-      })
+      try {
+        const response = await fetch(`${API}/api/sheets?${params.toString()}`, {
+          headers: authHeaders(),
+          credentials: 'include',
+          signal,
+        })
 
-      const data = await readJsonSafely(response, {})
+        const data = await readJsonSafely(response, {})
 
-      if (isAuthSessionFailure(response, data)) {
-        clearSession()
-        return
-      }
+        if (isAuthSessionFailure(response, data)) {
+          clearSession()
+          return
+        }
 
-      if (response.status === 403) {
+        if (response.status === 403) {
+          apply(() => {
+            setSheetsState((current) => ({
+              ...current,
+              loading: false,
+              error: getApiErrorMessage(data, 'Access to study sheets is temporarily restricted.'),
+            }))
+          })
+          return
+        }
+
+        if (!response.ok) {
+          throw new Error(getApiErrorMessage(data, 'Could not load sheets.'))
+        }
+
+        apply(() => {
+          setSheetsState({
+            sheets: Array.isArray(data.sheets) ? data.sheets : [],
+            total: data.total || 0,
+            loading: false,
+            error: '',
+          })
+        })
+      } catch (error) {
+        if (error?.name === 'AbortError') return
         apply(() => {
           setSheetsState((current) => ({
             ...current,
             loading: false,
-            error: getApiErrorMessage(data, 'Access to study sheets is temporarily restricted.'),
+            error: error.message || 'Could not load sheets.',
           }))
         })
-        return
       }
-
-      if (!response.ok) {
-        throw new Error(getApiErrorMessage(data, 'Could not load sheets.'))
-      }
-
-      apply(() => {
-        setSheetsState({
-          sheets: Array.isArray(data.sheets) ? data.sheets : [],
-          total: data.total || 0,
-          loading: false,
-          error: '',
-        })
-      })
-    } catch (error) {
-      if (error?.name === 'AbortError') return
-      apply(() => {
-        setSheetsState((current) => ({
-          ...current,
-          loading: false,
-          error: error.message || 'Could not load sheets.',
-        }))
-      })
-    }
-  }, [clearSession, courseId, formatValue, mine, schoolId, search, sortValue, starred, statusFilter])
+    },
+    [clearSession, courseId, formatValue, mine, schoolId, search, sortValue, starred, statusFilter],
+  )
 
   const loadMoreSheets = useCallback(async () => {
     setLoadingMore(true)
@@ -282,7 +302,17 @@ export default function useSheetsData() {
     } finally {
       setLoadingMore(false)
     }
-  }, [courseId, formatValue, mine, schoolId, search, sheetsState.sheets.length, sortValue, starred, statusFilter])
+  }, [
+    courseId,
+    formatValue,
+    mine,
+    schoolId,
+    search,
+    sheetsState.sheets.length,
+    sortValue,
+    starred,
+    statusFilter,
+  ])
 
   const loadPopularCourses = useCallback(async ({ signal } = {}) => {
     try {
@@ -316,14 +346,17 @@ export default function useSheetsData() {
     refreshKey: `${search}|${schoolId}|${courseId}|${mine}|${starred}|${sortValue}|${formatValue}|${statusFilter}`,
   })
 
-  const handleCourseFilter = useCallback((courseIdValue, schoolIdValue) => {
-    const next = new URLSearchParams(searchParams)
-    if (courseIdValue) next.set('courseId', String(courseIdValue))
-    else next.delete('courseId')
-    if (schoolIdValue) next.set('schoolId', String(schoolIdValue))
-    else next.delete('schoolId')
-    setSearchParams(next, { replace: true })
-  }, [searchParams, setSearchParams])
+  const handleCourseFilter = useCallback(
+    (courseIdValue, schoolIdValue) => {
+      const next = new URLSearchParams(searchParams)
+      if (courseIdValue) next.set('courseId', String(courseIdValue))
+      else next.delete('courseId')
+      if (schoolIdValue) next.set('schoolId', String(schoolIdValue))
+      else next.delete('schoolId')
+      setSearchParams(next, { replace: true })
+    },
+    [searchParams, setSearchParams],
+  )
 
   const toggleMine = useCallback(() => {
     const next = new URLSearchParams(searchParams)
@@ -353,11 +386,9 @@ export default function useSheetsData() {
       }
       setSheetsState((current) => ({
         ...current,
-        sheets: current.sheets.map((entry) => (
-          entry.id === sheet.id
-            ? { ...entry, starred: data.starred, stars: data.stars }
-            : entry
-        )),
+        sheets: current.sheets.map((entry) =>
+          entry.id === sheet.id ? { ...entry, starred: data.starred, stars: data.stars } : entry,
+        ),
       }))
     } catch (error) {
       showToast(error.message || 'Could not update the star.', 'error')

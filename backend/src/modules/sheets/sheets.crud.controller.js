@@ -28,14 +28,17 @@ router.delete('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: sheet.userId,
-      message: 'Not your sheet.',
-      targetType: 'sheet',
-      targetId: sheetId,
-    })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: sheet.userId,
+        message: 'Not your sheet.',
+        targetType: 'sheet',
+        targetId: sheetId,
+      })
+    )
+      return
 
     await prisma.studySheet.delete({ where: { id: sheetId } })
     await cleanupAttachmentIfUnused(prisma, sheet.attachmentUrl, {

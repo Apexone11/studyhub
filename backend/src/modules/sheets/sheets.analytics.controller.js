@@ -61,14 +61,17 @@ router.get('/:id/analytics', requireAuth, analyticsLimiter, async (req, res) => 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
 
     // Authorization: owner or admin only
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: sheet.userId,
-      message: 'Analytics are only available to the sheet owner.',
-      targetType: 'sheet',
-      targetId: sheetId,
-    })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: sheet.userId,
+        message: 'Analytics are only available to the sheet owner.',
+        targetType: 'sheet',
+        targetId: sheetId,
+      })
+    )
+      return
 
     // Parallel data fetches for performance
     const [

@@ -31,10 +31,14 @@ async function getCroppedBlob(imageSrc, pixelCrop) {
   const ctx = canvas.getContext('2d')
   ctx.drawImage(
     image,
-    pixelCrop.x, pixelCrop.y,
-    pixelCrop.width, pixelCrop.height,
-    0, 0,
-    pixelCrop.width, pixelCrop.height,
+    pixelCrop.x,
+    pixelCrop.y,
+    pixelCrop.width,
+    pixelCrop.height,
+    0,
+    0,
+    pixelCrop.width,
+    pixelCrop.height,
   )
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92))
 }
@@ -106,11 +110,28 @@ export default function CoverCropModal({ onClose, onUploaded }) {
   return (
     <div style={overlayStyle}>
       <div style={modalStyle}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
-          <h2 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)', fontFamily: FONT }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            marginBottom: 16,
+          }}
+        >
+          <h2
+            style={{
+              margin: 0,
+              fontSize: 18,
+              fontWeight: 800,
+              color: 'var(--sh-heading)',
+              fontFamily: FONT,
+            }}
+          >
             Upload Cover Image
           </h2>
-          <button type="button" onClick={onClose} style={closeBtnStyle}>Cancel</button>
+          <button type="button" onClick={onClose} style={closeBtnStyle}>
+            Cancel
+          </button>
         </div>
 
         {!imageSrc ? (
@@ -118,12 +139,24 @@ export default function CoverCropModal({ onClose, onUploaded }) {
             <div style={{ fontSize: 32, marginBottom: 8 }}>
               <i className="fa-solid fa-panorama" style={{ color: 'var(--sh-muted)' }} />
             </div>
-            <p style={{ margin: '0 0 12px', fontSize: 13, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
+            <p
+              style={{
+                margin: '0 0 12px',
+                fontSize: 13,
+                color: 'var(--sh-muted)',
+                lineHeight: 1.6,
+              }}
+            >
               Choose a wide photo for your profile banner
             </p>
             <label style={selectBtnStyle}>
               Select image
-              <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect} style={{ display: 'none' }} />
+              <input
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                onChange={handleFileSelect}
+                style={{ display: 'none' }}
+              />
             </label>
             <p style={{ margin: '8px 0 0', fontSize: 11, color: 'var(--sh-muted)' }}>
               JPG, PNG, or WebP. Max 8 MB. Cropped to 16:5.
@@ -131,7 +164,16 @@ export default function CoverCropModal({ onClose, onUploaded }) {
           </div>
         ) : (
           <>
-            <div style={{ position: 'relative', width: '100%', height: 220, borderRadius: 12, overflow: 'hidden', background: 'var(--sh-soft)' }}>
+            <div
+              style={{
+                position: 'relative',
+                width: '100%',
+                height: 220,
+                borderRadius: 12,
+                overflow: 'hidden',
+                background: 'var(--sh-soft)',
+              }}
+            >
               <Cropper
                 image={imageSrc}
                 crop={crop}
@@ -159,19 +201,37 @@ export default function CoverCropModal({ onClose, onUploaded }) {
             </div>
 
             <div style={{ display: 'flex', gap: 10, marginTop: 16, justifyContent: 'flex-end' }}>
-              <label style={{ ...selectBtnStyle, background: 'var(--sh-soft)', color: 'var(--sh-text)', border: '1px solid var(--sh-border)' }}>
+              <label
+                style={{
+                  ...selectBtnStyle,
+                  background: 'var(--sh-soft)',
+                  color: 'var(--sh-text)',
+                  border: '1px solid var(--sh-border)',
+                }}
+              >
                 Change image
-                <input type="file" accept="image/jpeg,image/png,image/webp" onChange={handleFileSelect} style={{ display: 'none' }} />
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={handleFileSelect}
+                  style={{ display: 'none' }}
+                />
               </label>
               <button
                 type="button"
                 disabled={uploading}
                 onClick={handleUpload}
                 style={{
-                  padding: '10px 22px', borderRadius: 10, border: 'none',
-                  background: 'var(--sh-brand)', color: '#fff',
-                  fontSize: 13, fontWeight: 700, cursor: uploading ? 'not-allowed' : 'pointer',
-                  opacity: uploading ? 0.6 : 1, fontFamily: FONT,
+                  padding: '10px 22px',
+                  borderRadius: 10,
+                  border: 'none',
+                  background: 'var(--sh-brand)',
+                  color: '#fff',
+                  fontSize: 13,
+                  fontWeight: 700,
+                  cursor: uploading ? 'not-allowed' : 'pointer',
+                  opacity: uploading ? 0.6 : 1,
+                  fontFamily: FONT,
                 }}
               >
                 {uploading ? 'Uploading\u2026' : 'Save'}
@@ -181,7 +241,17 @@ export default function CoverCropModal({ onClose, onUploaded }) {
         )}
 
         {error && (
-          <div style={{ marginTop: 12, padding: '8px 12px', borderRadius: 8, background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)', color: 'var(--sh-danger)', fontSize: 12 }}>
+          <div
+            style={{
+              marginTop: 12,
+              padding: '8px 12px',
+              borderRadius: 8,
+              background: 'var(--sh-danger-bg)',
+              border: '1px solid var(--sh-danger-border)',
+              color: 'var(--sh-danger)',
+              fontSize: 12,
+            }}
+          >
             {error}
           </div>
         )}
@@ -191,9 +261,14 @@ export default function CoverCropModal({ onClose, onUploaded }) {
 }
 
 const overlayStyle = {
-  position: 'fixed', inset: 0, zIndex: 1200,
-  background: 'rgba(15, 23, 42, 0.6)', backdropFilter: 'blur(4px)',
-  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  position: 'fixed',
+  inset: 0,
+  zIndex: 1200,
+  background: 'rgba(15, 23, 42, 0.6)',
+  backdropFilter: 'blur(4px)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
   padding: 20,
 }
 
@@ -208,9 +283,14 @@ const modalStyle = {
 }
 
 const closeBtnStyle = {
-  padding: '6px 14px', borderRadius: 8,
-  border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
-  color: 'var(--sh-muted)', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+  padding: '6px 14px',
+  borderRadius: 8,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)',
+  color: 'var(--sh-muted)',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
   fontFamily: FONT,
 }
 
@@ -224,8 +304,13 @@ const dropZoneStyle = {
 
 const selectBtnStyle = {
   display: 'inline-block',
-  padding: '9px 20px', borderRadius: 10, border: 'none',
-  background: 'var(--sh-brand)', color: '#fff',
-  fontSize: 13, fontWeight: 700, cursor: 'pointer',
+  padding: '9px 20px',
+  borderRadius: 10,
+  border: 'none',
+  background: 'var(--sh-brand)',
+  color: '#fff',
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: 'pointer',
   fontFamily: FONT,
 }

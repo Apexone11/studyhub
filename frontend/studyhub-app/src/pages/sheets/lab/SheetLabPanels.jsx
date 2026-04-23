@@ -16,10 +16,7 @@ export function WordSegments({ segments }) {
       {segments.map((seg, i) => {
         if (seg.type === 'equal') return <span key={i}>{seg.text}</span>
         return (
-          <span
-            key={i}
-            className={`sheet-lab__word-${seg.type}`}
-          >
+          <span key={i} className={`sheet-lab__word-${seg.type}`}>
             {seg.text}
           </span>
         )
@@ -78,10 +75,10 @@ function sideForLine(line) {
 
 function isSelected(selected, hunkIndex, lineOffset, side) {
   return (
-    selected
-    && selected.hunkIndex === hunkIndex
-    && selected.lineOffset === lineOffset
-    && selected.side === side
+    selected &&
+    selected.hunkIndex === hunkIndex &&
+    selected.lineOffset === lineOffset &&
+    selected.side === side
   )
 }
 
@@ -107,27 +104,41 @@ export function UnifiedDiffView({ diff, onSelectLine, selected }) {
                   key={li}
                   className={className}
                   onClick={handleClick}
-                  onKeyDown={selectable ? (event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault()
-                      onSelectLine({ hunkIndex: hi, lineOffset: li, side })
-                    }
-                  } : undefined}
+                  onKeyDown={
+                    selectable
+                      ? (event) => {
+                          if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault()
+                            onSelectLine({ hunkIndex: hi, lineOffset: li, side })
+                          }
+                        }
+                      : undefined
+                  }
                   role={selectable ? 'button' : undefined}
                   tabIndex={selectable ? 0 : undefined}
                   style={selectable ? { cursor: 'pointer' } : undefined}
                 >
-                  <span className="sheet-lab__diff-linenum sheet-lab__diff-linenum--old" aria-hidden="true">
+                  <span
+                    className="sheet-lab__diff-linenum sheet-lab__diff-linenum--old"
+                    aria-hidden="true"
+                  >
                     {lineNums[li].oldNum ?? ''}
                   </span>
-                  <span className="sheet-lab__diff-linenum sheet-lab__diff-linenum--new" aria-hidden="true">
+                  <span
+                    className="sheet-lab__diff-linenum sheet-lab__diff-linenum--new"
+                    aria-hidden="true"
+                  >
                     {lineNums[li].newNum ?? ''}
                   </span>
                   <span className="sheet-lab__diff-gutter">
                     {line.type === 'add' ? '+' : line.type === 'remove' ? '-' : ' '}
                   </span>
                   <span className="sheet-lab__diff-content">
-                    {line.segments ? <WordSegments segments={line.segments} /> : (line.content || '\u00A0')}
+                    {line.segments ? (
+                      <WordSegments segments={line.segments} />
+                    ) : (
+                      line.content || '\u00A0'
+                    )}
                   </span>
                 </div>
               )
@@ -136,7 +147,14 @@ export function UnifiedDiffView({ diff, onSelectLine, selected }) {
         )
       })}
       {diff.hunks?.length === 0 ? (
-        <div style={{ padding: 16, textAlign: 'center', color: 'var(--sh-muted, #94a3b8)', fontSize: 13 }}>
+        <div
+          style={{
+            padding: 16,
+            textAlign: 'center',
+            color: 'var(--sh-muted, #94a3b8)',
+            fontSize: 13,
+          }}
+        >
           No differences found.
         </div>
       ) : null}
@@ -150,15 +168,24 @@ export function SplitDiffView({ diff }) {
   if (!diff) return null
 
   const rows = []
-  for (const hunk of (diff.hunks || [])) {
-    rows.push({ type: 'header', text: `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@` })
+  for (const hunk of diff.hunks || []) {
+    rows.push({
+      type: 'header',
+      text: `@@ -${hunk.oldStart},${hunk.oldLines} +${hunk.newStart},${hunk.newLines} @@`,
+    })
 
     const lineNums = computeLineNumbers(hunk)
     const lines = hunk.lines
     let i = 0
     while (i < lines.length) {
       if (lines[i].type === 'equal') {
-        rows.push({ type: 'equal', left: lines[i], right: lines[i], leftNum: lineNums[i].oldNum, rightNum: lineNums[i].newNum })
+        rows.push({
+          type: 'equal',
+          left: lines[i],
+          right: lines[i],
+          leftNum: lineNums[i].oldNum,
+          rightNum: lineNums[i].newNum,
+        })
         i++
       } else {
         const removes = []
@@ -191,7 +218,14 @@ export function SplitDiffView({ diff }) {
 
   if (rows.length === 0) {
     return (
-      <div style={{ padding: 16, textAlign: 'center', color: 'var(--sh-muted, #94a3b8)', fontSize: 13 }}>
+      <div
+        style={{
+          padding: 16,
+          textAlign: 'center',
+          color: 'var(--sh-muted, #94a3b8)',
+          fontSize: 13,
+        }}
+      >
         No differences found.
       </div>
     )
@@ -217,18 +251,34 @@ export function SplitDiffView({ diff }) {
             <span className="sheet-lab__split-linenum" aria-hidden="true">
               {row.leftNum ?? ''}
             </span>
-            <div className={`sheet-lab__split-cell ${row.left?.type === 'remove' ? 'sheet-lab__split-cell--remove' : row.left?.type === 'equal' ? '' : 'sheet-lab__split-cell--empty'}`}>
+            <div
+              className={`sheet-lab__split-cell ${row.left?.type === 'remove' ? 'sheet-lab__split-cell--remove' : row.left?.type === 'equal' ? '' : 'sheet-lab__split-cell--empty'}`}
+            >
               {row.left ? (
-                row.left.segments ? <WordSegments segments={row.left.segments} /> : (row.left.content || '\u00A0')
-              ) : ''}
+                row.left.segments ? (
+                  <WordSegments segments={row.left.segments} />
+                ) : (
+                  row.left.content || '\u00A0'
+                )
+              ) : (
+                ''
+              )}
             </div>
             <span className="sheet-lab__split-linenum" aria-hidden="true">
               {row.rightNum ?? ''}
             </span>
-            <div className={`sheet-lab__split-cell ${row.right?.type === 'add' ? 'sheet-lab__split-cell--add' : row.right?.type === 'equal' ? '' : 'sheet-lab__split-cell--empty'}`}>
+            <div
+              className={`sheet-lab__split-cell ${row.right?.type === 'add' ? 'sheet-lab__split-cell--add' : row.right?.type === 'equal' ? '' : 'sheet-lab__split-cell--empty'}`}
+            >
               {row.right ? (
-                row.right.segments ? <WordSegments segments={row.right.segments} /> : (row.right.content || '\u00A0')
-              ) : ''}
+                row.right.segments ? (
+                  <WordSegments segments={row.right.segments} />
+                ) : (
+                  row.right.content || '\u00A0'
+                )
+              ) : (
+                ''
+              )}
             </div>
           </div>
         )
@@ -269,9 +319,11 @@ export function DiffViewer({ diff, title, onSelectLine, selected }) {
           </div>
         </div>
       </div>
-      {mode === 'unified'
-        ? <UnifiedDiffView diff={diff} onSelectLine={onSelectLine} selected={selected} />
-        : <SplitDiffView diff={diff} />}
+      {mode === 'unified' ? (
+        <UnifiedDiffView diff={diff} onSelectLine={onSelectLine} selected={selected} />
+      ) : (
+        <SplitDiffView diff={diff} />
+      )}
     </div>
   )
 }

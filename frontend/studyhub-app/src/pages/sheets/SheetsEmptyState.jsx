@@ -5,7 +5,12 @@ import { Link } from 'react-router-dom'
 import { IconUpload } from '../../components/Icons'
 
 export default function SheetsEmptyState({
-  search, hasActiveFilters, mine, statusFilter, clearAllFilters, selectedCourse,
+  search,
+  hasActiveFilters,
+  mine,
+  statusFilter,
+  clearAllFilters,
+  selectedCourse,
 }) {
   if (search.trim()) {
     return (
@@ -28,7 +33,8 @@ export default function SheetsEmptyState({
       <section className="sh-card sheets-page__empty-state">
         <h2 className="sheets-page__empty-title">No sheets for {courseLabel} yet</h2>
         <p className="sheets-page__empty-copy">
-          Be the first to share notes for {courseLabel}{schoolLabel ? ` at ${schoolLabel}` : ''}. Upload your study materials to help classmates.
+          Be the first to share notes for {courseLabel}
+          {schoolLabel ? ` at ${schoolLabel}` : ''}. Upload your study materials to help classmates.
         </p>
         <div className="sheets-page__empty-actions">
           <Link to="/sheets/upload" className="sh-btn sh-btn--primary">
@@ -62,7 +68,8 @@ export default function SheetsEmptyState({
       <section className="sh-card sheets-page__empty-state">
         <h2 className="sheets-page__empty-title">No drafts</h2>
         <p className="sheets-page__empty-copy">
-          You don&rsquo;t have any drafts right now. Start writing a new sheet and save it as a draft.
+          You don&rsquo;t have any drafts right now. Start writing a new sheet and save it as a
+          draft.
         </p>
         <div className="sheets-page__empty-actions">
           <Link to="/sheets/upload?new=1" className="sh-btn sh-btn--primary">
@@ -79,7 +86,8 @@ export default function SheetsEmptyState({
       <section className="sh-card sheets-page__empty-state">
         <h2 className="sheets-page__empty-title">Nothing pending</h2>
         <p className="sheets-page__empty-copy">
-          None of your sheets are waiting for review. Published sheets are live and visible to classmates.
+          None of your sheets are waiting for review. Published sheets are live and visible to
+          classmates.
         </p>
       </section>
     )
@@ -117,7 +125,8 @@ export default function SheetsEmptyState({
     <section className="sh-card sheets-page__empty-state">
       <h2 className="sheets-page__empty-title">Be the first to share for this space</h2>
       <p className="sheets-page__empty-copy">
-        No published sheets yet. Upload your notes or start with a template to kick off the course repo.
+        No published sheets yet. Upload your notes or start with a template to kick off the course
+        repo.
       </p>
       <div className="sheets-page__empty-actions">
         <Link to="/sheets/upload" className="sh-btn sh-btn--primary">

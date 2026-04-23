@@ -26,16 +26,24 @@ export default function TopContributorsPanel({ sheetId }) {
         if (cancelled) return
         setState({
           loading: false,
-          contributors: Array.isArray(data.contributors) ? data.contributors.slice(0, MAX_DISPLAYED) : [],
+          contributors: Array.isArray(data.contributors)
+            ? data.contributors.slice(0, MAX_DISPLAYED)
+            : [],
           error: '',
         })
       })
       .catch((err) => {
         if (cancelled) return
-        setState({ loading: false, contributors: [], error: err.message || 'Could not load contributors.' })
+        setState({
+          loading: false,
+          contributors: [],
+          error: err.message || 'Could not load contributors.',
+        })
       })
 
-    return () => { cancelled = true }
+    return () => {
+      cancelled = true
+    }
   }, [sheetId])
 
   // Hide the entire panel while loading or when empty — this is a nice-to-have
@@ -61,9 +69,7 @@ export default function TopContributorsPanel({ sheetId }) {
             }}
           >
             <UserAvatar username={user.username} avatarUrl={user.avatarUrl} size={28} />
-            <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>
-              {user.username}
-            </span>
+            <span style={{ flex: 1, fontSize: 13, fontWeight: 600 }}>{user.username}</span>
             <span
               title={`${commits} commit${commits === 1 ? '' : 's'}`}
               style={{

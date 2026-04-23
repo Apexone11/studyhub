@@ -15,11 +15,7 @@ const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const {
-  readLimiter,
-  groupReportLimiter,
-  groupAppealLimiter,
-} = require('../../lib/rateLimiters')
+const { readLimiter, groupReportLimiter, groupAppealLimiter } = require('../../lib/rateLimiters')
 const { parseId } = require('./studyGroups.helpers')
 const reportsService = require('./studyGroups.reports.service')
 

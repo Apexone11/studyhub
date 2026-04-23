@@ -55,7 +55,10 @@ async function clearExpiredChallenges(db = prisma) {
     where: {
       OR: [
         { expiresAt: { lt: new Date() } },
-        { NOT: [{ verifiedAt: null }], updatedAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) } },
+        {
+          NOT: [{ verifiedAt: null }],
+          updatedAt: { lt: new Date(Date.now() - 24 * 60 * 60 * 1000) },
+        },
       ],
     },
   })

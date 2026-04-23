@@ -100,7 +100,14 @@ function AnnouncementVideoPlayer({ video }) {
         onCanPlay={() => setBuffering(false)}
         onWaiting={() => setBuffering(true)}
         onPlaying={() => setBuffering(false)}
-        style={{ width: '100%', display: 'block', borderRadius: 'var(--radius)', maxHeight: 400, opacity: buffering ? 0 : 1, transition: 'opacity 0.2s' }}
+        style={{
+          width: '100%',
+          display: 'block',
+          borderRadius: 'var(--radius)',
+          maxHeight: 400,
+          opacity: buffering ? 0 : 1,
+          transition: 'opacity 0.2s',
+        }}
       />
     </div>
   )

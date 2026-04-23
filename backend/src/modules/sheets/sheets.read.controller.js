@@ -31,28 +31,48 @@ router.get('/:id', optionalAuth, async (req, res) => {
             },
           },
         },
-      })
+      }),
     )
     const sheet = mainSection.data
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null))
+      return res.status(404).json({ error: 'Sheet not found.' })
 
     const userId = req.user?.userId
     const enrichSections = await Promise.all([
       timedSection('likes', () => prisma.reaction.count({ where: { sheetId, type: 'like' } })),
-      timedSection('dislikes', () => prisma.reaction.count({ where: { sheetId, type: 'dislike' } })),
+      timedSection('dislikes', () =>
+        prisma.reaction.count({ where: { sheetId, type: 'dislike' } }),
+      ),
       timedSection('commentCount', () => prisma.comment.count({ where: { sheetId } })),
       timedSection('starred', () =>
-        userId ? prisma.starredSheet.findUnique({ where: { userId_sheetId: { userId, sheetId } }, select: { userId: true } }) : null
+        userId
+          ? prisma.starredSheet.findUnique({
+              where: { userId_sheetId: { userId, sheetId } },
+              select: { userId: true },
+            })
+          : null,
       ),
       timedSection('userReaction', () =>
-        userId ? prisma.reaction.findUnique({ where: { userId_sheetId: { userId, sheetId } }, select: { type: true } }) : null
+        userId
+          ? prisma.reaction.findUnique({
+              where: { userId_sheetId: { userId, sheetId } },
+              select: { type: true },
+            })
+          : null,
       ),
       timedSection('contributions', () => fetchContributionCollections(sheet, req.user || null)),
     ])
 
-    const [likeSection, dislikeSection, commentSection, starredSection, reactionSection, contribSection] = enrichSections
+    const [
+      likeSection,
+      dislikeSection,
+      commentSection,
+      starredSection,
+      reactionSection,
+      contribSection,
+    ] = enrichSections
     const allSections = [mainSection, ...enrichSections]
 
     const isOwner = req.user && (req.user.userId === sheet.userId || req.user.role === 'admin')
@@ -90,13 +110,17 @@ router.get('/:id/readme', sheetReadmeLimiter, optionalAuth, async (req, res) => 
     const sheet = await prisma.studySheet.findUnique({
       where: { id: sheetId },
       select: {
-        id: true, userId: true, status: true, courseId: true,
+        id: true,
+        userId: true,
+        status: true,
+        courseId: true,
         author: { select: AUTHOR_SELECT },
       },
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null))
+      return res.status(404).json({ error: 'Sheet not found.' })
 
     /* Fetch contributors (unique users from accepted contributions) and latest commit in parallel */
     const [acceptedContributions, latestCommit, forkCount] = await Promise.all([

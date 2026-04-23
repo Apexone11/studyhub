@@ -66,10 +66,7 @@ async function areMutualFollowers(userIdA, userIdB) {
     }),
   ])
 
-  return (
-    aFollowsB && aFollowsB.status === 'active' &&
-    bFollowsA && bFollowsA.status === 'active'
-  )
+  return aFollowsB && aFollowsB.status === 'active' && bFollowsA && bFollowsA.status === 'active'
 }
 
 /**

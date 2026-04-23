@@ -15,13 +15,19 @@ function DataRequestPage() {
     >
       <LegalSection title="Submit a Data Request">
         <p>
-          Under privacy laws including CCPA and GDPR, you have the right to request access
-          to your personal data, ask for corrections, or request deletion. Use the form below
-          to submit your request. We will respond within 24 hours.
+          Under privacy laws including CCPA and GDPR, you have the right to request access to your
+          personal data, ask for corrections, or request deletion. Use the form below to submit your
+          request. We will respond within 24 hours.
         </p>
         <p>
           You can also email us directly at{' '}
-          <a href={`mailto:${LEGAL_EMAILS.privacy}`} style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}>{LEGAL_EMAILS.privacy}</a>.
+          <a
+            href={`mailto:${LEGAL_EMAILS.privacy}`}
+            style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}
+          >
+            {LEGAL_EMAILS.privacy}
+          </a>
+          .
         </p>
         <iframe
           src={TERMLY_DSAR_URL}

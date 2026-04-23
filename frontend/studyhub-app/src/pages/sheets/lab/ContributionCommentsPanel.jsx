@@ -25,7 +25,8 @@ export default function ContributionCommentsPanel({
   selected,
   onClearSelected,
 }) {
-  const { comments, loading, error, addComment, removeComment } = useContributionComments(contributionId)
+  const { comments, loading, error, addComment, removeComment } =
+    useContributionComments(contributionId)
   const [body, setBody] = useState('')
   const [posting, setPosting] = useState(false)
 

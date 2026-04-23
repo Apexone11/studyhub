@@ -107,9 +107,11 @@ function previewKindForMime(mimeType = '') {
 function safeInlineName(name, fallback = 'attachment') {
   const sourceName = String(name || fallback)
   const ext = extensionOf(sourceName)
-  const base = path.basename(sourceName, ext)
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .slice(0, 96) || fallback
+  const base =
+    path
+      .basename(sourceName, ext)
+      .replace(/[^a-zA-Z0-9._-]/g, '_')
+      .slice(0, 96) || fallback
   return `${base}${ext}`.toLowerCase()
 }
 
@@ -148,7 +150,7 @@ async function sendAttachmentPreview({ res, localPath, attachmentName, attachmen
   res.setHeader('X-StudyHub-Preview-Kind', previewKind)
   res.setHeader(
     'Content-Disposition',
-    `inline; filename="${safeInlineName(attachmentName || path.basename(localPath))}"`
+    `inline; filename="${safeInlineName(attachmentName || path.basename(localPath))}"`,
   )
 
   if (previewKind === 'image') {

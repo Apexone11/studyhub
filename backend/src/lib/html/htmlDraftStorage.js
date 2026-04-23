@@ -16,16 +16,23 @@ const HTML_VERSION_KIND = {
 }
 
 function computeHtmlChecksum(content) {
-  return crypto.createHash('sha256').update(String(content || ''), 'utf8').digest('hex')
+  return crypto
+    .createHash('sha256')
+    .update(String(content || ''), 'utf8')
+    .digest('hex')
 }
 
 function normalizeTitle(value, fallback = 'Untitled draft') {
-  const title = String(value || '').trim().slice(0, 160)
+  const title = String(value || '')
+    .trim()
+    .slice(0, 160)
   return title || fallback
 }
 
 function normalizeDescription(value) {
-  return String(value || '').trim().slice(0, 300)
+  return String(value || '')
+    .trim()
+    .slice(0, 300)
 }
 
 function findVersionByKind(sheet, kind) {
@@ -82,7 +89,10 @@ async function ensureSheetOwnership(prisma, sheetId, user) {
   return sheet
 }
 
-async function upsertDraftSheet(prisma, { sheetId, user, title, courseId, description, allowDownloads, content }) {
+async function upsertDraftSheet(
+  prisma,
+  { sheetId, user, title, courseId, description, allowDownloads, content },
+) {
   if (!Number.isInteger(courseId) || courseId <= 0) {
     const error = new Error('Course is required.')
     error.statusCode = 400

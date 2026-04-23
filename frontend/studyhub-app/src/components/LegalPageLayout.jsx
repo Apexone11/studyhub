@@ -34,7 +34,10 @@ export default function LegalPageLayout({
   const resolvedAsideNote = asideNote || (
     <>
       Questions or concerns can always be sent to{' '}
-      <a href={SUPPORT_MAILTO} style={{ color: 'var(--sh-link, #2563eb)', textDecoration: 'none', fontWeight: 600 }}>
+      <a
+        href={SUPPORT_MAILTO}
+        style={{ color: 'var(--sh-link, #2563eb)', textDecoration: 'none', fontWeight: 600 }}
+      >
         {SUPPORT_EMAIL}
       </a>
       .
@@ -48,7 +51,10 @@ export default function LegalPageLayout({
       <main className="legal-shell">
         <section className={`legal-hero legal-hero--${tone}`}>
           <div className="legal-hero-head">
-            <div className={`legal-hero-icon-shell legal-hero-icon-shell--${tone}`} aria-hidden="true">
+            <div
+              className={`legal-hero-icon-shell legal-hero-icon-shell--${tone}`}
+              aria-hidden="true"
+            >
               {icon}
             </div>
             <div className="legal-hero-copy">
@@ -58,9 +64,7 @@ export default function LegalPageLayout({
             </div>
           </div>
 
-          <div className={`legal-intro legal-intro--${tone}`}>
-            {intro}
-          </div>
+          <div className={`legal-intro legal-intro--${tone}`}>{intro}</div>
         </section>
 
         <div className="legal-grid">
@@ -95,9 +99,26 @@ export default function LegalPageLayout({
       </main>
 
       <footer className="legal-footer">
-        <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'center', gap: '6px 14px', marginBottom: 8 }}>
+        <div
+          style={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'center',
+            gap: '6px 14px',
+            marginBottom: 8,
+          }}
+        >
           {RELATED_LINKS.map((link) => (
-            <Link key={link.to} to={link.to} style={{ color: 'var(--sh-muted)', fontSize: 12, textDecoration: 'none', fontWeight: 500 }}>
+            <Link
+              key={link.to}
+              to={link.to}
+              style={{
+                color: 'var(--sh-muted)',
+                fontSize: 12,
+                textDecoration: 'none',
+                fontWeight: 500,
+              }}
+            >
               {link.label}
             </Link>
           ))}
@@ -105,7 +126,12 @@ export default function LegalPageLayout({
             href="#"
             className="termly-display-preferences"
             onClick={(e) => e.preventDefault()}
-            style={{ color: 'var(--sh-muted)', fontSize: 12, textDecoration: 'none', fontWeight: 500 }}
+            style={{
+              color: 'var(--sh-muted)',
+              fontSize: 12,
+              textDecoration: 'none',
+              fontWeight: 500,
+            }}
           >
             Consent Preferences
           </a>

@@ -13,8 +13,14 @@ import ConfirmDialog from '../../../components/ConfirmDialog'
 import { pageShell } from '../../../lib/ui'
 import { FONT } from './uploadSheetConstants'
 import {
-  InfoFields, DescriptionField, HtmlImportSection,
-  AttachmentSection, DraftBanner, StatusBanner, ErrorBanner, EditorPanel,
+  InfoFields,
+  DescriptionField,
+  HtmlImportSection,
+  AttachmentSection,
+  DraftBanner,
+  StatusBanner,
+  ErrorBanner,
+  EditorPanel,
   UploadHelperCard,
 } from './UploadSheetFormFields'
 import { TutorialModal, HtmlReviewNoticeModal, HtmlScanModal } from '../lab/HtmlScanModal'
@@ -43,27 +49,49 @@ export default function UploadSheetPage() {
   if (hook.initializing) {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
-        <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: hook.isEditing ? 'Edit Sheet' : 'New Sheet', to: null }]} hideTabs hideSearch />
-        <div style={{ ...pageShell('editor', 20, 60), color: 'var(--sh-slate-500)', fontSize: 14 }}>Loading editor…</div>
+        <Navbar
+          crumbs={[
+            { label: 'Study Sheets', to: '/sheets' },
+            { label: hook.isEditing ? 'Edit Sheet' : 'New Sheet', to: null },
+          ]}
+          hideTabs
+          hideSearch
+        />
+        <div style={{ ...pageShell('editor', 20, 60), color: 'var(--sh-slate-500)', fontSize: 14 }}>
+          Loading editor…
+        </div>
       </div>
     )
   }
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
-      <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }, { label: hook.isEditing ? 'Edit Sheet' : 'New Sheet', to: null }]} hideTabs actions={navActions} hideSearch />
+      <Navbar
+        crumbs={[
+          { label: 'Study Sheets', to: '/sheets' },
+          { label: hook.isEditing ? 'Edit Sheet' : 'New Sheet', to: null },
+        ]}
+        hideTabs
+        actions={navActions}
+        hideSearch
+      />
       <div style={pageShell('editor', 20, 60)}>
         {hook.isEditing ? null : <UploadHelperCard />}
         <InfoFields
-          title={hook.title} setTitle={hook.setTitle}
-          courseId={hook.courseId} setCourseId={hook.setCourseId}
-          allowDownloads={hook.allowDownloads} setAllowDownloads={hook.setAllowDownloads}
-          courses={hook.courses} error={hook.error}
+          title={hook.title}
+          setTitle={hook.setTitle}
+          courseId={hook.courseId}
+          setCourseId={hook.setCourseId}
+          allowDownloads={hook.allowDownloads}
+          setAllowDownloads={hook.setAllowDownloads}
+          courses={hook.courses}
+          error={hook.error}
           setHasUnsavedChanges={hook.setHasUnsavedChanges}
         />
 
         <DescriptionField
-          description={hook.description} setDescription={hook.setDescription}
+          description={hook.description}
+          setDescription={hook.setDescription}
           setHasUnsavedChanges={hook.setHasUnsavedChanges}
         />
 
@@ -89,8 +117,10 @@ export default function UploadSheetPage() {
         />
 
         <DraftBanner
-          isEditing={hook.isEditing} draftId={hook.draftId}
-          status={hook.status} title={hook.title}
+          isEditing={hook.isEditing}
+          draftId={hook.draftId}
+          status={hook.status}
+          title={hook.title}
           discarding={hook.discarding}
           setShowDiscardDialog={hook.setShowDiscardDialog}
         />
@@ -99,8 +129,10 @@ export default function UploadSheetPage() {
         <ErrorBanner error={hook.error} verificationRequired={hook.verificationRequired} />
 
         <EditorPanel
-          content={hook.content} setContent={hook.setContent}
-          isHtmlMode={hook.isHtmlMode} canEditHtml={hook.canEditHtml}
+          content={hook.content}
+          setContent={hook.setContent}
+          isHtmlMode={hook.isHtmlMode}
+          canEditHtml={hook.canEditHtml}
           setHasUnsavedChanges={hook.setHasUnsavedChanges}
         />
       </div>
@@ -114,7 +146,10 @@ export default function UploadSheetPage() {
         setScanAckChecked={hook.setScanAckChecked}
         onClose={() => hook.setShowScanModal(false)}
         onAcknowledge={hook.acknowledgeScanAndDismiss}
-        onUnderstood={() => { hook.setScanModalDismissed(true); hook.setShowScanModal(false) }}
+        onUnderstood={() => {
+          hook.setScanModalDismissed(true)
+          hook.setShowScanModal(false)
+        }}
       />
 
       <HtmlReviewNoticeModal

@@ -16,7 +16,13 @@ const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const { readLimiter, writeLimiter, createAiMessageLimiter } = require('../../lib/rateLimiters')
 const aiService = require('./ai.service')
-const { MAX_MESSAGE_LENGTH, MAX_IMAGES_PER_MESSAGE, MAX_IMAGE_SIZE, ALLOWED_IMAGE_TYPES, AI_RATE_LIMIT_RPM } = require('./ai.constants')
+const {
+  MAX_MESSAGE_LENGTH,
+  MAX_IMAGES_PER_MESSAGE,
+  MAX_IMAGE_SIZE,
+  ALLOWED_IMAGE_TYPES,
+  AI_RATE_LIMIT_RPM,
+} = require('./ai.constants')
 
 const router = express.Router()
 
@@ -93,7 +99,11 @@ router.patch('/conversations/:id', requireAuth, writeLimiter, async (req, res) =
       return res.status(400).json({ error: 'Title is required.' })
     }
 
-    const updated = await aiService.renameConversation(id, req.user.userId, title.trim().slice(0, 200))
+    const updated = await aiService.renameConversation(
+      id,
+      req.user.userId,
+      title.trim().slice(0, 200),
+    )
     if (!updated) return res.status(404).json({ error: 'Conversation not found.' })
 
     res.json(updated)
@@ -118,13 +128,17 @@ router.post('/messages', requireAuth, aiMessageLimiter, async (req, res) => {
       return res.status(400).json({ error: 'Message content is required.' })
     }
     if (content.length > MAX_MESSAGE_LENGTH) {
-      return res.status(400).json({ error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` })
+      return res
+        .status(400)
+        .json({ error: `Message too long. Maximum ${MAX_MESSAGE_LENGTH} characters.` })
     }
 
     // Validate images if provided.
     if (images) {
       if (!Array.isArray(images) || images.length > MAX_IMAGES_PER_MESSAGE) {
-        return res.status(400).json({ error: `Maximum ${MAX_IMAGES_PER_MESSAGE} images per message.` })
+        return res
+          .status(400)
+          .json({ error: `Maximum ${MAX_IMAGES_PER_MESSAGE} images per message.` })
       }
       for (const img of images) {
         if (!img.base64 || !img.mediaType) {

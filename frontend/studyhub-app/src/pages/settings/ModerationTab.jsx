@@ -17,7 +17,12 @@ import { AppealsSection } from './components/ModerationAppealsSection'
 import { HistorySection } from './components/ModerationHistorySection'
 
 const SECTION_TABS = ['status', 'cases', 'appeals', 'history']
-const SECTION_LABELS = { status: 'My Status', cases: 'My Cases', appeals: 'My Appeals', history: 'My History' }
+const SECTION_LABELS = {
+  status: 'My Status',
+  cases: 'My Cases',
+  appeals: 'My Appeals',
+  history: 'My History',
+}
 
 export default function ModerationTab() {
   const [section, setSection] = useState('status')
@@ -45,7 +50,9 @@ export default function ModerationTab() {
     }
   }, [])
 
-  useEffect(() => { loadData() }, [loadData])
+  useEffect(() => {
+    loadData()
+  }, [loadData])
 
   async function handleSubmitAppeal(caseId, reasonCategory, reason) {
     try {
@@ -69,7 +76,9 @@ export default function ModerationTab() {
   if (loading) {
     return (
       <div style={{ padding: '20px 0' }}>
-        <div style={{ height: 80, background: 'var(--sh-soft)', borderRadius: 14, marginBottom: 12 }} />
+        <div
+          style={{ height: 80, background: 'var(--sh-soft)', borderRadius: 14, marginBottom: 12 }}
+        />
         <div style={{ height: 60, background: 'var(--sh-soft)', borderRadius: 14 }} />
       </div>
     )
@@ -77,19 +86,32 @@ export default function ModerationTab() {
 
   if (error) {
     return (
-      <div style={{
-        padding: '16px 20px', borderRadius: 12, fontSize: 13, fontWeight: 600,
-        background: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)',
-        border: '1px solid var(--sh-danger-border)',
-      }}>
+      <div
+        style={{
+          padding: '16px 20px',
+          borderRadius: 12,
+          fontSize: 13,
+          fontWeight: 600,
+          background: 'var(--sh-danger-bg)',
+          color: 'var(--sh-danger-text)',
+          border: '1px solid var(--sh-danger-border)',
+        }}
+      >
         {error}
         <button
           type="button"
           onClick={loadData}
           style={{
-            marginLeft: 12, padding: '4px 12px', borderRadius: 6, border: 'none',
-            background: 'var(--sh-danger)', color: '#fff', fontSize: 12,
-            fontWeight: 700, cursor: 'pointer', fontFamily: FONT,
+            marginLeft: 12,
+            padding: '4px 12px',
+            borderRadius: 6,
+            border: 'none',
+            background: 'var(--sh-danger)',
+            color: '#fff',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontFamily: FONT,
           }}
         >
           Retry
@@ -106,11 +128,18 @@ export default function ModerationTab() {
 
       {/* Success toast */}
       {successMsg && (
-        <div style={{
-          padding: '10px 14px', borderRadius: 10, fontSize: 13, fontWeight: 600, marginBottom: 14,
-          background: 'var(--sh-success-bg)', color: 'var(--sh-success-text)',
-          border: '1px solid var(--sh-success-border)',
-        }}>
+        <div
+          style={{
+            padding: '10px 14px',
+            borderRadius: 10,
+            fontSize: 13,
+            fontWeight: 600,
+            marginBottom: 14,
+            background: 'var(--sh-success-bg)',
+            color: 'var(--sh-success-text)',
+            border: '1px solid var(--sh-success-border)',
+          }}
+        >
           {successMsg}
         </div>
       )}
@@ -123,10 +152,15 @@ export default function ModerationTab() {
             type="button"
             onClick={() => setSection(s)}
             style={{
-              padding: '8px 16px', borderRadius: 8, border: 'none',
+              padding: '8px 16px',
+              borderRadius: 8,
+              border: 'none',
               background: section === s ? 'var(--sh-brand)' : 'var(--sh-soft)',
               color: section === s ? '#fff' : 'var(--sh-subtext)',
-              fontSize: 13, fontWeight: 700, cursor: 'pointer', fontFamily: FONT,
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: FONT,
             }}
           >
             {SECTION_LABELS[s]}

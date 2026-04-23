@@ -159,7 +159,13 @@ function CheckIcon({ size = 14 }) {
   return (
     <svg width={size} height={size} viewBox="0 0 16 16" fill="none" style={{ flexShrink: 0 }}>
       <circle cx="8" cy="8" r="7" fill="var(--sh-success)" />
-      <path d="M5 8l2 2 4-4" stroke="#fff" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M5 8l2 2 4-4"
+        stroke="#fff"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -184,7 +190,13 @@ function HostedLinkArrow() {
   return (
     <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
       <path d="M5 11L11 5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-      <path d="M6 5h5v5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path
+        d="M6 5h5v5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }
@@ -195,16 +207,13 @@ function FallbackDocumentPanel({ bodyText, linkUrl, showBackupBadge = false, not
       {(showBackupBadge || note) && (
         <div style={styles.fallbackHeader}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-            {showBackupBadge ? <span style={styles.fallbackBadge}>StudyHub Backup Copy</span> : null}
+            {showBackupBadge ? (
+              <span style={styles.fallbackBadge}>StudyHub Backup Copy</span>
+            ) : null}
             {note ? <p style={styles.fallbackNote}>{note}</p> : null}
           </div>
           {linkUrl ? (
-            <a
-              href={linkUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={styles.fallbackLink}
-            >
+            <a href={linkUrl} target="_blank" rel="noopener noreferrer" style={styles.fallbackLink}>
               Open hosted version
               <HostedLinkArrow />
             </a>
@@ -248,11 +257,15 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
     onLoad: markTermsViewed,
     onTimeout: markTermsViewed,
   })
-  const privacyEmbed = useTermlyEmbed(privacyContainerRef, privacyDocument.document?.termlyEmbedId, {
-    enabled: open && activeTab === 'privacy' && Boolean(privacyDocument.document?.termlyEmbedId),
-    onLoad: markPrivacyViewed,
-    onTimeout: markPrivacyViewed,
-  })
+  const privacyEmbed = useTermlyEmbed(
+    privacyContainerRef,
+    privacyDocument.document?.termlyEmbedId,
+    {
+      enabled: open && activeTab === 'privacy' && Boolean(privacyDocument.document?.termlyEmbedId),
+      onLoad: markPrivacyViewed,
+      onTimeout: markPrivacyViewed,
+    },
+  )
 
   useEffect(() => {
     if (!open) return
@@ -267,8 +280,8 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
     if (!open || activeTab !== 'terms') return
 
     const shouldMarkTermsViewed = Boolean(
-      termsDocument.document?.bodyText
-      && (!termsDocument.document?.termlyEmbedId || termsEmbed.timedOut),
+      termsDocument.document?.bodyText &&
+      (!termsDocument.document?.termlyEmbedId || termsEmbed.timedOut),
     )
 
     if (shouldMarkTermsViewed) {
@@ -279,14 +292,21 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
     }
 
     return undefined
-  }, [activeTab, markViewed, open, termsDocument.document?.bodyText, termsDocument.document?.termlyEmbedId, termsEmbed.timedOut])
+  }, [
+    activeTab,
+    markViewed,
+    open,
+    termsDocument.document?.bodyText,
+    termsDocument.document?.termlyEmbedId,
+    termsEmbed.timedOut,
+  ])
 
   useEffect(() => {
     if (!open || activeTab !== 'privacy') return
 
     const shouldMarkPrivacyViewed = Boolean(
-      privacyDocument.document?.bodyText
-      && (!privacyDocument.document?.termlyEmbedId || privacyEmbed.timedOut),
+      privacyDocument.document?.bodyText &&
+      (!privacyDocument.document?.termlyEmbedId || privacyEmbed.timedOut),
     )
 
     if (shouldMarkPrivacyViewed) {
@@ -297,7 +317,14 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
     }
 
     return undefined
-  }, [activeTab, markViewed, open, privacyDocument.document?.bodyText, privacyDocument.document?.termlyEmbedId, privacyEmbed.timedOut])
+  }, [
+    activeTab,
+    markViewed,
+    open,
+    privacyDocument.document?.bodyText,
+    privacyDocument.document?.termlyEmbedId,
+    privacyEmbed.timedOut,
+  ])
 
   const handleGuidelinesScroll = useCallback(
     (e) => {
@@ -322,21 +349,15 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
       }}
     >
       {/* Modal card */}
-      <div
-        style={styles.modal}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
         {/* Header */}
         <div style={styles.header}>
           <p style={styles.overline}>Required Before Signup</p>
-          <h2
-            style={styles.title}
-          >
-            Review Our Policies
-          </h2>
+          <h2 style={styles.title}>Review Our Policies</h2>
           <p style={styles.subtitle}>
-            Read each required document before creating your account. If the hosted Termly document is unavailable,
-            StudyHub will show the current backup copy stored with the same legal version.
+            Read each required document before creating your account. If the hosted Termly document
+            is unavailable, StudyHub will show the current backup copy stored with the same legal
+            version.
           </p>
 
           {/* Tab bar */}
@@ -365,7 +386,8 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                     fontWeight: isActive ? 700 : 500,
                     color: isActive ? 'var(--sh-brand)' : 'var(--sh-muted)',
                     boxShadow: isActive ? 'var(--shadow-sm)' : 'none',
-                    transition: 'color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s',
+                    transition:
+                      'color 0.15s, border-color 0.15s, background 0.15s, box-shadow 0.15s',
                   }}
                 >
                   {isViewed ? <CheckIcon size={14} /> : <DotIcon size={8} />}
@@ -382,9 +404,7 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
           {activeTab === 'terms' && (
             <div style={styles.scrollRegion}>
               {termsDocument.loading && !termsDocument.document && (
-                <div style={styles.loading}>
-                  Loading Terms of Use...
-                </div>
+                <div style={styles.loading}>Loading Terms of Use...</div>
               )}
               {termsDocument.document && !termsDocument.document.termlyEmbedId && (
                 <FallbackDocumentPanel
@@ -394,11 +414,10 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                   note="This version is served directly from StudyHub because no hosted Termly embed is configured for the current Terms of Use document."
                 />
               )}
-              {termsDocument.document?.termlyEmbedId && !termsEmbed.loaded && !termsEmbed.timedOut && !termsDocument.loading && (
-                <div style={styles.loading}>
-                  Loading Terms of Use...
-                </div>
-              )}
+              {termsDocument.document?.termlyEmbedId &&
+                !termsEmbed.loaded &&
+                !termsEmbed.timedOut &&
+                !termsDocument.loading && <div style={styles.loading}>Loading Terms of Use...</div>}
               {termsEmbed.timedOut && termsDocument.document?.bodyText && (
                 <FallbackDocumentPanel
                   bodyText={termsDocument.document.bodyText}
@@ -408,7 +427,14 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                 />
               )}
               {termsDocument.error && !termsDocument.document && (
-                <div style={{ padding: 20, color: 'var(--sh-warning-text)', fontSize: 13, lineHeight: 1.6 }}>
+                <div
+                  style={{
+                    padding: 20,
+                    color: 'var(--sh-warning-text)',
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                  }}
+                >
                   {termsDocument.error}
                 </div>
               )}
@@ -418,7 +444,10 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                   minHeight: 320,
                   opacity: termsEmbed.loaded ? 1 : 0,
                   transition: 'opacity 0.3s ease',
-                  display: termsEmbed.timedOut || !termsDocument.document?.termlyEmbedId ? 'none' : 'block',
+                  display:
+                    termsEmbed.timedOut || !termsDocument.document?.termlyEmbedId
+                      ? 'none'
+                      : 'block',
                 }}
               />
             </div>
@@ -428,9 +457,7 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
           {activeTab === 'privacy' && (
             <div style={styles.scrollRegion}>
               {privacyDocument.loading && !privacyDocument.document && (
-                <div style={styles.loading}>
-                  Loading Privacy Policy...
-                </div>
+                <div style={styles.loading}>Loading Privacy Policy...</div>
               )}
               {privacyDocument.document && !privacyDocument.document.termlyEmbedId && (
                 <FallbackDocumentPanel
@@ -440,11 +467,12 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                   note="This version is served directly from StudyHub because no hosted Termly embed is configured for the current Privacy Policy document."
                 />
               )}
-              {privacyDocument.document?.termlyEmbedId && !privacyEmbed.loaded && !privacyEmbed.timedOut && !privacyDocument.loading && (
-                <div style={styles.loading}>
-                  Loading Privacy Policy...
-                </div>
-              )}
+              {privacyDocument.document?.termlyEmbedId &&
+                !privacyEmbed.loaded &&
+                !privacyEmbed.timedOut &&
+                !privacyDocument.loading && (
+                  <div style={styles.loading}>Loading Privacy Policy...</div>
+                )}
               {privacyEmbed.timedOut && privacyDocument.document?.bodyText && (
                 <FallbackDocumentPanel
                   bodyText={privacyDocument.document.bodyText}
@@ -454,7 +482,14 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                 />
               )}
               {privacyDocument.error && !privacyDocument.document && (
-                <div style={{ padding: 20, color: 'var(--sh-warning-text)', fontSize: 13, lineHeight: 1.6 }}>
+                <div
+                  style={{
+                    padding: 20,
+                    color: 'var(--sh-warning-text)',
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                  }}
+                >
                   {privacyDocument.error}
                 </div>
               )}
@@ -464,7 +499,10 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                   minHeight: 320,
                   opacity: privacyEmbed.loaded ? 1 : 0,
                   transition: 'opacity 0.3s ease',
-                  display: privacyEmbed.timedOut || !privacyDocument.document?.termlyEmbedId ? 'none' : 'block',
+                  display:
+                    privacyEmbed.timedOut || !privacyDocument.document?.termlyEmbedId
+                      ? 'none'
+                      : 'block',
                 }}
               />
             </div>
@@ -472,13 +510,11 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
 
           {/* Guidelines scrollable content */}
           {activeTab === 'guidelines' && (
-            <div
-              ref={guidelinesRef}
-              onScroll={handleGuidelinesScroll}
-              style={styles.scrollRegion}
-            >
+            <div ref={guidelinesRef} onScroll={handleGuidelinesScroll} style={styles.scrollRegion}>
               {guidelinesDocument.loading && !guidelinesDocument.document ? (
-                <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading Community Guidelines...</div>
+                <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>
+                  Loading Community Guidelines...
+                </div>
               ) : guidelinesDocument.document?.bodyText ? (
                 <FallbackDocumentPanel
                   bodyText={guidelinesDocument.document.bodyText}
@@ -504,7 +540,14 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
           >
             {viewedCount} of 3 reviewed
             {!allViewed && (
-              <span style={{ marginLeft: 6, color: 'var(--sh-warning-text)', fontSize: 11.5, fontWeight: 700 }}>
+              <span
+                style={{
+                  marginLeft: 6,
+                  color: 'var(--sh-warning-text)',
+                  fontSize: 11.5,
+                  fontWeight: 700,
+                }}
+              >
                 Please review all documents before accepting
               </span>
             )}
@@ -526,8 +569,12 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                 cursor: 'pointer',
                 transition: 'background 0.15s',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.background = 'var(--sh-soft)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.background = 'var(--sh-surface)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'var(--sh-soft)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'var(--sh-surface)'
+              }}
             >
               Decline
             </button>

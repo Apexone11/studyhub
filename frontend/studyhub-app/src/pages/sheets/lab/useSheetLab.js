@@ -109,7 +109,10 @@ export default function useSheetLab() {
     if (!sheet || !user) return
     const owns = user.role === 'admin' || user.id === sheet.userId
     if (!owns && sheet.status !== 'published' && !sheet.allowEditing) {
-      showToast("You can\u2019t edit this sheet directly. Go back and click \u2018Make your own copy\u2019 to get started.", 'error')
+      showToast(
+        'You can\u2019t edit this sheet directly. Go back and click \u2018Make your own copy\u2019 to get started.',
+        'error',
+      )
       navigate(`/sheets/${sheetId}`, { replace: true })
     }
   }, [sheet, user, sheetId, navigate])
@@ -133,32 +136,35 @@ export default function useSheetLab() {
   }, [sheet, user, searchParams])
 
   // Load commits
-  const loadCommits = useCallback(async (targetPage = 1) => {
-    if (!Number.isInteger(sheetId)) return
-    setLoading(true)
-    try {
-      const response = await fetch(
-        `${API}/api/sheets/${sheetId}/lab/commits?page=${targetPage}&limit=20`,
-        { headers: authHeaders(), credentials: 'include' }
-      )
-      const data = await readJsonSafely(response, {})
-      if (isAuthSessionFailure(response, data)) {
-        clearSession()
-        navigate('/login', { replace: true })
-        return
+  const loadCommits = useCallback(
+    async (targetPage = 1) => {
+      if (!Number.isInteger(sheetId)) return
+      setLoading(true)
+      try {
+        const response = await fetch(
+          `${API}/api/sheets/${sheetId}/lab/commits?page=${targetPage}&limit=20`,
+          { headers: authHeaders(), credentials: 'include' },
+        )
+        const data = await readJsonSafely(response, {})
+        if (isAuthSessionFailure(response, data)) {
+          clearSession()
+          navigate('/login', { replace: true })
+          return
+        }
+        if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load commits.'))
+        setCommits(data.commits || [])
+        setTotal(data.total || 0)
+        setPage(data.page || 1)
+        setTotalPages(data.totalPages || 1)
+        setError('')
+      } catch (err) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
       }
-      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load commits.'))
-      setCommits(data.commits || [])
-      setTotal(data.total || 0)
-      setPage(data.page || 1)
-      setTotalPages(data.totalPages || 1)
-      setError('')
-    } catch (err) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }, [sheetId, clearSession, navigate])
+    },
+    [sheetId, clearSession, navigate],
+  )
 
   useEffect(() => {
     loadCommits(1)
@@ -185,10 +191,10 @@ export default function useSheetLab() {
     setExpandedCommitId(commitId)
     setLoadingContent(true)
     try {
-      const response = await fetch(
-        `${API}/api/sheets/${sheetId}/lab/commits/${commitId}`,
-        { headers: authHeaders(), credentials: 'include' }
-      )
+      const response = await fetch(`${API}/api/sheets/${sheetId}/lab/commits/${commitId}`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
       const data = await readJsonSafely(response, {})
       if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load commit content.'))
       setExpandedContent(data.commit?.content || '')
@@ -205,10 +211,10 @@ export default function useSheetLab() {
     if (!Number.isInteger(sheetId)) return
     setLoadingSummary(true)
     try {
-      const response = await fetch(
-        `${API}/api/sheets/${sheetId}/lab/auto-summary`,
-        { headers: authHeaders(), credentials: 'include' }
-      )
+      const response = await fetch(`${API}/api/sheets/${sheetId}/lab/auto-summary`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
       const data = await readJsonSafely(response, {})
       if (response.ok && data.summary) {
         setAutoSummary(data.summary)
@@ -257,10 +263,10 @@ export default function useSheetLab() {
     if (loadingRestorePreview) return
     setLoadingRestorePreview(commitId)
     try {
-      const response = await fetch(
-        `${API}/api/sheets/${sheetId}/lab/restore-preview/${commitId}`,
-        { headers: authHeaders(), credentials: 'include' }
-      )
+      const response = await fetch(`${API}/api/sheets/${sheetId}/lab/restore-preview/${commitId}`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
       const data = await readJsonSafely(response, {})
       if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not preview restore.'))
       setRestorePreview({ diff: data.diff, commit: data.commit, commitId })
@@ -315,10 +321,10 @@ export default function useSheetLab() {
     const [idA, idB] = compareSelection
     setLoadingDiff(true)
     try {
-      const response = await fetch(
-        `${API}/api/sheets/${sheetId}/lab/diff/${idA}/${idB}`,
-        { headers: authHeaders(), credentials: 'include' }
-      )
+      const response = await fetch(`${API}/api/sheets/${sheetId}/lab/diff/${idA}/${idB}`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
       const data = await readJsonSafely(response, {})
       if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not compute diff.'))
       setDiff(data.diff)
@@ -365,10 +371,10 @@ export default function useSheetLab() {
     if (!Number.isInteger(sheetId)) return
     setLoadingLineage(true)
     try {
-      const response = await fetch(
-        `${API}/api/sheets/${sheetId}/lab/lineage`,
-        { headers: authHeaders(), credentials: 'include' }
-      )
+      const response = await fetch(`${API}/api/sheets/${sheetId}/lab/lineage`, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
       const data = await readJsonSafely(response, {})
       if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load fork tree.'))
       setLineage(data)

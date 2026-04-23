@@ -32,9 +32,9 @@ describe('LoginPage', () => {
     let loginPayload = null
 
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
-        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      )),
+      http.get('http://localhost:4000/api/auth/me', () =>
+        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+      ),
       http.post('http://localhost:4000/api/auth/login', async ({ request }) => {
         loginPayload = await request.json()
         return HttpResponse.json({
@@ -53,9 +53,9 @@ describe('LoginPage', () => {
           },
         })
       }),
-      http.get('http://localhost:4000/api/notifications', () => (
-        HttpResponse.json({ notifications: [], unreadCount: 0 })
-      )),
+      http.get('http://localhost:4000/api/notifications', () =>
+        HttpResponse.json({ notifications: [], unreadCount: 0 }),
+      ),
     )
 
     renderLoginPage()
@@ -76,15 +76,18 @@ describe('LoginPage', () => {
     const user = userEvent.setup()
 
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
-        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      )),
-      http.post('http://localhost:4000/api/auth/login', () => (
-        HttpResponse.json({
-          error: 'Invalid username or password.',
-          showForgot: true,
-        }, { status: 401 })
-      )),
+      http.get('http://localhost:4000/api/auth/me', () =>
+        HttpResponse.json({ error: 'Unauthorized' }, { status: 401 }),
+      ),
+      http.post('http://localhost:4000/api/auth/login', () =>
+        HttpResponse.json(
+          {
+            error: 'Invalid username or password.',
+            showForgot: true,
+          },
+          { status: 401 },
+        ),
+      ),
     )
 
     renderLoginPage()

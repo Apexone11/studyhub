@@ -62,8 +62,8 @@ export default function AiSheetSetupPage() {
       const data = await res.json().catch(() => [])
       setCourses(
         (data || []).flatMap((school) =>
-          (school.courses || []).map((c) => ({ ...c, schoolName: school.name }))
-        )
+          (school.courses || []).map((c) => ({ ...c, schoolName: school.name })),
+        ),
       )
     } catch {
       setCourses([])
@@ -72,13 +72,17 @@ export default function AiSheetSetupPage() {
     }
   }, [])
 
-  useEffect(() => { loadCourses() }, [loadCourses])
+  useEffect(() => {
+    loadCourses()
+  }, [loadCourses])
 
   // Preview iframe source.
   const previewSrc = useMemo(() => {
     if (!aiHtml) return ''
     const isFullDoc = /^\s*<!DOCTYPE/i.test(aiHtml) || /^\s*<html/i.test(aiHtml)
-    const doc = isFullDoc ? aiHtml : `<!DOCTYPE html>
+    const doc = isFullDoc
+      ? aiHtml
+      : `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
 body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-height: 1.7; }
 </style></head><body>${aiHtml}</body></html>`
@@ -88,8 +92,14 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
   // Submit: create sheet and redirect to Lab.
   const handleSubmit = async () => {
     setError('')
-    if (!title.trim()) { setError('Title is required.'); return }
-    if (!courseId) { setError('Please select a course.'); return }
+    if (!title.trim()) {
+      setError('Title is required.')
+      return
+    }
+    if (!courseId) {
+      setError('Please select a course.')
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -122,9 +132,19 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
     return (
       <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: PAGE_FONT }}>
         <Navbar />
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            minHeight: 400,
+          }}
+        >
           <div style={{ textAlign: 'center', color: 'var(--sh-muted)' }}>
-            <IconSpinner size={24} style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }} />
+            <IconSpinner
+              size={24}
+              style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }}
+            />
             <div style={{ fontSize: 14 }}>Preparing AI sheet...</div>
           </div>
         </div>
@@ -135,32 +155,56 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
   const isCompact = layout.isCompact
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: PAGE_FONT, overflowX: 'hidden' }}>
+    <div
+      style={{
+        minHeight: '100vh',
+        background: 'var(--sh-bg)',
+        fontFamily: PAGE_FONT,
+        overflowX: 'hidden',
+      }}
+    >
       <Navbar />
       <div style={pageShell('app')}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: layout.columns.appTwoColumn,
-          gap: 20,
-          alignItems: 'start',
-        }}>
-          <div style={{ position: isCompact ? 'static' : 'sticky', top: isCompact ? undefined : 74 }}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: layout.columns.appTwoColumn,
+            gap: 20,
+            alignItems: 'start',
+          }}
+        >
+          <div
+            style={{ position: isCompact ? 'static' : 'sticky', top: isCompact ? undefined : 74 }}
+          >
             <AppSidebar mode={layout.sidebarMode} />
           </div>
           <main id="main-content">
             {/* Header */}
-            <div style={{
-              display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16,
-            }}>
-              <div style={{
-                width: 36, height: 36, borderRadius: '50%',
-                background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: '50%',
+                  background: 'linear-gradient(135deg, var(--sh-brand), #7c3aed)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
                 <IconSpark size={18} style={{ color: '#fff' }} />
               </div>
               <div>
-                <h1 style={{ fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)', margin: 0 }}>
+                <h1
+                  style={{ fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)', margin: 0 }}
+                >
                   Publish AI-Generated Sheet
                 </h1>
                 <p style={{ fontSize: 12, color: 'var(--sh-muted)', margin: 0 }}>
@@ -171,52 +215,85 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
 
             {/* Error */}
             {error && (
-              <div style={{
-                background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)',
-                borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13,
-                color: 'var(--sh-danger-text)',
-              }}>
+              <div
+                style={{
+                  background: 'var(--sh-danger-bg)',
+                  border: '1px solid var(--sh-danger-border)',
+                  borderRadius: 10,
+                  padding: '10px 14px',
+                  marginBottom: 12,
+                  fontSize: 13,
+                  color: 'var(--sh-danger-text)',
+                }}
+              >
                 {error}
               </div>
             )}
 
             {/* Main layout: form + preview */}
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: isCompact ? '1fr' : '340px 1fr',
-              gap: 16,
-              alignItems: 'start',
-            }}>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: isCompact ? '1fr' : '340px 1fr',
+                gap: 16,
+                alignItems: 'start',
+              }}
+            >
               {/* Left: Form */}
-              <div style={{
-                background: 'var(--sh-surface)', borderRadius: 14,
-                border: '1px solid var(--sh-border)', padding: '20px',
-              }}>
+              <div
+                style={{
+                  background: 'var(--sh-surface)',
+                  borderRadius: 14,
+                  border: '1px solid var(--sh-border)',
+                  padding: '20px',
+                }}
+              >
                 {/* Title */}
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{
-                    fontSize: 10, fontWeight: 700, color: 'var(--sh-slate-500)',
-                    letterSpacing: '.06em', display: 'block', marginBottom: 5,
-                  }}>SHEET TITLE</label>
+                  <label
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: 'var(--sh-slate-500)',
+                      letterSpacing: '.06em',
+                      display: 'block',
+                      marginBottom: 5,
+                    }}
+                  >
+                    SHEET TITLE
+                  </label>
                   <input
                     value={title}
                     onChange={(e) => setTitle(e.target.value)}
                     placeholder="e.g. Organic Chemistry Reactions"
                     style={{
-                      width: '100%', padding: '8px 12px',
+                      width: '100%',
+                      padding: '8px 12px',
                       border: `1.5px solid ${error && !title.trim() ? 'var(--sh-danger-border)' : 'var(--sh-border)'}`,
-                      borderRadius: 8, fontSize: 13, fontFamily: PAGE_FONT,
-                      outline: 'none', color: 'var(--sh-text)', boxSizing: 'border-box',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontFamily: PAGE_FONT,
+                      outline: 'none',
+                      color: 'var(--sh-text)',
+                      boxSizing: 'border-box',
                     }}
                   />
                 </div>
 
                 {/* Course */}
                 <div style={{ marginBottom: 14 }}>
-                  <label style={{
-                    fontSize: 10, fontWeight: 700, color: 'var(--sh-slate-500)',
-                    letterSpacing: '.06em', display: 'block', marginBottom: 5,
-                  }}>COURSE</label>
+                  <label
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: 'var(--sh-slate-500)',
+                      letterSpacing: '.06em',
+                      display: 'block',
+                      marginBottom: 5,
+                    }}
+                  >
+                    COURSE
+                  </label>
                   {loadingCourses ? (
                     <div style={{ fontSize: 12, color: 'var(--sh-muted)', padding: '8px 0' }}>
                       Loading courses...
@@ -226,32 +303,50 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
                       value={courseId}
                       onChange={(e) => setCourseId(e.target.value)}
                       style={{
-                        width: '100%', padding: '8px 12px',
+                        width: '100%',
+                        padding: '8px 12px',
                         border: `1.5px solid ${error && !courseId ? 'var(--sh-danger-border)' : 'var(--sh-border)'}`,
-                        borderRadius: 8, fontSize: 13, fontFamily: PAGE_FONT,
-                        outline: 'none', color: courseId ? 'var(--sh-text)' : 'var(--sh-muted)',
+                        borderRadius: 8,
+                        fontSize: 13,
+                        fontFamily: PAGE_FONT,
+                        outline: 'none',
+                        color: courseId ? 'var(--sh-text)' : 'var(--sh-muted)',
                         boxSizing: 'border-box',
                       }}
                     >
                       <option value="">Select a course...</option>
                       {courses.map((c) => (
-                        <option key={c.id} value={c.id}>{c.code} -- {c.name}</option>
+                        <option key={c.id} value={c.id}>
+                          {c.code} -- {c.name}
+                        </option>
                       ))}
                     </select>
                   )}
                   {courses.length === 0 && !loadingCourses && (
                     <div style={{ fontSize: 11, color: 'var(--sh-warning-text)', marginTop: 4 }}>
-                      No courses found. <a href="/my-courses" style={{ color: 'var(--sh-brand)', fontWeight: 600 }}>Add courses</a> first.
+                      No courses found.{' '}
+                      <a href="/my-courses" style={{ color: 'var(--sh-brand)', fontWeight: 600 }}>
+                        Add courses
+                      </a>{' '}
+                      first.
                     </div>
                   )}
                 </div>
 
                 {/* Description */}
                 <div style={{ marginBottom: 18 }}>
-                  <label style={{
-                    fontSize: 10, fontWeight: 700, color: 'var(--sh-slate-500)',
-                    letterSpacing: '.06em', display: 'block', marginBottom: 5,
-                  }}>DESCRIPTION</label>
+                  <label
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: 'var(--sh-slate-500)',
+                      letterSpacing: '.06em',
+                      display: 'block',
+                      marginBottom: 5,
+                    }}
+                  >
+                    DESCRIPTION
+                  </label>
                   <textarea
                     value={description}
                     onChange={(e) => setDescription(e.target.value.slice(0, 300))}
@@ -259,14 +354,27 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
                     maxLength={300}
                     placeholder="Brief summary of what this sheet covers..."
                     style={{
-                      width: '100%', padding: '8px 12px',
-                      border: '1.5px solid var(--sh-border)', borderRadius: 8,
-                      fontSize: 13, fontFamily: PAGE_FONT, outline: 'none',
-                      color: 'var(--sh-text)', boxSizing: 'border-box',
-                      resize: 'none', lineHeight: 1.6,
+                      width: '100%',
+                      padding: '8px 12px',
+                      border: '1.5px solid var(--sh-border)',
+                      borderRadius: 8,
+                      fontSize: 13,
+                      fontFamily: PAGE_FONT,
+                      outline: 'none',
+                      color: 'var(--sh-text)',
+                      boxSizing: 'border-box',
+                      resize: 'none',
+                      lineHeight: 1.6,
                     }}
                   />
-                  <div style={{ fontSize: 10, color: 'var(--sh-muted)', textAlign: 'right', marginTop: 3 }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      color: 'var(--sh-muted)',
+                      textAlign: 'right',
+                      marginTop: 3,
+                    }}
+                  >
                     {description.length}/300
                   </div>
                 </div>
@@ -276,12 +384,19 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
                   onClick={handleSubmit}
                   disabled={submitting || !title.trim() || !courseId}
                   style={{
-                    width: '100%', padding: '10px 16px',
+                    width: '100%',
+                    padding: '10px 16px',
                     background: title.trim() && courseId ? 'var(--sh-brand)' : 'var(--sh-soft)',
                     color: title.trim() && courseId ? '#fff' : 'var(--sh-muted)',
-                    border: 'none', borderRadius: 10, fontSize: 13, fontWeight: 700,
+                    border: 'none',
+                    borderRadius: 10,
+                    fontSize: 13,
+                    fontWeight: 700,
                     cursor: title.trim() && courseId && !submitting ? 'pointer' : 'not-allowed',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: 8,
                     fontFamily: PAGE_FONT,
                   }}
                 >
@@ -298,22 +413,34 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
                   )}
                 </button>
 
-                <p style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 10, lineHeight: 1.5 }}>
-                  Your sheet will be created as a private draft. You can edit it in the Sheet Lab and publish when ready.
+                <p
+                  style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 10, lineHeight: 1.5 }}
+                >
+                  Your sheet will be created as a private draft. You can edit it in the Sheet Lab
+                  and publish when ready.
                 </p>
               </div>
 
               {/* Right: Preview */}
-              <div style={{
-                background: 'var(--sh-surface)', borderRadius: 14,
-                border: '1px solid var(--sh-border)', overflow: 'hidden',
-                height: isCompact ? 400 : 'calc(100vh - 200px)',
-              }}>
-                <div style={{
-                  padding: '10px 16px', borderBottom: '1px solid var(--sh-border)',
-                  display: 'flex', alignItems: 'center', gap: 8,
-                  background: 'var(--sh-soft)',
-                }}>
+              <div
+                style={{
+                  background: 'var(--sh-surface)',
+                  borderRadius: 14,
+                  border: '1px solid var(--sh-border)',
+                  overflow: 'hidden',
+                  height: isCompact ? 400 : 'calc(100vh - 200px)',
+                }}
+              >
+                <div
+                  style={{
+                    padding: '10px 16px',
+                    borderBottom: '1px solid var(--sh-border)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    background: 'var(--sh-soft)',
+                  }}
+                >
                   <IconSheets size={14} style={{ color: 'var(--sh-brand)' }} />
                   <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-heading)' }}>
                     Sheet Preview

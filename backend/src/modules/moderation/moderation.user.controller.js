@@ -1,10 +1,22 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { countActiveStrikes, hasActiveRestriction } = require('../../lib/moderation/moderationEngine')
+const {
+  countActiveStrikes,
+  hasActiveRestriction,
+} = require('../../lib/moderation/moderationEngine')
 const { createNotification } = require('../../lib/notify')
-const { classifyReportPriority, classifyAppealPriority, REPEAT_OFFENDER_CASE_WINDOW_MS } = require('../../lib/notificationPolicy')
-const { appealLimiter, reportLimiter, REASON_CATEGORIES, APPEAL_REASON_CATEGORIES } = require('./moderation.constants')
+const {
+  classifyReportPriority,
+  classifyAppealPriority,
+  REPEAT_OFFENDER_CASE_WINDOW_MS,
+} = require('../../lib/notificationPolicy')
+const {
+  appealLimiter,
+  reportLimiter,
+  REASON_CATEGORIES,
+  APPEAL_REASON_CATEGORIES,
+} = require('./moderation.constants')
 const { logModerationEvent } = require('../../lib/moderation/moderationLogger')
 
 const router = express.Router()
@@ -25,61 +37,62 @@ router.get('/my-status', async (req, res) => {
   try {
     const userId = req.user.userId
 
-    const [restricted, activeStrikesCount, restriction, cases, strikes, appeals] = await Promise.all([
-      hasActiveRestriction(userId),
-      countActiveStrikes(userId),
-      prisma.userRestriction.findFirst({
-        where: {
-          userId,
-          OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }],
-        },
-        select: { id: true, type: true, reason: true, startsAt: true, endsAt: true },
-        orderBy: { startsAt: 'desc' },
-      }),
-      prisma.moderationCase.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-        select: {
-          id: true,
-          contentType: true,
-          contentId: true,
-          status: true,
-          reasonCategory: true,
-          excerpt: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
-      prisma.strike.findMany({
-        where: { userId },
-        orderBy: { issuedAt: 'desc' },
-        take: 20,
-        select: {
-          id: true,
-          reason: true,
-          issuedAt: true,
-          expiresAt: true,
-          decayedAt: true,
-          caseId: true,
-        },
-      }),
-      prisma.appeal.findMany({
-        where: { userId },
-        orderBy: { createdAt: 'desc' },
-        take: 20,
-        select: {
-          id: true,
-          caseId: true,
-          reasonCategory: true,
-          status: true,
-          reason: true,
-          reviewNote: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-      }),
-    ])
+    const [restricted, activeStrikesCount, restriction, cases, strikes, appeals] =
+      await Promise.all([
+        hasActiveRestriction(userId),
+        countActiveStrikes(userId),
+        prisma.userRestriction.findFirst({
+          where: {
+            userId,
+            OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }],
+          },
+          select: { id: true, type: true, reason: true, startsAt: true, endsAt: true },
+          orderBy: { startsAt: 'desc' },
+        }),
+        prisma.moderationCase.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            contentType: true,
+            contentId: true,
+            status: true,
+            reasonCategory: true,
+            excerpt: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+        prisma.strike.findMany({
+          where: { userId },
+          orderBy: { issuedAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            reason: true,
+            issuedAt: true,
+            expiresAt: true,
+            decayedAt: true,
+            caseId: true,
+          },
+        }),
+        prisma.appeal.findMany({
+          where: { userId },
+          orderBy: { createdAt: 'desc' },
+          take: 20,
+          select: {
+            id: true,
+            caseId: true,
+            reasonCategory: true,
+            status: true,
+            reason: true,
+            reviewNote: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        }),
+      ])
 
     res.json({
       restricted,
@@ -145,13 +158,17 @@ router.post('/reports', reportLimiter, async (req, res) => {
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 500) : ''
 
   if (!REPORTABLE_TYPES[targetType]) {
-    return res.status(400).json({ error: `Invalid targetType. Must be one of: ${Object.keys(REPORTABLE_TYPES).join(', ')}` })
+    return res.status(400).json({
+      error: `Invalid targetType. Must be one of: ${Object.keys(REPORTABLE_TYPES).join(', ')}`,
+    })
   }
   if (!Number.isFinite(targetId)) {
     return res.status(400).json({ error: 'Valid targetId is required.' })
   }
   if (!REASON_CATEGORIES.includes(reasonCategory)) {
-    return res.status(400).json({ error: `Invalid reasonCategory. Must be one of: ${REASON_CATEGORIES.join(', ')}` })
+    return res
+      .status(400)
+      .json({ error: `Invalid reasonCategory. Must be one of: ${REASON_CATEGORIES.join(', ')}` })
   }
 
   try {
@@ -191,7 +208,14 @@ router.post('/reports', reportLimiter, async (req, res) => {
     if (modelName !== 'user') {
       const contentRecord = await prisma[modelName].findUnique({
         where: { id: targetId },
-        select: { content: true, ...(modelName === 'studySheet' ? { title: true } : modelName === 'note' ? { title: true } : {}) },
+        select: {
+          content: true,
+          ...(modelName === 'studySheet'
+            ? { title: true }
+            : modelName === 'note'
+              ? { title: true }
+              : {}),
+        },
       })
       if (contentRecord) {
         const parts = [contentRecord.title, contentRecord.content].filter(Boolean)
@@ -213,7 +237,15 @@ router.post('/reports', reportLimiter, async (req, res) => {
       },
     })
 
-    logModerationEvent({ userId: contentOwnerId, action: 'case_opened', caseId: modCase.id, contentType: targetType, contentId: targetId, reason: reasonCategory, performedBy: req.user.userId })
+    logModerationEvent({
+      userId: contentOwnerId,
+      action: 'case_opened',
+      caseId: modCase.id,
+      contentType: targetType,
+      contentId: targetId,
+      reason: reasonCategory,
+      performedBy: req.user.userId,
+    })
 
     /* Notify admins with smart priority classification */
     try {
@@ -229,11 +261,14 @@ router.post('/reports', reportLimiter, async (req, res) => {
       ])
 
       // Reuse the excerpt query result instead of re-fetching the target.
-      const isPublicTarget = targetType === 'sheet'
-        ? excerpt.length > 0  // published sheets always have content
-        : targetType === 'note'
-          ? !!(await prisma.note.findUnique({ where: { id: targetId }, select: { private: true } }))?.private === false
-          : false
+      const isPublicTarget =
+        targetType === 'sheet'
+          ? excerpt.length > 0 // published sheets always have content
+          : targetType === 'note'
+            ? !!(
+                await prisma.note.findUnique({ where: { id: targetId }, select: { private: true } })
+              )?.private === false
+            : false
 
       const reportPriority = classifyReportPriority({
         reasonCategory,
@@ -243,20 +278,26 @@ router.post('/reports', reportLimiter, async (req, res) => {
         actorRecentCases: actorRecentCases,
       })
 
-      void Promise.all(admins.map((admin) =>
-        createNotification(prisma, {
-          userId: admin.id,
-          type: 'moderation',
-          message: `New user report: ${reasonCategory.replace(/_/g, ' ')} on ${targetType.replace(/_/g, ' ')}`,
-          actorId: null,
-          linkPath: '/admin?tab=moderation',
-          priority: reportPriority,
-          dedupKey: `report-${targetType}-${targetId}`,
-        })
-      ))
-    } catch { /* notification failures are non-fatal */ }
+      void Promise.all(
+        admins.map((admin) =>
+          createNotification(prisma, {
+            userId: admin.id,
+            type: 'moderation',
+            message: `New user report: ${reasonCategory.replace(/_/g, ' ')} on ${targetType.replace(/_/g, ' ')}`,
+            actorId: null,
+            linkPath: '/admin?tab=moderation',
+            priority: reportPriority,
+            dedupKey: `report-${targetType}-${targetId}`,
+          }),
+        ),
+      )
+    } catch {
+      /* notification failures are non-fatal */
+    }
 
-    res.status(201).json({ message: 'Report submitted. We will review it shortly.', caseId: modCase.id })
+    res
+      .status(201)
+      .json({ message: 'Report submitted. We will review it shortly.', caseId: modCase.id })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })
@@ -277,7 +318,8 @@ router.post('/reports', reportLimiter, async (req, res) => {
 router.post('/appeals', appealLimiter, async (req, res) => {
   const caseId = Number.parseInt(req.body?.caseId, 10)
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : ''
-  const reasonCategory = typeof req.body?.reasonCategory === 'string' ? req.body.reasonCategory.trim() : null
+  const reasonCategory =
+    typeof req.body?.reasonCategory === 'string' ? req.body.reasonCategory.trim() : null
 
   if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Valid caseId is required.' })
   if (reason.length < 20) {
@@ -306,7 +348,10 @@ router.post('/appeals', appealLimiter, async (req, res) => {
     })
 
     if (!(isContentOwner && isConfirmedCase) && !linkedStrike) {
-      return res.status(403).json({ error: 'You can only appeal confirmed cases on your content or cases linked to your active strikes.' })
+      return res.status(403).json({
+        error:
+          'You can only appeal confirmed cases on your content or cases linked to your active strikes.',
+      })
     }
 
     /* Prevent duplicate pending appeals */
@@ -327,7 +372,12 @@ router.post('/appeals', appealLimiter, async (req, res) => {
       },
     })
 
-    logModerationEvent({ userId: req.user.userId, action: 'appeal_submitted', caseId, appealId: appeal.id })
+    logModerationEvent({
+      userId: req.user.userId,
+      action: 'appeal_submitted',
+      caseId,
+      appealId: appeal.id,
+    })
 
     res.status(201).json({ message: 'Appeal submitted.', appeal })
 
@@ -338,18 +388,22 @@ router.post('/appeals', appealLimiter, async (req, res) => {
         where: { role: 'admin' },
         select: { id: true },
       })
-      void Promise.all(admins.map((admin) =>
-        createNotification(prisma, {
-          userId: admin.id,
-          type: 'moderation',
-          message: `New appeal submitted for case #${caseId}${reasonCategory ? ` (${reasonCategory.replace(/_/g, ' ')})` : ''}.`,
-          actorId: req.user.userId,
-          linkPath: '/admin?tab=moderation',
-          priority: appealPriority,
-          dedupKey: `appeal-${caseId}`,
-        })
-      ))
-    } catch { /* notification failures are non-fatal */ }
+      void Promise.all(
+        admins.map((admin) =>
+          createNotification(prisma, {
+            userId: admin.id,
+            type: 'moderation',
+            message: `New appeal submitted for case #${caseId}${reasonCategory ? ` (${reasonCategory.replace(/_/g, ' ')})` : ''}.`,
+            actorId: req.user.userId,
+            linkPath: '/admin?tab=moderation',
+            priority: appealPriority,
+            dedupKey: `appeal-${caseId}`,
+          }),
+        ),
+      )
+    } catch {
+      /* notification failures are non-fatal */
+    }
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

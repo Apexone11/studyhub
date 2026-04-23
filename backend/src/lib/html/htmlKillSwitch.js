@@ -24,7 +24,9 @@ const FLAG_NAME = 'html_uploads'
  * Read the env-var layer. Returns 'disabled' | 'enabled' | null.
  */
 function readEnvOverride() {
-  const raw = String(process.env.STUDYHUB_HTML_UPLOADS || '').trim().toLowerCase()
+  const raw = String(process.env.STUDYHUB_HTML_UPLOADS || '')
+    .trim()
+    .toLowerCase()
   if (raw === 'disabled') return 'disabled'
   if (raw === 'enabled') return 'enabled'
   return null
@@ -88,9 +90,8 @@ async function setHtmlUploadsEnabled(enabled, options = {}) {
   })
 
   // If the env var overrides, report that clearly
-  const effectiveEnabled = envOverride === 'disabled' ? false
-    : envOverride === 'enabled' ? true
-      : enabled
+  const effectiveEnabled =
+    envOverride === 'disabled' ? false : envOverride === 'enabled' ? true : enabled
 
   return {
     enabled: effectiveEnabled,

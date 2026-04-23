@@ -6,9 +6,7 @@ function delay(ms) {
 }
 
 function extractVerificationCode(message = {}) {
-  const haystack = [message.text, message.html]
-    .filter(Boolean)
-    .join('\n')
+  const haystack = [message.text, message.html].filter(Boolean).join('\n')
   const match = haystack.match(/\b(\d{6})\b/)
   return match ? match[1] : ''
 }
@@ -16,7 +14,10 @@ function extractVerificationCode(message = {}) {
 function recipientMatches(message, toEmail) {
   if (!toEmail) return true
   const normalizedRecipient = String(toEmail).trim().toLowerCase()
-  return String(message.to || '').trim().toLowerCase().includes(normalizedRecipient)
+  return String(message.to || '')
+    .trim()
+    .toLowerCase()
+    .includes(normalizedRecipient)
 }
 
 function subjectMatches(message, subjectIncludes) {
@@ -55,11 +56,14 @@ async function readCapturedEmails(directory) {
 
 async function findLatestCapturedEmail({ directory, toEmail, subjectIncludes, afterTimeMs = 0 }) {
   const messages = await readCapturedEmails(directory)
-  return messages.find((message) => (
-    message.createdAtMs >= afterTimeMs
-    && recipientMatches(message, toEmail)
-    && subjectMatches(message, subjectIncludes)
-  )) || null
+  return (
+    messages.find(
+      (message) =>
+        message.createdAtMs >= afterTimeMs &&
+        recipientMatches(message, toEmail) &&
+        subjectMatches(message, subjectIncludes),
+    ) || null
+  )
 }
 
 async function waitForCapturedVerificationCode({

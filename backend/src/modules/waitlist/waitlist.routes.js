@@ -37,43 +37,44 @@ router.post('/', writeLimiter, optionalAuth, async (req, res) => {
 
     // 0.1: Confirmation email (fire-and-forget — never blocks the response)
     try {
-      const {
-        deliverMail,
-      } = require('../../lib/email/emailTransport')
-      const {
-        escapeHtml,
-        getFromAddress,
-      } = require('../../lib/email/emailValidation')
+      const { deliverMail } = require('../../lib/email/emailTransport')
+      const { escapeHtml, getFromAddress } = require('../../lib/email/emailValidation')
 
       // Import htmlWrap from emailTemplates
       let htmlWrap
       try {
         const templates = require('../../lib/email/emailTemplates')
-        htmlWrap = templates.htmlWrap || ((title, body) => `<html><head><title>${title}</title></head><body>${body}</body></html>`)
+        htmlWrap =
+          templates.htmlWrap ||
+          ((title, body) => `<html><head><title>${title}</title></head><body>${body}</body></html>`)
       } catch {
-        htmlWrap = (title, body) => `<html><head><title>${title}</title></head><body>${body}</body></html>`
+        htmlWrap = (title, body) =>
+          `<html><head><title>${title}</title></head><body>${body}</body></html>`
       }
 
       const isInstitution = tier === 'institution'
       const tierLabel = isInstitution ? 'Institution' : 'Pro'
       const personalNote = isInstitution
-        ? 'We will reach out to discuss your institution\'s specific needs and how StudyHub can support your students and faculty.'
+        ? "We will reach out to discuss your institution's specific needs and how StudyHub can support your students and faculty."
         : 'You will be among the first to access Pro features when we launch, including unlimited uploads, advanced AI, and priority support.'
 
-      void deliverMail({
-        from: `"StudyHub" <${getFromAddress()}>`,
-        to: email.trim().toLowerCase(),
-        subject: `You're on the StudyHub ${tierLabel} waitlist`,
-        text: [
-          `Thank you for joining the StudyHub ${tierLabel} waitlist!`,
-          '',
-          personalNote,
-          '',
-          'We are working hard to bring these features to you soon.',
-          '',
-          '— The StudyHub Team',
-        ].join('\n'),
-        html: htmlWrap(`StudyHub ${tierLabel} Waitlist`, `
+      void deliverMail(
+        {
+          from: `"StudyHub" <${getFromAddress()}>`,
+          to: email.trim().toLowerCase(),
+          subject: `You're on the StudyHub ${tierLabel} waitlist`,
+          text: [
+            `Thank you for joining the StudyHub ${tierLabel} waitlist!`,
+            '',
+            personalNote,
+            '',
+            'We are working hard to bring these features to you soon.',
+            '',
+            '— The StudyHub Team',
+          ].join('\n'),
+          html: htmlWrap(
+            `StudyHub ${tierLabel} Waitlist`,
+            `
           <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">You're on the list</h2>
           <p style="margin:0 0 16px;color:#6b7280;font-size:15px;">
             Thank you for joining the StudyHub <strong>${escapeHtml(tierLabel)}</strong> waitlist.
@@ -85,8 +86,11 @@ router.post('/', writeLimiter, optionalAuth, async (req, res) => {
           <p style="margin:0;color:#6b7280;font-size:14px;">
             We are working hard to bring these features to you soon. Stay tuned!
           </p>
-        `),
-      }, 'waitlist-confirmation').catch((emailErr) => {
+        `,
+          ),
+        },
+        'waitlist-confirmation',
+      ).catch((emailErr) => {
         captureError(emailErr, { location: 'waitlist/confirmationEmail', email: entry.email })
       })
     } catch (emailSetupErr) {

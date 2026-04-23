@@ -2,7 +2,12 @@ const express = require('express')
 const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const requireAuth = require('../../core/auth/requireAuth')
-const { validateHtmlForSubmission, RISK_TIER, generateRiskSummary, generateTierExplanation } = require('../../lib/html/htmlSecurity')
+const {
+  validateHtmlForSubmission,
+  RISK_TIER,
+  generateRiskSummary,
+  generateTierExplanation,
+} = require('../../lib/html/htmlSecurity')
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
 const { signHtmlPreviewToken, HTML_PREVIEW_TOKEN_TTL_SECONDS } = require('../../lib/previewTokens')
 const { submitHtmlDraftForReview } = require('../../lib/html/htmlDraftWorkflow')
@@ -13,29 +18,35 @@ const { serializeSheet } = require('./sheets.serializer')
 
 const router = express.Router()
 
-router.post('/:id/submit-review', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
-  const sheetId = Number.parseInt(req.params.id, 10)
-  if (!Number.isInteger(sheetId)) {
-    return res.status(400).json({ error: 'Sheet id must be an integer.' })
-  }
-
-  try {
-    const sheet = await submitHtmlDraftForReview(prisma, { sheetId, user: req.user })
-    res.json({
-      ...serializeSheet(sheet),
-      message: 'HTML sheet submitted for admin review.',
-    })
-  } catch (error) {
-    const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500
-    if (statusCode >= 500) {
-      captureError(error, { route: req.originalUrl, method: req.method })
+router.post(
+  '/:id/submit-review',
+  requireAuth,
+  requireVerifiedEmail,
+  sheetWriteLimiter,
+  async (req, res) => {
+    const sheetId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(sheetId)) {
+      return res.status(400).json({ error: 'Sheet id must be an integer.' })
     }
-    res.status(statusCode).json({
-      error: error.message || 'Could not submit for review.',
-      findings: error.findings || [],
-    })
-  }
-})
+
+    try {
+      const sheet = await submitHtmlDraftForReview(prisma, { sheetId, user: req.user })
+      res.json({
+        ...serializeSheet(sheet),
+        message: 'HTML sheet submitted for admin review.',
+      })
+    } catch (error) {
+      const statusCode = Number.isInteger(error.statusCode) ? error.statusCode : 500
+      if (statusCode >= 500) {
+        captureError(error, { route: req.originalUrl, method: req.method })
+      }
+      res.status(statusCode).json({
+        error: error.message || 'Could not submit for review.',
+        findings: error.findings || [],
+      })
+    }
+  },
+)
 
 router.get('/:id/html-preview', requireAuth, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
@@ -57,7 +68,8 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null))
+      return res.status(404).json({ error: 'Sheet not found.' })
     if (sheet.contentFormat !== 'html') {
       return res.status(400).json({ error: 'This sheet is not in HTML mode.' })
     }
@@ -65,7 +77,7 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
     const tier = sheet.htmlRiskTier || 0
     const findings = Array.isArray(sheet.htmlScanFindings) ? sheet.htmlScanFindings : []
     const validation = validateHtmlForSubmission(sheet.content)
-    const issues = validation.ok ? [] : (validation.issues || [])
+    const issues = validation.ok ? [] : validation.issues || []
 
     const previewVersion = sheet.updatedAt ? new Date(sheet.updatedAt).toISOString() : '0'
     const previewToken = signHtmlPreviewToken({
@@ -89,7 +101,8 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
       sanitized: issues.length > 0,
       issues,
-      canInteract: Boolean(req.user) && (tier < RISK_TIER.FLAGGED || canModerateOrOwnSheet(sheet, req.user)),
+      canInteract:
+        Boolean(req.user) && (tier < RISK_TIER.FLAGGED || canModerateOrOwnSheet(sheet, req.user)),
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
@@ -117,7 +130,8 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null))
+      return res.status(404).json({ error: 'Sheet not found.' })
     if (sheet.contentFormat !== 'html') {
       return res.status(400).json({ error: 'This sheet is not in HTML mode.' })
     }
@@ -127,11 +141,16 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
     // Tier 0 (clean) sheets: any authenticated user can toggle interactive mode.
     // Higher-risk tiers: restrict to owner/admin only.
     if (tier >= RISK_TIER.FLAGGED && !canModerateOrOwnSheet(sheet, req.user)) {
-      return res.status(403).json({ error: 'Interactive preview for flagged sheets is only available to the sheet owner or an admin.' })
+      return res.status(403).json({
+        error:
+          'Interactive preview for flagged sheets is only available to the sheet owner or an admin.',
+      })
     }
 
     if (tier >= RISK_TIER.QUARANTINED) {
-      return res.status(403).json({ error: 'This sheet has been quarantined. Preview is disabled.' })
+      return res
+        .status(403)
+        .json({ error: 'This sheet has been quarantined. Preview is disabled.' })
     }
 
     const runtimeVersion = sheet.updatedAt ? new Date(sheet.updatedAt).toISOString() : '0'

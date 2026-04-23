@@ -30,20 +30,23 @@ export function ConfirmDeleteModal({ isOpen, onConfirm, onCancel }) {
       aria-modal="true"
       aria-label="Confirm delete conversation"
     >
-      <div style={{
-        width: '90%',
-        maxWidth: 380,
-        background: 'var(--sh-surface)',
-        borderRadius: 'var(--radius-card)',
-        padding: 24,
-        boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
-        fontFamily: PAGE_FONT,
-      }}>
+      <div
+        style={{
+          width: '90%',
+          maxWidth: 380,
+          background: 'var(--sh-surface)',
+          borderRadius: 'var(--radius-card)',
+          padding: 24,
+          boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)',
+          fontFamily: PAGE_FONT,
+        }}
+      >
         <h3 style={{ fontSize: 16, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 12 }}>
           Delete Conversation
         </h3>
         <p style={{ fontSize: 13, color: 'var(--sh-text)', marginBottom: 20, lineHeight: 1.5 }}>
-          Are you sure? For DMs this will archive the conversation. For groups you will leave the group. This cannot be undone.
+          Are you sure? For DMs this will archive the conversation. For groups you will leave the
+          group. This cannot be undone.
         </p>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
           <button

@@ -14,10 +14,17 @@ function MetadataBadge({ icon, label, color = 'var(--sh-subtext)' }) {
   return (
     <span
       style={{
-        display: 'inline-flex', alignItems: 'center', gap: 5,
-        padding: '3px 10px', borderRadius: 20,
-        background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
-        fontSize: 11, fontWeight: 700, color, whiteSpace: 'nowrap',
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 5,
+        padding: '3px 10px',
+        borderRadius: 20,
+        background: 'var(--sh-soft)',
+        border: '1px solid var(--sh-border)',
+        fontSize: 11,
+        fontWeight: 700,
+        color,
+        whiteSpace: 'nowrap',
       }}
     >
       {icon}
@@ -33,11 +40,20 @@ function ContributorAvatar({ user }) {
       to={`/users/${user.username}`}
       title={user.username}
       style={{
-        width: 28, height: 28, borderRadius: '50%',
-        background: 'var(--sh-avatar-bg)', color: 'var(--sh-avatar-text)',
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 11, fontWeight: 800, textTransform: 'uppercase', flexShrink: 0,
-        textDecoration: 'none', border: '2px solid var(--sh-surface)',
+        width: 28,
+        height: 28,
+        borderRadius: '50%',
+        background: 'var(--sh-avatar-bg)',
+        color: 'var(--sh-avatar-text)',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontSize: 11,
+        fontWeight: 800,
+        textTransform: 'uppercase',
+        flexShrink: 0,
+        textDecoration: 'none',
+        border: '2px solid var(--sh-surface)',
         marginLeft: -6,
       }}
     >
@@ -58,14 +74,24 @@ export default function SheetReadme({ sheet, readmeData }) {
       {sheet.description ? (
         <p
           style={{
-            margin: '0 0 16px', color: 'var(--sh-text)', fontSize: 14,
-            lineHeight: 1.75, whiteSpace: 'pre-wrap',
+            margin: '0 0 16px',
+            color: 'var(--sh-text)',
+            fontSize: 14,
+            lineHeight: 1.75,
+            whiteSpace: 'pre-wrap',
           }}
         >
           {sheet.description}
         </p>
       ) : (
-        <p style={{ margin: '0 0 16px', color: 'var(--sh-muted)', fontSize: 13, fontStyle: 'italic' }}>
+        <p
+          style={{
+            margin: '0 0 16px',
+            color: 'var(--sh-muted)',
+            fontSize: 13,
+            fontStyle: 'italic',
+          }}
+        >
           No description provided.
         </p>
       )}
@@ -73,18 +99,15 @@ export default function SheetReadme({ sheet, readmeData }) {
       {/* ── Metadata badges ──────────────────────────────────── */}
       <div
         style={{
-          display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 16,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 8,
+          marginBottom: 16,
           alignItems: 'center',
         }}
       >
-        <MetadataBadge
-          icon={<IconStar size={12} />}
-          label={`${sheet.stars || 0} stars`}
-        />
-        <MetadataBadge
-          icon={<IconFork size={12} />}
-          label={`${sheet.forks || 0} forks`}
-        />
+        <MetadataBadge icon={<IconStar size={12} />} label={`${sheet.stars || 0} stars`} />
+        <MetadataBadge icon={<IconFork size={12} />} label={`${sheet.forks || 0} forks`} />
         <MetadataBadge
           icon={<IconDownload size={12} />}
           label={`${sheet.downloads || 0} downloads`}
@@ -95,15 +118,8 @@ export default function SheetReadme({ sheet, readmeData }) {
           color="var(--sh-muted)"
         />
         {sheet.course?.code && (
-          <Link
-            to={`/sheets?courseId=${sheet.course.id}`}
-            style={{ textDecoration: 'none' }}
-          >
-            <MetadataBadge
-              icon={null}
-              label={sheet.course.code}
-              color="var(--sh-brand)"
-            />
+          <Link to={`/sheets?courseId=${sheet.course.id}`} style={{ textDecoration: 'none' }}>
+            <MetadataBadge icon={null} label={sheet.course.code} color="var(--sh-brand)" />
           </Link>
         )}
       </div>
@@ -111,14 +127,26 @@ export default function SheetReadme({ sheet, readmeData }) {
       {/* ── Contributors + latest commit row ─────────────────── */}
       <div
         style={{
-          display: 'flex', flexWrap: 'wrap', gap: 16,
-          alignItems: 'center', justifyContent: 'space-between',
-          borderTop: '1px solid var(--sh-border)', paddingTop: 14,
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: 16,
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          borderTop: '1px solid var(--sh-border)',
+          paddingTop: 14,
         }}
       >
         {/* Contributors */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              color: 'var(--sh-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.04em',
+            }}
+          >
             Contributors
           </span>
           <div style={{ display: 'flex', alignItems: 'center', paddingLeft: 6 }}>
@@ -126,7 +154,9 @@ export default function SheetReadme({ sheet, readmeData }) {
               <ContributorAvatar key={user.id} user={user} />
             ))}
             {contributors.length > 8 && (
-              <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', marginLeft: 6 }}>
+              <span
+                style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', marginLeft: 6 }}
+              >
                 +{contributors.length - 8}
               </span>
             )}
@@ -138,7 +168,15 @@ export default function SheetReadme({ sheet, readmeData }) {
 
         {/* Latest commit */}
         {latestCommit && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12, color: 'var(--sh-subtext)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              fontSize: 12,
+              color: 'var(--sh-subtext)',
+            }}
+          >
             {latestCommit.author && (
               <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
                 <Link
@@ -153,8 +191,11 @@ export default function SheetReadme({ sheet, readmeData }) {
             {latestCommit.message && (
               <span
                 style={{
-                  maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap', color: 'var(--sh-subtext)',
+                  maxWidth: 200,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  color: 'var(--sh-subtext)',
                 }}
                 title={latestCommit.message}
               >
@@ -164,17 +205,19 @@ export default function SheetReadme({ sheet, readmeData }) {
             {latestCommit.checksum && (
               <code
                 style={{
-                  fontSize: 11, fontWeight: 600, color: 'var(--sh-brand)',
-                  background: 'var(--sh-brand-soft)', padding: '1px 6px',
-                  borderRadius: 4, fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 11,
+                  fontWeight: 600,
+                  color: 'var(--sh-brand)',
+                  background: 'var(--sh-brand-soft)',
+                  padding: '1px 6px',
+                  borderRadius: 4,
+                  fontFamily: "'JetBrains Mono', monospace",
                 }}
               >
                 {latestCommit.checksum}
               </code>
             )}
-            <span style={{ color: 'var(--sh-muted)' }}>
-              {timeAgo(latestCommit.createdAt)}
-            </span>
+            <span style={{ color: 'var(--sh-muted)' }}>{timeAgo(latestCommit.createdAt)}</span>
           </div>
         )}
       </div>

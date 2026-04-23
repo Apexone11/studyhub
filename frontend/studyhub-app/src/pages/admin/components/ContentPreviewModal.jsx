@@ -18,9 +18,14 @@ function ContentPane({ preview }) {
           target="_blank"
           rel="noopener noreferrer"
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6,
-            fontSize: 13, fontWeight: 600, color: 'var(--sh-brand)',
-            textDecoration: 'none', marginBottom: 16,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            fontSize: 13,
+            fontWeight: 600,
+            color: 'var(--sh-brand)',
+            textDecoration: 'none',
+            marginBottom: 16,
             fontFamily: "'Plus Jakarta Sans', sans-serif",
           }}
         >
@@ -29,17 +34,31 @@ function ContentPane({ preview }) {
       )}
 
       {preview.title && (
-        <h3 style={{ fontSize: 16, fontWeight: 700, color: 'var(--sh-heading)', margin: '0 0 8px', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <h3
+          style={{
+            fontSize: 16,
+            fontWeight: 700,
+            color: 'var(--sh-heading)',
+            margin: '0 0 8px',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+          }}
+        >
           {preview.title}
         </h3>
       )}
 
       {preview.text && (
-        <div style={{
-          fontSize: 14, color: 'var(--sh-text)', lineHeight: 1.6,
-          marginBottom: 16, whiteSpace: 'pre-wrap', wordBreak: 'break-word',
-          fontFamily: "'Plus Jakarta Sans', sans-serif",
-        }}>
+        <div
+          style={{
+            fontSize: 14,
+            color: 'var(--sh-text)',
+            lineHeight: 1.6,
+            marginBottom: 16,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+          }}
+        >
           {preview.text}
         </div>
       )}
@@ -55,10 +74,15 @@ function ContentPane({ preview }) {
                   alt="Attachment"
                   loading="lazy"
                   style={{
-                    maxWidth: '100%', maxHeight: 400, borderRadius: 10,
-                    border: '1px solid var(--sh-border)', objectFit: 'contain',
+                    maxWidth: '100%',
+                    maxHeight: 400,
+                    borderRadius: 10,
+                    border: '1px solid var(--sh-border)',
+                    objectFit: 'contain',
                   }}
-                  onError={(e) => { e.target.style.display = 'none' }}
+                  onError={(e) => {
+                    e.target.style.display = 'none'
+                  }}
                 />
               )
             }
@@ -68,16 +92,28 @@ function ContentPane({ preview }) {
                   key={i}
                   src={`${API}${att.url}`}
                   title="PDF Preview"
-                  style={{ width: '100%', height: 400, borderRadius: 10, border: '1px solid var(--sh-border)' }}
+                  style={{
+                    width: '100%',
+                    height: 400,
+                    borderRadius: 10,
+                    border: '1px solid var(--sh-border)',
+                  }}
                 />
               )
             }
             return (
-              <div key={i} style={{
-                padding: 12, borderRadius: 10, border: '1px solid var(--sh-border)',
-                background: 'var(--sh-soft)', fontSize: 13, color: 'var(--sh-subtext)',
-                fontFamily: "'Plus Jakarta Sans', sans-serif",
-              }}>
+              <div
+                key={i}
+                style={{
+                  padding: 12,
+                  borderRadius: 10,
+                  border: '1px solid var(--sh-border)',
+                  background: 'var(--sh-soft)',
+                  fontSize: 13,
+                  color: 'var(--sh-subtext)',
+                  fontFamily: "'Plus Jakarta Sans', sans-serif",
+                }}
+              >
                 Attachment: {att.filename || 'file'} ({att.kind})
               </div>
             )
@@ -86,7 +122,14 @@ function ContentPane({ preview }) {
       )}
 
       {preview.owner && (
-        <div style={{ marginTop: 16, fontSize: 12, color: 'var(--sh-muted)', fontFamily: "'Plus Jakarta Sans', sans-serif" }}>
+        <div
+          style={{
+            marginTop: 16,
+            fontSize: 12,
+            color: 'var(--sh-muted)',
+            fontFamily: "'Plus Jakarta Sans', sans-serif",
+          }}
+        >
           By @{preview.owner.username} · {formatDateTime(preview.createdAt)}
         </div>
       )}
@@ -109,7 +152,9 @@ function ContextPane({ caseData, onConfirm, onDismiss, onIssueStrike }) {
       </div>
       <div className="admin-detail-row">
         <span className="admin-detail-row__label">Category</span>
-        <span className="admin-detail-row__value">{formatLabel(caseData.reasonCategory, '\u2014')}</span>
+        <span className="admin-detail-row__value">
+          {formatLabel(caseData.reasonCategory, '\u2014')}
+        </span>
       </div>
       <div className="admin-detail-row">
         <span className="admin-detail-row__label">Source</span>
@@ -121,11 +166,15 @@ function ContextPane({ caseData, onConfirm, onDismiss, onIssueStrike }) {
       </div>
       <div className="admin-detail-row">
         <span className="admin-detail-row__label">Status</span>
-        <span className="admin-detail-row__value"><AdminPill status={caseData.status}>{formatLabel(caseData.status)}</AdminPill></span>
+        <span className="admin-detail-row__value">
+          <AdminPill status={caseData.status}>{formatLabel(caseData.status)}</AdminPill>
+        </span>
       </div>
       <div className="admin-detail-row">
         <span className="admin-detail-row__label">Confidence</span>
-        <span className="admin-detail-row__value">{caseData.confidence != null ? `${(caseData.confidence * 100).toFixed(0)}%` : '\u2014'}</span>
+        <span className="admin-detail-row__value">
+          {caseData.confidence != null ? `${(caseData.confidence * 100).toFixed(0)}%` : '\u2014'}
+        </span>
       </div>
       <div className="admin-detail-row">
         <span className="admin-detail-row__label">Created</span>
@@ -135,7 +184,9 @@ function ContextPane({ caseData, onConfirm, onDismiss, onIssueStrike }) {
       {caseData.excerpt && (
         <div className="admin-detail-row">
           <span className="admin-detail-row__label">Reporter Note</span>
-          <span className="admin-detail-row__value" style={{ fontSize: 13, fontStyle: 'italic' }}>{caseData.excerpt}</span>
+          <span className="admin-detail-row__value" style={{ fontSize: 13, fontStyle: 'italic' }}>
+            {caseData.excerpt}
+          </span>
         </div>
       )}
 
@@ -167,15 +218,23 @@ function ContextPane({ caseData, onConfirm, onDismiss, onIssueStrike }) {
 
       {caseData.status === 'pending' && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 20 }}>
-          <button className="admin-btn admin-btn--danger" onClick={onConfirm}>Confirm Violation</button>
-          <button className="admin-btn admin-btn--ghost" onClick={onDismiss}>Dismiss</button>
-          <button className="admin-btn admin-btn--primary" onClick={onIssueStrike}>Issue Strike</button>
+          <button className="admin-btn admin-btn--danger" onClick={onConfirm}>
+            Confirm Violation
+          </button>
+          <button className="admin-btn admin-btn--ghost" onClick={onDismiss}>
+            Dismiss
+          </button>
+          <button className="admin-btn admin-btn--primary" onClick={onIssueStrike}>
+            Issue Strike
+          </button>
         </div>
       )}
 
       {caseData.status === 'confirmed' && (
         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 20 }}>
-          <button className="admin-btn admin-btn--primary" onClick={onIssueStrike}>Issue Strike</button>
+          <button className="admin-btn admin-btn--primary" onClick={onIssueStrike}>
+            Issue Strike
+          </button>
         </div>
       )}
     </div>
@@ -183,8 +242,12 @@ function ContextPane({ caseData, onConfirm, onDismiss, onIssueStrike }) {
 }
 
 export default function ContentPreviewModal({
-  open, onClose, caseId,
-  onConfirm, onDismiss, onIssueStrike,
+  open,
+  onClose,
+  caseId,
+  onConfirm,
+  onDismiss,
+  onIssueStrike,
 }) {
   const [caseData, setCaseData] = useState(null)
   const [preview, setPreview] = useState(null)
@@ -221,7 +284,9 @@ export default function ContentPreviewModal({
       size="xl"
     >
       {loading ? (
-        <div className="admin-loading" style={{ minHeight: 300 }}>Loading case details...</div>
+        <div className="admin-loading" style={{ minHeight: 300 }}>
+          Loading case details...
+        </div>
       ) : (
         <AdminSplitPanel
           left={<ContentPane preview={preview} caseData={caseData} />}

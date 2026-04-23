@@ -4,7 +4,11 @@ const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
-const { createProvenanceToken, verifyProvenanceToken, detectTampering } = require('../../lib/provenance')
+const {
+  createProvenanceToken,
+  verifyProvenanceToken,
+  detectTampering,
+} = require('../../lib/provenance')
 const { readLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
@@ -27,15 +31,12 @@ router.post('/:sheetId', requireAuth, async (req, res) => {
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (sheet.userId !== req.user.userId) {
-      return res.status(403).json({ error: 'Only the sheet owner can generate a provenance manifest.' })
+      return res
+        .status(403)
+        .json({ error: 'Only the sheet owner can generate a provenance manifest.' })
     }
 
-    const token = createProvenanceToken(
-      sheet.id,
-      sheet.userId,
-      sheet.content,
-      sheet.createdAt,
-    )
+    const token = createProvenanceToken(sheet.id, sheet.userId, sheet.content, sheet.createdAt)
 
     const manifest = await prisma.provenanceManifest.upsert({
       where: { sheetId },
@@ -176,7 +177,9 @@ router.delete('/:sheetId', requireAuth, async (req, res) => {
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
     if (sheet.userId !== req.user.userId && req.user.role !== 'admin') {
-      return res.status(403).json({ error: 'Only the sheet owner or an admin can delete a provenance manifest.' })
+      return res
+        .status(403)
+        .json({ error: 'Only the sheet owner or an admin can delete a provenance manifest.' })
     }
 
     const manifest = await prisma.provenanceManifest.findUnique({

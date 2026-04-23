@@ -26,7 +26,11 @@ export default function SheetLabContribute({ sheet, onContributed }) {
   const [loadingPreview, setLoadingPreview] = useState(false)
   /* Pre-submit checklist: all three must be checked before submit is enabled.
    * Reset every time the user re-enters the review step so it stays intentional. */
-  const [checklist, setChecklist] = useState({ reviewed: false, guidelines: false, original: false })
+  const [checklist, setChecklist] = useState({
+    reviewed: false,
+    guidelines: false,
+    original: false,
+  })
   const checklistReady = checklist.reviewed && checklist.guidelines && checklist.original
 
   const outgoing = sheet?.outgoingContributions || []
@@ -159,21 +163,34 @@ export default function SheetLabContribute({ sheet, onContributed }) {
   return (
     <div style={{ display: 'grid', gap: 20 }}>
       {/* Header */}
-      <div style={{ ...headerStyle, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+      <div
+        style={{
+          ...headerStyle,
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 12,
+        }}
+      >
         <div>
-          <h3 style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: 'var(--sh-heading)' }}>
+          <h3
+            style={{ margin: '0 0 4px', fontSize: 15, fontWeight: 800, color: 'var(--sh-heading)' }}
+          >
             Contribute to original
           </h3>
           <p style={{ margin: 0, fontSize: 13, color: 'var(--sh-muted)' }}>
             Submit your changes to{' '}
             {originalId ? (
-              <Link to={`/sheets/${originalId}`} style={{ color: 'var(--sh-brand, #6366f1)', textDecoration: 'underline' }}>
+              <Link
+                to={`/sheets/${originalId}`}
+                style={{ color: 'var(--sh-brand, #6366f1)', textDecoration: 'underline' }}
+              >
                 {originalTitle}
               </Link>
             ) : (
               <strong>{originalTitle}</strong>
-            )}
-            {' '}for the author to review.
+            )}{' '}
+            for the author to review.
           </p>
         </div>
         <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
@@ -183,7 +200,11 @@ export default function SheetLabContribute({ sheet, onContributed }) {
             disabled={loadingUpstreamDiff}
             style={compareButtonStyle}
           >
-            {loadingUpstreamDiff ? 'Comparing...' : showUpstreamDiff ? 'Hide comparison' : 'Compare to original'}
+            {loadingUpstreamDiff
+              ? 'Comparing...'
+              : showUpstreamDiff
+                ? 'Hide comparison'
+                : 'Compare to original'}
           </button>
           <button
             type="button"
@@ -200,20 +221,43 @@ export default function SheetLabContribute({ sheet, onContributed }) {
       {showUpstreamDiff && upstreamDiff ? (
         <div style={comparisonBoxStyle}>
           {upstreamDiff.identical ? (
-            <div style={{ padding: '14px 16px', fontSize: 13, color: 'var(--sh-success-text, #166534)', background: 'var(--sh-success-bg, #f0fdf4)', borderRadius: 12, border: '1px solid var(--sh-success-border, #bbf7d0)' }}>
+            <div
+              style={{
+                padding: '14px 16px',
+                fontSize: 13,
+                color: 'var(--sh-success-text, #166534)',
+                background: 'var(--sh-success-bg, #f0fdf4)',
+                borderRadius: 12,
+                border: '1px solid var(--sh-success-border, #bbf7d0)',
+              }}
+            >
               Your fork is identical to the original. No differences found.
             </div>
           ) : (
             <>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  marginBottom: 10,
+                  flexWrap: 'wrap',
+                  gap: 8,
+                }}
+              >
                 <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)' }}>
                   Differences from{' '}
-                  <Link to={`/sheets/${upstreamDiff.upstream?.id}`} style={{ color: 'var(--sh-brand, #6366f1)', textDecoration: 'underline' }}>
+                  <Link
+                    to={`/sheets/${upstreamDiff.upstream?.id}`}
+                    style={{ color: 'var(--sh-brand, #6366f1)', textDecoration: 'underline' }}
+                  >
                     {upstreamDiff.upstream?.title || 'original'}
                   </Link>
                 </span>
                 {upstreamDiff.summary ? (
-                  <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>{upstreamDiff.summary}</span>
+                  <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+                    {upstreamDiff.summary}
+                  </span>
                 ) : null}
               </div>
               <DiffViewer diff={upstreamDiff.diff} title="Your changes vs. original" />
@@ -227,7 +271,9 @@ export default function SheetLabContribute({ sheet, onContributed }) {
         submitStep === 'compose' ? (
           /* Step 1: Compose message */
           <div style={formBoxStyle}>
-            <label style={labelStyle} htmlFor="contribute-msg">Message (optional)</label>
+            <label style={labelStyle} htmlFor="contribute-msg">
+              Message (optional)
+            </label>
             <textarea
               id="contribute-msg"
               value={message}
@@ -249,7 +295,15 @@ export default function SheetLabContribute({ sheet, onContributed }) {
         ) : (
           /* Step 2: Review changes summary + confirm submission */
           <div style={formBoxStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <div
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                flexWrap: 'wrap',
+                gap: 8,
+              }}
+            >
               <h4 style={{ margin: 0, fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)' }}>
                 Review your contribution
               </h4>
@@ -262,10 +316,15 @@ export default function SheetLabContribute({ sheet, onContributed }) {
             {previewDiff?.diff ? (
               <div style={changesSummaryStyle}>
                 <div style={{ display: 'flex', gap: 16, fontSize: 13, fontWeight: 700 }}>
-                  <span style={{ color: 'var(--sh-success)' }}>+{previewDiff.diff.additions} additions</span>
-                  <span style={{ color: 'var(--sh-danger)' }}>−{previewDiff.diff.deletions} deletions</span>
+                  <span style={{ color: 'var(--sh-success)' }}>
+                    +{previewDiff.diff.additions} additions
+                  </span>
+                  <span style={{ color: 'var(--sh-danger)' }}>
+                    −{previewDiff.diff.deletions} deletions
+                  </span>
                   <span style={{ color: 'var(--sh-muted)' }}>
-                    {(previewDiff.diff.hunks || []).length} {(previewDiff.diff.hunks || []).length === 1 ? 'section' : 'sections'} changed
+                    {(previewDiff.diff.hunks || []).length}{' '}
+                    {(previewDiff.diff.hunks || []).length === 1 ? 'section' : 'sections'} changed
                   </span>
                 </div>
                 <DiffViewer diff={previewDiff.diff} title="Changes you are contributing" />
@@ -274,12 +333,39 @@ export default function SheetLabContribute({ sheet, onContributed }) {
 
             {/* Message preview */}
             {message.trim() ? (
-              <div style={{ padding: '10px 14px', borderRadius: 10, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)' }}>
-                <span style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase' }}>Your message</span>
-                <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--sh-heading)', lineHeight: 1.5 }}>{message.trim()}</p>
+              <div
+                style={{
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  background: 'var(--sh-soft)',
+                  border: '1px solid var(--sh-border)',
+                }}
+              >
+                <span
+                  style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: 'var(--sh-muted)',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  Your message
+                </span>
+                <p
+                  style={{
+                    margin: '4px 0 0',
+                    fontSize: 13,
+                    color: 'var(--sh-heading)',
+                    lineHeight: 1.5,
+                  }}
+                >
+                  {message.trim()}
+                </p>
               </div>
             ) : (
-              <p style={{ margin: 0, fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>No message attached.</p>
+              <p style={{ margin: 0, fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>
+                No message attached.
+              </p>
             )}
 
             {/* Pre-submit checklist — all three must be ticked */}
@@ -301,7 +387,12 @@ export default function SheetLabContribute({ sheet, onContributed }) {
                 />
                 <span>
                   My contribution follows the{' '}
-                  <Link to="/guidelines" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--sh-brand)', fontWeight: 600 }}>
+                  <Link
+                    to="/guidelines"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ color: 'var(--sh-brand)', fontWeight: 600 }}
+                  >
                     Community Guidelines
                   </Link>
                   .
@@ -324,8 +415,8 @@ export default function SheetLabContribute({ sheet, onContributed }) {
                 disabled={submitting || !checklistReady}
                 style={{
                   ...submitButtonStyle,
-                  opacity: (submitting || !checklistReady) ? 0.5 : 1,
-                  cursor: (submitting || !checklistReady) ? 'not-allowed' : 'pointer',
+                  opacity: submitting || !checklistReady ? 0.5 : 1,
+                  cursor: submitting || !checklistReady ? 'not-allowed' : 'pointer',
                 }}
               >
                 {submitting ? 'Submitting...' : 'Confirm & submit contribution'}
@@ -335,23 +426,42 @@ export default function SheetLabContribute({ sheet, onContributed }) {
         )
       ) : (
         <div style={pendingBannerStyle}>
-          You already have a pending contribution. Wait for the author to review it before submitting another.
+          You already have a pending contribution. Wait for the author to review it before
+          submitting another.
         </div>
       )}
 
       {/* Contribution history */}
       {outgoing.length > 0 ? (
         <div style={{ display: 'grid', gap: 10 }}>
-          <h4 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.3px' }}>
+          <h4
+            style={{
+              margin: 0,
+              fontSize: 13,
+              fontWeight: 700,
+              color: 'var(--sh-muted)',
+              textTransform: 'uppercase',
+              letterSpacing: '0.3px',
+            }}
+          >
             Your contributions ({outgoing.length})
           </h4>
           {outgoing.map((c) => (
             <div key={c.id} style={cardStyle}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  gap: 10,
+                }}
+              >
                 <div style={{ flex: 1 }}>
                   <StatusBadge status={c.status} />
                   {c.message ? (
-                    <span style={{ marginLeft: 8, fontSize: 13, color: 'var(--sh-heading)' }}>{c.message}</span>
+                    <span style={{ marginLeft: 8, fontSize: 13, color: 'var(--sh-heading)' }}>
+                      {c.message}
+                    </span>
                   ) : null}
                 </div>
                 <span style={{ fontSize: 11, color: 'var(--sh-muted)', whiteSpace: 'nowrap' }}>
@@ -359,13 +469,29 @@ export default function SheetLabContribute({ sheet, onContributed }) {
                 </span>
               </div>
               {c.reviewer ? (
-                <div style={{ marginTop: 8, padding: '8px 12px', borderRadius: 10, background: 'var(--sh-soft)', border: '1px solid var(--sh-border)' }}>
+                <div
+                  style={{
+                    marginTop: 8,
+                    padding: '8px 12px',
+                    borderRadius: 10,
+                    background: 'var(--sh-soft)',
+                    border: '1px solid var(--sh-border)',
+                  }}
+                >
                   <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
-                    {c.status === 'accepted' ? 'Accepted' : 'Rejected'} by <strong>{c.reviewer.username}</strong>
+                    {c.status === 'accepted' ? 'Accepted' : 'Rejected'} by{' '}
+                    <strong>{c.reviewer.username}</strong>
                     {c.reviewedAt ? ` on ${new Date(c.reviewedAt).toLocaleDateString()}` : ''}
                   </div>
                   {c.reviewComment ? (
-                    <p style={{ margin: '6px 0 0', fontSize: 13, color: 'var(--sh-heading)', lineHeight: 1.5 }}>
+                    <p
+                      style={{
+                        margin: '6px 0 0',
+                        fontSize: 13,
+                        color: 'var(--sh-heading)',
+                        lineHeight: 1.5,
+                      }}
+                    >
                       {c.reviewComment}
                     </p>
                   ) : null}
@@ -391,7 +517,9 @@ export default function SheetLabContribute({ sheet, onContributed }) {
         </div>
       ) : (
         <div style={emptyStyle}>
-          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>No contributions yet</p>
+          <p style={{ margin: 0, fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>
+            No contributions yet
+          </p>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: 'var(--sh-muted)' }}>
             When you're ready, submit your changes above for the original author to review.
           </p>
@@ -411,10 +539,17 @@ function StatusBadge({ status }) {
   }
   const s = styles[status] || styles.pending
   return (
-    <span style={{
-      display: 'inline-flex', fontSize: 11, fontWeight: 700, padding: '2px 8px',
-      borderRadius: 6, textTransform: 'capitalize', ...s,
-    }}>
+    <span
+      style={{
+        display: 'inline-flex',
+        fontSize: 11,
+        fontWeight: 700,
+        padding: '2px 8px',
+        borderRadius: 6,
+        textTransform: 'capitalize',
+        ...s,
+      }}
+    >
       {status}
     </span>
   )
@@ -423,107 +558,171 @@ function StatusBadge({ status }) {
 /* ── Styles ────────────────────────────────────────────────── */
 
 const headerStyle = {
-  padding: '14px 16px', borderRadius: 14,
-  background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
+  padding: '14px 16px',
+  borderRadius: 14,
+  background: 'var(--sh-surface)',
+  border: '1px solid var(--sh-border)',
 }
 
 const formBoxStyle = {
-  padding: 16, borderRadius: 14,
-  background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
-  display: 'grid', gap: 10,
+  padding: 16,
+  borderRadius: 14,
+  background: 'var(--sh-surface)',
+  border: '1px solid var(--sh-border)',
+  display: 'grid',
+  gap: 10,
 }
 
 const labelStyle = {
-  display: 'block', fontSize: 12, fontWeight: 700,
-  color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.3px',
+  display: 'block',
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'var(--sh-muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.3px',
 }
 
 const textareaStyle = {
-  width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-  borderRadius: 10, border: '1px solid var(--sh-border)',
-  background: 'var(--sh-soft)', color: 'var(--sh-heading)',
-  fontSize: 13, fontFamily: 'inherit', resize: 'vertical',
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)',
+  color: 'var(--sh-heading)',
+  fontSize: 13,
+  fontFamily: 'inherit',
+  resize: 'vertical',
 }
 
 const submitButtonStyle = {
-  justifySelf: 'start', padding: '10px 20px', borderRadius: 10,
-  border: 'none', background: 'linear-gradient(135deg, #6366f1, #818cf8)',
-  color: '#fff', fontWeight: 700, fontSize: 13, cursor: 'pointer', fontFamily: 'inherit',
+  justifySelf: 'start',
+  padding: '10px 20px',
+  borderRadius: 10,
+  border: 'none',
+  background: 'linear-gradient(135deg, #6366f1, #818cf8)',
+  color: '#fff',
+  fontWeight: 700,
+  fontSize: 13,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const compareButtonStyle = {
-  padding: '8px 16px', borderRadius: 10, whiteSpace: 'nowrap',
-  border: '1px solid #c7d2fe', background: '#eef2ff',
-  color: '#4338ca', fontWeight: 700, fontSize: 12,
-  cursor: 'pointer', fontFamily: 'inherit',
+  padding: '8px 16px',
+  borderRadius: 10,
+  whiteSpace: 'nowrap',
+  border: '1px solid #c7d2fe',
+  background: '#eef2ff',
+  color: '#4338ca',
+  fontWeight: 700,
+  fontSize: 12,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const comparisonBoxStyle = {
-  padding: 16, borderRadius: 14,
-  background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
+  padding: 16,
+  borderRadius: 14,
+  background: 'var(--sh-surface)',
+  border: '1px solid var(--sh-border)',
 }
 
 const syncButtonStyle = {
-  padding: '8px 16px', borderRadius: 10, whiteSpace: 'nowrap',
-  border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
-  color: 'var(--sh-heading)', fontWeight: 700, fontSize: 12,
-  cursor: 'pointer', fontFamily: 'inherit',
+  padding: '8px 16px',
+  borderRadius: 10,
+  whiteSpace: 'nowrap',
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)',
+  color: 'var(--sh-heading)',
+  fontWeight: 700,
+  fontSize: 12,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const pendingBannerStyle = {
-  padding: '12px 16px', borderRadius: 12, fontSize: 13,
+  padding: '12px 16px',
+  borderRadius: 12,
+  fontSize: 13,
   background: 'var(--sh-warning-bg, #fffbeb)',
   border: '1px solid var(--sh-warning-border, #fde68a)',
   color: 'var(--sh-warning-text, #92400e)',
 }
 
 const cardStyle = {
-  padding: '14px 16px', borderRadius: 14,
-  background: 'var(--sh-surface)', border: '1px solid var(--sh-border)',
+  padding: '14px 16px',
+  borderRadius: 14,
+  background: 'var(--sh-surface)',
+  border: '1px solid var(--sh-border)',
 }
 
 const diffToggleStyle = {
-  padding: '4px 10px', borderRadius: 8,
-  border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
-  color: 'var(--sh-muted)', fontSize: 11, fontWeight: 700,
-  cursor: 'pointer', fontFamily: 'inherit',
+  padding: '4px 10px',
+  borderRadius: 8,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)',
+  color: 'var(--sh-muted)',
+  fontSize: 11,
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const backButtonStyle = {
-  padding: '4px 12px', borderRadius: 8,
-  border: '1px solid var(--sh-border)', background: 'var(--sh-soft)',
-  color: 'var(--sh-muted)', fontSize: 12, fontWeight: 700,
-  cursor: 'pointer', fontFamily: 'inherit',
+  padding: '4px 12px',
+  borderRadius: 8,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-soft)',
+  color: 'var(--sh-muted)',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const changesSummaryStyle = {
-  display: 'grid', gap: 12,
-  padding: 14, borderRadius: 12,
-  background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
+  display: 'grid',
+  gap: 12,
+  padding: 14,
+  borderRadius: 12,
+  background: 'var(--sh-soft)',
+  border: '1px solid var(--sh-border)',
 }
 
 const emptyStyle = {
-  textAlign: 'center', padding: '40px 24px',
-  background: 'var(--sh-surface)', border: '1px dashed var(--sh-border)',
+  textAlign: 'center',
+  padding: '40px 24px',
+  background: 'var(--sh-surface)',
+  border: '1px dashed var(--sh-border)',
   borderRadius: 14,
 }
 
 const checklistStyle = {
-  display: 'grid', gap: 10,
-  padding: '12px 14px', borderRadius: 12,
-  background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
+  display: 'grid',
+  gap: 10,
+  padding: '12px 14px',
+  borderRadius: 12,
+  background: 'var(--sh-soft)',
+  border: '1px solid var(--sh-border)',
   margin: 0,
 }
 
 const checklistLegendStyle = {
   padding: '0 6px',
-  fontSize: 11, fontWeight: 800,
+  fontSize: 11,
+  fontWeight: 800,
   color: 'var(--sh-muted)',
-  textTransform: 'uppercase', letterSpacing: '0.3px',
+  textTransform: 'uppercase',
+  letterSpacing: '0.3px',
 }
 
 const checklistItemStyle = {
-  display: 'flex', alignItems: 'flex-start', gap: 8,
-  fontSize: 13, color: 'var(--sh-heading)', lineHeight: 1.5,
+  display: 'flex',
+  alignItems: 'flex-start',
+  gap: 8,
+  fontSize: 13,
+  color: 'var(--sh-heading)',
+  lineHeight: 1.5,
   cursor: 'pointer',
 }

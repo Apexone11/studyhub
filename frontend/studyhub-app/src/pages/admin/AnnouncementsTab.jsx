@@ -109,7 +109,9 @@ export default function AnnouncementsTab({
     }
 
     // Clean up
-    images.forEach((img) => { if (img.preview) URL.revokeObjectURL(img.preview) })
+    images.forEach((img) => {
+      if (img.preview) URL.revokeObjectURL(img.preview)
+    })
     setImages([])
     setUploading(false)
   }
@@ -140,15 +142,17 @@ export default function AnnouncementsTab({
               lineHeight: 1.7,
             }}
           />
-          <div style={{
-            position: 'absolute',
-            bottom: 8,
-            right: 12,
-            fontSize: 11,
-            color: bodyPct > 0.9 ? 'var(--sh-danger-text)' : 'var(--sh-muted)',
-            fontWeight: bodyPct > 0.9 ? 600 : 400,
-            pointerEvents: 'none',
-          }}>
+          <div
+            style={{
+              position: 'absolute',
+              bottom: 8,
+              right: 12,
+              fontSize: 11,
+              color: bodyPct > 0.9 ? 'var(--sh-danger-text)' : 'var(--sh-muted)',
+              fontWeight: bodyPct > 0.9 ? 600 : 400,
+              pointerEvents: 'none',
+            }}
+          >
             {bodyLen.toLocaleString()} / {MAX_BODY.toLocaleString()}
           </div>
         </div>
@@ -179,7 +183,9 @@ export default function AnnouncementsTab({
           </div>
 
           {imageError && (
-            <div style={{ color: 'var(--sh-danger-text)', fontSize: 12, marginBottom: 8 }}>{imageError}</div>
+            <div style={{ color: 'var(--sh-danger-text)', fontSize: 12, marginBottom: 8 }}>
+              {imageError}
+            </div>
           )}
 
           {images.length > 0 && (
@@ -226,7 +232,15 @@ export default function AnnouncementsTab({
           )}
         </div>
 
-        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--sh-muted)' }}>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 13,
+            color: 'var(--sh-muted)',
+          }}
+        >
           <input
             type="checkbox"
             checked={announceForm.pinned}
@@ -262,21 +276,37 @@ export default function AnnouncementsTab({
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
               <div style={{ flex: 1, minWidth: 0 }}>
                 {record.pinned && (
-                  <div style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-warning-text)', marginBottom: 5 }}>
+                  <div
+                    style={{
+                      fontSize: 10,
+                      fontWeight: 700,
+                      color: 'var(--sh-warning-text)',
+                      marginBottom: 5,
+                    }}
+                  >
                     PINNED
                   </div>
                 )}
-                <div style={{ fontSize: 14, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 6 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 800,
+                    color: 'var(--sh-heading)',
+                    marginBottom: 6,
+                  }}
+                >
                   {record.title}
                 </div>
-                <div style={{
-                  fontSize: 13,
-                  color: 'var(--sh-muted)',
-                  lineHeight: 1.7,
-                  whiteSpace: 'pre-wrap',
-                  maxHeight: 200,
-                  overflow: 'hidden',
-                }}>
+                <div
+                  style={{
+                    fontSize: 13,
+                    color: 'var(--sh-muted)',
+                    lineHeight: 1.7,
+                    whiteSpace: 'pre-wrap',
+                    maxHeight: 200,
+                    overflow: 'hidden',
+                  }}
+                >
                   {record.body}
                 </div>
                 {record.body?.length > 500 && (
@@ -286,34 +316,38 @@ export default function AnnouncementsTab({
                 )}
                 {record.media?.length > 0 && (
                   <div style={{ display: 'flex', gap: 6, marginTop: 8, flexWrap: 'wrap' }}>
-                    {record.media.filter((m) => m.type === 'image').map((m) => (
-                      <img
-                        key={m.id}
-                        src={m.url}
-                        alt=""
+                    {record.media
+                      .filter((m) => m.type === 'image')
+                      .map((m) => (
+                        <img
+                          key={m.id}
+                          src={m.url}
+                          alt=""
+                          style={{
+                            width: 60,
+                            height: 60,
+                            objectFit: 'cover',
+                            borderRadius: 6,
+                            border: '1px solid var(--sh-border)',
+                          }}
+                        />
+                      ))}
+                    {record.media.some((m) => m.type === 'video') && (
+                      <div
                         style={{
                           width: 60,
                           height: 60,
-                          objectFit: 'cover',
                           borderRadius: 6,
                           border: '1px solid var(--sh-border)',
+                          background: 'var(--sh-soft)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          fontSize: 10,
+                          color: 'var(--sh-muted)',
+                          fontWeight: 600,
                         }}
-                      />
-                    ))}
-                    {record.media.some((m) => m.type === 'video') && (
-                      <div style={{
-                        width: 60,
-                        height: 60,
-                        borderRadius: 6,
-                        border: '1px solid var(--sh-border)',
-                        background: 'var(--sh-soft)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        fontSize: 10,
-                        color: 'var(--sh-muted)',
-                        fontWeight: 600,
-                      }}>
+                      >
                         Video
                       </div>
                     )}
@@ -324,14 +358,22 @@ export default function AnnouncementsTab({
                 <button
                   type="button"
                   onClick={() => void togglePin(record.id)}
-                  style={pillButton('var(--sh-info-bg)', 'var(--sh-info-text)', 'var(--sh-info-border)')}
+                  style={pillButton(
+                    'var(--sh-info-bg)',
+                    'var(--sh-info-text)',
+                    'var(--sh-info-border)',
+                  )}
                 >
                   {record.pinned ? 'Unpin' : 'Pin'}
                 </button>
                 <button
                   type="button"
                   onClick={() => void deleteAnnouncement(record.id)}
-                  style={pillButton('var(--sh-danger-bg)', 'var(--sh-danger-text)', 'var(--sh-danger-border)')}
+                  style={pillButton(
+                    'var(--sh-danger-bg)',
+                    'var(--sh-danger-text)',
+                    'var(--sh-danger-border)',
+                  )}
                 >
                   Delete
                 </button>

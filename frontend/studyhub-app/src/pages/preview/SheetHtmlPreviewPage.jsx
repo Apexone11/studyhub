@@ -250,11 +250,26 @@ export default function SheetHtmlPreviewPage() {
               ) : null}
 
               {state.preview?.sanitized ? (
-                <section style={{ ...panelStyle(), borderColor: 'var(--sh-warning-border)', background: 'var(--sh-warning-bg)' }}>
-                  <div style={{ fontSize: 13, color: 'var(--sh-warning-dark-text)', fontWeight: 800 }}>
+                <section
+                  style={{
+                    ...panelStyle(),
+                    borderColor: 'var(--sh-warning-border)',
+                    background: 'var(--sh-warning-bg)',
+                  }}
+                >
+                  <div
+                    style={{ fontSize: 13, color: 'var(--sh-warning-dark-text)', fontWeight: 800 }}
+                  >
                     Safe preview mode
                   </div>
-                  <div style={{ fontSize: 12, color: 'var(--sh-warning-dark-text)', marginTop: 6, lineHeight: 1.6 }}>
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--sh-warning-dark-text)',
+                      marginTop: 6,
+                      lineHeight: 1.6,
+                    }}
+                  >
                     This preview has scripts and embeds disabled for safety. Review the scan
                     findings below if you want a clean report.
                   </div>
@@ -312,7 +327,8 @@ export default function SheetHtmlPreviewPage() {
                           fontWeight: 600,
                         }}
                       >
-                        Press <kbd
+                        Press{' '}
+                        <kbd
                           style={{
                             padding: '1px 6px',
                             borderRadius: 4,
@@ -322,7 +338,10 @@ export default function SheetHtmlPreviewPage() {
                             fontSize: 10,
                             color: 'var(--sh-slate-200, #e2e8f0)',
                           }}
-                        >Esc</kbd> to exit
+                        >
+                          Esc
+                        </kbd>{' '}
+                        to exit
                       </span>
                       <button
                         type="button"
@@ -343,7 +362,17 @@ export default function SheetHtmlPreviewPage() {
                           fontFamily: 'inherit',
                         }}
                       >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <svg
+                          width="14"
+                          height="14"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          strokeWidth="2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          aria-hidden="true"
+                        >
                           <line x1="18" y1="6" x2="6" y2="18" />
                           <line x1="6" y1="6" x2="18" y2="18" />
                         </svg>
@@ -354,7 +383,14 @@ export default function SheetHtmlPreviewPage() {
                 ) : null}
 
                 {runtimeLoading && interactive ? (
-                  <div style={{ padding: 24, textAlign: 'center', fontSize: 13, color: 'var(--sh-muted)' }}>
+                  <div
+                    style={{
+                      padding: 24,
+                      textAlign: 'center',
+                      fontSize: 13,
+                      color: 'var(--sh-muted)',
+                    }}
+                  >
                     Loading interactive preview…
                   </div>
                 ) : (

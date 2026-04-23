@@ -12,7 +12,9 @@ export function useIdleTimeout(onIdle, { enabled = true, timeoutMs = DEFAULT_TIM
   const onIdleRef = useRef(onIdle)
 
   // Keep callback ref in sync via effect (React 19 disallows ref writes during render)
-  useEffect(() => { onIdleRef.current = onIdle }, [onIdle])
+  useEffect(() => {
+    onIdleRef.current = onIdle
+  }, [onIdle])
 
   const resetTimer = useCallback(() => {
     if (timerRef.current) clearTimeout(timerRef.current)

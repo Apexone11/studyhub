@@ -59,10 +59,7 @@ function getEncryptionKey() {
  * @returns {{ originHash: string, encryptedToken: string, algorithm: string, iv: string, authTag: string }}
  */
 function createProvenanceToken(sheetId, userId, content, createdAt) {
-  const contentHash = crypto
-    .createHash('sha256')
-    .update(String(content))
-    .digest('hex')
+  const contentHash = crypto.createHash('sha256').update(String(content)).digest('hex')
 
   const payload = JSON.stringify({
     sheetId,
@@ -72,10 +69,7 @@ function createProvenanceToken(sheetId, userId, content, createdAt) {
     version: PROVENANCE_VERSION,
   })
 
-  const originHash = crypto
-    .createHash('sha256')
-    .update(payload)
-    .digest('hex')
+  const originHash = crypto.createHash('sha256').update(payload).digest('hex')
 
   const key = getEncryptionKey()
   const iv = crypto.randomBytes(IV_LENGTH)
@@ -110,11 +104,7 @@ function verifyProvenanceToken(encryptedToken, iv, authTag, algorithm) {
     }
 
     const key = getEncryptionKey()
-    const decipher = crypto.createDecipheriv(
-      ALGORITHM,
-      key,
-      Buffer.from(iv, 'hex'),
-    )
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, Buffer.from(iv, 'hex'))
     decipher.setAuthTag(Buffer.from(authTag, 'hex'))
 
     let decrypted = decipher.update(encryptedToken, 'base64', 'utf8')
@@ -123,10 +113,7 @@ function verifyProvenanceToken(encryptedToken, iv, authTag, algorithm) {
     const payload = JSON.parse(decrypted)
 
     // Re-derive originHash and verify integrity
-    const expectedOriginHash = crypto
-      .createHash('sha256')
-      .update(decrypted)
-      .digest('hex')
+    const expectedOriginHash = crypto.createHash('sha256').update(decrypted).digest('hex')
 
     return {
       valid: true,
@@ -164,10 +151,7 @@ function detectTampering(sheet, manifest) {
     }
   }
 
-  const currentContentHash = crypto
-    .createHash('sha256')
-    .update(String(sheet.content))
-    .digest('hex')
+  const currentContentHash = crypto.createHash('sha256').update(String(sheet.content)).digest('hex')
 
   const originalContentHash = result.payload.contentHash
   const tampered = currentContentHash !== originalContentHash

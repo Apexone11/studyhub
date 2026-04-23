@@ -30,10 +30,12 @@ const httpLogger = pinoHttp({
   autoLogging: {
     ignore: (req) => {
       const path = req.url || ''
-      return path === '/health'
-        || path === '/'
-        || path.startsWith('/uploads/avatars/')
-        || path.startsWith('/favicon')
+      return (
+        path === '/health' ||
+        path === '/' ||
+        path.startsWith('/uploads/avatars/') ||
+        path.startsWith('/favicon')
+      )
     },
   },
 

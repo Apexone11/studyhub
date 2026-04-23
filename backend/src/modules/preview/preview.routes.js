@@ -2,7 +2,10 @@ const express = require('express')
 const { previewLimiter } = require('../../lib/rateLimiters')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { buildPreviewDocument, buildInteractiveDocument } = require('../../lib/html/htmlPreviewDocument')
+const {
+  buildPreviewDocument,
+  buildInteractiveDocument,
+} = require('../../lib/html/htmlPreviewDocument')
 const { verifyHtmlPreviewToken } = require('../../lib/previewTokens')
 const { ERROR_CODES, sendError } = require('../../middleware/errorEnvelope')
 const { RISK_TIER } = require('../../lib/html/htmlSecurity')
@@ -26,9 +29,9 @@ const BASE_PREVIEW_DIRECTIVES = [
   "default-src 'none'",
   "style-src 'unsafe-inline' https://fonts.googleapis.com",
   "style-src-elem 'unsafe-inline' https://fonts.googleapis.com",
-  "img-src data: blob: https:",
-  "media-src data: blob:",
-  "font-src data: blob: https://fonts.gstatic.com",
+  'img-src data: blob: https:',
+  'media-src data: blob:',
+  'font-src data: blob: https://fonts.gstatic.com',
   "connect-src 'none'",
   "form-action 'none'",
   "frame-src 'none'",
@@ -62,7 +65,12 @@ router.get('/html', async (req, res) => {
   try {
     payload = verifyHtmlPreviewToken(rawToken)
   } catch {
-    return sendError(res, 403, 'Preview token is invalid or expired.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
+    return sendError(
+      res,
+      403,
+      'Preview token is invalid or expired.',
+      ERROR_CODES.PREVIEW_TOKEN_INVALID,
+    )
   }
 
   const sheetId = parseInteger(payload?.sheetId)
@@ -72,7 +80,12 @@ router.get('/html', async (req, res) => {
   const tier = Number.isInteger(payload?.tier) ? payload.tier : 0
 
   if (!tokenType || !sheetId || !tokenVersion) {
-    return sendError(res, 403, 'Preview token is invalid or expired.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
+    return sendError(
+      res,
+      403,
+      'Preview token is invalid or expired.',
+      ERROR_CODES.PREVIEW_TOKEN_INVALID,
+    )
   }
 
   try {
@@ -96,22 +109,42 @@ router.get('/html', async (req, res) => {
 
     const currentVersion = sheet.updatedAt ? new Date(sheet.updatedAt).toISOString() : '0'
     if (currentVersion !== tokenVersion) {
-      return sendError(res, 403, 'Preview token is invalid or expired.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
+      return sendError(
+        res,
+        403,
+        'Preview token is invalid or expired.',
+        ERROR_CODES.PREVIEW_TOKEN_INVALID,
+      )
     }
 
     if (sheet.status !== 'published' && !allowUnpublished) {
-      return sendError(res, 403, 'Preview token is invalid or expired.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
+      return sendError(
+        res,
+        403,
+        'Preview token is invalid or expired.',
+        ERROR_CODES.PREVIEW_TOKEN_INVALID,
+      )
     }
 
     // Tier 3 (quarantined): always block preview
     const effectiveTier = Math.max(tier, sheet.htmlRiskTier || 0)
     if (effectiveTier >= RISK_TIER.QUARANTINED) {
-      return sendError(res, 403, 'This sheet has been quarantined. Preview is disabled.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
+      return sendError(
+        res,
+        403,
+        'This sheet has been quarantined. Preview is disabled.',
+        ERROR_CODES.PREVIEW_TOKEN_INVALID,
+      )
     }
 
     // Tier 2 (high risk): only serve if allowUnpublished (admin/owner)
     if (effectiveTier >= RISK_TIER.HIGH_RISK && !allowUnpublished) {
-      return sendError(res, 403, 'This sheet is pending safety review. Preview is disabled.', ERROR_CODES.PREVIEW_TOKEN_INVALID)
+      return sendError(
+        res,
+        403,
+        'This sheet is pending safety review. Preview is disabled.',
+        ERROR_CODES.PREVIEW_TOKEN_INVALID,
+      )
     }
 
     const isRuntime = tokenType === 'html-runtime'

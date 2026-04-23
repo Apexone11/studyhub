@@ -10,7 +10,11 @@ const COURSES_MAJOR = {
     { name: 'Introduction to Computer Systems', code: 'CMSC216', department: 'Computer Science' },
     { name: 'Discrete Structures', code: 'CMSC250', department: 'Computer Science' },
     { name: 'Introduction to Data Science', code: 'CMSC320', department: 'Computer Science' },
-    { name: 'Organization of Programming Languages', code: 'CMSC330', department: 'Computer Science' },
+    {
+      name: 'Organization of Programming Languages',
+      code: 'CMSC330',
+      department: 'Computer Science',
+    },
     { name: 'Web Application Development', code: 'CMSC335', department: 'Computer Science' },
     { name: 'Algorithms', code: 'CMSC351', department: 'Computer Science' },
     { name: 'Computer Graphics', code: 'CMSC425', department: 'Computer Science' },

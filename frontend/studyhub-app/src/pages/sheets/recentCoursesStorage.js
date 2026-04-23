@@ -43,6 +43,8 @@ export function recordRecentCourse(entries, course, now = Date.now()) {
     viewedAt: new Date(now).toISOString(),
   }
 
-  const dedupedEntries = pruneRecentCourses(entries, now).filter((entry) => String(entry.id) !== String(course.id))
+  const dedupedEntries = pruneRecentCourses(entries, now).filter(
+    (entry) => String(entry.id) !== String(course.id),
+  )
   return pruneRecentCourses([nextEntry, ...dedupedEntries], now)
 }

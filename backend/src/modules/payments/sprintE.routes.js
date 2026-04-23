@@ -24,10 +24,7 @@ const log = require('../../lib/logger')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { PLANS } = require('./payments.constants')
 const service = require('./payments.service')
-const {
-  paymentCheckoutLimiter,
-  paymentReadLimiter,
-} = require('../../lib/rateLimiters')
+const { paymentCheckoutLimiter, paymentReadLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
@@ -201,18 +198,22 @@ router.post('/referral/redeem', requireAuth, paymentCheckoutLimiter, async (req,
     }
 
     if (referral.expiresAt && referral.expiresAt < new Date()) {
-      await prisma.referralCode.update({
-        where: { id: referral.id },
-        data: { active: false },
-      }).catch(() => {})
+      await prisma.referralCode
+        .update({
+          where: { id: referral.id },
+          data: { active: false },
+        })
+        .catch(() => {})
       return sendError(res, 400, 'This referral code has expired.', ERROR_CODES.BAD_REQUEST)
     }
 
     if (referral.maxUses > 0 && referral.currentUses >= referral.maxUses) {
-      await prisma.referralCode.update({
-        where: { id: referral.id },
-        data: { active: false },
-      }).catch(() => {})
+      await prisma.referralCode
+        .update({
+          where: { id: referral.id },
+          data: { active: false },
+        })
+        .catch(() => {})
       return sendError(
         res,
         400,
@@ -312,7 +313,12 @@ router.post('/gift/checkout', requireAuth, paymentCheckoutLimiter, async (req, r
       select: { email: true, username: true },
     })
     if (gifterUser?.email && gifterUser.email.toLowerCase() === normalizedEmail) {
-      return sendError(res, 400, 'You cannot gift a subscription to yourself.', ERROR_CODES.BAD_REQUEST)
+      return sendError(
+        res,
+        400,
+        'You cannot gift a subscription to yourself.',
+        ERROR_CODES.BAD_REQUEST,
+      )
     }
 
     // Limit gifts per day to prevent abuse (max 3 gifts per 24 hours)
@@ -418,7 +424,12 @@ router.post('/gift/redeem', requireAuth, paymentCheckoutLimiter, async (req, res
 
     // Prevent redeeming your own gift
     if (gift.gifterId === userId) {
-      return sendError(res, 400, 'You cannot redeem a gift you purchased yourself.', ERROR_CODES.BAD_REQUEST)
+      return sendError(
+        res,
+        400,
+        'You cannot redeem a gift you purchased yourself.',
+        ERROR_CODES.BAD_REQUEST,
+      )
     }
 
     if (gift.expiresAt && gift.expiresAt < new Date()) {

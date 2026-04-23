@@ -64,7 +64,10 @@ function decodeCBOR(buffer, offset = 0) {
   if (major === 3) {
     // Text string
     const { length, offset: dataStart } = readLength(additional, nextOffset)
-    return { value: buffer.slice(dataStart, dataStart + length).toString('utf8'), offset: dataStart + length }
+    return {
+      value: buffer.slice(dataStart, dataStart + length).toString('utf8'),
+      offset: dataStart + length,
+    }
   }
 
   if (major === 4) {

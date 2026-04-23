@@ -1,7 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-  ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
 } from 'recharts'
 import { API } from '../../config'
 import { FONT } from './adminConstants'
@@ -108,19 +119,29 @@ function KpiCard({ label, value, subtitle, color = '#2563eb', sparkData }) {
         {label.toUpperCase()}
       </div>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14 }}>
-        <div style={{ fontSize: 36, fontWeight: 800, color, lineHeight: 1, letterSpacing: '-.02em' }}>
+        <div
+          style={{ fontSize: 36, fontWeight: 800, color, lineHeight: 1, letterSpacing: '-.02em' }}
+        >
           {typeof value === 'number' ? value.toLocaleString() : value}
         </div>
         {sparkData?.length > 1 && (
           <ResponsiveContainer width={120} height={32}>
             <LineChart data={sparkData}>
-              <Line type="monotone" dataKey="count" stroke={color || CHART_COLORS.brand} strokeWidth={2} dot={false} />
+              <Line
+                type="monotone"
+                dataKey="count"
+                stroke={color || CHART_COLORS.brand}
+                strokeWidth={2}
+                dot={false}
+              />
             </LineChart>
           </ResponsiveContainer>
         )}
       </div>
       {subtitle ? (
-        <div style={{ fontSize: 12, color: 'var(--sh-slate-500)', fontWeight: 500 }}>{subtitle}</div>
+        <div style={{ fontSize: 12, color: 'var(--sh-slate-500)', fontWeight: 500 }}>
+          {subtitle}
+        </div>
       ) : null}
     </div>
   )
@@ -212,27 +233,48 @@ function buildContentPieData(contentData) {
 
 /* -- Pie chart card wrapper --------------------------------------------- */
 
-const PIE_COLORS = [CHART_COLORS.brand, CHART_COLORS.blue, CHART_COLORS.amber, CHART_COLORS.pink, CHART_COLORS.green, CHART_COLORS.slate]
+const PIE_COLORS = [
+  CHART_COLORS.brand,
+  CHART_COLORS.blue,
+  CHART_COLORS.amber,
+  CHART_COLORS.pink,
+  CHART_COLORS.green,
+  CHART_COLORS.slate,
+]
 
 function PieCard({ title, data }) {
   if (!data || data.length === 0) {
     return (
-      <div style={{
-        background: 'var(--sh-surface)', borderRadius: 12, padding: 20,
-        border: '1px solid var(--sh-border)',
-      }}>
-        <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 12 }}>{title}</div>
+      <div
+        style={{
+          background: 'var(--sh-surface)',
+          borderRadius: 12,
+          padding: 20,
+          border: '1px solid var(--sh-border)',
+        }}
+      >
+        <div
+          style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 12 }}
+        >
+          {title}
+        </div>
         <div style={{ color: 'var(--sh-muted)', fontSize: 12 }}>No data yet</div>
       </div>
     )
   }
 
   return (
-    <div style={{
-      background: 'var(--sh-surface)', borderRadius: 12, padding: 20,
-      border: '1px solid var(--sh-border)',
-    }}>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 12 }}>{title}</div>
+    <div
+      style={{
+        background: 'var(--sh-surface)',
+        borderRadius: 12,
+        padding: 20,
+        border: '1px solid var(--sh-border)',
+      }}
+    >
+      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 12 }}>
+        {title}
+      </div>
       <ResponsiveContainer width="100%" height={220}>
         <PieChart>
           <Pie
@@ -321,9 +363,13 @@ export default function AnalyticsTab() {
 
       /* Pie chart data -- fetched alongside, failures are non-critical */
       fetch(`${API}/api/admin/analytics/user-roles`, { credentials: 'include' })
-        .then(r => r.json()).then(setUserRoles).catch(() => {})
+        .then((r) => r.json())
+        .then(setUserRoles)
+        .catch(() => {})
       fetch(`${API}/api/admin/analytics/engagement-totals?period=${p}`, { credentials: 'include' })
-        .then(r => r.json()).then(setEngagementTotals).catch(() => {})
+        .then((r) => r.json())
+        .then(setEngagementTotals)
+        .catch(() => {})
     } catch (err) {
       setError(err.message || 'Failed to load analytics')
     } finally {
@@ -361,8 +407,20 @@ export default function AnalyticsTab() {
           }}
         >
           <div>
-            <h1 style={{ margin: 0, fontSize: 24, fontWeight: 800, color: 'var(--sh-heading)', letterSpacing: '-.01em' }}>Analytics</h1>
-            <div style={{ fontSize: 13, color: 'var(--sh-subtext)', marginTop: 4, lineHeight: 1.5 }}>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 24,
+                fontWeight: 800,
+                color: 'var(--sh-heading)',
+                letterSpacing: '-.01em',
+              }}
+            >
+              Analytics
+            </h1>
+            <div
+              style={{ fontSize: 13, color: 'var(--sh-subtext)', marginTop: 4, lineHeight: 1.5 }}
+            >
               Platform performance metrics and engagement data
             </div>
           </div>
@@ -456,8 +514,16 @@ export default function AnalyticsTab() {
       {(contentPieData.length > 0 || rolePieData.length > 0 || engagementPieData.length > 0) && (
         <section style={SECTION_STYLE}>
           <div style={SECTION_HEADING}>Distribution Overview</div>
-          <div style={SECTION_DESC}>Content, user roles, and engagement breakdown for this period</div>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+          <div style={SECTION_DESC}>
+            Content, user roles, and engagement breakdown for this period
+          </div>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
+              gap: 16,
+            }}
+          >
             <PieCard title="Content Distribution" data={contentPieData} />
             <PieCard title="User Roles" data={rolePieData} />
             <PieCard title="Engagement Breakdown" data={engagementPieData} />
@@ -487,9 +553,17 @@ export default function AnalyticsTab() {
                   height={50}
                   tickFormatter={(v) => v.slice(5)}
                 />
-                <YAxis tick={{ fontSize: 11, fontFamily: FONT, fill: '#64748b' }} allowDecimals={false} />
+                <YAxis
+                  tick={{ fontSize: 11, fontFamily: FONT, fill: '#64748b' }}
+                  allowDecimals={false}
+                />
                 <Tooltip {...TOOLTIP_STYLE} />
-                <Bar dataKey="count" fill={CHART_COLORS.brand} radius={[4, 4, 0, 0]} name="Signups" />
+                <Bar
+                  dataKey="count"
+                  fill={CHART_COLORS.brand}
+                  radius={[4, 4, 0, 0]}
+                  name="Signups"
+                />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -517,13 +591,26 @@ export default function AnalyticsTab() {
                   height={50}
                   tickFormatter={(v) => v.slice(5)}
                 />
-                <YAxis tick={{ fontSize: 11, fontFamily: FONT, fill: '#64748b' }} allowDecimals={false} />
+                <YAxis
+                  tick={{ fontSize: 11, fontFamily: FONT, fill: '#64748b' }}
+                  allowDecimals={false}
+                />
                 <Tooltip {...TOOLTIP_STYLE} />
                 <Legend wrapperStyle={{ fontSize: 12, fontFamily: FONT }} />
                 <Bar dataKey="posts" fill="#8b5cf6" radius={[4, 4, 0, 0]} name="Posts" />
-                <Bar dataKey="comments" fill={CHART_COLORS.blue} radius={[4, 4, 0, 0]} name="Comments" />
+                <Bar
+                  dataKey="comments"
+                  fill={CHART_COLORS.blue}
+                  radius={[4, 4, 0, 0]}
+                  name="Comments"
+                />
                 <Bar dataKey="stars" fill={CHART_COLORS.amber} radius={[4, 4, 0, 0]} name="Stars" />
-                <Bar dataKey="reactions" fill={CHART_COLORS.pink} radius={[4, 4, 0, 0]} name="Reactions" />
+                <Bar
+                  dataKey="reactions"
+                  fill={CHART_COLORS.pink}
+                  radius={[4, 4, 0, 0]}
+                  name="Reactions"
+                />
               </BarChart>
             </ResponsiveContainer>
           )}
@@ -543,7 +630,14 @@ export default function AnalyticsTab() {
             }}
           >
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 10 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: 'var(--sh-heading)',
+                  marginBottom: 10,
+                }}
+              >
                 Sheets
               </div>
               {!contentData.sheets || contentData.sheets.length === 0 ? (
@@ -552,16 +646,32 @@ export default function AnalyticsTab() {
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={contentData.sheets}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--sh-border)" opacity={0.6} />
-                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(v) => v.slice(5)} />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      tickFormatter={(v) => v.slice(5)}
+                    />
                     <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
                     <Tooltip {...TOOLTIP_STYLE} />
-                    <Bar dataKey="count" fill={CHART_COLORS.green} radius={[3, 3, 0, 0]} name="Sheets" />
+                    <Bar
+                      dataKey="count"
+                      fill={CHART_COLORS.green}
+                      radius={[3, 3, 0, 0]}
+                      name="Sheets"
+                    />
                   </BarChart>
                 </ResponsiveContainer>
               )}
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 10 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: 'var(--sh-heading)',
+                  marginBottom: 10,
+                }}
+              >
                 Notes
               </div>
               {!contentData.notes || contentData.notes.length === 0 ? (
@@ -570,7 +680,11 @@ export default function AnalyticsTab() {
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={contentData.notes}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--sh-border)" opacity={0.6} />
-                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(v) => v.slice(5)} />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      tickFormatter={(v) => v.slice(5)}
+                    />
                     <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
                     <Tooltip {...TOOLTIP_STYLE} />
                     <Bar dataKey="count" fill="#0f766e" radius={[3, 3, 0, 0]} name="Notes" />
@@ -579,7 +693,14 @@ export default function AnalyticsTab() {
               )}
             </div>
             <div>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 10 }}>
+              <div
+                style={{
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: 'var(--sh-heading)',
+                  marginBottom: 10,
+                }}
+              >
                 Feed Posts
               </div>
               {!contentData.feedPosts || contentData.feedPosts.length === 0 ? (
@@ -588,7 +709,11 @@ export default function AnalyticsTab() {
                 <ResponsiveContainer width="100%" height={200}>
                   <BarChart data={contentData.feedPosts}>
                     <CartesianGrid strokeDasharray="3 3" stroke="var(--sh-border)" opacity={0.6} />
-                    <XAxis dataKey="date" tick={{ fontSize: 10, fill: '#64748b' }} tickFormatter={(v) => v.slice(5)} />
+                    <XAxis
+                      dataKey="date"
+                      tick={{ fontSize: 10, fill: '#64748b' }}
+                      tickFormatter={(v) => v.slice(5)}
+                    />
                     <YAxis tick={{ fontSize: 10, fill: '#64748b' }} allowDecimals={false} />
                     <Tooltip {...TOOLTIP_STYLE} />
                     <Bar dataKey="count" fill="#8b5cf6" radius={[3, 3, 0, 0]} name="Feed Posts" />

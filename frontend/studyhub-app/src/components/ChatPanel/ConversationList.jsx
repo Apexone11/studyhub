@@ -14,7 +14,12 @@ function relTime(iso) {
   return `${Math.floor(h / 24)}d`
 }
 
-export default function ConversationList({ conversations, loading, onSelectConversation, onOpenFull }) {
+export default function ConversationList({
+  conversations,
+  loading,
+  onSelectConversation,
+  onOpenFull,
+}) {
   return (
     <>
       {loading ? (
@@ -27,46 +32,61 @@ export default function ConversationList({ conversations, loading, onSelectConve
           <Link
             to="/messages"
             onClick={onOpenFull}
-            style={{ color: 'var(--sh-brand)', fontSize: 13, fontWeight: 600, textDecoration: 'none' }}
+            style={{
+              color: 'var(--sh-brand)',
+              fontSize: 13,
+              fontWeight: 600,
+              textDecoration: 'none',
+            }}
           >
             Start a chat
           </Link>
         </div>
       ) : (
-        conversations.map(c => {
+        conversations.map((c) => {
           const other = c.participants?.[0] || {}
           return (
             <button
               key={c.id}
               onClick={() => onSelectConversation(c.id)}
               style={{
-                display: 'flex', alignItems: 'center', gap: 10,
-                width: '100%', padding: '10px 16px', border: 'none',
-                background: 'transparent', cursor: 'pointer', textAlign: 'left',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10,
+                width: '100%',
+                padding: '10px 16px',
+                border: 'none',
+                background: 'transparent',
+                cursor: 'pointer',
+                textAlign: 'left',
                 borderBottom: '1px solid var(--sh-border)',
                 fontFamily: PAGE_FONT,
               }}
             >
               <UserAvatar username={other.username} avatarUrl={other.avatarUrl} size={36} />
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
-                  fontWeight: c.unreadCount > 0 ? 800 : 600,
-                  fontSize: 13,
-                  color: 'var(--sh-heading)',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}>
+                <div
+                  style={{
+                    fontWeight: c.unreadCount > 0 ? 800 : 600,
+                    fontSize: 13,
+                    color: 'var(--sh-heading)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {other.username || 'Unknown'}
                 </div>
-                <div style={{
-                  fontSize: 12,
-                  color: c.unreadCount > 0 ? 'var(--sh-text)' : 'var(--sh-muted)',
-                  fontWeight: c.unreadCount > 0 ? 600 : 400,
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: c.unreadCount > 0 ? 'var(--sh-text)' : 'var(--sh-muted)',
+                    fontWeight: c.unreadCount > 0 ? 600 : 400,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   {c.lastMessage?.content?.slice(0, 50) || 'No messages yet'}
                 </div>
               </div>
@@ -90,7 +110,8 @@ export default function ConversationList({ conversations, loading, onSelectConve
                     padding: '0 4px',
                     lineHeight: 1,
                     flexShrink: 0,
-                  }}>
+                  }}
+                >
                   {c.unreadCount > 9 ? '9+' : c.unreadCount}
                 </span>
               )}

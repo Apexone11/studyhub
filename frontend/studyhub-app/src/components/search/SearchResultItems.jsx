@@ -3,7 +3,17 @@ import { Highlight, styles } from './searchModalConstants'
 
 function IconGroups({ size = 13 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
       <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
       <circle cx="9" cy="7" r="4" />
       <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
@@ -42,10 +52,14 @@ export function SheetResults({ sheets, query, activeIndex, setActiveIndex, navig
               background: activeIndex === flatIdx ? 'var(--sh-slate-100, #f1f5f9)' : 'transparent',
             }}
             onClick={() => navigateToItem({ type: 'sheet', data: sheet })}
-            onKeyDown={(e) => handleResultKeyDown(e, () => navigateToItem({ type: 'sheet', data: sheet }))}
+            onKeyDown={(e) =>
+              handleResultKeyDown(e, () => navigateToItem({ type: 'sheet', data: sheet }))
+            }
             onMouseEnter={() => setActiveIndex(flatIdx)}
           >
-            <div style={styles.resultTitle}><Highlight text={sheet.title} query={query} /></div>
+            <div style={styles.resultTitle}>
+              <Highlight text={sheet.title} query={query} />
+            </div>
             <div style={styles.resultMeta}>
               {sheet.course?.code} &middot; by {sheet.author?.username}
               {sheet.stars > 0 && <span> &middot; {sheet.stars} stars</span>}
@@ -57,7 +71,14 @@ export function SheetResults({ sheets, query, activeIndex, setActiveIndex, navig
   )
 }
 
-export function NoteResults({ notes, sheetsCount, query, activeIndex, setActiveIndex, navigateToItem }) {
+export function NoteResults({
+  notes,
+  sheetsCount,
+  query,
+  activeIndex,
+  setActiveIndex,
+  navigateToItem,
+}) {
   if (notes.length === 0) return null
   return (
     <div role="group" aria-label="Note results">
@@ -79,10 +100,14 @@ export function NoteResults({ notes, sheetsCount, query, activeIndex, setActiveI
               background: activeIndex === flatIdx ? 'var(--sh-slate-100, #f1f5f9)' : 'transparent',
             }}
             onClick={() => navigateToItem({ type: 'note', data: note })}
-            onKeyDown={(e) => handleResultKeyDown(e, () => navigateToItem({ type: 'note', data: note }))}
+            onKeyDown={(e) =>
+              handleResultKeyDown(e, () => navigateToItem({ type: 'note', data: note }))
+            }
             onMouseEnter={() => setActiveIndex(flatIdx)}
           >
-            <div style={styles.resultTitle}><Highlight text={note.title} query={query} /></div>
+            <div style={styles.resultTitle}>
+              <Highlight text={note.title} query={query} />
+            </div>
             <div style={styles.resultMeta}>
               {note.course?.code} &middot; by {note.author?.username}
             </div>
@@ -93,7 +118,14 @@ export function NoteResults({ notes, sheetsCount, query, activeIndex, setActiveI
   )
 }
 
-export function CourseResults({ courses, sheetsCount, query, activeIndex, setActiveIndex, navigateToItem }) {
+export function CourseResults({
+  courses,
+  sheetsCount,
+  query,
+  activeIndex,
+  setActiveIndex,
+  navigateToItem,
+}) {
   if (courses.length === 0) return null
   return (
     <div role="group" aria-label="Course results">
@@ -115,10 +147,14 @@ export function CourseResults({ courses, sheetsCount, query, activeIndex, setAct
               background: activeIndex === flatIdx ? 'var(--sh-slate-100, #f1f5f9)' : 'transparent',
             }}
             onClick={() => navigateToItem({ type: 'course', data: course })}
-            onKeyDown={(e) => handleResultKeyDown(e, () => navigateToItem({ type: 'course', data: course }))}
+            onKeyDown={(e) =>
+              handleResultKeyDown(e, () => navigateToItem({ type: 'course', data: course }))
+            }
             onMouseEnter={() => setActiveIndex(flatIdx)}
           >
-            <div style={styles.resultTitle}><Highlight text={`${course.code} — ${course.name}`} query={query} /></div>
+            <div style={styles.resultTitle}>
+              <Highlight text={`${course.code} — ${course.name}`} query={query} />
+            </div>
             <div style={styles.resultMeta}>{course.school?.name}</div>
           </div>
         )
@@ -127,7 +163,15 @@ export function CourseResults({ courses, sheetsCount, query, activeIndex, setAct
   )
 }
 
-export function UserResults({ users, sheetsCount, coursesCount, query, activeIndex, setActiveIndex, navigateToItem }) {
+export function UserResults({
+  users,
+  sheetsCount,
+  coursesCount,
+  query,
+  activeIndex,
+  setActiveIndex,
+  navigateToItem,
+}) {
   if (users.length === 0) return null
   return (
     <div role="group" aria-label="User results">
@@ -149,7 +193,9 @@ export function UserResults({ users, sheetsCount, coursesCount, query, activeInd
               background: activeIndex === flatIdx ? 'var(--sh-slate-100, #f1f5f9)' : 'transparent',
             }}
             onClick={() => navigateToItem({ type: 'user', data: user })}
-            onKeyDown={(e) => handleResultKeyDown(e, () => navigateToItem({ type: 'user', data: user }))}
+            onKeyDown={(e) =>
+              handleResultKeyDown(e, () => navigateToItem({ type: 'user', data: user }))
+            }
             onMouseEnter={() => setActiveIndex(flatIdx)}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -157,7 +203,9 @@ export function UserResults({ users, sheetsCount, coursesCount, query, activeInd
                 {user.username?.slice(0, 2).toUpperCase()}
               </div>
               <div>
-                <div style={styles.resultTitle}><Highlight text={user.username} query={query} /></div>
+                <div style={styles.resultTitle}>
+                  <Highlight text={user.username} query={query} />
+                </div>
                 <div style={styles.resultMeta}>{user.role}</div>
               </div>
             </div>
@@ -168,7 +216,16 @@ export function UserResults({ users, sheetsCount, coursesCount, query, activeInd
   )
 }
 
-export function GroupResults({ groups, sheetsCount, coursesCount, usersCount, query, activeIndex, setActiveIndex, navigateToItem }) {
+export function GroupResults({
+  groups,
+  sheetsCount,
+  coursesCount,
+  usersCount,
+  query,
+  activeIndex,
+  setActiveIndex,
+  navigateToItem,
+}) {
   if (groups.length === 0) return null
   return (
     <div role="group" aria-label="Group results">
@@ -191,10 +248,14 @@ export function GroupResults({ groups, sheetsCount, coursesCount, usersCount, qu
               background: activeIndex === flatIdx ? 'var(--sh-slate-100, #f1f5f9)' : 'transparent',
             }}
             onClick={() => navigateToItem({ type: 'group', data: group })}
-            onKeyDown={(e) => handleResultKeyDown(e, () => navigateToItem({ type: 'group', data: group }))}
+            onKeyDown={(e) =>
+              handleResultKeyDown(e, () => navigateToItem({ type: 'group', data: group }))
+            }
             onMouseEnter={() => setActiveIndex(flatIdx)}
           >
-            <div style={styles.resultTitle}><Highlight text={group.name} query={query} /></div>
+            <div style={styles.resultTitle}>
+              <Highlight text={group.name} query={query} />
+            </div>
             <div style={styles.resultMeta}>
               {memberCount} member{memberCount !== 1 ? 's' : ''}
               {group.course?.code && <span> &middot; {group.course.code}</span>}

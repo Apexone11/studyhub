@@ -105,7 +105,16 @@ export default function ActivityHeatmap({ data, weeks = 12 }) {
 
   return (
     <div>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 10,
+          flexWrap: 'wrap',
+          gap: 8,
+        }}
+      >
         <span style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)' }}>
           {totalCount} contribution{totalCount !== 1 ? 's' : ''} in the last {weeks} weeks
         </span>
@@ -116,10 +125,15 @@ export default function ActivityHeatmap({ data, weeks = 12 }) {
               type="button"
               onClick={() => setFilter(f.key)}
               style={{
-                padding: '3px 10px', borderRadius: 99, border: '1px solid var(--sh-border)',
+                padding: '3px 10px',
+                borderRadius: 99,
+                border: '1px solid var(--sh-border)',
                 background: filter === f.key ? 'var(--sh-brand)' : 'var(--sh-soft)',
                 color: filter === f.key ? '#fff' : 'var(--sh-muted)',
-                fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+                fontSize: 11,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
               }}
             >
               {f.label}
@@ -131,7 +145,7 @@ export default function ActivityHeatmap({ data, weeks = 12 }) {
       <div style={{ overflowX: 'auto', paddingBottom: 4 }}>
         <svg width={svgWidth} height={svgHeight} style={{ display: 'block' }}>
           {/* Day labels */}
-          {DAY_LABELS.map((label, i) => (
+          {DAY_LABELS.map((label, i) =>
             label ? (
               <text
                 key={i}
@@ -143,8 +157,8 @@ export default function ActivityHeatmap({ data, weeks = 12 }) {
               >
                 {label}
               </text>
-            ) : null
-          ))}
+            ) : null,
+          )}
 
           {/* Cells */}
           {gridByWeek.map((week, wi) =>
@@ -165,13 +179,21 @@ export default function ActivityHeatmap({ data, weeks = 12 }) {
                   <title>{`${cell.date}: ${count} contribution${count !== 1 ? 's' : ''}`}</title>
                 </rect>
               )
-            })
+            }),
           )}
         </svg>
       </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 6, justifyContent: 'flex-end' }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+          marginTop: 6,
+          justifyContent: 'flex-end',
+        }}
+      >
         <span style={{ fontSize: 10, color: 'var(--sh-muted)', marginRight: 4 }}>Less</span>
         {INTENSITY_COLORS.map((color, i) => (
           <div key={i} style={{ width: 10, height: 10, borderRadius: 2, background: color }} />

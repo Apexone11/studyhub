@@ -14,8 +14,8 @@ export default function NavbarNotifications() {
   const { user } = useSession()
 
   const [notifications, setNotifications] = useState([])
-  const [unreadCount,   setUnreadCount]   = useState(0)
-  const [showBell,      setShowBell]      = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [showBell, setShowBell] = useState(false)
   const bellRef = useRef(null)
 
   async function refreshNotifications({ signal, startTransition } = {}) {
@@ -32,10 +32,12 @@ export default function NavbarNotifications() {
     const nowMs = Date.now()
 
     startTransition(() => {
-      setNotifications((data.notifications || []).map((notif) => ({
-        ...notif,
-        timeAgoLabel: formatRelativeTime(notif.createdAt, nowMs),
-      })))
+      setNotifications(
+        (data.notifications || []).map((notif) => ({
+          ...notif,
+          timeAgoLabel: formatRelativeTime(notif.createdAt, nowMs),
+        })),
+      )
       setUnreadCount(data.unreadCount || 0)
     })
   }
@@ -69,7 +71,7 @@ export default function NavbarNotifications() {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
     }).catch(() => {})
-    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
     setUnreadCount(0)
   }
 
@@ -80,7 +82,7 @@ export default function NavbarNotifications() {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
     }).catch(() => {})
-    setNotifications(prev => prev.filter(n => !n.read))
+    setNotifications((prev) => prev.filter((n) => !n.read))
   }
 
   async function deleteOne(e, notifId) {
@@ -91,10 +93,10 @@ export default function NavbarNotifications() {
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
     }).catch(() => {})
-    setNotifications(prev => {
-      const removed = prev.find(n => n.id === notifId)
-      if (removed && !removed.read) setUnreadCount(c => Math.max(0, c - 1))
-      return prev.filter(n => n.id !== notifId)
+    setNotifications((prev) => {
+      const removed = prev.find((n) => n.id === notifId)
+      if (removed && !removed.read) setUnreadCount((c) => Math.max(0, c - 1))
+      return prev.filter((n) => n.id !== notifId)
     })
   }
 
@@ -105,8 +107,8 @@ export default function NavbarNotifications() {
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
       }).catch(() => {})
-      setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n))
-      setUnreadCount(c => Math.max(0, c - 1))
+      setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)))
+      setUnreadCount((c) => Math.max(0, c - 1))
     }
     setShowBell(false)
     if (notif.linkPath) navigate(notif.linkPath)
@@ -116,7 +118,7 @@ export default function NavbarNotifications() {
 
   if (!user) return null
 
-  const readCount = notifications.filter(n => n.read).length
+  const readCount = notifications.filter((n) => n.read).length
 
   return (
     <div ref={bellRef} style={{ position: 'relative' }}>
@@ -126,20 +128,29 @@ export default function NavbarNotifications() {
         aria-label={unreadCount > 0 ? `Notifications (${unreadCount} unread)` : 'Notifications'}
         aria-expanded={showBell}
         aria-haspopup="true"
-        onClick={() => setShowBell(v => !v)}
-        onMouseEnter={e => handleIconHover(e, true)}
-        onMouseLeave={e => handleIconHover(e, false)}
+        onClick={() => setShowBell((v) => !v)}
+        onMouseEnter={(e) => handleIconHover(e, true)}
+        onMouseLeave={(e) => handleIconHover(e, false)}
       >
         <IconBell size={17} />
         {unreadCount > 0 && (
           <span
             style={{
-              position: 'absolute', top: 2, right: 2,
-              background: 'var(--sh-nav-badge-bg)', color: 'var(--sh-nav-text)',
-              fontSize: 10, fontWeight: 800,
-              borderRadius: 99, minWidth: 16, height: 16,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              padding: '0 3px', lineHeight: 1,
+              position: 'absolute',
+              top: 2,
+              right: 2,
+              background: 'var(--sh-nav-badge-bg)',
+              color: 'var(--sh-nav-text)',
+              fontSize: 10,
+              fontWeight: 800,
+              borderRadius: 99,
+              minWidth: 16,
+              height: 16,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              padding: '0 3px',
+              lineHeight: 1,
             }}
             aria-live="polite"
             aria-label={`${unreadCount} unread notifications`}
@@ -150,36 +161,66 @@ export default function NavbarNotifications() {
       </button>
 
       {showBell && (
-        <div style={{
-          position: 'absolute', top: 'calc(100% + 8px)', right: 0,
-          width: 'clamp(280px, 90vw, 320px)', background: 'var(--sh-dropdown-bg)', borderRadius: 12,
-          border: '1px solid var(--sh-dropdown-border)',
-          boxShadow: 'var(--sh-dropdown-shadow)',
-          zIndex: 200, overflow: 'hidden',
-          fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-        }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: 'calc(100% + 8px)',
+            right: 0,
+            width: 'clamp(280px, 90vw, 320px)',
+            background: 'var(--sh-dropdown-bg)',
+            borderRadius: 12,
+            border: '1px solid var(--sh-dropdown-border)',
+            boxShadow: 'var(--sh-dropdown-shadow)',
+            zIndex: 200,
+            overflow: 'hidden',
+            fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+          }}
+        >
           {/* header */}
-          <div style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-            padding: '12px 16px', borderBottom: '1px solid var(--sh-dropdown-divider)',
-          }}>
-            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--sh-text)' }}>Notifications</span>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '12px 16px',
+              borderBottom: '1px solid var(--sh-dropdown-divider)',
+            }}
+          >
+            <span style={{ fontWeight: 700, fontSize: 14, color: 'var(--sh-text)' }}>
+              Notifications
+            </span>
             <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
               {unreadCount > 0 && (
-                <button onClick={markAllRead} style={{
-                  fontSize: 11, color: 'var(--sh-link)', fontWeight: 600,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontFamily: 'inherit', padding: 0,
-                }}>
+                <button
+                  onClick={markAllRead}
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--sh-link)',
+                    fontWeight: 600,
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    padding: 0,
+                  }}
+                >
                   Mark all read
                 </button>
               )}
               {readCount > 0 && (
-                <button onClick={clearRead} style={{
-                  fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600,
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  fontFamily: 'inherit', padding: 0,
-                }}>
+                <button
+                  onClick={clearRead}
+                  style={{
+                    fontSize: 11,
+                    color: 'var(--sh-muted)',
+                    fontWeight: 600,
+                    background: 'none',
+                    border: 'none',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    padding: 0,
+                  }}
+                >
                   Clear read
                 </button>
               )}
@@ -188,61 +229,125 @@ export default function NavbarNotifications() {
 
           {/* list */}
           <div style={{ maxHeight: 340, overflowY: 'auto' }}>
-            {notifications.length === 0
-              ? (
-                <div style={{ padding: '28px 16px', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
-                  <i className="fas fa-bell-slash" style={{ fontSize: 22, display: 'block', marginBottom: 8, color: 'var(--sh-notif-empty-icon)' }}></i>
-                  No notifications yet
-                </div>
-              )
-              : notifications.map(notif => (
+            {notifications.length === 0 ? (
+              <div
+                style={{
+                  padding: '28px 16px',
+                  textAlign: 'center',
+                  color: 'var(--sh-muted)',
+                  fontSize: 13,
+                }}
+              >
+                <i
+                  className="fas fa-bell-slash"
+                  style={{
+                    fontSize: 22,
+                    display: 'block',
+                    marginBottom: 8,
+                    color: 'var(--sh-notif-empty-icon)',
+                  }}
+                ></i>
+                No notifications yet
+              </div>
+            ) : (
+              notifications.map((notif) => (
                 <div
                   key={notif.id}
                   role="button"
                   tabIndex={0}
                   aria-label={`${notif.read ? '' : 'Unread: '}${notif.actor?.username || 'Someone'} ${notif.message}`}
                   onClick={() => markOneRead(notif)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); markOneRead(notif) } }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault()
+                      markOneRead(notif)
+                    }
+                  }}
                   style={{
                     padding: '12px 16px',
                     paddingRight: 36,
                     borderBottom: '1px solid var(--sh-dropdown-divider)',
                     cursor: 'pointer',
-                    background: notif.read ? 'var(--sh-notif-read-bg)' : 'var(--sh-notif-unread-bg)',
-                    borderLeft: notif.read ? '3px solid transparent' : `3px solid ${notif.priority === 'high' ? 'var(--sh-danger)' : 'var(--sh-link)'}`,
+                    background: notif.read
+                      ? 'var(--sh-notif-read-bg)'
+                      : 'var(--sh-notif-unread-bg)',
+                    borderLeft: notif.read
+                      ? '3px solid transparent'
+                      : `3px solid ${notif.priority === 'high' ? 'var(--sh-danger)' : 'var(--sh-link)'}`,
                     transition: 'background .12s',
                     position: 'relative',
                   }}
-                  onMouseEnter={e => e.currentTarget.style.background = notif.read ? 'var(--sh-notif-read-hover)' : 'var(--sh-notif-unread-hover)'}
-                  onMouseLeave={e => e.currentTarget.style.background = notif.read ? 'var(--sh-notif-read-bg)' : 'var(--sh-notif-unread-bg)'}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = notif.read
+                      ? 'var(--sh-notif-read-hover)'
+                      : 'var(--sh-notif-unread-hover)')
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = notif.read
+                      ? 'var(--sh-notif-read-bg)'
+                      : 'var(--sh-notif-unread-bg)')
+                  }
                 >
-                  <div style={{ fontSize: 13, color: 'var(--sh-text)', lineHeight: 1.4, marginBottom: 4 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--sh-text)',
+                      lineHeight: 1.4,
+                      marginBottom: 4,
+                    }}
+                  >
                     {notif.priority === 'high' && (
-                      <span style={{ color: 'var(--sh-danger)', fontWeight: 700, fontSize: 11, marginRight: 4 }}>!</span>
+                      <span
+                        style={{
+                          color: 'var(--sh-danger)',
+                          fontWeight: 700,
+                          fontSize: 11,
+                          marginRight: 4,
+                        }}
+                      >
+                        !
+                      </span>
                     )}
                     <strong>{notif.actor?.username || 'Someone'}</strong> {notif.message}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>{notif.timeAgoLabel || 'just now'}</div>
+                  <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                    {notif.timeAgoLabel || 'just now'}
+                  </div>
                   {/* X delete button */}
                   <button
                     onClick={(e) => deleteOne(e, notif.id)}
                     title="Delete notification"
                     aria-label="Delete notification"
                     style={{
-                      position: 'absolute', top: 10, right: 10,
-                      background: 'none', border: 'none', cursor: 'pointer',
-                      color: 'var(--sh-muted)', fontSize: 14, fontWeight: 700,
-                      lineHeight: 1, padding: '2px 4px', borderRadius: 4,
-                      opacity: 0.5, transition: 'opacity .12s',
+                      position: 'absolute',
+                      top: 10,
+                      right: 10,
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: 'var(--sh-muted)',
+                      fontSize: 14,
+                      fontWeight: 700,
+                      lineHeight: 1,
+                      padding: '2px 4px',
+                      borderRadius: 4,
+                      opacity: 0.5,
+                      transition: 'opacity .12s',
                     }}
-                    onMouseEnter={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = 'var(--sh-danger)' }}
-                    onMouseLeave={e => { e.currentTarget.style.opacity = '0.5'; e.currentTarget.style.color = 'var(--sh-muted)' }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.opacity = '1'
+                      e.currentTarget.style.color = 'var(--sh-danger)'
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.opacity = '0.5'
+                      e.currentTarget.style.color = 'var(--sh-muted)'
+                    }}
                   >
                     ×
                   </button>
                 </div>
               ))
-            }
+            )}
           </div>
         </div>
       )}

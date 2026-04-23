@@ -13,27 +13,132 @@ const { getUserStreak } = require('./streaks')
  */
 const BADGE_CATALOG = [
   // ── Studying category ───────────────────────────────────────
-  { slug: 'first-sheet', name: 'First Sheet', description: 'Upload your first study sheet', category: 'studying', tier: 'bronze', threshold: 1 },
-  { slug: 'prolific-writer', name: 'Prolific Writer', description: 'Upload 10 study sheets', category: 'studying', tier: 'silver', threshold: 10 },
-  { slug: 'study-machine', name: 'Study Machine', description: 'Upload 50 study sheets', category: 'studying', tier: 'gold', threshold: 50 },
-  { slug: 'first-star', name: 'First Star', description: 'Get your first star on a sheet', category: 'studying', tier: 'bronze', threshold: 1 },
+  {
+    slug: 'first-sheet',
+    name: 'First Sheet',
+    description: 'Upload your first study sheet',
+    category: 'studying',
+    tier: 'bronze',
+    threshold: 1,
+  },
+  {
+    slug: 'prolific-writer',
+    name: 'Prolific Writer',
+    description: 'Upload 10 study sheets',
+    category: 'studying',
+    tier: 'silver',
+    threshold: 10,
+  },
+  {
+    slug: 'study-machine',
+    name: 'Study Machine',
+    description: 'Upload 50 study sheets',
+    category: 'studying',
+    tier: 'gold',
+    threshold: 50,
+  },
+  {
+    slug: 'first-star',
+    name: 'First Star',
+    description: 'Get your first star on a sheet',
+    category: 'studying',
+    tier: 'bronze',
+    threshold: 1,
+  },
 
   // ── Building category ───────────────────────────────────────
-  { slug: 'first-fork', name: 'First Fork', description: 'Fork your first study sheet', category: 'building', tier: 'bronze', threshold: 1 },
-  { slug: 'fork-master', name: 'Fork Master', description: 'Fork 10 study sheets', category: 'building', tier: 'silver', threshold: 10 },
-  { slug: 'first-commit', name: 'First Commit', description: 'Create your first commit in SheetLab', category: 'building', tier: 'bronze', threshold: 1 },
-  { slug: 'commit-streak', name: 'Commit Streak', description: 'Make 50 commits', category: 'building', tier: 'gold', threshold: 50 },
+  {
+    slug: 'first-fork',
+    name: 'First Fork',
+    description: 'Fork your first study sheet',
+    category: 'building',
+    tier: 'bronze',
+    threshold: 1,
+  },
+  {
+    slug: 'fork-master',
+    name: 'Fork Master',
+    description: 'Fork 10 study sheets',
+    category: 'building',
+    tier: 'silver',
+    threshold: 10,
+  },
+  {
+    slug: 'first-commit',
+    name: 'First Commit',
+    description: 'Create your first commit in SheetLab',
+    category: 'building',
+    tier: 'bronze',
+    threshold: 1,
+  },
+  {
+    slug: 'commit-streak',
+    name: 'Commit Streak',
+    description: 'Make 50 commits',
+    category: 'building',
+    tier: 'gold',
+    threshold: 50,
+  },
 
   // ── Collaboration category ──────────────────────────────────
-  { slug: 'first-contribution', name: 'First Contribution', description: 'Submit your first contribution', category: 'collaboration', tier: 'bronze', threshold: 1 },
-  { slug: 'helpful-reviewer', name: 'Helpful Reviewer', description: 'Review 5 contributions', category: 'collaboration', tier: 'silver', threshold: 5 },
-  { slug: 'community-star', name: 'Community Star', description: 'Get 25 total stars across all sheets', category: 'collaboration', tier: 'gold', threshold: 25 },
-  { slug: 'first-follower', name: 'First Follower', description: 'Get your first follower', category: 'collaboration', tier: 'bronze', threshold: 1 },
+  {
+    slug: 'first-contribution',
+    name: 'First Contribution',
+    description: 'Submit your first contribution',
+    category: 'collaboration',
+    tier: 'bronze',
+    threshold: 1,
+  },
+  {
+    slug: 'helpful-reviewer',
+    name: 'Helpful Reviewer',
+    description: 'Review 5 contributions',
+    category: 'collaboration',
+    tier: 'silver',
+    threshold: 5,
+  },
+  {
+    slug: 'community-star',
+    name: 'Community Star',
+    description: 'Get 25 total stars across all sheets',
+    category: 'collaboration',
+    tier: 'gold',
+    threshold: 25,
+  },
+  {
+    slug: 'first-follower',
+    name: 'First Follower',
+    description: 'Get your first follower',
+    category: 'collaboration',
+    tier: 'bronze',
+    threshold: 1,
+  },
 
   // ── Streaks category ────────────────────────────────────────
-  { slug: 'streak-3', name: '3-Day Streak', description: '3-day study streak', category: 'streaks', tier: 'bronze', threshold: 3 },
-  { slug: 'streak-7', name: '7-Day Streak', description: '7-day study streak', category: 'streaks', tier: 'silver', threshold: 7 },
-  { slug: 'streak-30', name: '30-Day Streak', description: '30-day study streak', category: 'streaks', tier: 'gold', threshold: 30 },
+  {
+    slug: 'streak-3',
+    name: '3-Day Streak',
+    description: '3-day study streak',
+    category: 'streaks',
+    tier: 'bronze',
+    threshold: 3,
+  },
+  {
+    slug: 'streak-7',
+    name: '7-Day Streak',
+    description: '7-day study streak',
+    category: 'streaks',
+    tier: 'silver',
+    threshold: 7,
+  },
+  {
+    slug: 'streak-30',
+    name: '30-Day Streak',
+    description: '30-day study streak',
+    category: 'streaks',
+    tier: 'gold',
+    threshold: 30,
+  },
 ]
 
 /**
@@ -45,7 +150,13 @@ async function seedBadgeCatalog(prisma) {
     for (const badge of BADGE_CATALOG) {
       await prisma.badge.upsert({
         where: { slug: badge.slug },
-        update: { name: badge.name, description: badge.description, category: badge.category, tier: badge.tier, threshold: badge.threshold },
+        update: {
+          name: badge.name,
+          description: badge.description,
+          category: badge.category,
+          tier: badge.tier,
+          threshold: badge.threshold,
+        },
         create: badge,
       })
     }
@@ -90,7 +201,9 @@ async function checkAndAwardBadges(prisma, userId) {
     const followerCount = user._count.followers
 
     const [totalStars, forkCount, contributionCount, reviewCount, streakData] = await Promise.all([
-      prisma.studySheet.aggregate({ where: { userId }, _sum: { stars: true } }).then((r) => r._sum.stars || 0),
+      prisma.studySheet
+        .aggregate({ where: { userId }, _sum: { stars: true } })
+        .then((r) => r._sum.stars || 0),
       prisma.studySheet.count({ where: { userId, NOT: [{ forkOf: null }] } }),
       prisma.sheetContribution.count({ where: { proposerId: userId } }),
       prisma.sheetContribution.count({ where: { reviewerId: userId } }),

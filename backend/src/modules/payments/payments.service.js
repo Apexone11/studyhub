@@ -281,7 +281,10 @@ async function handleCheckoutCompleted(session) {
             })
           }
         } catch (err) {
-          log.warn({ err: err.message, sessionId: session.id }, 'Failed to send donation thank-you email')
+          log.warn(
+            { err: err.message, sessionId: session.id },
+            'Failed to send donation thank-you email',
+          )
         }
       }
     }
@@ -425,7 +428,8 @@ async function handleCheckoutCompleted(session) {
 
     if (
       subscriber?.email &&
-      (!existingSubscription || ['canceled', 'incomplete', 'incomplete_expired'].includes(existingSubscription.status))
+      (!existingSubscription ||
+        ['canceled', 'incomplete', 'incomplete_expired'].includes(existingSubscription.status))
     ) {
       const billingLabel = plan === 'pro_yearly' ? 'yearly' : 'monthly'
       await sendSubscriptionWelcome({
@@ -617,12 +621,16 @@ async function handleInvoicePaymentFailed(invoice) {
       await createNotification(prisma, {
         userId: subscription.userId,
         type: 'payment_failed',
-        message: 'We could not process your StudyHub subscription payment. Update billing to keep Pro active.',
+        message:
+          'We could not process your StudyHub subscription payment. Update billing to keep Pro active.',
         linkPath: '/settings?tab=subscription',
         priority: 'high',
       })
     } catch (err) {
-      log.warn({ err: err.message, userId: subscription.userId }, 'Failed to create payment failure notification')
+      log.warn(
+        { err: err.message, userId: subscription.userId },
+        'Failed to create payment failure notification',
+      )
     }
   }
 
@@ -658,17 +666,29 @@ async function getUserSubscription(userId) {
     if (totalCents >= 10000) donorInfo = { isDonor: true, donorLevel: 'gold' }
     else if (totalCents >= 2500) donorInfo = { isDonor: true, donorLevel: 'silver' }
     else if (totalCents >= 100) donorInfo = { isDonor: true, donorLevel: 'bronze' }
-  } catch { /* graceful */ }
+  } catch {
+    /* graceful */
+  }
 
   // No subscription or fully inactive
   if (!sub || sub.status === 'canceled' || sub.status === 'incomplete_expired') {
     const effectiveFeatures = donorInfo.isDonor ? PLANS.donor : PLANS.free
-    return { plan: donorInfo.isDonor ? 'donor' : 'free', status: 'active', features: effectiveFeatures, ...donorInfo }
+    return {
+      plan: donorInfo.isDonor ? 'donor' : 'free',
+      status: 'active',
+      features: effectiveFeatures,
+      ...donorInfo,
+    }
   }
   // Incomplete (payment pending) - treat as free until confirmed
   if (sub.status === 'incomplete') {
     const effectiveFeatures = donorInfo.isDonor ? PLANS.donor : PLANS.free
-    return { plan: donorInfo.isDonor ? 'donor' : 'free', status: 'incomplete', features: effectiveFeatures, ...donorInfo }
+    return {
+      plan: donorInfo.isDonor ? 'donor' : 'free',
+      status: 'incomplete',
+      features: effectiveFeatures,
+      ...donorInfo,
+    }
   }
 
   return {

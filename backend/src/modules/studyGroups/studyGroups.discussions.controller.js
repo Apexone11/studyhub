@@ -120,7 +120,9 @@ async function createDiscussion(req, res) {
 
     // Phase 5: muted users cannot create discussion posts.
     if (await isMutedInGroup(groupId, req.user.userId)) {
-      return res.status(403).json({ error: 'You are currently muted in this group and cannot post.' })
+      return res
+        .status(403)
+        .json({ error: 'You are currently muted in this group and cannot post.' })
     }
 
     const { title, content, type = 'discussion', attachments } = req.body
@@ -173,7 +175,9 @@ async function createDiscussion(req, res) {
           return res.status(400).json({ error: 'Each attachment must be an object.' })
         }
         if (typeof raw.url !== 'string' || !raw.url.startsWith('/uploads/group-media/')) {
-          return res.status(400).json({ error: 'attachment.url must be an uploaded /uploads/group-media/... path.' })
+          return res
+            .status(400)
+            .json({ error: 'attachment.url must be an uploaded /uploads/group-media/... path.' })
         }
         if (raw.kind && !allowedKinds.has(raw.kind)) {
           return res.status(400).json({ error: 'Invalid attachment.kind.' })
@@ -239,13 +243,16 @@ async function createDiscussion(req, res) {
       })
 
       if (members.length > 0 && groupData) {
-        await createNotifications(prisma, members.map((member) => ({
+        await createNotifications(
+          prisma,
+          members.map((member) => ({
             userId: member.userId,
             type: 'group_post',
             message: `${req.user.username} posted in ${groupData.name}: ${validTitle}`,
             actorId: req.user.userId,
             linkPath: `/study-groups/${groupId}`,
-          })))
+          })),
+        )
       }
     } catch (notifErr) {
       // Fire-and-forget: don't fail the request
@@ -498,7 +505,8 @@ async function deleteDiscussion(req, res) {
         if (authorMember) {
           const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
           // Reset counter if lastStrikeAt is older than 30 days.
-          const resetCounter = !authorMember.lastStrikeAt || new Date(authorMember.lastStrikeAt) < thirtyDaysAgo
+          const resetCounter =
+            !authorMember.lastStrikeAt || new Date(authorMember.lastStrikeAt) < thirtyDaysAgo
           const nextCount = resetCounter ? 1 : (authorMember.strikeCount || 0) + 1
 
           await prisma.studyGroupMember.update({
@@ -525,7 +533,9 @@ async function deleteDiscussion(req, res) {
                 context: { strikes: nextCount, window: '30d' },
                 req,
               })
-            } catch { /* audit never blocks */ }
+            } catch {
+              /* audit never blocks */
+            }
           }
         }
       } catch {

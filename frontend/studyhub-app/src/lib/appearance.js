@@ -125,7 +125,7 @@ export function writeCachedAppearancePreferences(preferences = {}, userId) {
       JSON.stringify({
         theme: preferences.theme,
         fontSize: preferences.fontSize,
-      })
+      }),
     )
   } catch {
     /* ignore */
@@ -152,7 +152,9 @@ export function writeGlobalTheme(theme) {
   if (typeof window === 'undefined') return
   try {
     window.localStorage.setItem(GLOBAL_THEME_KEY, theme)
-  } catch { /* ignore */ }
+  } catch {
+    /* ignore */
+  }
 }
 
 export function applyGlobalTheme() {

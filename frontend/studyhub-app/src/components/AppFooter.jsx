@@ -40,7 +40,11 @@ export default function AppFooter() {
       >
         {FOOTER_LINKS.map((link, i) => (
           <span key={link.to} style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-            {i > 0 && <span style={{ color: 'var(--sh-muted)', opacity: 0.5 }} aria-hidden="true">·</span>}
+            {i > 0 && (
+              <span style={{ color: 'var(--sh-muted)', opacity: 0.5 }} aria-hidden="true">
+                ·
+              </span>
+            )}
             <Link
               to={link.to}
               style={{
@@ -54,7 +58,9 @@ export default function AppFooter() {
           </span>
         ))}
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: 'var(--sh-muted)', opacity: 0.5 }} aria-hidden="true">·</span>
+          <span style={{ color: 'var(--sh-muted)', opacity: 0.5 }} aria-hidden="true">
+            ·
+          </span>
           <a
             href={`mailto:${LEGAL_EMAILS.privacy}`}
             style={{
@@ -67,7 +73,9 @@ export default function AppFooter() {
           </a>
         </span>
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <span style={{ color: 'var(--sh-muted)', opacity: 0.5 }} aria-hidden="true">·</span>
+          <span style={{ color: 'var(--sh-muted)', opacity: 0.5 }} aria-hidden="true">
+            ·
+          </span>
           <a
             href="#"
             className="termly-display-preferences"

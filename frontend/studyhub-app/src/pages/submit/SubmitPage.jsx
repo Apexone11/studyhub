@@ -53,7 +53,10 @@ export default function SubmitPage() {
   }
 
   return (
-    <PageShell nav={<Navbar crumbs={[{ label: 'Request a Course', to: '/submit' }]} hideTabs />} sidebar={<AppSidebar />}>
+    <PageShell
+      nav={<Navbar crumbs={[{ label: 'Request a Course', to: '/submit' }]} hideTabs />}
+      sidebar={<AppSidebar />}
+    >
       <div style={s.card}>
         <h1 style={s.title}>Request a Missing Course</h1>
         <p style={s.subtitle}>
@@ -67,7 +70,12 @@ export default function SubmitPage() {
               Thank you for your request. We will review it and add the course shortly.
             </p>
             <button
-              onClick={() => { setSubmitted(false); setCourseName(''); setCourseCode(''); setReason('') }}
+              onClick={() => {
+                setSubmitted(false)
+                setCourseName('')
+                setCourseCode('')
+                setReason('')
+              }}
               style={s.submitBtn}
             >
               Submit Another
@@ -75,12 +83,12 @@ export default function SubmitPage() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={s.form}>
-            {error && (
-              <div style={s.errorBox}>{error}</div>
-            )}
+            {error && <div style={s.errorBox}>{error}</div>}
 
             <div style={s.field}>
-              <label htmlFor="course-name" style={s.label}>Course Name *</label>
+              <label htmlFor="course-name" style={s.label}>
+                Course Name *
+              </label>
               <input
                 id="course-name"
                 type="text"
@@ -93,7 +101,9 @@ export default function SubmitPage() {
             </div>
 
             <div style={s.field}>
-              <label htmlFor="course-code" style={s.label}>Course Code</label>
+              <label htmlFor="course-code" style={s.label}>
+                Course Code
+              </label>
               <input
                 id="course-code"
                 type="text"
@@ -105,7 +115,9 @@ export default function SubmitPage() {
             </div>
 
             <div style={s.field}>
-              <label htmlFor="reason" style={s.label}>Additional Details</label>
+              <label htmlFor="reason" style={s.label}>
+                Additional Details
+              </label>
               <textarea
                 id="reason"
                 value={reason}

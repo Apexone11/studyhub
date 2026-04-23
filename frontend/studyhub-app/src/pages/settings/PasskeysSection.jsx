@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
-import { isWebAuthnSupported, registerPasskey, listPasskeys, removePasskey } from '../../lib/webauthn'
+import {
+  isWebAuthnSupported,
+  registerPasskey,
+  listPasskeys,
+  removePasskey,
+} from '../../lib/webauthn'
 import { Button, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
 import {
   passkeyLoadingStyle,
@@ -71,7 +76,10 @@ export default function PasskeysSection({ user, sessionUser, busyKey, setBusyKey
     <SectionCard title="Passkeys" subtitle="Register a passkey for passwordless admin sign-in.">
       <MsgList msg={passkeyMsg} />
       {!webauthnSupported ? (
-        <Message tone="info">Your browser does not support WebAuthn passkeys. Try Chrome, Safari, or Edge on a supported device.</Message>
+        <Message tone="info">
+          Your browser does not support WebAuthn passkeys. Try Chrome, Safari, or Edge on a
+          supported device.
+        </Message>
       ) : (
         <>
           {loadingPasskeys ? (
@@ -102,7 +110,10 @@ export default function PasskeysSection({ user, sessionUser, busyKey, setBusyKey
             </div>
           )}
 
-          <FormField label="Passkey Name (optional)" hint="Give this passkey a name to identify it later.">
+          <FormField
+            label="Passkey Name (optional)"
+            hint="Give this passkey a name to identify it later."
+          >
             <Input
               value={passkeyName}
               onChange={(e) => setPasskeyName(e.target.value)}
@@ -110,10 +121,7 @@ export default function PasskeysSection({ user, sessionUser, busyKey, setBusyKey
               maxLength={60}
             />
           </FormField>
-          <Button
-            disabled={busyKey === 'passkey-register'}
-            onClick={handleRegisterPasskey}
-          >
+          <Button disabled={busyKey === 'passkey-register'} onClick={handleRegisterPasskey}>
             {busyKey === 'passkey-register' ? 'Registering...' : 'Register New Passkey'}
           </Button>
         </>

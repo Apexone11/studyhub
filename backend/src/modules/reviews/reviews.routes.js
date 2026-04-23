@@ -12,7 +12,11 @@ const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
-const { reviewSubmitLimiter, reviewReadLimiter, reviewReportGenerateLimiter } = require('../../lib/rateLimiters')
+const {
+  reviewSubmitLimiter,
+  reviewReadLimiter,
+  reviewReportGenerateLimiter,
+} = require('../../lib/rateLimiters')
 const { ERROR_CODES, sendError } = require('../../middleware/errorEnvelope')
 const { clampLimit, clampPage } = require('../../lib/constants')
 const { MAX_REVIEW_LENGTH, MIN_STARS, MAX_STARS } = require('./reviews.constants')
@@ -28,7 +32,12 @@ router.post('/', requireAuth, reviewSubmitLimiter, async (req, res) => {
     // Validate stars
     const parsedStars = Number.parseInt(stars, 10)
     if (!Number.isInteger(parsedStars) || parsedStars < MIN_STARS || parsedStars > MAX_STARS) {
-      return sendError(res, 400, `Stars must be an integer between ${MIN_STARS} and ${MAX_STARS}.`, ERROR_CODES.VALIDATION)
+      return sendError(
+        res,
+        400,
+        `Stars must be an integer between ${MIN_STARS} and ${MAX_STARS}.`,
+        ERROR_CODES.VALIDATION,
+      )
     }
 
     // Validate text
@@ -212,24 +221,30 @@ router.patch('/admin/:id', requireAuth, requireAdmin, async (req, res) => {
 })
 
 // ── POST /admin/reports/generate — Trigger AI review report generation ────
-router.post('/admin/reports/generate', requireAuth, requireAdmin, reviewReportGenerateLimiter, async (req, res) => {
-  try {
-    const days = Number.parseInt(req.body?.days, 10) || 7
+router.post(
+  '/admin/reports/generate',
+  requireAuth,
+  requireAdmin,
+  reviewReportGenerateLimiter,
+  async (req, res) => {
+    try {
+      const days = Number.parseInt(req.body?.days, 10) || 7
 
-    const report = await generateReviewReport({
-      days: Math.min(Math.max(days, 1), 90),
-      adminUserId: req.user.userId,
-    })
+      const report = await generateReviewReport({
+        days: Math.min(Math.max(days, 1), 90),
+        adminUserId: req.user.userId,
+      })
 
-    res.status(201).json(report)
-  } catch (err) {
-    if (err.message === 'No reviews found in the specified period.') {
-      return sendError(res, 400, err.message, ERROR_CODES.BAD_REQUEST)
+      res.status(201).json(report)
+    } catch (err) {
+      if (err.message === 'No reviews found in the specified period.') {
+        return sendError(res, 400, err.message, ERROR_CODES.BAD_REQUEST)
+      }
+      captureError(err, { route: req.originalUrl, method: req.method })
+      res.status(500).json({ error: 'Failed to generate review report.' })
     }
-    captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Failed to generate review report.' })
-  }
-})
+  },
+)
 
 // ── GET /admin/reports — List all review reports ──────────────────────────
 router.get('/admin/reports', requireAuth, requireAdmin, reviewReadLimiter, async (req, res) => {

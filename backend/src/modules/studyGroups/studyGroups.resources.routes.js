@@ -42,9 +42,15 @@ const router = express.Router({ mergeParams: true })
 const GROUP_MEDIA_MAX_BYTES = 25 * 1024 * 1024 // 25 MB
 const GROUP_MEDIA_ALLOWED_MIME = new Set([
   // images
-  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif',
+  'image/jpeg',
+  'image/png',
+  'image/gif',
+  'image/webp',
+  'image/avif',
   // video
-  'video/mp4', 'video/webm', 'video/quicktime',
+  'video/mp4',
+  'video/webm',
+  'video/quicktime',
   // documents
   'application/pdf',
   'application/zip',
@@ -60,7 +66,10 @@ function mediaKindForMime(mime) {
 }
 
 function safeMediaName(originalName) {
-  const ext = path.extname(String(originalName || '')).toLowerCase().slice(0, 10)
+  const ext = path
+    .extname(String(originalName || ''))
+    .toLowerCase()
+    .slice(0, 10)
   const random = crypto.randomBytes(8).toString('hex')
   return `${Date.now()}-${random}${ext || ''}`
 }
@@ -201,7 +210,9 @@ router.post('/upload', groupMediaUploadLimiter, requireAuth, (req, res) => {
           try {
             const fs = require('node:fs')
             fs.unlinkSync(req.file.path)
-          } catch { /* ignore */ }
+          } catch {
+            /* ignore */
+          }
           return res.status(429).json({
             error: quotaErr.message,
             code: quotaErr.code || 'RATE_LIMITED',
@@ -247,7 +258,9 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
 
     // Phase 5: muted users cannot create resources.
     if (await isMutedInGroup(groupId, req.user.userId)) {
-      return res.status(403).json({ error: 'You are currently muted in this group and cannot post.' })
+      return res
+        .status(403)
+        .json({ error: 'You are currently muted in this group and cannot post.' })
     }
 
     const {
@@ -290,7 +303,9 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       } else {
         validUrl = validateResourceUrl(resourceUrl)
         if (!validUrl) {
-          return res.status(400).json({ error: 'Invalid resource URL. Must be a valid http or https URL.' })
+          return res
+            .status(400)
+            .json({ error: 'Invalid resource URL. Must be a valid http or https URL.' })
         }
       }
     }
@@ -318,7 +333,9 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       }
       if (mediaUrl != null) {
         if (typeof mediaUrl !== 'string' || !mediaUrl.startsWith('/uploads/group-media/')) {
-          return res.status(400).json({ error: 'mediaUrl must be an /uploads/group-media/... path.' })
+          return res
+            .status(400)
+            .json({ error: 'mediaUrl must be an /uploads/group-media/... path.' })
         }
         mediaData.mediaUrl = mediaUrl
       }
@@ -430,7 +447,9 @@ router.patch('/:resourceId', writeLimiter, requireAuth, async (req, res) => {
       const isUploadPath = resourceUrl.startsWith('/uploads/group-media/')
       const isHttpUrl = resourceUrl.startsWith('https://') || resourceUrl.startsWith('http://')
       if (!isUploadPath && !isHttpUrl) {
-        return res.status(400).json({ error: 'resourceUrl must be an /uploads/group-media/... path or a valid http(s) URL.' })
+        return res.status(400).json({
+          error: 'resourceUrl must be an /uploads/group-media/... path or a valid http(s) URL.',
+        })
       }
       // Phase 5 C.2: same link-safety check as POST — prevent bypass via
       // create-benign-then-patch-to-phishing attack vector.

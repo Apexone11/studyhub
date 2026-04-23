@@ -40,7 +40,8 @@ router.get('/restrictions', async (req, res) => {
 /* PATCH /restrictions/:id/lift — Lift a restriction */
 router.patch('/restrictions/:id/lift', async (req, res) => {
   const restrictionId = Number.parseInt(req.params.id, 10)
-  if (!Number.isFinite(restrictionId)) return res.status(400).json({ error: 'Invalid restriction ID.' })
+  if (!Number.isFinite(restrictionId))
+    return res.status(400).json({ error: 'Invalid restriction ID.' })
 
   try {
     const existing = await prisma.userRestriction.findUnique({
@@ -59,7 +60,11 @@ router.patch('/restrictions/:id/lift', async (req, res) => {
       include: { user: { select: { id: true, username: true } } },
     })
 
-    logModerationEvent({ userId: existing.userId, action: 'restriction_lifted', performedBy: req.user.userId })
+    logModerationEvent({
+      userId: existing.userId,
+      action: 'restriction_lifted',
+      performedBy: req.user.userId,
+    })
 
     try {
       await createNotification(prisma, {
@@ -69,7 +74,9 @@ router.patch('/restrictions/:id/lift', async (req, res) => {
         actorId: null,
         performerUserId: req.user.userId,
       })
-    } catch { /* non-fatal */ }
+    } catch {
+      /* non-fatal */
+    }
 
     res.json({ message: 'Restriction lifted.', restriction: updated })
   } catch (error) {
@@ -116,8 +123,11 @@ router.get('/appeals', async (req, res) => {
 /* PATCH /appeals/:id/review — Approve or reject an appeal */
 router.patch('/appeals/:id/review', async (req, res) => {
   const appealId = Number.parseInt(req.params.id, 10)
-  const action = String(req.body?.action || '').trim().toLowerCase()
-  const reviewNote = typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim().slice(0, 500) : ''
+  const action = String(req.body?.action || '')
+    .trim()
+    .toLowerCase()
+  const reviewNote =
+    typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim().slice(0, 500) : ''
 
   if (!Number.isFinite(appealId)) return res.status(400).json({ error: 'Invalid appeal ID.' })
   if (!['approve', 'reject'].includes(action)) {
@@ -141,37 +151,63 @@ router.patch('/appeals/:id/review', async (req, res) => {
       })
 
       if (appeal.caseId) {
-        await prisma.moderationCase.update({
-          where: { id: appeal.caseId },
-          data: { status: 'reversed', reviewedBy: req.user.userId, reviewNote: 'Reversed via approved appeal.' },
-        }).catch((err) => captureError(err, { context: 'appeal-case-dismiss', appealId }))
+        await prisma.moderationCase
+          .update({
+            where: { id: appeal.caseId },
+            data: {
+              status: 'reversed',
+              reviewedBy: req.user.userId,
+              reviewNote: 'Reversed via approved appeal.',
+            },
+          })
+          .catch((err) => captureError(err, { context: 'appeal-case-dismiss', appealId }))
 
         /* Restore taken-down content */
         const restoreResult = await restoreContent(appeal.caseId)
         if (!restoreResult.success) {
-          captureError(new Error(restoreResult.error || 'restoreContent failed'), { context: 'appeal-restore', appealId, caseId: appeal.caseId })
+          captureError(new Error(restoreResult.error || 'restoreContent failed'), {
+            context: 'appeal-restore',
+            appealId,
+            caseId: appeal.caseId,
+          })
         }
       }
 
-      await prisma.strike.updateMany({
-        where: { caseId: appeal.caseId, userId: appeal.userId, decayedAt: null },
-        data: { decayedAt: new Date() },
-      }).catch((err) => captureError(err, { context: 'appeal-strike-decay', appealId }))
+      await prisma.strike
+        .updateMany({
+          where: { caseId: appeal.caseId, userId: appeal.userId, decayedAt: null },
+          data: { decayedAt: new Date() },
+        })
+        .catch((err) => captureError(err, { context: 'appeal-strike-decay', appealId }))
 
       const activeStrikes = await countActiveStrikes(appeal.userId)
       if (activeStrikes < 4) {
-        await prisma.userRestriction.updateMany({
-          where: {
-            userId: appeal.userId,
-            type: 'full',
-            OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }],
-          },
-          data: { endsAt: new Date() },
-        }).catch((err) => captureError(err, { context: 'appeal-restriction-lift', appealId }))
+        await prisma.userRestriction
+          .updateMany({
+            where: {
+              userId: appeal.userId,
+              type: 'full',
+              OR: [{ endsAt: null }, { endsAt: { gt: new Date() } }],
+            },
+            data: { endsAt: new Date() },
+          })
+          .catch((err) => captureError(err, { context: 'appeal-restriction-lift', appealId }))
       }
 
-      logModerationEvent({ userId: appeal.userId, action: 'appeal_approved', caseId: appeal.caseId, appealId: appeal.id, performedBy: req.user.userId })
-      logModerationEvent({ userId: appeal.userId, action: 'strike_decayed', caseId: appeal.caseId, appealId: appeal.id, performedBy: req.user.userId })
+      logModerationEvent({
+        userId: appeal.userId,
+        action: 'appeal_approved',
+        caseId: appeal.caseId,
+        appealId: appeal.id,
+        performedBy: req.user.userId,
+      })
+      logModerationEvent({
+        userId: appeal.userId,
+        action: 'strike_decayed',
+        caseId: appeal.caseId,
+        appealId: appeal.id,
+        performedBy: req.user.userId,
+      })
 
       try {
         await createNotification(prisma, {
@@ -182,7 +218,9 @@ router.patch('/appeals/:id/review', async (req, res) => {
           linkPath: '/settings?tab=moderation',
           performerUserId: req.user.userId,
         })
-      } catch { /* non-fatal */ }
+      } catch {
+        /* non-fatal */
+      }
 
       auditFromRequest(req, AUDIT_EVENTS.MOD_APPEAL_RESOLVE, { targetUserId: appeal.userId })
       return res.json({ message: 'Appeal approved. Strike decayed.', appeal: updated })
@@ -193,7 +231,13 @@ router.patch('/appeals/:id/review', async (req, res) => {
       data: { status: 'rejected', reviewedBy: req.user.userId, reviewNote },
     })
 
-    logModerationEvent({ userId: appeal.userId, action: 'appeal_rejected', caseId: appeal.caseId, appealId: appeal.id, performedBy: req.user.userId })
+    logModerationEvent({
+      userId: appeal.userId,
+      action: 'appeal_rejected',
+      caseId: appeal.caseId,
+      appealId: appeal.id,
+      performedBy: req.user.userId,
+    })
     auditFromRequest(req, AUDIT_EVENTS.MOD_APPEAL_RESOLVE, { targetUserId: appeal.userId })
 
     try {
@@ -205,7 +249,9 @@ router.patch('/appeals/:id/review', async (req, res) => {
         linkPath: '/settings?tab=account',
         performerUserId: req.user.userId,
       })
-    } catch { /* non-fatal */ }
+    } catch {
+      /* non-fatal */
+    }
 
     res.json({ message: 'Appeal rejected.', appeal: updated })
   } catch (error) {

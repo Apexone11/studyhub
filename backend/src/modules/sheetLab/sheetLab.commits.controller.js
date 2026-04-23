@@ -3,7 +3,12 @@ const requireAuth = require('../../middleware/auth')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { optionalAuth, canReadSheet, parsePositiveInt, computeChecksum } = require('./sheetLab.constants')
+const {
+  optionalAuth,
+  canReadSheet,
+  parsePositiveInt,
+  computeChecksum,
+} = require('./sheetLab.constants')
 const { trackActivity } = require('../../lib/activityTracker')
 const { checkAndAwardBadges } = require('../../lib/badges')
 
@@ -122,14 +127,17 @@ router.post('/:id/lab/commits', requireAuth, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: sheet.userId,
-      message: 'Only the sheet owner can create commits.',
-      targetType: 'sheet-lab',
-      targetId: sheetId,
-    })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: sheet.userId,
+        message: 'Only the sheet owner can create commits.',
+        targetType: 'sheet-lab',
+        targetId: sheetId,
+      })
+    )
+      return
 
     const latestCommit = await prisma.sheetCommit.findFirst({
       where: { sheetId },

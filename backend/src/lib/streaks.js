@@ -55,7 +55,8 @@ async function getUserStreak(prisma, userId) {
     for (let i = 0; i < activities.length; i++) {
       const activity = activities[i]
       const activityDate = new Date(activity.date)
-      const totalActivity = activity.commits + activity.sheets + activity.reviews + activity.comments
+      const totalActivity =
+        activity.commits + activity.sheets + activity.reviews + activity.comments
 
       if (totalActivity > 0) {
         if (!lastActiveDate) {
