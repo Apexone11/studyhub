@@ -244,6 +244,7 @@ Tables with migrations (safe to query):
 - After each beta implementation cycle, document changes and validation results in `docs/internal/beta-v2.0.0-release-log.md`.
 - For frontend validation in this repo, `npm --prefix frontend/studyhub-app run lint` is the reliable full-lint command.
 - Use quoted paths in PowerShell because the workspace path contains spaces.
+- `.git-blame-ignore-revs` at the repo root lists commits skipped by `git blame`. Enable locally with `git config blame.ignoreRevsFile .git-blame-ignore-revs`. GitHub honors it automatically. Add new revs when landing mechanical commits (reformats, mass renames, codemods) that would otherwise pollute blame.
 
 ## UI / Design Conventions
 
