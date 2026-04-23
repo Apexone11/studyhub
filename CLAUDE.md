@@ -251,6 +251,86 @@ Tables with migrations (safe to query):
 - Preserve the current HomePage visual language unless a task explicitly calls for a redesign.
 - UserAvatar component (`frontend/studyhub-app/src/components/UserAvatar.jsx`) must be used everywhere a user's profile picture is displayed. It handles fallback avatars automatically.
 
+## Mobile APK Dev Testing (LAN IP must always match)
+
+When testing the Capacitor Android APK against the **local** (non-Railway) backend, the phone reaches the laptop over Wi-Fi at `http://<LAPTOP_LAN_IP>:4000`. That IP is hardcoded in two places that MUST stay in sync with the laptop's current DHCP-assigned address:
+
+1. `frontend/studyhub-app/.env.mobile.local` — holds `VITE_MOBILE_API_URL=http://<ip>:4000`. Vite bakes this into the bundled `config.js` at build time, so the APK can only talk to whatever IP was set when the build ran.
+2. `frontend/studyhub-app/android/app/src/main/res/xml/network_security_config.xml` — Android's cleartext-HTTP whitelist. Even if the JS tries to fetch the right IP, Android will silently block the request if that IP isn't in this file's `<domain>` list.
+
+**Why this matters:** the laptop's LAN IP changes whenever DHCP renews the lease (reboots, router restarts, simply leaving the Wi-Fi for a bit). A stale IP in either file silently breaks login on the phone with a generic "Connection error" — the phone appears to do nothing, no useful error surfaces.
+
+### Mandatory workflow before any mobile APK dev test
+
+**Always run `npm run mobile:build` first.** Do not skip straight to `gradle assembleDebug` or `npx cap run android`. The script now starts with an auto-sync step (`scripts/sync-mobile-lan-ip.js`) that:
+
+- Detects the current primary LAN IPv4 (prefers real adapters, skips Hyper-V / VMware / WSL virtual ones).
+- Rewrites `VITE_MOBILE_API_URL` in `.env.mobile.local` to `http://<current-ip>:4000`.
+- Rewrites the single LAN-IP `<domain>` entry in `network_security_config.xml` to the same address.
+- Idempotent — if nothing changed, both files are left alone.
+
+Expected output when it runs:
+
+```text
+[sync-mobile-lan-ip] .env.mobile.local: rewrote -> http://10.0.0.221:4000
+[sync-mobile-lan-ip] network_security_config.xml: rewrote -> 10.0.0.221
+```
+
+After that, Vite builds, `cap sync android` copies to the Android project, and you're ready for `gradle assembleDebug` + `adb install`.
+
+### Full dev-testing flow (copy-paste sequence)
+
+```bash
+# 1. Sync IP + rebuild web bundle + sync to Android project
+npm --prefix frontend/studyhub-app run mobile:build
+
+# 2. Build the APK (gradle)
+cd frontend/studyhub-app/android && ./gradlew :app:assembleDebug && cd ../../..
+
+# 3. Install + launch on the connected phone
+adb install -r "$(pwd)/../studyhub-android-build/android/app/outputs/apk/debug/app-debug.apk"
+adb shell monkey -p app.studyhub.mobile -c android.intent.category.LAUNCHER 1
+```
+
+(The gradle output path `../studyhub-android-build/android/app/outputs/apk/debug/app-debug.apk` is non-standard because the project redirects the Android build directory off OneDrive — see the existing gradle config. If you get a "file not found" on install, run `find / -name "app-debug.apk" 2>/dev/null | head` to locate it.)
+
+### Host-side prerequisites (one-time per laptop)
+
+These must be true on the laptop before any mobile dev test will work:
+
+- **Windows Firewall rule:** inbound TCP port 4000 allowed. Created once with (Admin PowerShell):
+
+  ```powershell
+  New-NetFirewallRule -DisplayName "StudyHub Backend Dev 4000" -Direction Inbound -LocalPort 4000 -Protocol TCP -Action Allow -Profile Private
+  ```
+
+- **Wi-Fi profile classified as Private:** the firewall rule above only applies to Private networks (safer than exposing port 4000 to coffee-shop Wi-Fi). Check + fix with:
+
+  ```powershell
+  Get-NetConnectionProfile -InterfaceAlias "Wi-Fi"   # should show NetworkCategory : Private
+  Set-NetConnectionProfile -InterfaceAlias "Wi-Fi" -NetworkCategory Private   # if it isn't, this fixes it (Admin)
+  ```
+
+- **Backend listening on all interfaces:** `docker ps` should show `studyhub-backend-1` mapping port 4000 on `0.0.0.0`. Already configured in `docker-compose.yml`.
+
+### Verification when sign-in fails on the phone
+
+Run this on the laptop to get a full status snapshot:
+
+```powershell
+$ip = (Get-NetIPAddress -AddressFamily IPv4 -InterfaceAlias "Wi-Fi").IPAddress
+"lan-ip:         $ip"
+"wifi-profile:   " + (Get-NetConnectionProfile -InterfaceAlias "Wi-Fi").NetworkCategory
+"firewall-rule:  " + (Get-NetFirewallRule -DisplayName "StudyHub Backend Dev 4000" -ErrorAction SilentlyContinue).Profile
+"port-reachable: " + (Test-NetConnection -ComputerName $ip -Port 4000 -InformationLevel Quiet)
+```
+
+All four must be green: IP detected, profile Private, rule Private, port reachable True. If `port-reachable: False`, either (a) the firewall rule is missing/wrong profile, (b) the backend container isn't running, or (c) the Wi-Fi is somehow misclassified.
+
+### Production builds are exempt from all of this
+
+`npm run mobile:build` + the production env (`.env.mobile.production`) target `https://studyhub-production-c655.up.railway.app`, which is a public DNS name reached over HTTPS. No LAN, no firewall, no DHCP. The sync-mobile-lan-ip script still runs but its output doesn't matter for production because Vite is using the production env file, not `.env.mobile.local`.
+
 ## Validation Commands
 
 Root workspace:
@@ -336,10 +416,9 @@ When handling a new task:
 
 Founder-approved design refresh in progress. Context for any agent picking up this work:
 
-- Full brainstorm, KEEP/SKIP lists, phased plan, locked decisions: `docs/internal/design-refresh-v2-brainstorm.md` — read before editing any page listed below.
-- Web master plan (8 phases, approved April 19, 2026): `docs/internal/design-refresh-v2-master-plan.md`.
-- Mobile companion plan (8 phases + M1–M10 parity suggestions, parallel-weekly cadence): `docs/internal/design-refresh-v2-mobile-plan.md`. Every phase ships behind a shared `design_v2_*` feature flag so web and mobile light up together. Parallel cadence: web Mon–Wed, mobile Thu–Fri, cohort rollout end of week.
-- Roles integration plan (student / teacher / self-learner as three first-class experiences, woven into every v2 phase, with teacher module landing in week 7): `docs/internal/design-refresh-v2-roles-integration.md`. Founder approved April 19, 2026 — Week 1 (Phase 1) in progress. See also `docs/internal/roles-and-permissions-plan.md` for the underlying role model and OAuth picker flow.
+- Web master plan, roles integration, week-2-to-5 execution log, scholar tier (web portion), cloud import, creator audit, sheet custom CSS — all consolidated into `docs/internal/web-master-plan.md` (sections 1-7). Read the relevant section before editing any page it covers.
+- Mobile companion plan is archived at `docs/internal/mobile-archive.md` section 5. Mobile work is paused as of 2026-04-23; do not start new mobile work unless Abdul explicitly reopens it.
+- Role model + OAuth picker flow (underlying the roles integration above): `docs/internal/roles-and-permissions-plan.md`.
 - **All internal planning docs live in `docs/internal/` and are gitignored.** Do not recreate planning docs at the `docs/` root. Do not reference them by the old root path.
 - Identity: stay "Campus Lab" (warm paper, `#f6f5f2`, ink typography, blue `#2563eb` accent). Gradients remain accent moments on hero/auth only; do NOT gradient-fill inner app pages.
 - Emoji policy (see above): user content only, never UI chrome. The mockup's "Welcome back, Jaden 👋" renders as "Welcome back, Jaden" in our implementation.
