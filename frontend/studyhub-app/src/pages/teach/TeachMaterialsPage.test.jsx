@@ -31,7 +31,22 @@ vi.mock('../../components/Icons', () => ({
 }))
 vi.mock('../../lib/ui', () => ({
   pageShell: () => ({}),
-  useResponsiveAppLayout: () => ({ sidebarMode: 'desktop' }),
+  // Must match the real shape returned by lib/ui.js resolveAppLayout():
+  // { sidebarMode, columns: { appTwoColumn, appThreeColumn, readingThreeColumn }, ... }.
+  // The page references layout.columns.appTwoColumn at render time; if the
+  // mock omits `columns` the render crashes with a TypeError that masks the
+  // rest of the test intent.
+  useResponsiveAppLayout: () => ({
+    sidebarMode: 'desktop',
+    isPhone: false,
+    isTablet: false,
+    isCompact: false,
+    columns: {
+      appTwoColumn: 'minmax(0, 1fr) 280px',
+      appThreeColumn: '220px minmax(0, 1fr) 280px',
+      readingThreeColumn: '220px minmax(0, 1fr) 280px',
+    },
+  }),
 }))
 vi.mock('../../lib/usePageTitle', () => ({
   usePageTitle: vi.fn(),
