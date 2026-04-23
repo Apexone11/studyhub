@@ -348,5 +348,28 @@ Founder-approved design refresh in progress. Context for any agent picking up th
 - Top nav: keep existing `NavBar` + `--sh-nav-bg` chrome. Spacing/search polish only.
 - Phase 1 target: `frontend/studyhub-app/src/pages/dashboard/DashboardPage.jsx` (authenticated personal overview, NOT the public profile page at `/u/:username`). Sidebar section labels (MAIN/PERSONAL/ACCOUNT), sidebar user card at bottom, dashboard welcome context line, Top Contributors mini-widget. Frontend-only, no migrations.
 - Later phases (do not start without founder approval): Upcoming Exams card (needs schema work), inline Hub AI suggestion card, Sheets Grid view (needs `previewText` migration + backfill), auth split layout + referral banner, onboarding polish, feed polish, home hero dial-up.
-- Hard rules for this cycle: no package.json / package-lock.json changes, no new npm deps, no auth logic changes, no git commits without founder approval, no hardcoded colors.
-                                                                                                                                                                                                                                                                                    
+- Hard rules for this cycle (with the v2.1 dependency exception carved out below):
+  - No auth logic changes without founder approval.
+  - No git commits without founder approval.
+  - No hardcoded colors — always use `var(--sh-*)` tokens.
+  - No ad-hoc npm dependency churn. Do not add unused packages "just in case". Do not swap one library for another because you prefer it.
+
+- **v2.1 dependency exception (updated April 22, 2026).** The earlier blanket ban on `package.json` and `package-lock.json` changes is relaxed in the following narrow circumstances. This exception exists because discovery during v2 implementation surfaced cases (like the missing `idb` install on `/notes`) where the alternatives — rewriting library internals from scratch, or shipping broken routes — waste more time than a clean, auditable dependency change. **Abuse the exception and it gets revoked.**
+  - **Allowed without prompting again:** running `npm install` at the root of a workspace when the package is already declared in `dependencies` / `devDependencies` (i.e., you are syncing `node_modules` and at most regenerating `package-lock.json` to match the existing declaration). This is not a "new dep" — it is an install step a new developer would run.
+  - **Allowed when it is the ONLY viable path** — e.g., the page is crash-broken because of a missing module, there is no realistic inline-rewrite option within a few hours, and there is no existing dep that already solves the same problem:
+    1. Add exactly one dependency at a time.
+    2. Pin to a specific `~` or `^` range that matches the repo's existing styling.
+    3. Update both `package.json` and `package-lock.json` in the same commit.
+    4. Do not add transitive helpers ("while I'm in here…"). One problem → one dep.
+    5. Log the add in `docs/internal/beta-v2.0.0-release-log.md` under a `### Dependency changes` subsection with: date, package name + version, why no existing dep solved the need, and a one-line rollback plan.
+  - **Still forbidden without an explicit founder "yes" in chat:**
+    - Major version bumps of React, React Router, Vite, Prisma, Express, Socket.io, Tailwind, or any auth/crypto library.
+    - Replacing a library the repo already uses with a competitor.
+    - Adding runtime deps for purely internal developer-experience wins (formatters, linters, test reporters). Those go in `devDependencies` only, and still need founder approval.
+    - Adding anything that pulls native binaries or postinstall scripts into CI (Capacitor plugins, sharp, canvas, puppeteer, etc.).
+  - **Preferred order of remediation when an import is missing:**
+    1. Check whether the package is already declared in `package.json`. If yes, it is a sync problem — run `npm install` at that workspace; no founder approval required.
+    2. If the code is using <50 LOC worth of the library (like `idb` was) and there is a first-party standard API that replaces it (IndexedDB, fetch, FormData, URL, Intl, crypto.subtle, etc.), rewrite inline with no new dep.
+    3. If neither option works, follow the "Allowed when it is the ONLY viable path" checklist above and log the exception.
+  - **`package-lock.json` rules specifically:** never hand-edit. Only regenerate via `npm install`. If `package-lock.json` changes because of a legitimate install, commit it with the matching `package.json` change in the same commit so bisect stays clean.
+                                                                                                                                                                                                                                                                                      

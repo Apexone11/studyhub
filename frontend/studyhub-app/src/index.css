@@ -84,6 +84,14 @@
   --sh-soft: #faf9f7;
   --sh-page-bg: #f0eeeb;
 
+  /* Paper surface — always light, for rendering user HTML content
+     (sheet previews, attachment iframes). Sheet authors assume a white
+     paper background; keeping this stable across themes prevents a
+     "black box behind sheets" effect in dark mode. */
+  --sh-paper: #ffffff;
+  --sh-paper-soft: #faf9f7;
+  --sh-paper-border: #e5e2dd;
+
   /* ── Text colors (ink) ───────────────────────────────────────────── */
   --sh-text: #1a1a1a;
   --sh-heading: #111111;
@@ -368,6 +376,13 @@
   --sh-surface: #1c1c1c;
   --sh-soft: #242424;
   --sh-page-bg: #0e0e0e;
+
+  /* Paper surfaces stay LIGHT in dark mode on purpose — sheet content
+     is authored assuming a white page, so rendering a dark panel around
+     it looks like an "unprofessional black box". */
+  --sh-paper: #ffffff;
+  --sh-paper-soft: #faf9f7;
+  --sh-paper-border: #d6d3cc;
 
   /* ── Text ────────────────────────────────────────────────────────── */
   --sh-text: #e8e8e8;
@@ -1167,6 +1182,36 @@ textarea.sh-input {
 
 .sh-landing-search {
   display: flex;
+}
+
+/* Navbar search trigger — hover and keyboard-focus states. */
+[data-search-trigger] {
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+[data-search-trigger]:hover {
+  background: var(--sh-nav-muted-hover);
+  border-color: var(--sh-nav-muted);
+}
+[data-search-trigger]:focus-visible {
+  outline: none;
+  border-color: var(--sh-brand);
+  box-shadow: 0 0 0 3px var(--sh-brand-soft-bg);
+}
+
+/* SearchModal input row — focus-within highlight so users see the
+   active field even though the input itself has no border. */
+.sh-search-input-row {
+  transition: background 0.15s ease;
+}
+.sh-search-input-row:focus-within {
+  background: var(--sh-soft);
+}
+.sh-search-input::placeholder {
+  color: var(--sh-subtext);
+  opacity: 1;
 }
 
 .sh-landing-actions {

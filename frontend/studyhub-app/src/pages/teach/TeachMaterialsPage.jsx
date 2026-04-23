@@ -141,7 +141,10 @@ export default function TeachMaterialsPage() {
       <Navbar />
       <div className="sh-app-page" style={styles.page}>
         <div className="sh-ambient-shell" style={pageShell('app', 26, 48)}>
-          <div className="sh-ambient-grid" style={styles.appGrid}>
+          <div
+            className="sh-ambient-grid"
+            style={{ ...styles.appGrid, gridTemplateColumns: layout.columns.appTwoColumn }}
+          >
             <AppSidebar mode={layout.sidebarMode} />
 
             <main className="sh-ambient-main" id="main-content" style={styles.main}>
@@ -550,7 +553,8 @@ const styles = {
   },
   appGrid: {
     display: 'grid',
-    gridTemplateColumns: 'minmax(0, 1fr)',
+    // gridTemplateColumns is set at render time from layout.columns.appTwoColumn
+    // so the sidebar gets its own column and doesn't overlap the <main> area.
     gap: 24,
   },
   main: {

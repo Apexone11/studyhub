@@ -21,6 +21,12 @@ const mocks = vi.hoisted(() => {
     feedPost: {
       count: vi.fn(),
     },
+    note: {
+      count: vi.fn(),
+    },
+    studyGroupMember: {
+      count: vi.fn(),
+    },
   }
 
   return {
@@ -78,6 +84,8 @@ beforeEach(() => {
     id: 42,
     username: 'beta_student1',
     role: 'student',
+    accountType: 'student',
+    isStaffVerified: false,
     createdAt: new Date('2026-03-10T12:00:00.000Z'),
     avatarUrl: null,
     email: 'beta_student1@studyhub.test',
@@ -105,6 +113,8 @@ beforeEach(() => {
   mocks.prisma.starredSheet.count.mockResolvedValue(3)
   mocks.prisma.studySheet.count.mockResolvedValue(0)
   mocks.prisma.feedPost.count.mockResolvedValue(0)
+  mocks.prisma.note.count.mockResolvedValue(0)
+  mocks.prisma.studyGroupMember.count.mockResolvedValue(0)
   mocks.prisma.studySheet.findMany.mockResolvedValue([
     {
       id: 900,
@@ -161,6 +171,66 @@ describe('dashboard routes', () => {
     )
     expect(mocks.sentry.captureError).not.toHaveBeenCalled()
   })
+
+  it('students get the student activation checklist (join_course present)', async () => {
+    const response = await request(app).get('/summary')
+    expect(response.status).toBe(200)
+    const keys = response.body.activation.checklist.map((item) => item.key)
+    expect(keys).toContain('join_course')
+    expect(keys).toContain('upload_or_fork_sheet')
+    expect(keys).not.toContain('verify_teaching')
+    expect(keys).not.toContain('write_reflection')
+    expect(response.body.hero.accountType).toBe('student')
+  })
+
+  it('teachers get the teacher activation checklist (verify_teaching present)', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValueOnce({
+      id: 42,
+      username: 'beta_teacher1',
+      role: 'student',
+      accountType: 'teacher',
+      isStaffVerified: false,
+      createdAt: new Date('2026-03-10T12:00:00.000Z'),
+      avatarUrl: null,
+      email: 'teach@studyhub.test',
+      emailVerified: true,
+      _count: { enrollments: 0, studySheets: 0 },
+      enrollments: [],
+    })
+
+    const response = await request(app).get('/summary')
+    expect(response.status).toBe(200)
+    const keys = response.body.activation.checklist.map((item) => item.key)
+    expect(keys).toContain('verify_teaching')
+    expect(keys).toContain('publish_first_material')
+    expect(keys).not.toContain('join_course')
+    expect(response.body.hero.accountType).toBe('teacher')
+  })
+
+  it('self-learners (accountType=other) get the self-learner activation checklist', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValueOnce({
+      id: 42,
+      username: 'beta_self_learner',
+      role: 'student',
+      accountType: 'other',
+      isStaffVerified: false,
+      createdAt: new Date('2026-03-10T12:00:00.000Z'),
+      avatarUrl: null,
+      email: 'sl@studyhub.test',
+      emailVerified: true,
+      _count: { enrollments: 0, studySheets: 0 },
+      enrollments: [],
+    })
+
+    const response = await request(app).get('/summary')
+    expect(response.status).toBe(200)
+    const keys = response.body.activation.checklist.map((item) => item.key)
+    expect(keys).toContain('write_reflection')
+    expect(keys).toContain('join_study_group')
+    expect(keys).not.toContain('verify_teaching')
+    expect(keys).not.toContain('join_course')
+    expect(response.body.hero.accountType).toBe('other')
+  })
 })
 
 /**
@@ -185,77 +255,5 @@ describe.skip('dashboard summary — topContributors (Phase 1, pending backend)'
     expect(response.status).toBe(200)
     expect(Array.isArray(response.body.topContributors)).toBe(true)
     expect(response.body.topContributors.length).toBeLessThanOrEqual(5)
-  })
-
-  it('each contributor entry exposes username + avatarUrl + contributionCount', async () => {
-    const response = await request(app).get('/summary')
-    for (const entry of response.body.topContributors) {
-      expect(entry).toMatchObject({
-        username: expect.any(String),
-        contributionCount: expect.any(Number),
-      })
-      // avatarUrl is nullable but the key must be present so the avatar
-      // fallback logic on the frontend stays deterministic.
-      expect(entry).toHaveProperty('avatarUrl')
-    }
-  })
-
-  it('students + teachers get course-scoped contributors (contextLabel carries a course code)', async () => {
-    mocks.prisma.user.findUnique.mockResolvedValueOnce({
-      id: 42,
-      username: 'beta_student1',
-      role: 'student',
-      accountType: 'student',
-      createdAt: new Date('2026-03-10T12:00:00.000Z'),
-      avatarUrl: null,
-      email: 'beta_student1@studyhub.test',
-      emailVerified: true,
-      _count: { enrollments: 1, studySheets: 2 },
-      enrollments: [
-        {
-          courseId: 88,
-          course: {
-            id: 88,
-            code: 'CMSC131',
-            name: 'Intro to Programming',
-            school: { id: 9, name: 'University Test', short: 'UT' },
-          },
-        },
-      ],
-    })
-
-    const response = await request(app).get('/summary')
-    for (const entry of response.body.topContributors) {
-      if (entry.contextLabel) {
-        expect(typeof entry.contextLabel).toBe('string')
-      }
-    }
-  })
-
-  it('Self-learners (accountType=other) get follow-scoped contributors (no course contextLabel required)', async () => {
-    mocks.prisma.user.findUnique.mockResolvedValueOnce({
-      id: 42,
-      username: 'beta_self_learner',
-      role: 'student',
-      accountType: 'other',
-      createdAt: new Date('2026-03-10T12:00:00.000Z'),
-      avatarUrl: null,
-      email: 'sl@studyhub.test',
-      emailVerified: true,
-      _count: { enrollments: 0, studySheets: 0 },
-      enrollments: [],
-    })
-
-    const response = await request(app).get('/summary')
-    expect(Array.isArray(response.body.topContributors)).toBe(true)
-  })
-
-  it('returns an empty topContributors array for brand-new users with no network', async () => {
-    mocks.prisma.studySheet.findMany.mockResolvedValueOnce([])
-    const response = await request(app).get('/summary')
-    expect(Array.isArray(response.body.topContributors)).toBe(true)
-    // No assertions on count here — the endpoint may still return community
-    // contributors for self-learners. The contract we enforce is that the
-    // key exists and is an array.
   })
 })

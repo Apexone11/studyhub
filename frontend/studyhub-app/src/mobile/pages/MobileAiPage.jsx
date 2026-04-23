@@ -6,9 +6,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import MobileTopBar from '../components/MobileTopBar'
+import AiOrb from '../components/AiOrb'
+import Chip from '../components/Chip'
 import AiMarkdown from '../../components/ai/AiMarkdown'
 import AiThinkingDots from '../../components/ai/AiThinkingDots'
 import { useAiChat } from '../../lib/useAiChat'
+import { useToast } from '../hooks/useToast'
 
 /* ── Small inline icons ─────────────────────────────────────────── */
 
@@ -189,63 +192,35 @@ function StreamingBubble({ text }) {
   )
 }
 
-function EmptyThread() {
+const STARTER_SUGGESTIONS = [
+  'Summarize my latest note',
+  'Make a study sheet from my class',
+  'Quiz me on what I just read',
+  'Explain this concept simply',
+]
+
+function EmptyThread({ onSuggestionPick }) {
   return (
-    <div
-      style={{
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '48px 24px',
-        textAlign: 'center',
-        gap: 12,
-      }}
-    >
-      <div
-        style={{
-          width: 64,
-          height: 64,
-          borderRadius: '50%',
-          background: 'var(--sh-brand-soft-bg)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          color: 'var(--sh-brand)',
-        }}
-      >
-        <svg width="28" height="28" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-          <path
-            d="M12 2l2 5 5 2-5 2-2 5-2-5-5-2 5-2 2-5z"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
-      </div>
-      <h3
-        style={{
-          fontSize: 18,
-          fontWeight: 700,
-          color: 'var(--sh-heading)',
-          margin: 0,
-        }}
-      >
-        Ask Hub AI anything
-      </h3>
-      <p
-        style={{
-          fontSize: 14,
-          color: 'var(--sh-subtext)',
-          margin: 0,
-          maxWidth: 280,
-        }}
-      >
+    <div className="sh-m-ai-landing">
+      <AiOrb size={120} thinking />
+      <h3 className="sh-m-ai-landing__title">Ask Hub AI anything</h3>
+      <p className="sh-m-ai-landing__sub">
         Summarize a note, explain a concept, or generate a study sheet. Your chats sync with the
         StudyHub website.
       </p>
+      <div className="sh-m-ai-landing__chips">
+        {STARTER_SUGGESTIONS.map((text) => (
+          <Chip
+            key={text}
+            variant="soft"
+            onPress={
+              typeof onSuggestionPick === 'function' ? () => onSuggestionPick(text) : undefined
+            }
+          >
+            {text}
+          </Chip>
+        ))}
+      </div>
     </div>
   )
 }
@@ -260,6 +235,53 @@ function ConversationsDrawer({
   onNew,
   loading,
 }) {
+  const toast = useToast()
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const confirmTimerRef = useRef(null)
+
+  // Clear the auto-reset timer on unmount.
+  useEffect(
+    () => () => {
+      if (confirmTimerRef.current) {
+        clearTimeout(confirmTimerRef.current)
+        confirmTimerRef.current = null
+      }
+    },
+    [],
+  )
+
+  const handleDeleteClick = useCallback(
+    (convId) => {
+      if (confirmTimerRef.current) {
+        clearTimeout(confirmTimerRef.current)
+        confirmTimerRef.current = null
+      }
+      if (confirmDeleteId === convId) {
+        setConfirmDeleteId(null)
+        onDelete(convId)
+        toast.show({ message: 'Chat deleted', kind: 'success' })
+        return
+      }
+      setConfirmDeleteId(convId)
+      toast.show({ message: 'Tap delete again to confirm', kind: 'warn' })
+      confirmTimerRef.current = setTimeout(() => {
+        setConfirmDeleteId(null)
+        confirmTimerRef.current = null
+      }, 3500)
+    },
+    [confirmDeleteId, onDelete, toast],
+  )
+
+  // Wrap onClose so any armed delete is dropped when the drawer closes.
+  const handleClose = useCallback(() => {
+    setConfirmDeleteId(null)
+    if (confirmTimerRef.current) {
+      clearTimeout(confirmTimerRef.current)
+      confirmTimerRef.current = null
+    }
+    onClose()
+  }, [onClose])
+
   if (!open) return null
 
   return (
@@ -267,7 +289,7 @@ function ConversationsDrawer({
       {/* Backdrop */}
       <button
         type="button"
-        onClick={onClose}
+        onClick={handleClose}
         aria-label="Close conversations"
         style={{
           position: 'fixed',
@@ -318,7 +340,7 @@ function ConversationsDrawer({
           </h2>
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleClose}
             aria-label="Close"
             style={{
               background: 'none',
@@ -421,22 +443,22 @@ function ConversationsDrawer({
                   </button>
                   <button
                     type="button"
-                    aria-label="Delete conversation"
-                    onClick={() => {
-                      if (
-                        typeof window !== 'undefined' &&
-                        window.confirm('Delete this conversation? This cannot be undone.')
-                      ) {
-                        onDelete(conv.id)
-                      }
-                    }}
+                    aria-label={
+                      confirmDeleteId === conv.id
+                        ? 'Tap again to confirm delete'
+                        : 'Delete conversation'
+                    }
+                    onClick={() => handleDeleteClick(conv.id)}
                     style={{
-                      background: 'none',
+                      background: confirmDeleteId === conv.id ? 'var(--sh-danger-bg)' : 'none',
                       border: 'none',
                       padding: '8px 10px',
-                      color: 'var(--sh-muted)',
+                      color:
+                        confirmDeleteId === conv.id ? 'var(--sh-danger-text)' : 'var(--sh-muted)',
                       cursor: 'pointer',
                       display: 'flex',
+                      borderRadius: 6,
+                      transition: 'background 0.15s ease, color 0.15s ease',
                     }}
                   >
                     <IconTrash />
@@ -547,7 +569,7 @@ export default function MobileAiPage() {
   )
 
   return (
-    <>
+    <div className="mob-ai-wrap">
       <MobileTopBar title="Hub AI" left={headerLeft} right={headerRight} />
 
       <ConversationsDrawer
@@ -562,18 +584,7 @@ export default function MobileAiPage() {
       />
 
       {/* Scrollable thread area */}
-      <div
-        ref={scrollRef}
-        style={{
-          flex: 1,
-          overflowY: 'auto',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 2,
-          paddingTop: 8,
-          paddingBottom: 12,
-        }}
-      >
+      <div ref={scrollRef} className="mob-ai-thread">
         {loading ? (
           <div style={{ padding: '40px 20px', textAlign: 'center' }} aria-busy="true">
             <div
@@ -584,7 +595,7 @@ export default function MobileAiPage() {
             />
           </div>
         ) : messages.length === 0 && !streaming ? (
-          <EmptyThread />
+          <EmptyThread onSuggestionPick={(text) => setInput(text)} />
         ) : (
           <>
             {messages.map((msg) => (
@@ -633,16 +644,7 @@ export default function MobileAiPage() {
       </div>
 
       {/* Composer */}
-      <div
-        style={{
-          borderTop: '1px solid var(--sh-border)',
-          background: 'var(--sh-bg)',
-          padding: '10px 12px',
-          display: 'flex',
-          alignItems: 'flex-end',
-          gap: 8,
-        }}
-      >
+      <div className="mob-ai-composer">
         <textarea
           ref={textareaRef}
           aria-label="Message Hub AI"
@@ -712,6 +714,6 @@ export default function MobileAiPage() {
           </button>
         )}
       </div>
-    </>
+    </div>
   )
 }

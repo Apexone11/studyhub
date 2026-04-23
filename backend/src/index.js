@@ -12,6 +12,7 @@ const { bootstrapRuntime } = require('./lib/bootstrap/bootstrap')
 const { validateEmailTransport } = require('./lib/email/email')
 const { startHtmlArchiveScheduler } = require('./lib/html/htmlArchiveScheduler')
 const { startModerationCleanupScheduler } = require('./lib/moderation/moderationCleanupScheduler')
+const { startInactiveSessionScheduler } = require('./lib/inactiveSessionScheduler')
 const {
   AVATARS_DIR,
   CONTENT_IMAGES_DIR,
@@ -574,6 +575,7 @@ async function startServer() {
   const instance = server.listen(PORT, () => {
     startHtmlArchiveScheduler()
     startModerationCleanupScheduler()
+    startInactiveSessionScheduler()
     // Pre-warm library cache with popular books (non-blocking).
     // Also syncs to CachedBook DB table so fallback works when Google Books is unavailable.
     const {

@@ -43,7 +43,7 @@ export const styles = {
     outline: 'none',
     fontSize: 15,
     fontFamily: 'inherit',
-    color: '#0f172a',
+    color: 'var(--sh-text)',
     background: 'transparent',
   },
   clearBtn: {

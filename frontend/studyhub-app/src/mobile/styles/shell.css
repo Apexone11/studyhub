@@ -113,13 +113,13 @@ body.sh-mobile .sh-m-tabbar {
   position: fixed;
   left: 50%;
   bottom: var(--sh-mobile-tab-inset);
-  transform: translateX(-50%);
+  transform: translateX(-50%) translateY(0);
   z-index: 60;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   height: var(--sh-mobile-tab-height);
-  padding: 10px 14px;
+  padding: 10px 16px;
   border-radius: 36px;
   background: var(--sh-mobile-glass);
   backdrop-filter: blur(var(--sh-mobile-blur));
@@ -127,6 +127,39 @@ body.sh-mobile .sh-m-tabbar {
   box-shadow: var(--shadow-float);
   border: 1px solid var(--sh-border);
   max-width: calc(100% - 24px);
+  opacity: 1;
+  transition:
+    transform var(--dur-base) var(--ease-smooth),
+    opacity var(--dur-base) var(--ease-smooth);
+  will-change: transform, opacity;
+}
+
+/* Scroll-hide: slide below the safe-area inset while keeping the horizontal
+ * centering transform intact. */
+body.sh-mobile .sh-m-tabbar--hidden {
+  transform: translateX(-50%) translateY(calc(100% + var(--sh-mobile-tab-inset, 16px) + 12px));
+  opacity: 0;
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.sh-mobile .sh-m-tabbar {
+    transition: none;
+  }
+  body.sh-mobile .sh-m-tabbar--hidden {
+    transform: translateX(-50%) translateY(0);
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+body.sh-mobile-reduced-motion .sh-m-tabbar {
+  transition: none;
+}
+body.sh-mobile-reduced-motion .sh-m-tabbar--hidden {
+  transform: translateX(-50%) translateY(0);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 @supports not (backdrop-filter: blur(2px)) {
@@ -199,7 +232,7 @@ body.sh-mobile .sh-m-tabbar__item--active .sh-m-tabbar__avatar {
 body.sh-mobile .sh-m-tabbar__compose {
   width: 56px;
   height: 56px;
-  margin: 0 4px;
+  margin: 0 6px;
   display: inline-flex;
   align-items: center;
   justify-content: center;

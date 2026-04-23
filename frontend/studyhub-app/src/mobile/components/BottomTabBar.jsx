@@ -6,7 +6,10 @@ import { useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSession } from '../../lib/session-context'
 import haptics from '../lib/haptics'
+import { safeImageSrc } from '../lib/safeImage'
 import BottomSheet from './BottomSheet'
+import { useScrollDirection } from '../hooks/useScrollDirection'
+import { useReducedMotion } from '../hooks/useReducedMotion'
 
 function TabIcon({ name, active }) {
   const weight = active ? '2.2' : '1.8'
@@ -80,6 +83,11 @@ export default function BottomTabBar() {
   const navigate = useNavigate()
   const { user } = useSession()
   const [composeOpen, setComposeOpen] = useState(false)
+  const scrollDirection = useScrollDirection()
+  const reducedMotion = useReducedMotion()
+  // Hide only when the user is actively scrolling down on a long page and no
+  // modal/sheet is open. Reduced-motion users keep the bar pinned.
+  const hidden = !reducedMotion && !composeOpen && scrollDirection === 'down'
 
   const activeTab =
     TABS.find((t) => location.pathname.startsWith(t.path))?.key ||
@@ -119,7 +127,11 @@ export default function BottomTabBar() {
 
   return (
     <>
-      <nav className="sh-m-tabbar" aria-label="Main navigation">
+      <nav
+        className={`sh-m-tabbar ${hidden ? 'sh-m-tabbar--hidden' : ''}`.trim()}
+        aria-label="Main navigation"
+        aria-hidden={hidden ? 'true' : undefined}
+      >
         {/* Left cluster: Home + Messages */}
         {TABS.slice(0, 2).map((tab) => {
           const isActive = tab.key === activeTab
@@ -175,9 +187,9 @@ export default function BottomTabBar() {
           aria-current={profileActive ? 'page' : undefined}
           aria-label="Profile"
         >
-          {user?.avatarUrl ? (
+          {safeImageSrc(user?.avatarUrl) ? (
             <img
-              src={user.avatarUrl}
+              src={safeImageSrc(user.avatarUrl)}
               alt=""
               className="sh-m-tabbar__avatar"
               referrerPolicy="no-referrer"
