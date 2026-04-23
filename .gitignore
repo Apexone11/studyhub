@@ -63,6 +63,11 @@ desktop.ini
 *.swo
 *~
 
+# Linux/fuse editor artifacts — left behind by some editors on OneDrive-
+# backed filesystems. Harmless but clutter the working tree.
+.fuse_hidden*
+**/.fuse_hidden*
+
 # Debug logs
 npm-debug.log*
 yarn-debug.log*

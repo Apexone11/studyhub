@@ -9,3 +9,15 @@ package-lock.json
 backend/prisma/migrations
 frontend/studyhub-app/public/sw.js
 .claude/worktrees
+
+# Internal planning docs — kept markdown authored by hand, not auto-formatted
+docs/internal
+
+# Playwright / test output
+playwright-report
+test-results
+**/playwright-report
+**/test-results
+
+# Android / Capacitor — owned by gradle and cap sync, not prettier
+frontend/studyhub-app/android
