@@ -27,7 +27,7 @@ describe('UpcomingExamsCard', () => {
     expect(skeleton).toHaveAttribute('aria-busy', 'true')
   })
 
-  it('renders the empty-state copy when the API returns no exams', async () => {
+  it('renders the empty-state copy + Add exam CTA when the API returns no exams', async () => {
     server.use(
       http.get('http://localhost:4000/api/exams/upcoming', () => HttpResponse.json({ exams: [] })),
     )
@@ -37,6 +37,9 @@ describe('UpcomingExamsCard', () => {
     await waitFor(() => {
       expect(screen.getByText(/No exams coming up/i)).toBeInTheDocument()
     })
+    // Day 4 added the write path: empty state exposes an Add-exam CTA
+    // so a real user without seeded exams can actually track one.
+    expect(screen.getByRole('button', { name: /add exam/i })).toBeInTheDocument()
   })
 
   it('renders the error-state copy when the API returns a 500', async () => {
@@ -160,6 +163,38 @@ describe('UpcomingExamsCard', () => {
     const bar = screen.getByTestId('exam-preparedness-11')
     expect(bar).toHaveAttribute('aria-valuenow', '0')
     expect(bar.firstChild).toHaveStyle({ width: '0%' })
+  })
+
+  it('exposes per-row Edit and Delete buttons when exams exist (Day 4 write path)', async () => {
+    server.use(
+      http.get('http://localhost:4000/api/exams/upcoming', () =>
+        HttpResponse.json({
+          exams: [
+            {
+              id: 99,
+              title: 'Physics Midterm',
+              examDate: '2026-05-20T14:00:00Z',
+              courseCode: 'PHYS101',
+              preparednessPercent: 40,
+            },
+          ],
+        }),
+      ),
+    )
+
+    render(<UpcomingExamsCard limit={3} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Physics Midterm')).toBeInTheDocument()
+    })
+
+    // Each exam row has an aria-labelled Edit + Delete button so
+    // keyboard users can find them without a hover menu. Real UI
+    // stores the exam title in aria-label, so the button is
+    // addressable by the specific exam even when multiple rows
+    // are on screen.
+    expect(screen.getByRole('button', { name: /edit physics midterm/i })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /delete physics midterm/i })).toBeInTheDocument()
   })
 
   it('clamps out-of-range percentages to [0, 100]', async () => {
