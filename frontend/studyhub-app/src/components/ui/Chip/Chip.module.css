@@ -1,0 +1,89 @@
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+
+/* Sizes apply to pill and badge variants; eyebrow ignores size (it's
+   always compact). */
+.chip--sm {
+  font-size: var(--type-xs);
+  padding: 2px var(--space-2);
+  min-height: 20px;
+}
+.chip--md {
+  font-size: var(--type-xs);
+  padding: var(--space-1) var(--space-3);
+  min-height: 24px;
+}
+
+/* Variants */
+.chip--eyebrow {
+  padding: 0;
+  background: transparent;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: var(--type-xs);
+  min-height: auto;
+}
+
+.chip--pill {
+  border-radius: var(--radius-full);
+}
+
+.chip--badge {
+  border-radius: var(--radius-sm);
+  padding: 2px var(--space-2);
+  min-height: 20px;
+  font-size: var(--type-xs);
+}
+
+/* Tones — background + text pairs. Eyebrow variant uses only the
+   text color (no background). */
+.chip--tone-brand {
+  background: var(--sh-brand-soft);
+  color: var(--sh-brand);
+}
+.chip--tone-success {
+  background: var(--sh-success-bg);
+  color: var(--sh-success-text);
+}
+.chip--tone-warning {
+  background: var(--sh-warning-bg);
+  color: var(--sh-warning-text);
+}
+.chip--tone-danger {
+  background: var(--sh-danger-bg);
+  color: var(--sh-danger-text);
+}
+.chip--tone-neutral {
+  background: var(--sh-soft);
+  color: var(--sh-subtext);
+}
+
+/* Eyebrow strips the background and just keeps the tone color for text. */
+.chip--eyebrow.chip--tone-brand {
+  background: transparent;
+  color: var(--sh-brand);
+}
+.chip--eyebrow.chip--tone-success {
+  background: transparent;
+  color: var(--sh-success-text);
+}
+.chip--eyebrow.chip--tone-warning {
+  background: transparent;
+  color: var(--sh-warning-text);
+}
+.chip--eyebrow.chip--tone-danger {
+  background: transparent;
+  color: var(--sh-danger-text);
+}
+.chip--eyebrow.chip--tone-neutral {
+  background: transparent;
+  color: var(--sh-muted);
+}
