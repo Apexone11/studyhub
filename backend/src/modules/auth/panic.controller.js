@@ -49,6 +49,14 @@ router.post('/security/panic', requireAuth, panicLimiter, async (req, res) => {
     // Inlined rather than importing the /forgot-password route — that endpoint
     // is public and has its own rate limiter; we're already rate-limited here.
     try {
+      // FRONTEND_URL must be set explicitly outside dev. Falling back to
+      // `localhost:5173` in prod would email a broken reset URL to a user
+      // mid-incident — worse than just not sending. We still create the
+      // PasswordResetToken row (so a hand-crafted reset link or a separate
+      // flow can pick it up) but skip the email send and let Sentry log it.
+      const isDevEnv = process.env.NODE_ENV !== 'production' && process.env.NODE_ENV !== 'staging'
+      const baseUrl = process.env.FRONTEND_URL || (isDevEnv ? 'http://localhost:5173' : null)
+
       const user = await prisma.user.findUnique({ where: { id: userId } })
       if (user?.email) {
         const crypto = require('crypto')
@@ -62,8 +70,17 @@ router.post('/security/panic', requireAuth, panicLimiter, async (req, res) => {
           create: { userId: user.id, token: tokenHash, expiresAt },
           update: { token: tokenHash, expiresAt },
         })
-        const resetUrl = `${process.env.FRONTEND_URL || 'http://localhost:5173'}/reset-password?token=${token}`
-        void sendPasswordReset(user.email, user.username, resetUrl).catch(() => {})
+        if (baseUrl) {
+          const resetUrl = `${baseUrl}/reset-password?token=${token}`
+          void sendPasswordReset(user.email, user.username, resetUrl).catch(() => {})
+        } else {
+          const { captureError } = require('../../monitoring/sentry')
+          captureError(new Error('panic: FRONTEND_URL unset, skipping reset email'), {
+            route: 'auth.panic',
+            userId,
+            reason: 'frontend_url_missing',
+          })
+        }
       }
     } catch {
       // password reset is best-effort — panic response must succeed anyway
@@ -85,7 +102,16 @@ router.post('/security/panic', requireAuth, panicLimiter, async (req, res) => {
       .catch(() => {})
 
     clearAuthCookie(res)
-    return res.json({ message: 'All sessions revoked. Check your email to reset your password.' })
+    // Deliberately conditional phrasing: the password-reset email is
+    // best-effort. We swallow SMTP failures and we explicitly skip
+    // the send when FRONTEND_URL is unset in non-dev. Promising "you'll
+    // receive" would be a lie under any of those branches —
+    // "we'll attempt to send" keeps the message honest under every
+    // branch (no email on file, SMTP down, FRONTEND_URL missing).
+    return res.json({
+      message:
+        "All sessions revoked. If your account has an email on file, we'll attempt to send a password reset link shortly.",
+    })
   } catch {
     return sendError(res, 500, 'Panic action failed. Please try again.', ERROR_CODES.INTERNAL)
   }

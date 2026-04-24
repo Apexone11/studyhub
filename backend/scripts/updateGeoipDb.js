@@ -39,33 +39,52 @@ const EDITIONS = [
   { id: 'GeoIP2-Anonymous-IP', required: false },
 ]
 
-function download(url, outFile) {
+// Network guards. The GeoIP fetch runs during Railway preDeploy, so a
+// hung connection or a redirect loop on MaxMind's side could stall a
+// deploy indefinitely. Bound both: a per-attempt timeout and a max
+// redirect chain length.
+const REQUEST_TIMEOUT_MS = 30_000
+const MAX_REDIRECTS = 5
+
+function download(url, outFile, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(outFile)
-    https
-      .get(url, (res) => {
-        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
-          file.close()
-          fs.unlinkSync(outFile)
-          return download(res.headers.location, outFile).then(resolve, reject)
+    const cleanup = () => {
+      file.close()
+      try {
+        fs.unlinkSync(outFile)
+      } catch {
+        /* ignore */
+      }
+    }
+    const req = https.get(url, (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        if (redirectCount >= MAX_REDIRECTS) {
+          cleanup()
+          return reject(new Error(`Too many redirects (max ${MAX_REDIRECTS})`))
         }
-        if (res.statusCode !== 200) {
-          file.close()
-          fs.unlinkSync(outFile)
-          return reject(new Error(`HTTP ${res.statusCode}`))
-        }
-        res.pipe(file)
-        file.on('finish', () => file.close(resolve))
-      })
-      .on('error', (err) => {
-        file.close()
-        try {
-          fs.unlinkSync(outFile)
-        } catch {
-          /* ignore */
-        }
-        reject(err)
-      })
+        // Resolve relative against the current request URL — Location
+        // is allowed to be a relative reference per RFC 7231 §7.1.2,
+        // and passing it raw to https.get would either fail or
+        // misinterpret the host on a relative redirect.
+        const redirectUrl = new URL(res.headers.location, url).toString()
+        cleanup()
+        return download(redirectUrl, outFile, redirectCount + 1).then(resolve, reject)
+      }
+      if (res.statusCode !== 200) {
+        cleanup()
+        return reject(new Error(`HTTP ${res.statusCode}`))
+      }
+      res.pipe(file)
+      file.on('finish', () => file.close(resolve))
+    })
+    req.on('error', (err) => {
+      cleanup()
+      reject(err)
+    })
+    req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+      req.destroy(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`))
+    })
   })
 }
 
@@ -91,7 +110,37 @@ async function fetchEdition(edition) {
       const target = path.join(DB_DIR, `${edition.id}.mmdb`)
       const tmp = `${target}.new`
       fs.renameSync(path.join(DB_DIR, d, mmdb), tmp)
-      fs.renameSync(tmp, target) // atomic replace
+      // POSIX rename(2) replaces an existing target atomically. On
+      // Windows that fails with EEXIST/EPERM, so we fall back to
+      // copyFileSync (which overwrites on both platforms) and then
+      // unlink the tmp file. Two important guards on the fallback:
+      //
+      // 1. err.code is restricted to the Windows replacement codes
+      //    AND process.platform must be 'win32'. A POSIX EACCES or
+      //    ENOSPC here would mean a real permission / disk problem,
+      //    not a Windows quirk — re-throw rather than masking it.
+      // 2. We do NOT rmSync the target before copying. A previous
+      //    revision did, which meant a transient lock on the second
+      //    move would leave the contributor with no .mmdb at all
+      //    (geoip.service no-ops geolocation + risk signals until
+      //    someone manually restores). copyFileSync preserves the
+      //    old target if the copy itself fails.
+      try {
+        fs.renameSync(tmp, target)
+      } catch (err) {
+        const isWindowsReplaceFailure =
+          process.platform === 'win32' &&
+          err &&
+          (err.code === 'EEXIST' || err.code === 'EPERM') &&
+          fs.existsSync(target)
+        if (!isWindowsReplaceFailure) throw err
+        fs.copyFileSync(tmp, target)
+        try {
+          fs.unlinkSync(tmp)
+        } catch {
+          /* tmp cleanup is best-effort; the next run overwrites */
+        }
+      }
       fs.rmSync(path.join(DB_DIR, d), { recursive: true })
     }
   }

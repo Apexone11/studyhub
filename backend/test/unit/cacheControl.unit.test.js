@@ -239,5 +239,37 @@ describe('cacheControl middleware', () => {
       expect(tokens).toContain('X-Custom-Header')
       expect(tokens).toContain('Accept-Language')
     })
+
+    it('short-circuits to just `*` when upstream Vary is `*`', async () => {
+      // RFC 7231 §7.1.4: `Vary: *` means "varies on axes we won't
+      // enumerate" and MUST NOT be combined with other field names.
+      // A cache seeing `*, Origin` treats the whole header as
+      // undefined, which in practice disables correct caching. When
+      // upstream has already set `*`, appending Origin/Cookie must
+      // not produce a mixed header.
+      const { appendVary } = await loadFresh()
+      const set = { vary: '*' }
+      const res = {
+        getHeader: (key) => set[key.toLowerCase()],
+        set: (key, value) => {
+          set[key.toLowerCase()] = value
+        },
+      }
+      appendVary(res, ['Origin', 'Cookie'])
+      expect(set.vary).toBe('*')
+    })
+
+    it('short-circuits to just `*` when the caller passes `*`', async () => {
+      const { appendVary } = await loadFresh()
+      const set = { vary: 'Origin' }
+      const res = {
+        getHeader: (key) => set[key.toLowerCase()],
+        set: (key, value) => {
+          set[key.toLowerCase()] = value
+        },
+      }
+      appendVary(res, ['*'])
+      expect(set.vary).toBe('*')
+    })
   })
 })

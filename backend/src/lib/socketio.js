@@ -80,6 +80,15 @@ function authenticateSocketHandshake(socket, next) {
       typeof socket.handshake.headers.origin === 'string'
         ? socket.handshake.headers.origin.toLowerCase()
         : ''
+    // Strict equality on UNPORTED localhost is by design. Capacitor's
+    // Android webview uses `http://localhost` (no port) and iOS uses
+    // `https://localhost` (no port) — those clients can't carry the
+    // session cookie cross-origin and need the bearer-token fallback.
+    // The ported equivalents `http://localhost:5173` / `:4173` are
+    // browser dev origins where the cookie IS present, so they MUST
+    // NOT match here — broadening this check to accept ports would
+    // let a dev-tools-injected bearer token bypass the cookie path
+    // and broaden the attack surface for an XSS to grab tokens.
     const isCapacitorOrigin =
       originHeader === 'http://localhost' ||
       originHeader === 'https://localhost' ||
