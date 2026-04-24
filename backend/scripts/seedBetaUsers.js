@@ -185,9 +185,15 @@ async function seedUpcomingExams(studentUsers) {
     ) || null
   if (!primary) return
 
+  // Deterministic ordering: the fixtures below pin exam titles to
+  // enrollments[0] ("<code> Midterm") and enrollments[1] ("<code> Final"),
+  // and seeding is idempotent on title. Without an explicit orderBy the
+  // SQL row order is undefined, so a rerun could swap positions and
+  // defeat the dedupe — producing duplicates instead of a stable seed.
   const enrollments = await prisma.enrollment.findMany({
     where: { userId: primary.id },
     include: { course: { select: { id: true, code: true, name: true } } },
+    orderBy: { courseId: 'asc' },
     take: 2,
   })
 

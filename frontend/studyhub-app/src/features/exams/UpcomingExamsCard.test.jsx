@@ -131,7 +131,9 @@ describe('UpcomingExamsCard', () => {
     expect(bar).toHaveAttribute('role', 'progressbar')
     expect(bar).toHaveAttribute('aria-valuenow', '62')
     // The inner <div> carries the width, not the outer role=progressbar.
-    const fill = bar.firstChild
+    // firstElementChild over firstChild so that a whitespace text node
+    // introduced by future JSX formatting wouldn't make this flake.
+    const fill = bar.firstElementChild
     expect(fill).toHaveStyle({ width: '62%' })
     // Sanity: the "62% prepared" label is visible.
     expect(screen.getByText(/62% prepared/i)).toBeInTheDocument()
@@ -162,7 +164,7 @@ describe('UpcomingExamsCard', () => {
     expect(screen.getByText(/0% prepared/i)).toBeInTheDocument()
     const bar = screen.getByTestId('exam-preparedness-11')
     expect(bar).toHaveAttribute('aria-valuenow', '0')
-    expect(bar.firstChild).toHaveStyle({ width: '0%' })
+    expect(bar.firstElementChild).toHaveStyle({ width: '0%' })
   })
 
   it('exposes per-row Edit and Delete buttons when exams exist (Day 4 write path)', async () => {

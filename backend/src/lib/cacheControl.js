@@ -82,9 +82,12 @@ function appendVary(res, values) {
     const trimmed = String(rawToken || '').trim()
     if (!trimmed) return
     const normalized = trimmed.toLowerCase()
-    // If we already saw this token, keep the first casing (which is
-    // typically the upstream middleware's choice). Otherwise pick the
-    // canonical casing when we know it.
+    // First occurrence wins per normalized token. For known tokens we
+    // emit the canonical casing (so an upstream `vary: origin` is
+    // re-spelled to `Origin`); for unknown tokens we preserve whatever
+    // casing the caller supplied. Subsequent duplicates are ignored,
+    // which means once a known token is seen we're locked to its
+    // canonical form for the rest of the response.
     if (!merged.has(normalized)) {
       merged.set(normalized, CANONICAL_VARY_TOKENS[normalized] || trimmed)
     }
