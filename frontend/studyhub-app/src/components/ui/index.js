@@ -14,3 +14,9 @@ export { default as Card, CardHeader, CardBody, CardFooter } from './Card/Card'
 export { default as Modal, ModalFooter } from './Modal/Modal'
 export { default as Chip, Badge } from './Chip/Chip'
 export { default as Avatar } from './Avatar/Avatar'
+export {
+  default as Skeleton,
+  SkeletonText,
+  SkeletonAvatar,
+  SkeletonCard,
+} from './Skeleton/Skeleton'
