@@ -258,6 +258,47 @@ async function seedUpcomingExams(studentUsers) {
 }
 
 /**
+ * Seed beta_student1 with one plausible AiSuggestion row so localhost
+ * shows the AiSuggestionCard with happy-path content out of the box.
+ * Phase 3 of v2 design refresh — required by CLAUDE.md §11 (every UI
+ * surface must have a seed update).
+ *
+ * Idempotent: dedupes on (userId, text). The fixture content is static
+ * so reruns don't produce duplicate rows. The card's staleness window
+ * (30 min in the service) means this seeded suggestion will be served
+ * from cache until the user clicks Refresh, which is the right UX for
+ * a "log in fresh and see something useful immediately" smoke test.
+ */
+async function seedAiSuggestions(studentUsers) {
+  const primary =
+    studentUsers.find(
+      (u) => u.username === (process.env.BETA_STUDENT1_USERNAME || 'beta_student1'),
+    ) || null
+  if (!primary) return
+
+  const fixture = {
+    text: "You haven't reviewed Organic Chemistry in 3 days. Quick refresher?",
+    ctaLabel: 'Open in Hub AI',
+    ctaAction: 'open_chat',
+  }
+
+  const existing = await prisma.aiSuggestion.findFirst({
+    where: { userId: primary.id, text: fixture.text },
+    select: { id: true },
+  })
+  if (existing) return
+
+  await prisma.aiSuggestion.create({
+    data: {
+      userId: primary.id,
+      text: fixture.text,
+      ctaLabel: fixture.ctaLabel,
+      ctaAction: fixture.ctaAction,
+    },
+  })
+}
+
+/**
  * IN_FLIGHT_DESIGN_V2_FLAGS — DOCUMENTATION ONLY as of decision #20
  * (2026-04-24, CLAUDE.md §12).
  *
@@ -273,8 +314,6 @@ async function seedUpcomingExams(studentUsers) {
  * remove it from here.
  */
 const IN_FLIGHT_DESIGN_V2_FLAGS = [
-  // Phase 3 — inline Hub AI suggestion card. Not greenlit yet.
-  'design_v2_ai_card',
   // Phase 4 — Sheets Grid/List toggle + preview. Needs `previewText`
   // schema column first.
   'design_v2_sheets_grid',
@@ -315,6 +354,7 @@ async function main() {
     await seedFeedFixture(studentUserIds[0])
   }
   await seedUpcomingExams(studentUsers)
+  await seedAiSuggestions(studentUsers)
   await seedFeatureFlags(prisma)
 
   console.log('Local beta users are ready:')

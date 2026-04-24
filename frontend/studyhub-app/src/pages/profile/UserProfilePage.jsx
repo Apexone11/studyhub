@@ -78,6 +78,7 @@ import FeedCard from '../feed/FeedCard'
 import FollowRequestsList from './FollowRequestsList'
 import TopContributors from '../../components/TopContributors'
 import UpcomingExamsCard from '../../features/exams/UpcomingExamsCard'
+import AiSuggestionCard from '../../features/ai/AiSuggestionCard'
 import { useDesignV2Flags } from '../../lib/designV2Flags'
 
 /* ═══════════════════════════════════════════════════════════════════════════ */
@@ -144,6 +145,7 @@ export default function UserProfilePage() {
   const v2Flags = useDesignV2Flags()
   const phase1On = v2Flags.phase1Dashboard
   const upcomingExamsOn = v2Flags.upcomingExams
+  const aiCardOn = v2Flags.aiCard
   const { recentlyViewed } = useRecentlyViewed()
   const {
     statuses: allStudyStatuses,
@@ -1120,6 +1122,7 @@ export default function UserProfilePage() {
                     viewerAccountType={viewerAccountType}
                     phase1On={phase1On}
                     upcomingExamsOn={upcomingExamsOn}
+                    aiCardOn={aiCardOn}
                     topContributors={topContributors}
                     topContributorsLoading={topContributorsLoading}
                   />
@@ -1214,6 +1217,7 @@ function OwnOverviewTab({
   viewerAccountType,
   phase1On,
   upcomingExamsOn,
+  aiCardOn,
   topContributors,
   topContributorsLoading,
 }) {
@@ -1223,6 +1227,11 @@ function OwnOverviewTab({
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
         <ResumeStudying entries={recentlyViewed} />
         {upcomingExamsOn && !isSelfLearner(viewerAccountType) ? <UpcomingExamsCard /> : null}
+        {/* Phase 3 — inline Hub AI suggestion. Card itself gates on the
+            flag internally (fail-closed), so we only need to mount it
+            when this prop is on. Sits next to UpcomingExamsCard in the
+            study-action column. */}
+        {aiCardOn ? <AiSuggestionCard /> : null}
         <StudyNudges toReview={studyToReview} studying={studyStudying} done={studyDone} />
         <StudyQueue counts={studyQueueCounts} toReview={studyToReview} studying={studyStudying} />
         <DashboardRecentSheets recentSheets={dashboardRecentSheets} />

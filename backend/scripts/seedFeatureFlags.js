@@ -46,6 +46,10 @@ const SHIPPED_DESIGN_V2_FLAGS = [
   // Phase 2 — shipped 2026-04-24. UpcomingExamsCard + /api/exams CRUD
   // + component-kit foundation.
   'design_v2_upcoming_exams',
+  // Phase 3 — shipped 2026-04-28. Inline AiSuggestionCard on
+  // UserProfilePage Overview + /api/ai/suggestions endpoints with
+  // PII redaction + shared daily quota with Hub AI.
+  'design_v2_ai_card',
 ]
 
 async function seedFeatureFlags(prisma) {
