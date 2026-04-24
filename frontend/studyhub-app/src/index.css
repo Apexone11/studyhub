@@ -560,9 +560,20 @@
   color: var(--sh-input-placeholder) !important;
 }
 
-/* Cards, panels, sections with white backgrounds */
-[data-theme='dark'] section,
-[data-theme='dark'] aside section,
+/* Cards, panels, sections with white backgrounds. The previous selector
+ * matched every `section` element in dark mode and slammed `--sh-surface`
+ * onto layout-only sections (like the docs CTA row), which rendered as a
+ * phantom dark card behind buttons that weren't supposed to be carded.
+ * Match the same inline-style pattern as the button rule below so only
+ * sections that ACTUALLY ship a white background in their inline style
+ * get re-themed for dark mode. Plain layout sections render with the
+ * page background, as intended. */
+[data-theme='dark'] section[style*='background: #fff'],
+[data-theme='dark'] section[style*='background: rgb(255, 255, 255)'],
+[data-theme='dark'] section[style*='background: white'],
+[data-theme='dark'] aside section[style*='background: #fff'],
+[data-theme='dark'] aside section[style*='background: rgb(255, 255, 255)'],
+[data-theme='dark'] aside section[style*='background: white'],
 [data-theme='dark'] .settings-nav-btn {
   background: var(--sh-surface) !important;
   border-color: var(--sh-border) !important;
