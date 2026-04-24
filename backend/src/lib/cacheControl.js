@@ -75,6 +75,20 @@ const CANONICAL_VARY_TOKENS = {
  */
 function appendVary(res, values) {
   const existing = res.getHeader('Vary')
+
+  // RFC 7231 §7.1.4: `Vary: *` is a sentinel meaning "response varies
+  // on axes the server won't enumerate" and MUST NOT be combined with
+  // other field names — a cache seeing `*, Origin` will treat the
+  // whole header as undefined. If either side contributes `*`, emit
+  // just `*` and short-circuit the merge.
+  const existingStr = existing ? String(existing) : ''
+  const existingHasStar = existingStr.split(',').some((t) => t.trim() === '*')
+  const incomingHasStar = values.some((v) => String(v || '').trim() === '*')
+  if (existingHasStar || incomingHasStar) {
+    res.set('Vary', '*')
+    return
+  }
+
   // Map keyed by lowercased token, value is the casing we'll emit.
   const merged = new Map()
 
@@ -93,8 +107,8 @@ function appendVary(res, values) {
     }
   }
 
-  if (existing) {
-    String(existing).split(',').forEach(addToken)
+  if (existingStr) {
+    existingStr.split(',').forEach(addToken)
   }
   for (const value of values) addToken(value)
 

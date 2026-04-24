@@ -85,7 +85,15 @@ router.post('/security/panic', requireAuth, panicLimiter, async (req, res) => {
       .catch(() => {})
 
     clearAuthCookie(res)
-    return res.json({ message: 'All sessions revoked. Check your email to reset your password.' })
+    // Deliberately conditional phrasing: the password-reset email is
+    // best-effort (we swallow failures above so the panic action
+    // itself always succeeds). Promising "Check your email" would be
+    // a lie when SMTP is down or no email is on file — "If your
+    // account has..." keeps the message honest under every branch.
+    return res.json({
+      message:
+        "All sessions revoked. If your account has an email on file, you'll receive a password reset link shortly.",
+    })
   } catch {
     return sendError(res, 500, 'Panic action failed. Please try again.', ERROR_CODES.INTERNAL)
   }

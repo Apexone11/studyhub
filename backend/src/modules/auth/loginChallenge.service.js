@@ -86,10 +86,35 @@ async function verifyChallenge({ id, code }) {
     }
   }
 
-  const consumed = await prisma.loginChallenge.update({
-    where: { id },
-    data: { consumedAt: new Date() },
+  // Atomic single-use redemption. A conditional updateMany gates on
+  // the same guards we already checked above; if a parallel request
+  // won the race and consumed the row first, this update's count is 0
+  // and we re-classify the outcome by re-reading the current row. Do
+  // NOT set consumedAt with a plain `update` — two parallel correct
+  // submissions could both pass the findUnique check above and both
+  // call update, which would issue two sessions from one code.
+  const consumeAt = new Date()
+  const claimed = await prisma.loginChallenge.updateMany({
+    where: {
+      id,
+      consumedAt: null,
+      expiresAt: { gte: consumeAt },
+      attempts: { lt: MAX_ATTEMPTS },
+    },
+    data: { consumedAt: consumeAt },
   })
+  if (claimed.count !== 1) {
+    const current = await prisma.loginChallenge.findUnique({ where: { id } })
+    if (!current) return { ok: false, reason: 'not_found', remaining: 0 }
+    if (current.consumedAt) return { ok: false, reason: 'consumed', remaining: 0 }
+    if (current.expiresAt < consumeAt) return { ok: false, reason: 'expired', remaining: 0 }
+    if (current.attempts >= MAX_ATTEMPTS) return { ok: false, reason: 'locked', remaining: 0 }
+    // Fell through every known reason — treat as already consumed to
+    // stay conservative. The lost-race path is functionally the same
+    // as a consumed row from the caller's perspective.
+    return { ok: false, reason: 'consumed', remaining: 0 }
+  }
+  const consumed = await prisma.loginChallenge.findUnique({ where: { id } })
   return { ok: true, challenge: consumed }
 }
 

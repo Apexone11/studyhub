@@ -91,7 +91,18 @@ async function fetchEdition(edition) {
       const target = path.join(DB_DIR, `${edition.id}.mmdb`)
       const tmp = `${target}.new`
       fs.renameSync(path.join(DB_DIR, d, mmdb), tmp)
-      fs.renameSync(tmp, target) // atomic replace
+      // POSIX rename(2) replaces an existing target atomically. On
+      // Windows the equivalent fails with EEXIST/EPERM, so when the
+      // atomic rename throws we explicitly remove the destination and
+      // retry. Keeps Linux (Railway) on the atomic path while giving
+      // Windows contributors a working local `npm run update-geoip-db`.
+      try {
+        fs.renameSync(tmp, target)
+      } catch (err) {
+        if (!fs.existsSync(target)) throw err
+        fs.rmSync(target, { force: true })
+        fs.renameSync(tmp, target)
+      }
       fs.rmSync(path.join(DB_DIR, d), { recursive: true })
     }
   }
