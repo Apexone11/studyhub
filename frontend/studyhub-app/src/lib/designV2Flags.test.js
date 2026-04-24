@@ -1,25 +1,21 @@
 /**
- * designV2Flags — fail-open regression test.
+ * designV2Flags — fail-closed contract matrix (decision #20, 2026-04-24).
  *
- * Bug caught during Day 2 -> Day 3 smoke test: the <UpcomingExamsCard />
- * was completely absent on localhost for beta_student1 even though
- * the Day 2 handoff claimed the flag was fail-open.
+ * History: Day 3 made FLAG_NOT_FOUND fail-OPEN to fix localhost DX where
+ * a fresh install had zero FeatureFlag rows and every design-v2 surface
+ * was invisible. Codex P1 correctly pointed out that prod/staging don't
+ * run the beta seed, so a missing row in prod would silently expose
+ * whatever in-flight Phase-N surface had code landed behind the gate.
  *
- * Root cause:
- *   - backend/src/lib/featureFlags.js::evaluateFlag() returns
- *     {enabled: false, reason: 'FLAG_NOT_FOUND'} when no row exists
- *     in the FeatureFlag table. On a fresh install NO design_v2_* rows
- *     exist, so every design-v2 gate was reporting "off".
- *   - The frontend hook previously looked at data.enabled only, which
- *     means it honored the server's `false` even though the product
- *     intent (and the hook's own docstring) was "fail-open for design v2".
+ * Decision #20 (CLAUDE.md §12): flag evaluation is fail-CLOSED in all
+ * environments. Only an explicit `enabled: true` response enables a
+ * flag. Every other signal — missing row, network error, non-200,
+ * malformed JSON — disables. Provisioning happens via
+ * `backend/scripts/seedFeatureFlags.js` (safe for prod, idempotent,
+ * only SHIPPED flags).
  *
- * Fix:
- *   - Hook now treats `reason: 'FLAG_NOT_FOUND'` as fail-open, matching
- *     the documented intent and the network-error branch.
- *
- * These tests lock that behavior so no one silently regresses the
- * fail-open contract and hides a Day-N feature from localhost users.
+ * These tests lock the 5-case contract so nobody silently regresses to
+ * fail-open and leaks a WIP feature to real users.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { clearDesignV2FlagCache, useDesignV2Flags } from './designV2Flags'
@@ -36,62 +32,53 @@ afterEach(() => {
   clearDesignV2FlagCache()
 })
 
-describe('useDesignV2Flags fail-open contract', () => {
-  it('treats FLAG_NOT_FOUND from the server as ENABLED (fail-open)', async () => {
-    // Mirror the server response for a flag row that does not exist in
-    // the FeatureFlag table. Before the fix, the hook returned
-    // enabled=false here and hid every design-v2 feature on localhost.
+describe('useDesignV2Flags fail-closed contract (decision #20)', () => {
+  it('treats FLAG_NOT_FOUND from the server as DISABLED', async () => {
+    // Server says the row does not exist. Under fail-closed this is
+    // DISABLED — the shipped-flags seed is how prod gets the rows it
+    // needs.
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ enabled: false, reason: 'FLAG_NOT_FOUND' }),
     })
 
     const { result } = renderHook(() => useDesignV2Flags())
-
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
     })
 
-    // Every declared flag should be true (fail-open) because every
-    // evaluation returned FLAG_NOT_FOUND.
-    expect(result.current.phase1Dashboard).toBe(true)
-    expect(result.current.upcomingExams).toBe(true)
-    expect(result.current.aiCard).toBe(true)
-    expect(result.current.sheetsGrid).toBe(true)
+    expect(result.current.phase1Dashboard).toBe(false)
+    expect(result.current.upcomingExams).toBe(false)
+    expect(result.current.aiCard).toBe(false)
+    expect(result.current.sheetsGrid).toBe(false)
   })
 
-  it('respects an explicit DISABLED response (DB row exists, enabled=false)', async () => {
-    // When an admin has explicitly flipped a flag off, we must honor
-    // that. FLAG_NOT_FOUND is the only "missing row" case — anything
-    // else should respect the server.
+  it('respects an explicit DISABLED response (row exists, enabled=false)', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ enabled: false, reason: 'DISABLED' }),
     })
 
     const { result } = renderHook(() => useDesignV2Flags())
-
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
     })
 
-    // DISABLED is respected, not fail-opened.
     expect(result.current.upcomingExams).toBe(false)
   })
 
-  it('fails open on a network error', async () => {
+  it('fails CLOSED on a network error', async () => {
     globalThis.fetch = vi.fn().mockRejectedValue(new Error('network down'))
 
     const { result } = renderHook(() => useDesignV2Flags())
-
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
     })
 
-    expect(result.current.upcomingExams).toBe(true)
+    expect(result.current.upcomingExams).toBe(false)
   })
 
-  it('fails open on a non-200 response', async () => {
+  it('fails CLOSED on a non-200 response', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: false,
       status: 500,
@@ -99,22 +86,20 @@ describe('useDesignV2Flags fail-open contract', () => {
     })
 
     const { result } = renderHook(() => useDesignV2Flags())
-
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
     })
 
-    expect(result.current.upcomingExams).toBe(true)
+    expect(result.current.upcomingExams).toBe(false)
   })
 
-  it('respects enabled=true', async () => {
+  it('respects enabled=true (the only green path)', async () => {
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({ enabled: true, reason: 'ENABLED' }),
     })
 
     const { result } = renderHook(() => useDesignV2Flags())
-
     await waitFor(() => {
       expect(result.current.loading).toBe(false)
     })

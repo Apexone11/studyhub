@@ -6,26 +6,17 @@
  * `npm run seed:beta` produces a localhost state where the feature
  * is visible end-to-end for beta_student1 without manual data setup.
  *
- * Flag seed policy (ratified 2026-04-24): the seed MUST track the
- * ship frontier, not every declared design_v2_* flag.
- *
- *   - SHIPPED features inherit an explicit enabled=true row so they
- *     render and are visible in the admin flag UI.
- *   - IN-FLIGHT features get an explicit enabled=false row. This
- *     opts them out of the client-side FLAG_NOT_FOUND fail-open
- *     behavior, which would otherwise silently turn unreleased
- *     features on whenever the DB row was missing.
- *
- * The two lists are maintained in `SHIPPED_DESIGN_V2_FLAGS` and
- * `IN_FLIGHT_DESIGN_V2_FLAGS` further down in this file. When a
- * phase ships, move its flag name between the two arrays — don't
- * re-flip the whole set.
+ * Flag seed policy (decision #20, 2026-04-24, CLAUDE.md §12):
+ * the client evaluates flags fail-CLOSED. Only shipped flags get a
+ * DB row (via `scripts/seedFeatureFlags.js`, imported and called
+ * below). In-flight flags have no row and stay off by default.
  */
 
 const path = require('node:path')
 const bcrypt = require('bcryptjs')
 const { createPrismaClient } = require('../src/lib/prisma')
 const { assertLocalDatabase } = require('./assertLocalDatabase')
+const { seedFeatureFlags } = require('./seedFeatureFlags')
 
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
 
@@ -267,41 +258,20 @@ async function seedUpcomingExams(studentUsers) {
 }
 
 /**
- * Seed design_v2_* FeatureFlag rows with a SCOPE THAT MATCHES WHAT
- * HAS ACTUALLY SHIPPED.
+ * IN_FLIGHT_DESIGN_V2_FLAGS — DOCUMENTATION ONLY as of decision #20
+ * (2026-04-24, CLAUDE.md §12).
  *
- * Policy (ratified 2026-04-24 after a Day 2->3 scope-drift incident
- * where every design_v2_* flag was seeded enabled=true, which flipped
- * on Phase 3/4/5+ in-flight features on localhost and broke the
- * "Phase 3 opens after Day 3 closes" rule):
+ * The client evaluates flags fail-CLOSED, so an in-flight flag's
+ * behavior is correct by default: no row → disabled. There is no
+ * longer any need to insert explicit `enabled=false` rows to "opt
+ * out" of fail-open, because fail-open is gone.
  *
- *   SHIPPED flags  → enabled=true row. These features are live on
- *                    main / local-main and should render when the
- *                    flag is evaluated. Explicit row beats fail-open
- *                    and shows up in the admin flag UI so an operator
- *                    can flip it off.
- *
- *   IN-FLIGHT flags → enabled=false row. The frontend hook treats
- *                    FLAG_NOT_FOUND as fail-open (so a missing row
- *                    would SILENTLY TURN THE FEATURE ON). An explicit
- *                    enabled=false row opts the WIP surface out of
- *                    that fail-open behavior. When each phase ships,
- *                    the corresponding row gets flipped to true (or
- *                    deleted, which falls back to fail-open = on).
- *
- * Convention reinforced in CLAUDE.md §11 — the seed MUST track the
- * ship frontier, not every declared flag.
+ * This list is kept as a visible roster of design_v2_* flags that
+ * exist in the client's `FLAG_NAMES` but are not yet shipped. When a
+ * phase ships, move its flag name into `SHIPPED_DESIGN_V2_FLAGS` in
+ * `scripts/seedFeatureFlags.js` (that's what the seed acts on), and
+ * remove it from here.
  */
-
-const SHIPPED_DESIGN_V2_FLAGS = [
-  // Phase 1 — shipped 2026-04-23. Sectioned AppSidebar + welcome hero
-  // + top-contributors widget on UserProfilePage.
-  'design_v2_phase1_dashboard',
-  // Phase 2 — shipped 2026-04-24 (this cycle). UpcomingExamsCard +
-  // /api/exams CRUD end-to-end.
-  'design_v2_upcoming_exams',
-]
-
 const IN_FLIGHT_DESIGN_V2_FLAGS = [
   // Phase 3 — inline Hub AI suggestion card. Not greenlit yet.
   'design_v2_ai_card',
@@ -316,13 +286,8 @@ const IN_FLIGHT_DESIGN_V2_FLAGS = [
   'design_v2_feed_polish',
   // Phase 8 — Public home hero + for-role cards.
   'design_v2_home_hero',
-  // Week 2/3 tracks — TeachMaterials page, public docs, study-groups
-  // polish, role checklist, weekly focus widget, teacher sections.
-  // Code scaffolding exists for each; none has been explicitly
-  // greenlit as "shipped" by the founder. If the re-walk after this
-  // change surfaces a feature that IS actually live in production,
-  // promote the specific flag from this list to SHIPPED_DESIGN_V2_FLAGS
-  // — don't re-flip the whole set.
+  // Week 2/3 tracks — TeachMaterials, public docs, study-groups
+  // polish, role checklist, weekly focus, teacher sections.
   'design_v2_teach_materials',
   'design_v2_docs_public',
   'design_v2_groups_polish',
@@ -330,35 +295,6 @@ const IN_FLIGHT_DESIGN_V2_FLAGS = [
   'design_v2_weekly_focus',
   'design_v2_teach_sections',
 ]
-
-async function seedDesignV2Flags() {
-  for (const name of SHIPPED_DESIGN_V2_FLAGS) {
-    await prisma.featureFlag.upsert({
-      where: { name },
-      update: { enabled: true, rolloutPercentage: 100 },
-      create: {
-        name,
-        description: 'Design refresh v2 — SHIPPED. Explicit enabled=true for local beta.',
-        enabled: true,
-        rolloutPercentage: 100,
-      },
-    })
-  }
-
-  for (const name of IN_FLIGHT_DESIGN_V2_FLAGS) {
-    await prisma.featureFlag.upsert({
-      where: { name },
-      update: { enabled: false, rolloutPercentage: 0 },
-      create: {
-        name,
-        description:
-          'Design refresh v2 — IN-FLIGHT. Explicit enabled=false to opt out of fail-open until the phase ships.',
-        enabled: false,
-        rolloutPercentage: 0,
-      },
-    })
-  }
-}
 
 async function main() {
   assertLocalDatabase('beta test-user seed')
@@ -379,7 +315,7 @@ async function main() {
     await seedFeedFixture(studentUserIds[0])
   }
   await seedUpcomingExams(studentUsers)
-  await seedDesignV2Flags()
+  await seedFeatureFlags(prisma)
 
   console.log('Local beta users are ready:')
   for (const user of users) {
@@ -388,11 +324,18 @@ async function main() {
   console.log('Seeded upcoming exams + design_v2_* feature flags for local beta.')
 }
 
-main()
-  .catch((error) => {
-    console.error(error)
-    process.exitCode = 1
-  })
-  .finally(async () => {
-    await prisma.$disconnect()
-  })
+module.exports = { IN_FLIGHT_DESIGN_V2_FLAGS }
+
+// Only run the seed when invoked directly. This file is also imported
+// for its IN_FLIGHT_DESIGN_V2_FLAGS export; requiring it should not
+// trigger a DB write.
+if (require.main === module) {
+  main()
+    .catch((error) => {
+      console.error(error)
+      process.exitCode = 1
+    })
+    .finally(async () => {
+      await prisma.$disconnect()
+    })
+}
