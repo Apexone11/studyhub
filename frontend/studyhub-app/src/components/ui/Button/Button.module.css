@@ -1,0 +1,137 @@
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  position: relative;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  border-radius: var(--radius-control);
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    background-color 0.15s ease,
+    transform 0.15s ease,
+    box-shadow 0.15s ease,
+    border-color 0.15s ease;
+  user-select: none;
+  white-space: nowrap;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sh-brand) 30%, transparent);
+}
+
+/* Sizes */
+.btn--sm {
+  font-size: var(--type-xs);
+  padding: var(--space-1) var(--space-3);
+  min-height: 32px;
+}
+.btn--md {
+  font-size: var(--type-sm);
+  padding: var(--space-2) var(--space-4);
+  min-height: 40px;
+}
+.btn--lg {
+  font-size: var(--type-base);
+  padding: var(--space-3) var(--space-6);
+  min-height: 48px;
+}
+
+/* Variants */
+.btn--primary {
+  background: var(--sh-brand);
+  /* Per CLAUDE.md — white text on colored buttons is an explicit
+     exception to the "no hex" rule. Hardcoding #ffffff here keeps
+     the primary button legible in dark mode (where --sh-surface
+     becomes near-black and would collapse contrast). */
+  color: #ffffff;
+  box-shadow: var(--sh-btn-primary-shadow);
+}
+.btn--primary:hover:not(:disabled) {
+  background: var(--sh-brand-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px color-mix(in srgb, var(--sh-brand) 30%, transparent);
+}
+.btn--primary:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.btn--secondary {
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  border-color: var(--sh-border);
+}
+.btn--secondary:hover:not(:disabled) {
+  background: var(--sh-soft);
+  border-color: var(--sh-border-strong);
+}
+
+.btn--ghost {
+  background: transparent;
+  color: var(--sh-subtext);
+}
+.btn--ghost:hover:not(:disabled) {
+  background: var(--sh-soft);
+  color: var(--sh-text);
+}
+
+.btn--danger {
+  background: var(--sh-danger);
+  color: var(--sh-surface);
+}
+.btn--danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sh-danger) 85%, black);
+  transform: translateY(-2px);
+}
+
+.btn--fullWidth {
+  width: 100%;
+}
+
+/* Loading */
+.btn--loading .btn__label,
+.btn--loading .btn__leftIcon,
+.btn--loading .btn__rightIcon {
+  visibility: hidden;
+}
+.btn__spinner {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  border: 2px solid color-mix(in srgb, currentColor 30%, transparent);
+  border-top-color: currentColor;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.btn__leftIcon,
+.btn__rightIcon,
+.btn__label {
+  display: inline-flex;
+  align-items: center;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .btn {
+    transition: none;
+  }
+  .btn:hover {
+    transform: none;
+  }
+  .btn__spinner {
+    animation-duration: 2s;
+  }
+}

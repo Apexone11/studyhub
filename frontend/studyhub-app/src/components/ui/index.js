@@ -8,3 +8,4 @@
  * Components get added here as they land in their own commits so the
  * tree stays importable at every point in the history.
  */
+export { default as Button } from './Button/Button'
