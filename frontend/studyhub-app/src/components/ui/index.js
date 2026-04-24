@@ -9,3 +9,4 @@
  * tree stays importable at every point in the history.
  */
 export { default as Button } from './Button/Button'
+export { default as Input } from './Input/Input'
