@@ -93,14 +93,36 @@ async function lookup(ip) {
 
 /**
  * Returns true for RFC1918 + loopback + link-local ranges + common
- * container-internal addresses. We skip geolocation for these because
- * the result is meaningless and the read is cheap but non-zero.
+ * container-internal addresses, including IPv6 equivalents. We skip
+ * geolocation for these because the result is meaningless and the read
+ * is cheap but non-zero.
+ *
+ * Covered ranges:
+ *   IPv4: 10/8, 172.16/12, 192.168/16 (RFC1918); 127/8 (loopback);
+ *         169.254/16 (link-local)
+ *   IPv6: ::1 (loopback); fe80::/10 (link-local);
+ *         fc00::/7 (unique local addresses, i.e. the IPv6 equivalent of
+ *         RFC1918 — covers fc00::/8 and fd00::/8);
+ *         ::ffff:0:0/96 (IPv4-mapped — recurse on the mapped IPv4)
  */
 function isPrivateOrLocal(ip) {
+  if (!ip || typeof ip !== 'string') return false
   if (ip === '::1' || ip === '127.0.0.1' || ip === 'localhost') return true
+
+  // IPv4-mapped IPv6 — strip the ::ffff: prefix and re-check the IPv4.
+  if (ip.startsWith('::ffff:')) return isPrivateOrLocal(ip.slice(7))
+
+  // IPv6 link-local (fe80::/10) — first 10 bits are 1111 1110 10xx xxxx.
+  // That means the leading hextet is fe80..febf. Match any of those.
+  const lower = ip.toLowerCase()
+  if (/^fe[89ab][0-9a-f]:/.test(lower)) return true
+
+  // IPv6 unique local (fc00::/7) — leading byte fc or fd.
+  if (/^f[cd][0-9a-f]{2}:/.test(lower)) return true
+
+  // IPv4 private + loopback + link-local.
   if (ip.startsWith('10.')) return true
   if (ip.startsWith('192.168.')) return true
-  if (ip.startsWith('::ffff:')) return isPrivateOrLocal(ip.slice(7))
   if (ip.startsWith('169.254.')) return true
   const match = /^172\.(\d+)\./.exec(ip)
   if (match) {

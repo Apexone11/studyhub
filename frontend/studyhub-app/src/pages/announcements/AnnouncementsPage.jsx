@@ -16,6 +16,7 @@ import SafeJoyride from '../../components/SafeJoyride'
 import MentionText from '../../components/MentionText'
 import AnnouncementMediaGallery from '../../components/AnnouncementMedia'
 import { IconPlus, IconX } from '../../components/Icons'
+import UserAvatar from '../../components/UserAvatar'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { useLivePolling } from '../../lib/useLivePolling'
@@ -676,22 +677,12 @@ export default function AnnouncementsPage() {
                   color: 'var(--sh-warning-text)',
                 }}
               >
-                <span
-                  style={{
-                    width: 22,
-                    height: 22,
-                    borderRadius: '50%',
-                    background: 'var(--sh-warning-text)',
-                    color: 'var(--sh-warning-light-bg)',
-                    display: 'grid',
-                    placeItems: 'center',
-                    fontSize: 9,
-                    fontWeight: 800,
-                    flexShrink: 0,
-                  }}
-                >
-                  {(a.author?.username || '?').slice(0, 2).toUpperCase()}
-                </span>
+                <UserAvatar
+                  username={a.author?.username}
+                  avatarUrl={a.author?.avatarUrl}
+                  role={a.author?.role}
+                  size={22}
+                />
                 <Link
                   to={`/users/${a.author?.username}`}
                   style={{
@@ -719,22 +710,12 @@ export default function AnnouncementsPage() {
               }}
             >
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <span
-                  style={{
-                    width: 36,
-                    height: 36,
-                    borderRadius: '50%',
-                    background: 'var(--sh-heading)',
-                    color: '#fff',
-                    display: 'grid',
-                    placeItems: 'center',
-                    fontSize: 13,
-                    fontWeight: 800,
-                    flexShrink: 0,
-                  }}
-                >
-                  {(a.author?.username || '?').slice(0, 2).toUpperCase()}
-                </span>
+                <UserAvatar
+                  username={a.author?.username}
+                  avatarUrl={a.author?.avatarUrl}
+                  role={a.author?.role}
+                  size={36}
+                />
                 <div>
                   <Link
                     to={`/users/${a.author?.username}`}

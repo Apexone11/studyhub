@@ -103,19 +103,6 @@ export const styles = {
     color: 'var(--sh-slate-500, #64748b)',
     marginTop: 2,
   },
-  userAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: '50%',
-    background: 'var(--sh-avatar-bg)',
-    border: '1.5px solid var(--sh-brand)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 10,
-    fontWeight: 700,
-    color: 'var(--sh-avatar-text)',
-  },
 }
 
 /* ── Re-export JSX component from searchModalComponents.jsx ────────── */

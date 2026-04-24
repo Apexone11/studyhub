@@ -339,8 +339,9 @@ function TestimonialCard({ t, index }) {
       <div className="home-testimonial-author">
         {avatarUrl ? (
           <img
-            src={avatarUrl}
+            src={avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`}
             alt=""
+            loading="lazy"
             style={{
               width: 36,
               height: 36,

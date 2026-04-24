@@ -16,7 +16,12 @@ const prisma = require('../../lib/prisma')
 
 /**
  * Look up a device by (userId, deviceId). If it exists, refresh its
- * last-seen metadata and clear any prior `revokedAt`. If not, create it.
+ * last-seen metadata (lastSeenAt, lastIp, lastCountry, lastRegion, label).
+ * If it doesn't exist, create it.
+ *
+ * Does NOT touch `revokedAt` — a revoked device stays revoked until a
+ * successful step-up challenge clears it via `markTrusted`. See the
+ * CRITICAL comment inside the upsert for the reasoning.
  */
 async function findOrCreateDevice({ userId, deviceId, label, ip, country, region }) {
   if (!userId || !deviceId) return null
@@ -31,6 +36,13 @@ async function findOrCreateDevice({ userId, deviceId, label, ip, country, region
   const normalizedCountry = country ? String(country).slice(0, 2) : null
   const normalizedRegion = region ? String(region).slice(0, 10) : null
 
+  // CRITICAL: do NOT clear `revokedAt` here. A user who explicitly revoked
+  // this device from Settings ("This wasn't me" / "Sign out everywhere")
+  // must stay revoked until they complete a step-up challenge. Re-trusting
+  // on every findOrCreate would silently defeat the revoke button — any
+  // subsequent login attempt (even a failed one) would re-enable the
+  // device. Re-trust happens only in `markTrusted`, which is gated behind
+  // a successful email challenge.
   return prisma.trustedDevice.upsert({
     where: { userId_deviceId: { userId, deviceId } },
     update: {
@@ -42,7 +54,6 @@ async function findOrCreateDevice({ userId, deviceId, label, ip, country, region
       lastCountry: normalizedCountry ?? undefined,
       lastRegion: normalizedRegion ?? undefined,
       label: normalizedLabel ?? undefined,
-      revokedAt: null,
     },
     create: {
       userId,
@@ -58,12 +69,18 @@ async function findOrCreateDevice({ userId, deviceId, label, ip, country, region
 /**
  * Mark a device as verified/trusted. Called after a successful step-up
  * challenge (Phase 3) or whenever the login was confidently low-risk.
+ *
+ * Also clears any prior `revokedAt` — this is the legitimate "user proved
+ * ownership, re-enable this device" path. Paired with the rule in
+ * `findOrCreateDevice` which intentionally does NOT clear `revokedAt`,
+ * this means a revoked device stays revoked until the owner actually
+ * completes a challenge.
  */
 async function markTrusted(id) {
   if (!id) return null
   return prisma.trustedDevice.update({
     where: { id },
-    data: { trustedAt: new Date() },
+    data: { trustedAt: new Date(), revokedAt: null },
   })
 }
 
