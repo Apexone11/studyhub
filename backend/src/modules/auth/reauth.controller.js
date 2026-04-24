@@ -103,13 +103,16 @@ router.post('/security/reauth/verify', requireAuth, sessionRevokeLimiter, async 
     }
 
     // Verify the challenge belongs to the current user (prevents a stolen
-    // challengeId from verifying a different session).
+    // challengeId from verifying a different session). 403 + FORBIDDEN
+    // is the correct semantic — the request IS authenticated, it's just
+    // not authorized for THIS challenge. UNAUTHORIZED would tell the
+    // frontend's interceptor to log the user out, which is wrong here.
     if (result.challenge.userId !== req.user.userId) {
       return sendError(
         res,
         403,
         'Challenge does not belong to this account.',
-        ERROR_CODES.UNAUTHORIZED,
+        ERROR_CODES.FORBIDDEN,
       )
     }
 

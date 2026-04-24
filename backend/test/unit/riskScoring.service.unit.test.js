@@ -175,6 +175,28 @@ describe('scoreLogin — impossible travel math', () => {
     expect(result.signals).not.toContain('impossible_travel')
   })
 
+  it('rejects NaN / Infinity coordinates so impossible_travel is not silently disabled', () => {
+    // typeof NaN === 'number' is true, so the original guard would
+    // accept NaN and propagate it through haversineKm into the score.
+    // Number.isFinite catches it. Same for ±Infinity.
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+    const r1 = scoreLogin({
+      deviceKnown: true,
+      geo: { country: 'US', lat: NaN, lon: -122 },
+      recentSessions: [{ lat: 40.7, lon: -74, createdAt: oneHourAgo }],
+    })
+    expect(r1.signals).not.toContain('impossible_travel')
+    expect(Number.isNaN(r1.score)).toBe(false)
+
+    const r2 = scoreLogin({
+      deviceKnown: true,
+      geo: { country: 'US', lat: 37.7, lon: -122 },
+      recentSessions: [{ lat: Infinity, lon: -74, createdAt: oneHourAgo }],
+    })
+    expect(r2.signals).not.toContain('impossible_travel')
+    expect(Number.isNaN(r2.score)).toBe(false)
+  })
+
   it('does not divide-by-zero when last session createdAt equals now', () => {
     // Edge case: hours is 0 or negative. The service guards on `hours > 0`
     // — verify it stays normal/zero-score rather than NaN-ing into a band.
