@@ -178,4 +178,40 @@ ${list}
   return '\n\n--- STUDENT CONTEXT ---\n' + sections.join('\n\n')
 }
 
-module.exports = { buildContext }
+/**
+ * Strip PII patterns from a string before sending to / receiving
+ * from Anthropic. Decision #17 (security addendum): redact at BOTH
+ * the input and output boundary so:
+ *   - The model never sees student emails / phone numbers (even if
+ *     they appear in note titles, sheet bodies, etc.).
+ *   - A model hallucination that emits a training-data-style email
+ *     or phone number doesn't reach the client surface.
+ *
+ * Conservative: false positives (over-redaction) are preferred to
+ * a leak. Patterns covered:
+ *   - Email addresses (RFC 5322-ish, simplified to common shapes).
+ *   - Phone numbers in NANP-style formats (10-digit with optional
+ *     country code, common separators). International formats
+ *     starting with `+` and 7+ digits.
+ *
+ * Both replacements use fixed sentinels (`[redacted-email]`,
+ * `[redacted-phone]`) so downstream code can spot redactions
+ * without re-running the regex.
+ *
+ * @param {unknown} text
+ * @returns {string} Original string minus PII matches. Non-string
+ *   inputs return ''.
+ */
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
+// Phone: optional + and country code, then 7+ digits with common
+// separators. Anchored on word boundaries to avoid matching arbitrary
+// digit runs inside IDs.
+const PHONE_RE =
+  /(?<![\w-])(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}(?![\w-])/g
+
+function redactPII(text) {
+  if (typeof text !== 'string' || text.length === 0) return ''
+  return text.replace(EMAIL_RE, '[redacted-email]').replace(PHONE_RE, '[redacted-phone]')
+}
+
+module.exports = { buildContext, redactPII }

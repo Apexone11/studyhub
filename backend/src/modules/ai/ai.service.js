@@ -590,4 +590,10 @@ module.exports = {
   getWeeklyLimit,
   getOrCreateUsage,
   getWeeklyUsage,
+  // Phase 3 — exposed so ai.suggestions.service can share the same
+  // Anthropic client + daily-usage counter as the chat surface.
+  // Quota aggregation is by design: a user who burned today's budget
+  // in Hub AI must see "quota exhausted" on the suggestion card too.
+  getClient,
+  incrementUsage,
 }
