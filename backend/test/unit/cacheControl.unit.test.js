@@ -197,5 +197,47 @@ describe('cacheControl middleware', () => {
       expect(tokens.filter((t) => t === 'Origin').length).toBe(1)
       expect(tokens).toContain('Authorization')
     })
+
+    it('deduplicates case-insensitively — lowercase origin collapses with Origin', async () => {
+      // Regression test: HTTP header values are case-insensitive
+      // (RFC 7230 §3.2). Upstream middleware that writes `vary: origin`
+      // (lowercase) must not collide with our canonical `Origin`. Before
+      // this fix, the Vary header ended up with both "origin" and
+      // "Origin" as distinct entries, which some proxies treat as
+      // malformed.
+      const { appendVary } = await loadFresh()
+      const set = { vary: 'origin, cookie' }
+      const res = {
+        getHeader: (key) => set[key.toLowerCase()],
+        set: (key, value) => {
+          set[key.toLowerCase()] = value
+        },
+      }
+      appendVary(res, ['Origin', 'Cookie', 'Authorization'])
+      const tokens = set.vary.split(',').map((t) => t.trim())
+      // Exactly one of each canonical Vary dimension — no case-variant
+      // duplicates.
+      expect(tokens.length).toBe(3)
+      const normalized = tokens.map((t) => t.toLowerCase()).sort()
+      expect(normalized).toEqual(['authorization', 'cookie', 'origin'])
+    })
+
+    it('preserves the upstream casing for non-canonical tokens', async () => {
+      // If the caller passes a token we don't have a canonical casing
+      // for, keep whatever casing they sent — only canonical tokens
+      // get rewritten to the table's spelling.
+      const { appendVary } = await loadFresh()
+      const set = { vary: 'X-Custom-Header' }
+      const res = {
+        getHeader: (key) => set[key.toLowerCase()],
+        set: (key, value) => {
+          set[key.toLowerCase()] = value
+        },
+      }
+      appendVary(res, ['Accept-Language'])
+      const tokens = set.vary.split(',').map((t) => t.trim())
+      expect(tokens).toContain('X-Custom-Header')
+      expect(tokens).toContain('Accept-Language')
+    })
   })
 })

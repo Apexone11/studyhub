@@ -7,8 +7,13 @@
  *
  * - Codes are 6 random digits, hashed with SHA-256 before storage.
  * - TTL 15 minutes.
- * - Max 3 verify attempts; the 3rd wrong attempt locks the challenge and
- *   arms the existing per-user lockedUntil (15 min) as a secondary gate.
+ * - Max 3 verify attempts per challenge row. The 3rd wrong attempt
+ *   causes `verifyChallenge` to return locked=true and stops accepting
+ *   codes against THIS challenge row. A new login attempt can mint a
+ *   fresh challenge; wiring a per-user lockout on top is a separate
+ *   follow-up (see docs/internal/security/roadmap.md if/when we add
+ *   that layer). Do not infer from this comment that User.lockedUntil
+ *   is updated here — this service never writes it.
  * - Challenge rows are single-use: consumedAt is set on success.
  */
 
