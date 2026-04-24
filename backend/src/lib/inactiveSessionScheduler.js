@@ -9,15 +9,24 @@
  * deletes rows past their 24h TTL, this one *revokes* (keeps the row
  * for audit but kills the session) anything that's been idle for 30 days.
  *
- * Horizontal-scaling note: when the backend runs on multiple instances,
- * every process would otherwise fire the same sweep and multiply DB
- * load for zero extra value (updateMany is idempotent, but the
- * second/third/Nth call is pure waste). The scheduler is gated behind
- * `ENABLE_INACTIVE_SESSION_SWEEP=true` — flip it on for exactly one
- * "worker" instance (or the single-node deployment). Other instances
- * no-op. When unset we default to enabled in dev/single-instance
- * setups so local behavior is unchanged; set it explicitly to "false"
- * on N-1 replicas in production.
+ * Horizontal-scaling safety: when the backend runs on multiple
+ * instances, every process would otherwise fire the same sweep and
+ * multiply DB load for zero extra value. The sweep is therefore
+ * **OFF BY DEFAULT in every environment** — production, staging,
+ * test, and local dev. Opt in explicitly per-instance with
+ * `ENABLE_INACTIVE_SESSION_SWEEP=true`.
+ *
+ * Rationale for default-off-everywhere (Copilot review round 4):
+ *   - Production: any scaled deployment must pick exactly one worker.
+ *   - Staging: the moment staging is scaled to two replicas, an
+ *     implicit "on in non-prod" default silently doubles DB load.
+ *   - Local dev: developers who need the sweep can set it in
+ *     their own .env; skipping the sweep by default costs nothing
+ *     because local sessions almost never sit idle for 30 days.
+ *
+ * The standalone `backend/scripts/sweepInactiveSessions.js` remains
+ * the always-safe alternative — run it from a cron / CI job if you
+ * don't want any in-process scheduler at all.
  */
 
 const prisma = require('./prisma')
@@ -31,15 +40,13 @@ const DEFAULT_INACTIVE_DAYS = 30
 
 function isEnabled() {
   const flag = process.env.ENABLE_INACTIVE_SESSION_SWEEP
-  if (flag === undefined || flag === '') {
-    // Default: enabled in dev/test/staging (single-node convenience);
-    // DISABLED in production unless explicitly opted in. Production is
-    // where horizontal scaling creates the risk of every replica
-    // hammering the DB with the same idempotent sweep, so the safer
-    // default there is "off — pick one worker and set ENABLE=true".
-    return process.env.NODE_ENV !== 'production'
-  }
-  return flag !== 'false' && flag !== '0'
+  // Off by default in every environment (prod / staging / test /
+  // local). Opt in explicitly per instance. See the file-level
+  // docstring for the reasoning — the short version is that a
+  // default-on staging blows up the moment staging is scaled to
+  // more than one replica.
+  if (flag === undefined || flag === '') return false
+  return flag === 'true' || flag === '1'
 }
 
 function startInactiveSessionScheduler() {
@@ -47,7 +54,7 @@ function startInactiveSessionScheduler() {
   if (sweepInterval) return
   if (!isEnabled()) {
     log.info(
-      '[inactive-session-sweep] disabled via ENABLE_INACTIVE_SESSION_SWEEP=false; relying on another worker or scripts/sweepInactiveSessions.js',
+      '[inactive-session-sweep] disabled (default). Set ENABLE_INACTIVE_SESSION_SWEEP=true on exactly one worker to enable, or run scripts/sweepInactiveSessions.js from cron.',
     )
     return
   }
