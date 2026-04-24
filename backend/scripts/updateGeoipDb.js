@@ -106,20 +106,35 @@ async function fetchEdition(edition) {
       const tmp = `${target}.new`
       fs.renameSync(path.join(DB_DIR, d, mmdb), tmp)
       // POSIX rename(2) replaces an existing target atomically. On
-      // Windows the equivalent fails with EEXIST/EPERM/EACCES, so we
-      // remove the destination and retry ONLY for those specific codes.
-      // Any other failure (read-only mount, transient I/O error, the
-      // .new file disappearing) re-throws — silently rm-ing the live
-      // DB on a permission glitch would lose both the old and new
-      // copies on the next failed rename.
+      // Windows that fails with EEXIST/EPERM, so we fall back to
+      // copyFileSync (which overwrites on both platforms) and then
+      // unlink the tmp file. Two important guards on the fallback:
+      //
+      // 1. err.code is restricted to the Windows replacement codes
+      //    AND process.platform must be 'win32'. A POSIX EACCES or
+      //    ENOSPC here would mean a real permission / disk problem,
+      //    not a Windows quirk — re-throw rather than masking it.
+      // 2. We do NOT rmSync the target before copying. A previous
+      //    revision did, which meant a transient lock on the second
+      //    move would leave the contributor with no .mmdb at all
+      //    (geoip.service no-ops geolocation + risk signals until
+      //    someone manually restores). copyFileSync preserves the
+      //    old target if the copy itself fails.
       try {
         fs.renameSync(tmp, target)
       } catch (err) {
-        const isWindowsCollision =
-          err && (err.code === 'EEXIST' || err.code === 'EPERM' || err.code === 'EACCES')
-        if (!isWindowsCollision || !fs.existsSync(target)) throw err
-        fs.rmSync(target, { force: true })
-        fs.renameSync(tmp, target)
+        const isWindowsReplaceFailure =
+          process.platform === 'win32' &&
+          err &&
+          (err.code === 'EEXIST' || err.code === 'EPERM') &&
+          fs.existsSync(target)
+        if (!isWindowsReplaceFailure) throw err
+        fs.copyFileSync(tmp, target)
+        try {
+          fs.unlinkSync(tmp)
+        } catch {
+          /* tmp cleanup is best-effort; the next run overwrites */
+        }
       }
       fs.rmSync(path.join(DB_DIR, d), { recursive: true })
     }
