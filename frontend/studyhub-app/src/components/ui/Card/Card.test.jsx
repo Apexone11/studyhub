@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { describe, it, expect, vi } from 'vitest'
+import { fireEvent, render, screen } from '@testing-library/react'
 import { createRef } from 'react'
 import Card, { CardHeader, CardBody, CardFooter } from './Card'
 
@@ -38,6 +38,63 @@ describe('Card', () => {
     const el = screen.getByText('clickable')
     expect(el).toHaveAttribute('role', 'button')
     expect(el).toHaveAttribute('tabindex', '0')
+  })
+
+  it('fires onClick on Enter keypress when interactive (keyboard activation)', () => {
+    const handler = vi.fn()
+    render(
+      <Card interactive onClick={handler}>
+        clickable
+      </Card>,
+    )
+    fireEvent.keyDown(screen.getByText('clickable'), { key: 'Enter' })
+    expect(handler).toHaveBeenCalledTimes(1)
+  })
+
+  it('fires onClick on Space keypress when interactive', () => {
+    const handler = vi.fn()
+    render(
+      <Card interactive onClick={handler}>
+        clickable
+      </Card>,
+    )
+    fireEvent.keyDown(screen.getByText('clickable'), { key: ' ' })
+    expect(handler).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT fire onClick on Enter when not interactive', () => {
+    const handler = vi.fn()
+    render(<Card onClick={handler}>static</Card>)
+    fireEvent.keyDown(screen.getByText('static'), { key: 'Enter' })
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('does NOT double-activate when rendered as <button> (native Enter already works)', () => {
+    const handler = vi.fn()
+    // The keyboard-activation branch is only for non-native elements.
+    // A <button> already has native Enter/Space click semantics — we
+    // must not wire our own handler on top or it would fire twice.
+    render(
+      <Card as="button" interactive onClick={handler}>
+        click
+      </Card>,
+    )
+    // Our handler only fires on Enter/Space via onKeyDown; since we
+    // skip the manual wiring for <button>, onKeyDown here is a no-op.
+    fireEvent.keyDown(screen.getByText('click'), { key: 'Enter' })
+    expect(handler).not.toHaveBeenCalled()
+  })
+
+  it('lets a consumer preventDefault in their own onKeyDown to suppress activation', () => {
+    const handler = vi.fn()
+    const consumerKeyDown = (e) => e.preventDefault()
+    render(
+      <Card interactive onClick={handler} onKeyDown={consumerKeyDown}>
+        click
+      </Card>,
+    )
+    fireEvent.keyDown(screen.getByText('click'), { key: 'Enter' })
+    expect(handler).not.toHaveBeenCalled()
   })
 
   it('does NOT add role=button when interactive and rendered as <a>', () => {

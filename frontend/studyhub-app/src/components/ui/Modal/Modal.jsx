@@ -200,10 +200,9 @@ export default function Modal({
         ) : (
           <button
             type="button"
-            className={styles.closeBtn}
+            className={`${styles.closeBtn} ${styles['closeBtn--floating']}`}
             onClick={onClose}
             aria-label="Close dialog"
-            style={{ position: 'absolute', top: 'var(--space-3)', right: 'var(--space-3)' }}
           >
             <CloseIcon />
           </button>

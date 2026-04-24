@@ -22,7 +22,16 @@ import styles from './Card.module.css'
  * `--card-inner-pad` CSS variable set by the Card's `padding` class.
  */
 const Card = forwardRef(function Card(
-  { interactive = false, as: Tag = 'div', padding = 'md', className, children, ...rest },
+  {
+    interactive = false,
+    as: Tag = 'div',
+    padding = 'md',
+    className,
+    onClick,
+    onKeyDown,
+    children,
+    ...rest
+  },
   ref,
 ) {
   const classes = [
@@ -35,13 +44,33 @@ const Card = forwardRef(function Card(
     .join(' ')
 
   // When rendering as an interactive non-button element, expose a role
-  // + tabindex so keyboard users can reach it. An <a> already has its
-  // own semantics; skip the ARIA override there.
-  const interactiveProps =
-    interactive && Tag !== 'a' && Tag !== 'button' ? { role: 'button', tabIndex: 0 } : undefined
+  // + tabindex + keyboard activation so keyboard users get parity with
+  // mouse users. Native <a> / <button> already have activation built in,
+  // so we skip the ARIA override there to let the native semantics win.
+  const needsManualKeyboard = interactive && Tag !== 'a' && Tag !== 'button'
+  const handleKeyDown = needsManualKeyboard
+    ? (event) => {
+        // Defer to a caller-supplied onKeyDown first; they can call
+        // event.preventDefault() to suppress the default activation.
+        if (typeof onKeyDown === 'function') onKeyDown(event)
+        if (event.defaultPrevented) return
+        if (event.key === 'Enter' || event.key === ' ' || event.key === 'Spacebar') {
+          event.preventDefault()
+          if (typeof onClick === 'function') onClick(event)
+        }
+      }
+    : onKeyDown
+  const interactiveProps = needsManualKeyboard ? { role: 'button', tabIndex: 0 } : undefined
 
   return (
-    <Tag ref={ref} className={classes} {...interactiveProps} {...rest}>
+    <Tag
+      ref={ref}
+      className={classes}
+      onClick={onClick}
+      onKeyDown={handleKeyDown}
+      {...interactiveProps}
+      {...rest}
+    >
       {children}
     </Tag>
   )

@@ -50,6 +50,17 @@ describe('Button', () => {
     expect(btn.className).toMatch(/btn--loading/)
   })
 
+  it('preserves the accessible name while loading (label stays in the a11y tree)', () => {
+    // Regression test for a bug caught in review: visibility:hidden on
+    // the label during loading would remove it from the accessibility
+    // tree, leaving the button with no accessible name (the spinner is
+    // aria-hidden). We now use opacity+pointer-events to keep the name
+    // intact. Verified here by asserting getByRole('button', { name })
+    // still finds the button during loading.
+    render(<Button loading>Save changes</Button>)
+    expect(screen.getByRole('button', { name: /save changes/i })).toBeInTheDocument()
+  })
+
   it('forwards ref to the underlying <button>', () => {
     const ref = createRef()
     render(<Button ref={ref}>x</Button>)

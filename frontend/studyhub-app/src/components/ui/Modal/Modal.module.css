@@ -1,7 +1,7 @@
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
+  background: var(--sh-modal-overlay);
   backdrop-filter: blur(3px);
   display: flex;
   align-items: center;
@@ -12,6 +12,10 @@
 }
 
 .modal {
+  /* position:relative anchors the absolutely-positioned floating
+     close button to the modal body when there's no header, instead
+     of to the fixed overlay (which would pin it to the viewport). */
+  position: relative;
   background: var(--sh-surface);
   border-radius: var(--radius-card);
   box-shadow: var(--shadow-lg);
@@ -78,6 +82,16 @@
 .closeBtn:focus-visible {
   outline: none;
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--sh-brand) 30%, transparent);
+}
+
+/* Floating variant — used when the modal has no title/description
+   header. Anchors to the `.modal` container (which is position:relative)
+   so it lands in the top-right of the dialog body, not the viewport. */
+.closeBtn--floating {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 1;
 }
 
 .body {

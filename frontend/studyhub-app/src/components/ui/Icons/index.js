@@ -8,8 +8,14 @@
  * uses so a consumer can `import { Star, Close, ArrowRight } from
  * '../../components/ui'` and the names match the design file one-to-one.
  *
- * Every icon accepts a `size` prop and uses `currentColor` for its
- * stroke/fill, inheriting color from the parent.
+ * Every icon accepts a `size` prop. Most icons inherit color via
+ * `currentColor` on their strokes and fills, so wrapping them in a
+ * colored container theme-paints them correctly. A small number of
+ * icons in the underlying `components/Icons.jsx` retain fixed accent
+ * fills for intentional brand moments (e.g. the amber dot on
+ * `IconNotes`). When those accents are wrong for a new surface, pick
+ * a different icon rather than overriding the fill — the icon set
+ * is the source of truth here.
  */
 export {
   // Figma name -> existing Icon function (aliased via `as`).

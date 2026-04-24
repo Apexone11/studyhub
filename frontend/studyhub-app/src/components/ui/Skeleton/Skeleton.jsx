@@ -35,13 +35,17 @@ const Skeleton = forwardRef(function Skeleton(
 ) {
   // Multi-line text variant: emit a stacked flex container of line bars.
   if (variant === 'text' && lines > 1) {
+    // aria-hidden is set AFTER ...rest so a consumer cannot accidentally
+    // override it — skeletons are pure visual scaffolding and must stay
+    // out of the accessibility tree. Consumers expose busy state via
+    // role="status"/aria-busy on the surrounding container instead.
     return (
       <span
         ref={ref}
         className={[styles.lines, className].filter(Boolean).join(' ')}
         style={style}
-        aria-hidden="true"
         {...rest}
+        aria-hidden="true"
       >
         {Array.from({ length: lines }).map((_, i) => (
           <span
@@ -64,7 +68,8 @@ const Skeleton = forwardRef(function Skeleton(
     ...style,
   }
 
-  return <span ref={ref} className={classes} style={mergedStyle} aria-hidden="true" {...rest} />
+  // aria-hidden set AFTER ...rest — same reasoning as above.
+  return <span ref={ref} className={classes} style={mergedStyle} {...rest} aria-hidden="true" />
 })
 
 export default Skeleton

@@ -6,9 +6,12 @@
  * `design_v2_upcoming_exams` at the mount site (FeedPage, UserProfilePage).
  *
  * Rewritten 2026-04-24 (Day 2) to sit on the new components/ui kit:
- *   - Card (structural container with consistent border/radius/shadow).
+ *   - Card + CardBody (structural container with consistent
+ *     border/radius/shadow).
  *   - SkeletonCard while the fetch is in flight.
- *   - Chip (eyebrow variant) for the course code.
+ *   - Course code renders as plain text on the meta line for now.
+ *     Promoting it to <Chip variant="eyebrow"> is a Day 3 polish item
+ *     once the Figma screen-context design lands.
  *
  * The handoff's richer "Biology Midterm · 62% prepared · Study now" design
  * is deferred — the schema has no `preparednessPercent` column, so

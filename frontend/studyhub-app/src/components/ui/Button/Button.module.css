@@ -48,11 +48,11 @@
 /* Variants */
 .btn--primary {
   background: var(--sh-brand);
-  /* Per CLAUDE.md — white text on colored buttons is an explicit
-     exception to the "no hex" rule. Hardcoding #ffffff here keeps
-     the primary button legible in dark mode (where --sh-surface
-     becomes near-black and would collapse contrast). */
-  color: #ffffff;
+  /* Use the existing theme-aware primary-text token. It resolves to
+     #ffffff in both light and dark themes (verified in index.css
+     lines 128 + 422), so the button stays legible on the blue
+     brand background regardless of theme. */
+  color: var(--sh-btn-primary-text);
   box-shadow: var(--sh-btn-primary-shadow);
 }
 .btn--primary:hover:not(:disabled) {
@@ -85,7 +85,10 @@
 
 .btn--danger {
   background: var(--sh-danger);
-  color: var(--sh-surface);
+  /* Same reasoning as .btn--primary — the primary-text token is
+     always near-white and is the right legibility pair for any
+     saturated colored button. */
+  color: var(--sh-btn-primary-text);
 }
 .btn--danger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--sh-danger) 85%, black);
@@ -96,11 +99,17 @@
   width: 100%;
 }
 
-/* Loading */
+/* Loading.
+   Use opacity + pointer-events instead of visibility:hidden so the
+   label text stays in the accessibility tree (screen readers can still
+   compute the button's accessible name from its children). The spinner
+   is aria-hidden, so only the label contributes to the name — losing
+   it via visibility:hidden would make the button unnamed while loading. */
 .btn--loading .btn__label,
 .btn--loading .btn__leftIcon,
 .btn--loading .btn__rightIcon {
-  visibility: hidden;
+  opacity: 0;
+  pointer-events: none;
 }
 .btn__spinner {
   position: absolute;
