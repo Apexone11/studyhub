@@ -63,8 +63,13 @@ function download(url, outFile, redirectCount = 0) {
           cleanup()
           return reject(new Error(`Too many redirects (max ${MAX_REDIRECTS})`))
         }
+        // Resolve relative against the current request URL — Location
+        // is allowed to be a relative reference per RFC 7231 §7.1.2,
+        // and passing it raw to https.get would either fail or
+        // misinterpret the host on a relative redirect.
+        const redirectUrl = new URL(res.headers.location, url).toString()
         cleanup()
-        return download(res.headers.location, outFile, redirectCount + 1).then(resolve, reject)
+        return download(redirectUrl, outFile, redirectCount + 1).then(resolve, reject)
       }
       if (res.statusCode !== 200) {
         cleanup()

@@ -51,12 +51,10 @@ describe('scoreLogin — band boundaries', () => {
     expect(result.signals).toEqual([])
   })
 
-  it('exactly 29 stays in `normal` band (boundary check just below 30)', () => {
-    // No single signal scores 29, so we synthesize via UA change (10)
-    // + failed attempts (20) which sums to 30 — bump down to 29 by
-    // dropping the UA signal and adding nothing. Easiest precise 29
-    // can't be hit with current weights, so we verify the next-lower
-    // achievable score instead: UA_FAMILY_CHANGE (10) alone.
+  it('below 30 stays in `normal` band', () => {
+    // No current weight combination hits exactly 29, so this checks
+    // the nearest simple achievable below-threshold case:
+    // UA_FAMILY_CHANGE (10) alone stays in the normal band.
     const result = scoreLogin({
       deviceKnown: true,
       uaFamilyChanged: true,

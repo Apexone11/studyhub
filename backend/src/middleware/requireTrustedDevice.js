@@ -5,9 +5,15 @@
  * is linked to a TrustedDevice whose `trustedAt` is non-null (i.e. the user
  * has verified this browser via the step-up challenge at least once).
  *
- * Responds 403 with code `REAUTH_REQUIRED` otherwise. The frontend catches
- * this code and opens a step-up modal that routes the user through an
- * email code before retrying the original request.
+ * Responses:
+ *   - 403 + `REAUTH_REQUIRED` when the session is not linked to a verified
+ *     TrustedDevice. The frontend catches this code and opens a step-up
+ *     modal that routes the user through an email code before retrying.
+ *   - 503 + `REAUTH_REQUIRED` on a transient DB error (see "Outage
+ *     behavior" below). Same code as the 403 path so the frontend's
+ *     retry-after-step-up handler still triggers, but the 503 status
+ *     surfaces "temporarily unavailable" to the user instead of
+ *     pretending the device is untrusted.
  *
  * Outage behavior: this is a security gate on sensitive endpoints, so we
  * fail CLOSED on DB errors with 503 + REAUTH_REQUIRED. Failing open during
