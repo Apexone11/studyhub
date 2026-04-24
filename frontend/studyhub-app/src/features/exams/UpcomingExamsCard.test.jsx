@@ -101,4 +101,97 @@ describe('UpcomingExamsCard', () => {
       expect(seen).toBe('include')
     })
   })
+
+  it('renders a preparedness bar at the correct width when preparednessPercent=62', async () => {
+    server.use(
+      http.get('http://localhost:4000/api/exams/upcoming', () =>
+        HttpResponse.json({
+          exams: [
+            {
+              id: 7,
+              title: 'Biology Midterm',
+              examDate: '2026-05-05T14:00:00Z',
+              courseCode: 'BIOL201',
+              preparednessPercent: 62,
+            },
+          ],
+        }),
+      ),
+    )
+
+    render(<UpcomingExamsCard limit={3} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Biology Midterm')).toBeInTheDocument()
+    })
+    const bar = screen.getByTestId('exam-preparedness-7')
+    expect(bar).toHaveAttribute('role', 'progressbar')
+    expect(bar).toHaveAttribute('aria-valuenow', '62')
+    // The inner <div> carries the width, not the outer role=progressbar.
+    const fill = bar.firstChild
+    expect(fill).toHaveStyle({ width: '62%' })
+    // Sanity: the "62% prepared" label is visible.
+    expect(screen.getByText(/62% prepared/i)).toBeInTheDocument()
+  })
+
+  it('renders "0% prepared" for a new exam with the default value', async () => {
+    server.use(
+      http.get('http://localhost:4000/api/exams/upcoming', () =>
+        HttpResponse.json({
+          exams: [
+            {
+              id: 11,
+              title: 'CMSC131 Final',
+              examDate: '2026-06-08T10:00:00Z',
+              courseCode: 'CMSC131',
+              preparednessPercent: 0,
+            },
+          ],
+        }),
+      ),
+    )
+
+    render(<UpcomingExamsCard limit={3} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('CMSC131 Final')).toBeInTheDocument()
+    })
+    expect(screen.getByText(/0% prepared/i)).toBeInTheDocument()
+    const bar = screen.getByTestId('exam-preparedness-11')
+    expect(bar).toHaveAttribute('aria-valuenow', '0')
+    expect(bar.firstChild).toHaveStyle({ width: '0%' })
+  })
+
+  it('clamps out-of-range percentages to [0, 100]', async () => {
+    server.use(
+      http.get('http://localhost:4000/api/exams/upcoming', () =>
+        HttpResponse.json({
+          exams: [
+            {
+              id: 20,
+              title: 'Weird row',
+              examDate: '2026-07-01T10:00:00Z',
+              courseCode: 'XX',
+              preparednessPercent: 999,
+            },
+            {
+              id: 21,
+              title: 'Another weird row',
+              examDate: '2026-07-02T10:00:00Z',
+              courseCode: 'XX',
+              preparednessPercent: -15,
+            },
+          ],
+        }),
+      ),
+    )
+
+    render(<UpcomingExamsCard limit={3} />)
+
+    await waitFor(() => {
+      expect(screen.getByText('Weird row')).toBeInTheDocument()
+    })
+    expect(screen.getByTestId('exam-preparedness-20')).toHaveAttribute('aria-valuenow', '100')
+    expect(screen.getByTestId('exam-preparedness-21')).toHaveAttribute('aria-valuenow', '0')
+  })
 })

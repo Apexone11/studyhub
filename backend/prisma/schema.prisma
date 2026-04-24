@@ -2421,16 +2421,21 @@ model LearningGoal {
 // See docs/internal/design-refresh-v2-master-plan.md §5.
 // Private by default; future "course"-level visibility is a stretch item, not in Phase 2.
 model CourseExam {
-  id         Int      @id @default(autoincrement())
-  userId     Int
-  courseId   Int
-  title      String   @db.VarChar(120)
-  location   String?  @db.VarChar(120)
-  examDate   DateTime
-  visibility String   @default("private")
-  notes      String?  @db.VarChar(500)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id                  Int      @id @default(autoincrement())
+  userId              Int
+  courseId            Int
+  title               String   @db.VarChar(120)
+  location            String?  @db.VarChar(120)
+  examDate            DateTime
+  visibility          String   @default("private")
+  notes               String?  @db.VarChar(500)
+  // 0-100 progress bar shown on the UpcomingExamsCard. DB-side
+  // CHECK constraint (see migration 20260424110200_add_preparedness_
+  // to_course_exam) pins the range so the frontend never has to
+  // clamp. Default 0 = "new exam, no studying yet."
+  preparednessPercent Int      @default(0)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   course Course @relation(fields: [courseId], references: [id], onDelete: Cascade)

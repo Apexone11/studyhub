@@ -1,3 +1,27 @@
+/**
+ * seedBetaUsers.js — local beta test-user + fixture seed.
+ *
+ * Per CLAUDE.md §11 (Working Agreement For AI Agents), every feature
+ * that adds a UI surface should include a seed update so
+ * `npm run seed:beta` produces a localhost state where the feature
+ * is visible end-to-end for beta_student1 without manual data setup.
+ *
+ * Flag seed policy (ratified 2026-04-24): the seed MUST track the
+ * ship frontier, not every declared design_v2_* flag.
+ *
+ *   - SHIPPED features inherit an explicit enabled=true row so they
+ *     render and are visible in the admin flag UI.
+ *   - IN-FLIGHT features get an explicit enabled=false row. This
+ *     opts them out of the client-side FLAG_NOT_FOUND fail-open
+ *     behavior, which would otherwise silently turn unreleased
+ *     features on whenever the DB row was missing.
+ *
+ * The two lists are maintained in `SHIPPED_DESIGN_V2_FLAGS` and
+ * `IN_FLIGHT_DESIGN_V2_FLAGS` further down in this file. When a
+ * phase ships, move its flag name between the two arrays — don't
+ * re-flip the whole set.
+ */
+
 const path = require('node:path')
 const bcrypt = require('bcryptjs')
 const { createPrismaClient } = require('../src/lib/prisma')
@@ -184,6 +208,9 @@ async function seedUpcomingExams(studentUsers) {
       location: 'ITE 231',
       examDate: new Date(now + 11 * day),
       notes: 'Covers chapters 1–6. Bring a calculator.',
+      // Middle of the progress range so the UpcomingExamsCard bar
+      // shows something more interesting than 0 or 100.
+      preparednessPercent: 62,
     },
   ]
   // If the second course is available, queue a longer-horizon exam so
@@ -195,6 +222,9 @@ async function seedUpcomingExams(studentUsers) {
       location: 'Engineering 027',
       examDate: new Date(now + 45 * day),
       notes: 'Comprehensive. Three hours.',
+      // Further-out exam, lower preparedness — makes the "got
+      // farther to go" state visible on the card.
+      preparednessPercent: 20,
     })
   }
 
@@ -211,6 +241,7 @@ async function seedUpcomingExams(studentUsers) {
           location: fixture.location,
           examDate: fixture.examDate,
           notes: fixture.notes,
+          preparednessPercent: fixture.preparednessPercent,
         },
       })
     } else {
@@ -222,6 +253,7 @@ async function seedUpcomingExams(studentUsers) {
           location: fixture.location,
           examDate: fixture.examDate,
           notes: fixture.notes,
+          preparednessPercent: fixture.preparednessPercent,
         },
       })
     }
@@ -229,41 +261,94 @@ async function seedUpcomingExams(studentUsers) {
 }
 
 /**
- * Seed design_v2_* FeatureFlag rows as enabled. Without these the
- * server's evaluateFlag returns FLAG_NOT_FOUND for every design_v2
- * gate on a fresh install, which historically left features invisible
- * on localhost even with fail-open client semantics. The frontend hook
- * now treats FLAG_NOT_FOUND as fail-open too (defense in depth), but
- * seeding the rows is still the right "source of truth" for the dev
- * environment and makes the admin flag UI show the flags explicitly.
+ * Seed design_v2_* FeatureFlag rows with a SCOPE THAT MATCHES WHAT
+ * HAS ACTUALLY SHIPPED.
+ *
+ * Policy (ratified 2026-04-24 after a Day 2->3 scope-drift incident
+ * where every design_v2_* flag was seeded enabled=true, which flipped
+ * on Phase 3/4/5+ in-flight features on localhost and broke the
+ * "Phase 3 opens after Day 3 closes" rule):
+ *
+ *   SHIPPED flags  → enabled=true row. These features are live on
+ *                    main / local-main and should render when the
+ *                    flag is evaluated. Explicit row beats fail-open
+ *                    and shows up in the admin flag UI so an operator
+ *                    can flip it off.
+ *
+ *   IN-FLIGHT flags → enabled=false row. The frontend hook treats
+ *                    FLAG_NOT_FOUND as fail-open (so a missing row
+ *                    would SILENTLY TURN THE FEATURE ON). An explicit
+ *                    enabled=false row opts the WIP surface out of
+ *                    that fail-open behavior. When each phase ships,
+ *                    the corresponding row gets flipped to true (or
+ *                    deleted, which falls back to fail-open = on).
+ *
+ * Convention reinforced in CLAUDE.md §11 — the seed MUST track the
+ * ship frontier, not every declared flag.
  */
-async function seedDesignV2Flags() {
-  const flags = [
-    'design_v2_phase1_dashboard',
-    'design_v2_upcoming_exams',
-    'design_v2_ai_card',
-    'design_v2_sheets_grid',
-    'design_v2_auth_split',
-    'design_v2_onboarding',
-    'design_v2_feed_polish',
-    'design_v2_home_hero',
-    'design_v2_teach_materials',
-    'design_v2_docs_public',
-    'design_v2_groups_polish',
-    'design_v2_role_checklist',
-    'design_v2_weekly_focus',
-    'design_v2_teach_sections',
-  ]
 
-  for (const name of flags) {
+const SHIPPED_DESIGN_V2_FLAGS = [
+  // Phase 1 — shipped 2026-04-23. Sectioned AppSidebar + welcome hero
+  // + top-contributors widget on UserProfilePage.
+  'design_v2_phase1_dashboard',
+  // Phase 2 — shipped 2026-04-24 (this cycle). UpcomingExamsCard +
+  // /api/exams CRUD end-to-end.
+  'design_v2_upcoming_exams',
+]
+
+const IN_FLIGHT_DESIGN_V2_FLAGS = [
+  // Phase 3 — inline Hub AI suggestion card. Not greenlit yet.
+  'design_v2_ai_card',
+  // Phase 4 — Sheets Grid/List toggle + preview. Needs `previewText`
+  // schema column first.
+  'design_v2_sheets_grid',
+  // Phase 5 — Auth split layout + referral banner.
+  'design_v2_auth_split',
+  // Phase 6 — Onboarding polish.
+  'design_v2_onboarding',
+  // Phase 7 — Feed density + swipe gestures.
+  'design_v2_feed_polish',
+  // Phase 8 — Public home hero + for-role cards.
+  'design_v2_home_hero',
+  // Week 2/3 tracks — TeachMaterials page, public docs, study-groups
+  // polish, role checklist, weekly focus widget, teacher sections.
+  // Code scaffolding exists for each; none has been explicitly
+  // greenlit as "shipped" by the founder. If the re-walk after this
+  // change surfaces a feature that IS actually live in production,
+  // promote the specific flag from this list to SHIPPED_DESIGN_V2_FLAGS
+  // — don't re-flip the whole set.
+  'design_v2_teach_materials',
+  'design_v2_docs_public',
+  'design_v2_groups_polish',
+  'design_v2_role_checklist',
+  'design_v2_weekly_focus',
+  'design_v2_teach_sections',
+]
+
+async function seedDesignV2Flags() {
+  for (const name of SHIPPED_DESIGN_V2_FLAGS) {
     await prisma.featureFlag.upsert({
       where: { name },
       update: { enabled: true, rolloutPercentage: 100 },
       create: {
         name,
-        description: `Design refresh v2 gate — seeded enabled for local beta.`,
+        description: 'Design refresh v2 — SHIPPED. Explicit enabled=true for local beta.',
         enabled: true,
         rolloutPercentage: 100,
+      },
+    })
+  }
+
+  for (const name of IN_FLIGHT_DESIGN_V2_FLAGS) {
+    await prisma.featureFlag.upsert({
+      where: { name },
+      update: { enabled: false, rolloutPercentage: 0 },
+      create: {
+        name,
+        description:
+          'Design refresh v2 — IN-FLIGHT. Explicit enabled=false to opt out of fail-open until the phase ships.',
+        enabled: false,
+        rolloutPercentage: 0,
       },
     })
   }

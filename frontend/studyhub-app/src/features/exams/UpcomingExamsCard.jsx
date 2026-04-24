@@ -13,11 +13,11 @@
  *     Promoting it to <Chip variant="eyebrow"> is a Day 3 polish item
  *     once the Figma screen-context design lands.
  *
- * The handoff's richer "Biology Midterm · 62% prepared · Study now" design
- * is deferred — the schema has no `preparednessPercent` column, so
- * shipping that design would require a migration. The compact list
- * renders the real shape of the data we actually have today.
- * See the Day 2 report for the deferral note.
+ * Day 3 catch-up: the preparedness progress bar is now rendered per
+ * exam row using the `preparednessPercent` column added in the
+ * `20260424110200_add_preparedness_to_course_exam` migration.
+ * Bar track: --sh-soft background, bar fill: --sh-brand,
+ * both radius-full. "X% prepared" + "N days left" below each bar.
  *
  * Uses native Intl.DateTimeFormat for the badge — no new deps.
  * States: loading skeleton, empty, error (soft fail).
@@ -126,76 +126,122 @@ export default function UpcomingExamsCard({ limit = 3 }) {
             No exams coming up. Add one from a course page and it will show here.
           </p>
         ) : (
-          <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
+          <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 14 }}>
             {exams.map((exam) => {
               const badge = formatBadge(exam.examDate)
+              // Pin to 0-100 even if the API returned something weird.
+              // DB CHECK constraint guarantees the range end-to-end in
+              // practice; this is belt-and-suspenders against a legacy
+              // row that predates the constraint.
+              const rawPercent =
+                typeof exam.preparednessPercent === 'number' ? exam.preparednessPercent : 0
+              const percent = Math.max(0, Math.min(100, Math.round(rawPercent)))
               return (
-                <li key={exam.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <li key={exam.id} style={{ display: 'grid', gap: 8 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                    <div
+                      aria-hidden="true"
+                      style={{
+                        width: 44,
+                        height: 44,
+                        borderRadius: 'var(--radius-sm)',
+                        background: 'var(--sh-soft)',
+                        border: '1px solid var(--sh-border)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        flexShrink: 0,
+                      }}
+                    >
+                      <span
+                        style={{
+                          fontSize: 9,
+                          fontWeight: 700,
+                          letterSpacing: '0.08em',
+                          color: 'var(--sh-muted)',
+                          textTransform: 'uppercase',
+                        }}
+                      >
+                        {badge.month}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: 16,
+                          fontWeight: 800,
+                          color: 'var(--sh-heading)',
+                          lineHeight: 1,
+                        }}
+                      >
+                        {badge.day}
+                      </span>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
+                        style={{
+                          fontWeight: 700,
+                          fontSize: 13,
+                          color: 'var(--sh-heading)',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {exam.title}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: 'var(--sh-muted)',
+                          marginTop: 2,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {exam.course?.code || exam.courseCode || 'Course'}
+                        {exam.location ? ` · ${exam.location}` : ''}
+                      </div>
+                    </div>
+                  </div>
+                  {/* Preparedness bar. ARIA progressbar so screen
+                       readers announce "62% prepared" without any
+                       extra visually-hidden sibling. */}
                   <div
-                    aria-hidden="true"
+                    role="progressbar"
+                    aria-label={`${percent}% prepared for ${exam.title}`}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={percent}
+                    data-testid={`exam-preparedness-${exam.id}`}
                     style={{
-                      width: 44,
-                      height: 44,
-                      borderRadius: 'var(--radius-sm)',
+                      height: 8,
+                      width: '100%',
                       background: 'var(--sh-soft)',
-                      border: '1px solid var(--sh-border)',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      flexShrink: 0,
+                      borderRadius: 'var(--radius-full)',
+                      overflow: 'hidden',
                     }}
                   >
-                    <span
+                    <div
                       style={{
-                        fontSize: 9,
-                        fontWeight: 700,
-                        letterSpacing: '0.08em',
-                        color: 'var(--sh-muted)',
-                        textTransform: 'uppercase',
+                        height: '100%',
+                        width: `${percent}%`,
+                        background: 'var(--sh-brand)',
+                        borderRadius: 'var(--radius-full)',
+                        transition: 'width 0.3s ease',
                       }}
-                    >
-                      {badge.month}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 16,
-                        fontWeight: 800,
-                        color: 'var(--sh-heading)',
-                        lineHeight: 1,
-                      }}
-                    >
-                      {badge.day}
-                    </span>
+                    />
                   </div>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontWeight: 700,
-                        fontSize: 13,
-                        color: 'var(--sh-heading)',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {exam.title}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: 'var(--sh-muted)',
-                        marginTop: 2,
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap',
-                      }}
-                    >
-                      {exam.course?.code || exam.courseCode || 'Course'}
-                      {exam.location ? ` · ${exam.location}` : ''}
-                      {' · '}
-                      {formatRelative(exam.examDate)}
-                    </div>
+                  <div
+                    style={{
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      fontSize: 11,
+                      color: 'var(--sh-muted)',
+                    }}
+                  >
+                    <span>{percent}% prepared</span>
+                    <span>{formatRelative(exam.examDate)}</span>
                   </div>
                 </li>
               )

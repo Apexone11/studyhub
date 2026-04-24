@@ -51,6 +51,11 @@ function serializeExam(exam) {
     examDate: exam.examDate.toISOString(),
     visibility: exam.visibility,
     notes: exam.notes,
+    // 0-100. DB-side CHECK constraint guarantees the range; we still
+    // coalesce to 0 to survive a legacy row that somehow slipped
+    // through without the default.
+    preparednessPercent:
+      typeof exam.preparednessPercent === 'number' ? exam.preparednessPercent : 0,
     createdAt: exam.createdAt.toISOString(),
     updatedAt: exam.updatedAt.toISOString(),
     course: exam.course
@@ -79,6 +84,10 @@ const createBodySchema = z.object({
     location: z.string().trim().max(120).nullable().optional(),
     examDate: z.string().datetime(),
     notes: z.string().trim().max(500).nullable().optional(),
+    // Preparedness is optional on create — defaults to 0. Integer
+    // range pinned to the DB CHECK constraint; out-of-range values
+    // rejected at zod time with a 400 before Prisma sees them.
+    preparednessPercent: z.number().int().min(0).max(100).optional(),
   }),
 })
 
@@ -91,6 +100,7 @@ const patchBodySchema = z.object({
     location: z.string().trim().max(120).nullable().optional(),
     examDate: z.string().datetime().optional(),
     notes: z.string().trim().max(500).nullable().optional(),
+    preparednessPercent: z.number().int().min(0).max(100).optional(),
   }),
 })
 
@@ -153,7 +163,7 @@ router.post(
   validate(createBodySchema),
   async (req, res) => {
     try {
-      const { courseId, title, location, examDate, notes } = req.body
+      const { courseId, title, location, examDate, notes, preparednessPercent } = req.body
       const parsedDate = new Date(examDate)
       if (!isExamDateValid(parsedDate)) {
         return sendError(
@@ -186,6 +196,10 @@ router.post(
           location: location || null,
           examDate: parsedDate,
           notes: notes || null,
+          // Omit when not supplied so Prisma uses the column default
+          // (0). Zod already pinned the 0-100 range; the DB CHECK
+          // constraint is defense in depth.
+          ...(typeof preparednessPercent === 'number' ? { preparednessPercent } : {}),
         },
         include: {
           course: { select: { id: true, code: true, name: true } },
@@ -208,7 +222,7 @@ router.patch(
   async (req, res) => {
     try {
       const { id } = req.params
-      const { title, location, examDate, notes } = req.body
+      const { title, location, examDate, notes, preparednessPercent } = req.body
 
       const existing = await prisma.courseExam.findUnique({
         where: { id },
@@ -225,6 +239,7 @@ router.patch(
       if (typeof title === 'string') data.title = title
       if (location !== undefined) data.location = location || null
       if (notes !== undefined) data.notes = notes || null
+      if (typeof preparednessPercent === 'number') data.preparednessPercent = preparednessPercent
       if (typeof examDate === 'string') {
         const parsedDate = new Date(examDate)
         if (!isExamDateValid(parsedDate)) {
