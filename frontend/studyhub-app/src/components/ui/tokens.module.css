@@ -1,0 +1,12 @@
+/*
+ * tokens.module.css
+ *
+ * Reserved for future CSS Module-local alias tokens when we want
+ * tighter theming control (e.g. mapping global `--sh-*` vars to
+ * component-scoped names so a consumer can override them per
+ * instance without global scope leakage).
+ *
+ * Empty on purpose for now — the global tokens in
+ * `src/index.css` are the current source of truth for every
+ * component in this directory.
+ */
