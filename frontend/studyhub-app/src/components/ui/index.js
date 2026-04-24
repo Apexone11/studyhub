@@ -20,3 +20,9 @@ export {
   SkeletonAvatar,
   SkeletonCard,
 } from './Skeleton/Skeleton'
+
+// Figma-aligned icon namespace. Re-exports the existing `Icons.jsx`
+// set under the names Figma uses. Consumers can either pull individual
+// icons from the root ui barrel or bulk-import via `import * as Icons
+// from '../../components/ui/Icons'`.
+export * from './Icons'
