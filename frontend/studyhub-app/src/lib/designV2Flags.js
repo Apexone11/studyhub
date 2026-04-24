@@ -4,21 +4,28 @@ import { API } from '../config'
 /**
  * Design Refresh v2 feature-flag wrapper.
  *
- * See docs/internal/design-refresh-v2-master-plan.md and
- * docs/internal/design-refresh-v2-mobile-plan.md for the 8-phase rollout.
- * Each phase ships behind a shared `design_v2_*` flag so web and mobile
+ * See docs/internal/web-master-plan.md for the 8-phase rollout. Each
+ * phase ships behind a shared `design_v2_*` flag so web and mobile
  * light up together. Evaluation uses the existing
  * `/api/flags/evaluate/:name` endpoint with an in-memory cache.
  *
- * Fail-open semantics (matches the existing `rolesV2Flags` pattern):
- * if the flag row is missing or the network errors, we treat the flag
- * as ENABLED. Staged cohort rollout is handled server-side; this client
- * never hides functionality on a transient failure.
+ * Fail-CLOSED semantics (decision #20, 2026-04-24, CLAUDE.md §12).
+ * Only an explicit `enabled: true` response enables a flag. Missing
+ * rows, network errors, and non-200 responses all return DISABLED.
+ * This trades a "works on my machine" failure mode for a visible one:
+ * if a shipped feature's row is missing in prod the feature silently
+ * disappears (user ticket, 30-second fix — run `seed:flags`), rather
+ * than an in-flight WIP surface quietly leaking to real users.
+ *
+ * Flag-row provisioning lives in `backend/scripts/seedFeatureFlags.js`
+ * and runs via `npm --prefix backend run seed:flags`. Local dev
+ * inherits it through `seed:beta`.
  *
  * Flags covered:
  *   - design_v2_phase1_dashboard   — Phase 1: welcome hero, sectioned sidebar,
- *                                    top contributors mini-widget.
+ *                                    top contributors mini-widget. SHIPPED 2026-04-23.
  *   - design_v2_upcoming_exams     — Phase 2: Upcoming Exams card + /api/exams.
+ *                                    SHIPPED 2026-04-24.
  *   - design_v2_ai_card            — Phase 3: Inline Hub AI suggestion card.
  *   - design_v2_sheets_grid        — Phase 4: Sheets Grid/List toggle + preview.
  *   - design_v2_auth_split         — Phase 5: Auth split layout + referral banner.
@@ -59,10 +66,17 @@ async function fetchFlag(name) {
       fetch(`${API}/api/flags/evaluate/${name}`, { credentials: 'include' })
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
-          if (!data || typeof data.enabled !== 'boolean') return true
-          return data.enabled
+          // Fail-closed contract (decision #20, CLAUDE.md §12):
+          //   - non-200 / non-JSON → disabled.
+          //   - missing enabled boolean → disabled.
+          //   - FLAG_NOT_FOUND (no DB row) → disabled. Shipped flags
+          //     get explicit rows via `seed:flags`; in-flight flags
+          //     have no row and stay off until they ship.
+          //   - Any other response: honor `data.enabled` verbatim.
+          if (!data || typeof data.enabled !== 'boolean') return false
+          return data.enabled === true
         })
-        .catch(() => true),
+        .catch(() => false),
     )
   }
   return cache.get(name)
@@ -72,25 +86,25 @@ export function clearDesignV2FlagCache() {
   cache.clear()
 }
 
+// Fail-closed defaults. Every gated surface stays hidden until the
+// server returns an explicit `enabled: true`. Consumers render against
+// `loading: true` as the initial state so gated UI doesn't flash on
+// mount before the fetch resolves.
 const DEFAULTS = {
-  phase1Dashboard: true,
-  upcomingExams: true,
-  aiCard: true,
-  sheetsGrid: true,
-  authSplit: true,
-  onboarding: true,
-  feedPolish: true,
-  homeHero: true,
-  // Week 2 flags — fail-open defaults. `weeklyFocus` stays false by default
-  // until the Week 3 merge of GoalTriage + InterestChipRow + WeeklyProgress.
-  teachMaterials: true,
-  docsPublic: true,
-  groupsPolish: true,
-  roleChecklist: true,
+  phase1Dashboard: false,
+  upcomingExams: false,
+  aiCard: false,
+  sheetsGrid: false,
+  authSplit: false,
+  onboarding: false,
+  feedPolish: false,
+  homeHero: false,
+  teachMaterials: false,
+  docsPublic: false,
+  groupsPolish: false,
+  roleChecklist: false,
   weeklyFocus: false,
-  // Section-aware publishing opens gated (fail-open true, same as other Week 3
-  // surfaces). Gate flip is cohort-driven server-side.
-  teachSections: true,
+  teachSections: false,
   loading: true,
 }
 

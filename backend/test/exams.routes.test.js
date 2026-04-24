@@ -110,6 +110,7 @@ function fakeExam(overrides = {}) {
     examDate: new Date(isoDaysFromNow(7)),
     visibility: 'private',
     notes: null,
+    preparednessPercent: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
     course: { id: 17, code: 'BIOL 201', name: 'Intro to Biology' },
@@ -177,6 +178,17 @@ describe('GET /api/exams/upcoming', () => {
     expect(row.title).toBe('Biology Midterm')
     expect(typeof row.examDate).toBe('string')
     expect(row.course).toEqual({ id: 17, code: 'BIOL 201', name: 'Intro to Biology' })
+  })
+
+  it('serializes preparednessPercent on every row (defaults to 0)', async () => {
+    mocks.prisma.courseExam.findMany.mockResolvedValue([
+      fakeExam({ id: 1, preparednessPercent: 62 }),
+      fakeExam({ id: 2, preparednessPercent: 0 }),
+    ])
+    const res = await request(app).get('/api/exams/upcoming')
+    expect(res.status).toBe(200)
+    expect(res.body.exams[0].preparednessPercent).toBe(62)
+    expect(res.body.exams[1].preparednessPercent).toBe(0)
   })
 
   it('returns 401 when the caller is unauthenticated', async () => {
@@ -277,6 +289,59 @@ describe('POST /api/exams', () => {
       .send({ courseId: 17, title: 'x', examDate: isoDaysFromNow(7) })
     expect(res.status).toBe(401)
   })
+
+  it('accepts preparednessPercent within 0..100 and passes it to Prisma', async () => {
+    mocks.prisma.enrollment.findUnique.mockResolvedValue({ id: 1 })
+    mocks.prisma.courseExam.create.mockResolvedValue(fakeExam({ id: 10, preparednessPercent: 62 }))
+    const res = await request(app)
+      .post('/api/exams')
+      .send({
+        courseId: 17,
+        title: 'Midterm',
+        examDate: isoDaysFromNow(10),
+        preparednessPercent: 62,
+      })
+    expect(res.status).toBe(201)
+    expect(res.body.exam.preparednessPercent).toBe(62)
+    const createArg = mocks.prisma.courseExam.create.mock.calls[0][0].data
+    expect(createArg.preparednessPercent).toBe(62)
+  })
+
+  it('rejects preparednessPercent > 100 with a 400 before Prisma runs', async () => {
+    const res = await request(app)
+      .post('/api/exams')
+      .send({
+        courseId: 17,
+        title: 'Midterm',
+        examDate: isoDaysFromNow(10),
+        preparednessPercent: 150,
+      })
+    expect(res.status).toBe(400)
+    expect(mocks.prisma.courseExam.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects negative preparednessPercent with a 400', async () => {
+    const res = await request(app)
+      .post('/api/exams')
+      .send({
+        courseId: 17,
+        title: 'Midterm',
+        examDate: isoDaysFromNow(10),
+        preparednessPercent: -5,
+      })
+    expect(res.status).toBe(400)
+    expect(mocks.prisma.courseExam.create).not.toHaveBeenCalled()
+  })
+
+  it('omits preparednessPercent from the Prisma call when not supplied (let DB default apply)', async () => {
+    mocks.prisma.enrollment.findUnique.mockResolvedValue({ id: 1 })
+    mocks.prisma.courseExam.create.mockResolvedValue(fakeExam({ id: 11 }))
+    await request(app)
+      .post('/api/exams')
+      .send({ courseId: 17, title: 'Midterm', examDate: isoDaysFromNow(10) })
+    const createArg = mocks.prisma.courseExam.create.mock.calls[0][0].data
+    expect(createArg).not.toHaveProperty('preparednessPercent')
+  })
 })
 
 // ── PATCH /api/exams/:id ─────────────────────────────────────────────────
@@ -309,6 +374,22 @@ describe('PATCH /api/exams/:id', () => {
       .patch('/api/exams/5')
       .send({ examDate: isoDaysFromNow(365 * 6) })
     expect(res.status).toBe(400)
+  })
+
+  it('updates preparednessPercent on the owner exam', async () => {
+    mocks.prisma.courseExam.findUnique.mockResolvedValue({ id: 5, userId: 42 })
+    mocks.prisma.courseExam.update.mockResolvedValue(fakeExam({ id: 5, preparednessPercent: 75 }))
+    const res = await request(app).patch('/api/exams/5').send({ preparednessPercent: 75 })
+    expect(res.status).toBe(200)
+    expect(res.body.exam.preparednessPercent).toBe(75)
+    const updateArg = mocks.prisma.courseExam.update.mock.calls[0][0].data
+    expect(updateArg.preparednessPercent).toBe(75)
+  })
+
+  it('rejects PATCH preparednessPercent > 100 with a 400 before Prisma runs', async () => {
+    const res = await request(app).patch('/api/exams/5').send({ preparednessPercent: 200 })
+    expect(res.status).toBe(400)
+    expect(mocks.prisma.courseExam.update).not.toHaveBeenCalled()
   })
 })
 

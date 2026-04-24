@@ -16,6 +16,7 @@
     "seed:beta": "node scripts/seedBetaUsers.js",
     "preview:fixture": "node scripts/ensurePreviewFixture.js",
     "seed:admin": "node scripts/seedAdmin.js",
+    "seed:flags": "node scripts/seedFeatureFlags.js",
     "seed:roles-v2-flags": "node scripts/seedRolesV2Flags.js",
     "seed:notes-hardening-flag": "node scripts/seedNotesHardeningFlag.js",
     "backfill:note-version-bytes": "node scripts/backfillNoteVersionBytes.js",

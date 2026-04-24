@@ -91,7 +91,13 @@ async function createSession({
       country: country ? String(country).slice(0, 2) : null,
       region: region ? String(region).slice(0, 10) : null,
       city: city ? String(city).slice(0, 128) : null,
-      riskScore: Number.isFinite(riskScore) ? riskScore : null,
+      // Session.riskScore is an Int? column — floats would fail at the
+      // Prisma boundary. Current scoreLogin() only sums integer weights,
+      // so this is defensive for a future signal that produces a float
+      // (decay multipliers, probability-weighted boosts, etc.). Round
+      // instead of truncate so an edge-case 29.6 lands at 30 ("notify"
+      // band) instead of silently downgrading to 29 ("normal").
+      riskScore: Number.isFinite(riskScore) ? Math.round(riskScore) : null,
       trustedDeviceId: trustedDeviceId || null,
       expiresAt,
     },

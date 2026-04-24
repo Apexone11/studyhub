@@ -55,19 +55,50 @@ function cacheControl(maxAge, options = {}) {
   }
 }
 
-/** Merge additional values into the Vary header without dropping existing ones. */
+// Canonical casing for the Vary tokens we emit. HTTP header values are
+// case-insensitive per RFC 7230 §3.2, so upstream middleware that set
+// `vary: origin` (lowercase) must not collide with our `Origin` —
+// otherwise the header ends up with both "origin" and "Origin" as
+// distinct entries, which some proxies treat as invalid.
+const CANONICAL_VARY_TOKENS = {
+  origin: 'Origin',
+  cookie: 'Cookie',
+  authorization: 'Authorization',
+  'accept-encoding': 'Accept-Encoding',
+}
+
+/**
+ * Merge additional values into the Vary header without dropping existing
+ * ones. Case-insensitive dedupe: we key by lowercased token so `origin`
+ * and `Origin` collapse to a single entry. The emitted casing prefers the
+ * canonical spelling when we know it, otherwise keeps the caller's input.
+ */
 function appendVary(res, values) {
   const existing = res.getHeader('Vary')
-  const set = new Set(
-    existing
-      ? String(existing)
-          .split(',')
-          .map((token) => token.trim())
-          .filter(Boolean)
-      : [],
-  )
-  for (const value of values) set.add(value)
-  res.set('Vary', Array.from(set).join(', '))
+  // Map keyed by lowercased token, value is the casing we'll emit.
+  const merged = new Map()
+
+  const addToken = (rawToken) => {
+    const trimmed = String(rawToken || '').trim()
+    if (!trimmed) return
+    const normalized = trimmed.toLowerCase()
+    // First occurrence wins per normalized token. For known tokens we
+    // emit the canonical casing (so an upstream `vary: origin` is
+    // re-spelled to `Origin`); for unknown tokens we preserve whatever
+    // casing the caller supplied. Subsequent duplicates are ignored,
+    // which means once a known token is seen we're locked to its
+    // canonical form for the rest of the response.
+    if (!merged.has(normalized)) {
+      merged.set(normalized, CANONICAL_VARY_TOKENS[normalized] || trimmed)
+    }
+  }
+
+  if (existing) {
+    String(existing).split(',').forEach(addToken)
+  }
+  for (const value of values) addToken(value)
+
+  res.set('Vary', Array.from(merged.values()).join(', '))
 }
 
 module.exports = { cacheControl, appendVary }
