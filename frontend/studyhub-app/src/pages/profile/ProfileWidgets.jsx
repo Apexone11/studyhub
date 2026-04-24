@@ -8,6 +8,7 @@ import { Link } from 'react-router-dom'
 import { IconBook, IconSheets, IconStar } from '../../components/Icons'
 import BadgeDisplay from '../../components/BadgeDisplay'
 import StudyStatusChip from '../../components/StudyStatusChip'
+import UserAvatar from '../../components/UserAvatar'
 import { API } from '../../config'
 import { FONT, cardStyle, sectionHeadingStyle, pillStyle } from './profileConstants'
 
@@ -814,47 +815,7 @@ export function FollowModal({ followModal, followList, followListLoading, onClos
                   e.currentTarget.style.background = 'transparent'
                 }}
               >
-                <div
-                  style={{
-                    width: 38,
-                    height: 38,
-                    borderRadius: '50%',
-                    background: 'var(--sh-avatar-bg)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                    overflow: 'hidden',
-                  }}
-                >
-                  {u.avatarUrl ? (
-                    <img
-                      src={u.avatarUrl.startsWith('http') ? u.avatarUrl : `${API}${u.avatarUrl}`}
-                      alt={u.username}
-                      loading="lazy"
-                      onError={(e) => {
-                        e.currentTarget.style.display = 'none'
-                        e.currentTarget.nextSibling.style.display = ''
-                      }}
-                      style={{
-                        width: '100%',
-                        height: '100%',
-                        borderRadius: '50%',
-                        objectFit: 'cover',
-                      }}
-                    />
-                  ) : null}
-                  <span
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 800,
-                      color: 'var(--sh-avatar-text)',
-                      display: u.avatarUrl ? 'none' : '',
-                    }}
-                  >
-                    {u.username.slice(0, 2).toUpperCase()}
-                  </span>
-                </div>
+                <UserAvatar username={u.username} avatarUrl={u.avatarUrl} role={u.role} size={38} />
                 <div>
                   <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>
                     {u.username}

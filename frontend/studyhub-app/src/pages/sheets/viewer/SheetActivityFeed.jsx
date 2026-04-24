@@ -4,6 +4,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { API } from '../../../config'
+import UserAvatar from '../../../components/UserAvatar'
 import { authHeaders, timeAgo, FONT } from './sheetViewerConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
 
@@ -172,12 +173,15 @@ export default function SheetActivityFeed({ sheetId }) {
                   alignItems: 'baseline',
                 }}
               >
-                <span style={actorStyle}>
-                  {item.actor?.avatarUrl ? (
-                    <img src={item.actor.avatarUrl} alt="" loading="lazy" style={avatarStyle} />
-                  ) : null}
+                <div style={actorStyle}>
+                  <UserAvatar
+                    username={item.actor?.username}
+                    avatarUrl={item.actor?.avatarUrl}
+                    role={item.actor?.role}
+                    size={16}
+                  />
                   {item.actor?.username || 'Unknown'}
-                </span>
+                </div>
                 <span style={{ fontSize: 12, color: meta.color, fontWeight: 700 }}>
                   {meta.label}
                 </span>
@@ -270,14 +274,6 @@ const actorStyle = {
   display: 'inline-flex',
   alignItems: 'center',
   gap: 5,
-}
-
-const avatarStyle = {
-  width: 16,
-  height: 16,
-  borderRadius: '50%',
-  objectFit: 'cover',
-  verticalAlign: 'middle',
 }
 
 const timeStyle = {

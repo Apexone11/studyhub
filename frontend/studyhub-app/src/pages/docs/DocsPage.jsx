@@ -78,19 +78,28 @@ export default function DocsPage() {
               By role
             </h2>
             <div style={styles.roleGrid}>
-              {ROLE_WALKTHROUGHS.map((r) => (
-                <article key={r.role} className="sh-card sh-fade-up" style={styles.roleCard}>
-                  <h3 style={styles.roleTitle}>{r.title}</h3>
-                  <p style={styles.roleIntro}>{r.intro}</p>
-                  <ol style={styles.roleSteps}>
-                    {r.steps.map((step, i) => (
-                      <li key={i} style={styles.roleStep}>
-                        {step}
-                      </li>
-                    ))}
-                  </ol>
-                </article>
-              ))}
+              {ROLE_WALKTHROUGHS.map((r) => {
+                // Numbered markers by default; self-learner keeps dash
+                // bullets per the founder's docs-page copy request.
+                const isDash = r.listStyle === 'dash'
+                const ListTag = isDash ? 'ul' : 'ol'
+                const listStyleOverride = isDash
+                  ? { ...styles.roleSteps, listStyleType: "'-  '" }
+                  : { ...styles.roleSteps, listStyleType: 'decimal' }
+                return (
+                  <article key={r.role} className="sh-card sh-fade-up" style={styles.roleCard}>
+                    <h3 style={styles.roleTitle}>{r.title}</h3>
+                    <p style={styles.roleIntro}>{r.intro}</p>
+                    <ListTag style={listStyleOverride}>
+                      {r.steps.map((step, i) => (
+                        <li key={i} style={styles.roleStep}>
+                          {step}
+                        </li>
+                      ))}
+                    </ListTag>
+                  </article>
+                )
+              })}
             </div>
           </section>
 

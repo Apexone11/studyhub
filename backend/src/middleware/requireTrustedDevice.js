@@ -38,7 +38,7 @@ module.exports = async function requireTrustedDevice(req, res, next) {
         res,
         403,
         'This action requires device verification. Check your email for a code.',
-        'REAUTH_REQUIRED',
+        ERROR_CODES.REAUTH_REQUIRED,
       )
     }
     return next()

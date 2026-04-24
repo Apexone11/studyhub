@@ -2,7 +2,18 @@
  * Express middleware that sets Cache-Control (and Vary) headers.
  *
  * @param {number} maxAge - Cache duration in seconds
- * @param {object} [options] - { public: boolean, staleWhileRevalidate: number }
+ * @param {object} [options]
+ *   - public {boolean} — `public` directive. When true, shared caches may
+ *     store the response. Implies the body does NOT depend on auth; the
+ *     Vary header intentionally omits Cookie/Authorization so shared
+ *     caches can actually share the entry across users (keying every
+ *     variant by Cookie is the same as disabling the shared cache).
+ *   - staleWhileRevalidate {number} — seconds of SWR grace.
+ *   - varyByAuth {boolean} — force Cookie + Authorization into the Vary
+ *     header even on `public` responses. Use only when the body legitimately
+ *     differs for authed vs anonymous callers (e.g., an endpoint that
+ *     degrades for anonymous users but still opts into shared caching).
+ *     For private responses this is the default regardless.
  * @returns {Function} Express middleware
  *
  * Critical: every response that CORS decorates (`Access-Control-Allow-Origin`
@@ -17,10 +28,12 @@
  * this was the root cause of the `/api/courses/schools`,
  * `/api/public/*`, and `/api/feed/*` failures reported in production.
  *
- * We also vary on `Cookie` and `Authorization` so authenticated and
- * anonymous variants of the same endpoint don't share cache slots.
- * Without that, an anonymous response could be served to a logged-in
- * user (or vice versa) whenever the same URL is hit.
+ * For PRIVATE responses we also vary on Cookie + Authorization so a
+ * cached authenticated response doesn't leak to a different user or an
+ * anonymous one. For PUBLIC responses we deliberately skip those unless
+ * the caller opts in with `varyByAuth: true` — otherwise the shared
+ * cache becomes useless because every unique session cookie creates a
+ * new cache slot.
  */
 function cacheControl(maxAge, options = {}) {
   return (req, res, next) => {
@@ -31,7 +44,13 @@ function cacheControl(maxAge, options = {}) {
       parts.push(`stale-while-revalidate=${options.staleWhileRevalidate}`)
     }
     res.set('Cache-Control', parts.join(', '))
-    appendVary(res, ['Origin', 'Cookie', 'Authorization'])
+
+    const varyValues = ['Origin']
+    const includeAuthVary = !options.public || options.varyByAuth === true
+    if (includeAuthVary) {
+      varyValues.push('Cookie', 'Authorization')
+    }
+    appendVary(res, varyValues)
     next()
   }
 }

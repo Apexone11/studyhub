@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import MediaComposer from './MediaComposer'
+import UserAvatar from '../../components/UserAvatar'
 import { formatRelativeTime, getPostTypeLabel } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 
@@ -119,14 +120,21 @@ function DiscussionPostItem({
         )}
       </div>
 
-      <div style={styles.discussionMeta}>
-        {post.author?.avatarUrl ? (
-          <img
-            src={post.author.avatarUrl}
-            alt=""
-            style={{ width: 16, height: 16, borderRadius: '50%', verticalAlign: 'middle' }}
-          />
-        ) : null}
+      <div
+        style={{
+          ...styles.discussionMeta,
+          display: 'flex',
+          alignItems: 'center',
+          gap: 6,
+          flexWrap: 'wrap',
+        }}
+      >
+        <UserAvatar
+          username={post.author?.username}
+          avatarUrl={post.author?.avatarUrl}
+          role={post.author?.role}
+          size={16}
+        />
         <span>{authorName}</span>
         <span> -- {formatRelativeTime(post.createdAt)}</span>
         <span> -- {post.replyCount || 0} replies</span>

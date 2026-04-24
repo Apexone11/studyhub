@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react'
 import { API } from '../../../config'
+import UserAvatar from '../../../components/UserAvatar'
 import { SearchIcon, CloseIcon } from './icons'
 import './admin-primitives.css'
 
@@ -84,31 +85,12 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
             fontSize: 14,
           }}
         >
-          {value.avatarUrl ? (
-            <img
-              src={value.avatarUrl}
-              alt=""
-              loading="lazy"
-              style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover' }}
-            />
-          ) : (
-            <div
-              style={{
-                width: 28,
-                height: 28,
-                borderRadius: '50%',
-                background: 'var(--sh-brand-soft)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: 12,
-                fontWeight: 700,
-                color: 'var(--sh-brand)',
-              }}
-            >
-              {(value.username || '?')[0].toUpperCase()}
-            </div>
-          )}
+          <UserAvatar
+            username={value.username}
+            avatarUrl={value.avatarUrl}
+            role={value.role}
+            size={28}
+          />
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontWeight: 600, color: 'var(--sh-heading)' }}>
               {value.displayName || value.username}
@@ -201,31 +183,12 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
               onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--sh-soft)')}
               onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
             >
-              {user.avatarUrl ? (
-                <img
-                  src={user.avatarUrl}
-                  alt=""
-                  loading="lazy"
-                  style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }}
-                />
-              ) : (
-                <div
-                  style={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: '50%',
-                    background: 'var(--sh-brand-soft)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    color: 'var(--sh-brand)',
-                  }}
-                >
-                  {(user.username || '?')[0].toUpperCase()}
-                </div>
-              )}
+              <UserAvatar
+                username={user.username}
+                avatarUrl={user.avatarUrl}
+                role={user.role}
+                size={32}
+              />
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--sh-heading)' }}>
                   {user.displayName || user.username}

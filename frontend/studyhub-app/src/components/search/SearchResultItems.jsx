@@ -1,4 +1,5 @@
 import { IconSheets, IconNotes, IconUsers, IconSchool } from '../Icons'
+import UserAvatar from '../UserAvatar'
 import { Highlight, styles } from './searchModalConstants'
 
 function IconGroups({ size = 13 }) {
@@ -199,9 +200,12 @@ export function UserResults({
             onMouseEnter={() => setActiveIndex(flatIdx)}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={styles.userAvatar} aria-hidden="true">
-                {user.username?.slice(0, 2).toUpperCase()}
-              </div>
+              <UserAvatar
+                username={user.username}
+                avatarUrl={user.avatarUrl}
+                role={user.role}
+                size={32}
+              />
               <div>
                 <div style={styles.resultTitle}>
                   <Highlight text={user.username} query={query} />
