@@ -1,18 +1,28 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * UpcomingExamsCard.jsx — Phase 2 of v2 design refresh
  *
- * Lists the viewer's next few exams with a date badge ("APR 22") and the
- * course code. Fetches `/api/exams/upcoming?limit=3`. Flag-gated by
+ * Lists the viewer's next few exams with a date badge and the course code.
+ * Fetches `/api/exams/upcoming?limit=3`. Flag-gated by
  * `design_v2_upcoming_exams` at the mount site (FeedPage, UserProfilePage).
  *
- * Uses native `Intl.DateTimeFormat` for the badge — no new deps (per the
- * "no package.json changes" rule in CLAUDE.md). See master plan §5.6.
+ * Rewritten 2026-04-24 (Day 2) to sit on the new components/ui kit:
+ *   - Card (structural container with consistent border/radius/shadow).
+ *   - SkeletonCard while the fetch is in flight.
+ *   - Chip (eyebrow variant) for the course code.
  *
- * States: loading skeleton, empty ("No exams coming up"), error (soft fail).
+ * The handoff's richer "Biology Midterm · 62% prepared · Study now" design
+ * is deferred — the schema has no `preparednessPercent` column, so
+ * shipping that design would require a migration. The compact list
+ * renders the real shape of the data we actually have today.
+ * See the Day 2 report for the deferral note.
+ *
+ * Uses native Intl.DateTimeFormat for the badge — no new deps.
+ * States: loading skeleton, empty, error (soft fail).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState } from 'react'
 import { API } from '../../config'
 import { authHeaders } from '../../pages/shared/pageUtils'
+import { Card, CardBody, SkeletonCard } from '../../components/ui'
 
 const MONTH_FMT = new Intl.DateTimeFormat('en-US', { month: 'short' })
 const DAY_FMT = new Intl.DateTimeFormat('en-US', { day: '2-digit' })
@@ -74,157 +84,122 @@ export default function UpcomingExamsCard({ limit = 3 }) {
     }
   }, [limit])
 
+  if (loading) {
+    return <SkeletonCard data-testid="upcoming-exams-skeleton" />
+  }
+
   return (
-    <section
-      aria-labelledby="upcoming-exams-heading"
-      style={{
-        background: 'var(--sh-surface)',
-        border: '1px solid var(--sh-border)',
-        borderRadius: 14,
-        padding: '16px 18px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 12,
-      }}
-    >
-      <header
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: 10,
-        }}
-      >
-        <h3
-          id="upcoming-exams-heading"
+    <Card padding="md" aria-labelledby="upcoming-exams-heading">
+      <CardBody>
+        <header
           style={{
-            margin: 0,
-            fontSize: 14,
-            fontWeight: 800,
-            color: 'var(--sh-heading)',
-            letterSpacing: '-0.01em',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 10,
+            marginBottom: 12,
           }}
         >
-          Upcoming exams
-        </h3>
-      </header>
+          <h3
+            id="upcoming-exams-heading"
+            style={{
+              margin: 0,
+              fontSize: 14,
+              fontWeight: 800,
+              color: 'var(--sh-heading)',
+              letterSpacing: '-0.01em',
+            }}
+          >
+            Upcoming exams
+          </h3>
+        </header>
 
-      {loading ? (
-        <ul
-          aria-busy="true"
-          style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}
-        >
-          {Array.from({ length: 2 }).map((_, index) => (
-            <li
-              key={index}
-              style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '6px 0' }}
-            >
-              <div
-                aria-hidden="true"
-                style={{
-                  width: 44,
-                  height: 44,
-                  borderRadius: 10,
-                  background: 'var(--sh-soft)',
-                }}
-              />
-              <div
-                aria-hidden="true"
-                style={{
-                  height: 10,
-                  width: '55%',
-                  background: 'var(--sh-soft)',
-                  borderRadius: 6,
-                }}
-              />
-            </li>
-          ))}
-        </ul>
-      ) : errored ? (
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
-          We could not load your exams. Try refreshing the page.
-        </p>
-      ) : exams.length === 0 ? (
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
-          No exams coming up. Add one from a course page and it will show here.
-        </p>
-      ) : (
-        <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
-          {exams.map((exam) => {
-            const badge = formatBadge(exam.examDate)
-            return (
-              <li key={exam.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <div
-                  aria-hidden="true"
-                  style={{
-                    width: 44,
-                    height: 44,
-                    borderRadius: 10,
-                    background: 'var(--sh-soft)',
-                    border: '1px solid var(--sh-border)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    flexShrink: 0,
-                  }}
-                >
-                  <span
-                    style={{
-                      fontSize: 9,
-                      fontWeight: 700,
-                      letterSpacing: '0.08em',
-                      color: 'var(--sh-muted)',
-                      textTransform: 'uppercase',
-                    }}
-                  >
-                    {badge.month}
-                  </span>
-                  <span
-                    style={{
-                      fontSize: 16,
-                      fontWeight: 800,
-                      color: 'var(--sh-heading)',
-                      lineHeight: 1,
-                    }}
-                  >
-                    {badge.day}
-                  </span>
-                </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
+        {errored ? (
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
+            We could not load your exams. Try refreshing the page.
+          </p>
+        ) : exams.length === 0 ? (
+          <p style={{ margin: 0, fontSize: 13, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
+            No exams coming up. Add one from a course page and it will show here.
+          </p>
+        ) : (
+          <ol style={{ listStyle: 'none', margin: 0, padding: 0, display: 'grid', gap: 10 }}>
+            {exams.map((exam) => {
+              const badge = formatBadge(exam.examDate)
+              return (
+                <li key={exam.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                   <div
+                    aria-hidden="true"
                     style={{
-                      fontWeight: 700,
-                      fontSize: 13,
-                      color: 'var(--sh-heading)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
+                      width: 44,
+                      height: 44,
+                      borderRadius: 'var(--radius-sm)',
+                      background: 'var(--sh-soft)',
+                      border: '1px solid var(--sh-border)',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      flexShrink: 0,
                     }}
                   >
-                    {exam.title}
+                    <span
+                      style={{
+                        fontSize: 9,
+                        fontWeight: 700,
+                        letterSpacing: '0.08em',
+                        color: 'var(--sh-muted)',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {badge.month}
+                    </span>
+                    <span
+                      style={{
+                        fontSize: 16,
+                        fontWeight: 800,
+                        color: 'var(--sh-heading)',
+                        lineHeight: 1,
+                      }}
+                    >
+                      {badge.day}
+                    </span>
                   </div>
-                  <div
-                    style={{
-                      fontSize: 11,
-                      color: 'var(--sh-muted)',
-                      marginTop: 2,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {exam.course?.code || 'Course'}
-                    {exam.location ? ` · ${exam.location}` : ''}
-                    {' · '}
-                    {formatRelative(exam.examDate)}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div
+                      style={{
+                        fontWeight: 700,
+                        fontSize: 13,
+                        color: 'var(--sh-heading)',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {exam.title}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: 'var(--sh-muted)',
+                        marginTop: 2,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {exam.course?.code || exam.courseCode || 'Course'}
+                      {exam.location ? ` · ${exam.location}` : ''}
+                      {' · '}
+                      {formatRelative(exam.examDate)}
+                    </div>
                   </div>
-                </div>
-              </li>
-            )
-          })}
-        </ol>
-      )}
-    </section>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </CardBody>
+    </Card>
   )
 }

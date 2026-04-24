@@ -21,8 +21,10 @@ describe('UpcomingExamsCard', () => {
 
     render(<UpcomingExamsCard limit={3} />)
 
-    const loadingList = await screen.findByRole('list', { hidden: true })
-    expect(loadingList).toHaveAttribute('aria-busy', 'true')
+    // As of Day 2 the card delegates its loading state to <SkeletonCard>
+    // from the ui kit, which renders role="status" + aria-busy="true".
+    const skeleton = await screen.findByRole('status')
+    expect(skeleton).toHaveAttribute('aria-busy', 'true')
   })
 
   it('renders the empty-state copy when the API returns no exams', async () => {
