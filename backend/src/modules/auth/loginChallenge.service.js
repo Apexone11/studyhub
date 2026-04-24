@@ -114,8 +114,11 @@ async function verifyChallenge({ id, code }) {
     // as a consumed row from the caller's perspective.
     return { ok: false, reason: 'consumed', remaining: 0 }
   }
-  const consumed = await prisma.loginChallenge.findUnique({ where: { id } })
-  return { ok: true, challenge: consumed }
+  // Reuse the pre-read row with consumedAt overlaid. The fields
+  // callers actually use (userId, pendingDeviceId, id) don't change
+  // after creation, and we know the claim succeeded, so the post-
+  // update findUnique would be a redundant round-trip on the hot path.
+  return { ok: true, challenge: { ...challenge, consumedAt: consumeAt } }
 }
 
 /**

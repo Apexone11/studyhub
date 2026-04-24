@@ -143,9 +143,7 @@ describe('loginChallenge.service verifyChallenge', () => {
   })
 
   it('correct code redeems via conditional updateMany and returns ok: true', async () => {
-    mocks.prisma.loginChallenge.findUnique
-      .mockResolvedValueOnce(makeChallenge())
-      .mockResolvedValueOnce(makeChallenge({ consumedAt: new Date() }))
+    mocks.prisma.loginChallenge.findUnique.mockResolvedValueOnce(makeChallenge())
     mocks.prisma.loginChallenge.updateMany.mockResolvedValueOnce({ count: 1 })
 
     const result = await service.verifyChallenge({ id: 'chal_1', code: CORRECT_CODE })
@@ -153,6 +151,11 @@ describe('loginChallenge.service verifyChallenge', () => {
     expect(result.ok).toBe(true)
     expect(result.challenge.id).toBe('chal_1')
     expect(result.challenge.consumedAt).not.toBeNull()
+    // Hot-path optimization: on a successful claim the service overlays
+    // consumedAt on the pre-read row instead of issuing a second
+    // findUnique. So findUnique should only be called once for a
+    // successful redemption.
+    expect(mocks.prisma.loginChallenge.findUnique).toHaveBeenCalledTimes(1)
     // The consume path MUST use the gated updateMany, not a blind update.
     expect(mocks.prisma.loginChallenge.updateMany).toHaveBeenCalledTimes(1)
     const call = mocks.prisma.loginChallenge.updateMany.mock.calls[0][0]
