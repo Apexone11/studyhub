@@ -2,18 +2,11 @@
  * upcoming-exams.e2e.spec.js — Playwright coverage for the Phase 2
  * Upcoming Exams card on UserProfilePage Overview.
  *
- * Scope:
- *   - Card visibility: confirms the gate (flag × not-self-learner)
- *     is correctly reached and the card is mounted.
- *   - Empty / happy-path / error render paths — the three states the
- *     component actually supports today.
- *
- * Out of scope (skipped with explicit TODO blocks):
- *   - Add-exam modal flow: the "Add exam" CTA + <Modal> form is not
- *     yet built. Day 2/3 wired READ; write-side UI is a follow-up
- *     cycle. The handoff's E2E steps 4-10 target that UI. Un-skip
- *     once the modal + form lands.
- *   - Edit / delete hover-menu: same story — UI not yet built.
+ * Scope (Day 4):
+ *   - View states: empty / happy-path (with preparedness bar) / error.
+ *   - Write flows: add (empty-state CTA → modal → POST → row appears),
+ *     edit (per-row Edit → modal → PATCH → row updates), delete
+ *     (per-row Delete → confirm → DELETE → row removed).
  *
  * Gating: relies on the `design_v2_upcoming_exams` flag being
  * fail-open in the hook (which it is as of 2026-04-24). The
