@@ -59,7 +59,17 @@ async function fetchFlag(name) {
       fetch(`${API}/api/flags/evaluate/${name}`, { credentials: 'include' })
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
+          // Network error / non-200 → fail open (design_v2 is a
+          // UI-surface rollout, not a security control).
           if (!data || typeof data.enabled !== 'boolean') return true
+          // The backend's evaluateFlag returns {enabled:false,
+          // reason:'FLAG_NOT_FOUND'} when no DB row exists for the
+          // flag, which is the default state on every fresh install.
+          // Treat that as fail-open too — otherwise Day 2 features
+          // are invisible on localhost until someone remembers to
+          // insert a FeatureFlag row, which is not a documented
+          // setup step and would make every new feature ship dark.
+          if (data.reason === 'FLAG_NOT_FOUND') return true
           return data.enabled
         })
         .catch(() => true),

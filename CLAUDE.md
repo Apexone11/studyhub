@@ -332,6 +332,7 @@ When handling a new task:
 8. Do not put emoji in UI chrome (component copy, buttons, headings, labels, nav, empty states, toasts). Emoji are allowed only inside user-generated content surfaces (feed posts, messages, notes, comments, group discussions, profile bios). See "CSS and Styling" for the full policy.
 9. All inline style colors must use CSS custom property tokens (`var(--sh-*)`).
 10. Wrap any call to `getBlockedUserIds` or `getMutedUserIds` in try-catch for graceful degradation.
+11. **Every feature that adds a new UI surface MUST include a seed update so `npm run seed:beta` produces a localhost state where the feature is visible end-to-end for `beta_student1` without manual data setup.** Tests passing is necessary but not sufficient — a feature that only renders with hand-inserted DB rows is invisible during smoke tests and every downstream design/UX/timing decision is made blind. If the feature is flag-gated, seed the flag row as enabled. If it requires domain data (exams, sheets, groups, etc.), seed a plausible example. The rule is: `git pull && npm run seed:beta && log in as beta_student1` must result in every new Day-N feature rendering on its intended page with realistic data. Retroactive application is expected when touching an existing feature that shipped dark.
 
 ## Active Design Refresh Cycle (v2, April 2026)
 
