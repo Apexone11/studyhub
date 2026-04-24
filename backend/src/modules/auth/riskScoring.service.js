@@ -36,7 +36,11 @@ function haversineKm(lat1, lon1, lat2, lon2) {
 }
 
 function hasLatLon(x) {
-  return x && typeof x.lat === 'number' && typeof x.lon === 'number'
+  // Number.isFinite over typeof === 'number' so NaN and ±Infinity are
+  // rejected. A NaN slipping through would propagate through haversineKm
+  // and silently disable the impossible-travel signal — exactly the
+  // adversary case the signal exists for.
+  return x && Number.isFinite(x.lat) && Number.isFinite(x.lon)
 }
 
 /**

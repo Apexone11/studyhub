@@ -43,6 +43,14 @@ function htmlPage(title, body) {
 }
 
 router.get('/revoke-link/:token', async (req, res) => {
+  // The URL embeds a single-use token. Tell every cache (browser,
+  // proxy, CDN) not to store it — replays via cache hit would
+  // bypass our DB-side single-use semantics and could expose the
+  // token's payload to anyone with cache access.
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private')
+  res.setHeader('Pragma', 'no-cache')
+  res.setHeader('Expires', '0')
+
   const token = String(req.params.token || '')
   if (!token) {
     return res
@@ -68,9 +76,27 @@ router.get('/revoke-link/:token', async (req, res) => {
       )
   }
 
-  const userId = payload.sub
-  const sessionId = payload.sid
-  const trustedDeviceId = payload.tdid || null
+  // Coerce payload fields to the schema's expected types and treat
+  // anything malformed as invalid. JWT round-trips through JSON, so
+  // a string-typed `sub` would compare false against Session.userId
+  // (Int) and silently fail to revoke — the user would see a "Device
+  // revoked" page even though nothing happened. Hard-fail instead.
+  const userIdRaw = payload?.sub
+  const userId = typeof userIdRaw === 'number' ? userIdRaw : Number.parseInt(userIdRaw, 10)
+  const sessionId = typeof payload?.sid === 'string' ? payload.sid : null
+  const trustedDeviceId = typeof payload?.tdid === 'string' ? payload.tdid : null
+
+  if (!Number.isInteger(userId) || userId <= 0 || !sessionId) {
+    return res
+      .status(400)
+      .send(
+        htmlPage(
+          'Invalid link',
+          '<h1>Invalid link</h1><p>This revoke link is malformed. Open Settings → Sessions to revoke the device directly.</p>' +
+            `<a class="btn" href="${getPublicAppUrl()}/settings?tab=sessions">Open Sessions</a>`,
+        ),
+      )
+  }
 
   try {
     const session = await prisma.session.findUnique({
