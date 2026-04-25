@@ -11,6 +11,7 @@ const { runPlagiarismScan } = require('../plagiarism/plagiarism.service')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
+const { extractPreviewText } = require('../../lib/sheets/extractPreviewText')
 const { getUserTier } = require('../../lib/getUserPlan')
 const { PLANS } = require('../payments/payments.constants')
 const { trackActivity } = require('../../lib/activityTracker')
@@ -95,11 +96,13 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
         ? allowDownloads
         : await getUserDefaultDownloads(req.user.userId)
 
+    const trimmedContent = content.trim()
     const sheet = await prisma.studySheet.create({
       data: {
         title: title.trim().slice(0, 160),
         description: description?.trim().slice(0, 300) || '',
-        content: content.trim(),
+        previewText: extractPreviewText(trimmedContent),
+        content: trimmedContent,
         contentFormat,
         status: nextStatus,
         courseId: Number.parseInt(courseId, 10),
