@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * features/messages — barrel re-exports for the Messages feature
  *
- * Convention (Cycle 35+): new hooks, helpers, and constants go here.
+ * Convention: new hooks, helpers, and constants go here.
  * Pages stay in pages/messages/ and import from this barrel.
  * ═══════════════════════════════════════════════════════════════════════════ */
 

@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * features/notes — barrel re-exports for the Notes feature
  *
- * Convention (Cycle 35+): new hooks, helpers, and constants go here.
+ * Convention: new hooks, helpers, and constants go here.
  * Pages stay in pages/notes/ and import from this barrel.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
