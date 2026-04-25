@@ -107,9 +107,9 @@ model User {
   groupAuditActions          GroupAuditLog[]           @relation("GroupAuditActor")
   groupBlocksReceived        GroupBlock[]              @relation("GroupBlockUser")
   groupBlocksIssued          GroupBlock[]              @relation("GroupBlockActor")
-  plagiarismReportsResolved  PlagiarismReport[]       @relation("PlagiarismReportResolver")
-  plagiarismDisputesFiled    PlagiarismDispute[]      @relation("PlagiarismDisputeFiler")
-  plagiarismDisputesReviewed PlagiarismDispute[]      @relation("PlagiarismDisputeReviewer")
+  plagiarismReportsResolved  PlagiarismReport[]        @relation("PlagiarismReportResolver")
+  plagiarismDisputesFiled    PlagiarismDispute[]       @relation("PlagiarismDisputeFiler")
+  plagiarismDisputesReviewed PlagiarismDispute[]       @relation("PlagiarismDisputeReviewer")
   groupResources             GroupResource[]
   groupSessionRsvps          GroupSessionRsvp[]
   groupDiscussionPosts       GroupDiscussionPost[]
@@ -121,6 +121,7 @@ model User {
   aiConversations            AiConversation[]
   aiMessages                 AiMessage[]               @relation("AiMessageUser")
   aiUsageLogs                AiUsageLog[]
+  aiSuggestions              AiSuggestion[]
   bookShelves                BookShelf[]
   readingProgress            ReadingProgress[]
   bookBookmarks              BookBookmark[]
@@ -136,36 +137,36 @@ model User {
   legalAcceptances           LegalAcceptance[]
   referralCodes              ReferralCode[]
   referralRedemptions        ReferralRedemption[]
-  giftsSent                  GiftSubscription[]    @relation("GiftsSent")
-  giftsReceived              GiftSubscription[]    @relation("GiftsReceived")
+  giftsSent                  GiftSubscription[]        @relation("GiftsSent")
+  giftsReceived              GiftSubscription[]        @relation("GiftsReceived")
   subscriptionPauses         SubscriptionPause[]
   lastActiveAt               DateTime?
   userReviews                UserReview[]
-  generatedReviewReports     ReviewReport[]        @relation("ReviewReportGenerator")
-  videoAppeals               VideoAppeal[]         @relation("VideoAppealUploader")
-  videoAppealReviews         VideoAppeal[]         @relation("VideoAppealReviewer")
+  generatedReviewReports     ReviewReport[]            @relation("ReviewReportGenerator")
+  videoAppeals               VideoAppeal[]             @relation("VideoAppealUploader")
+  videoAppealReviews         VideoAppeal[]             @relation("VideoAppealReviewer")
   sessions                   Session[]
   trustedDevices             TrustedDevice[]
   loginChallenges            LoginChallenge[]
   securityEvents             SecurityEvent[]
   studyStatuses              StudyStatus[]
   onboardingProgress         OnboardingProgress?
-  referralCode               String?   @unique
+  referralCode               String?                   @unique
   referredByUserId           Int?
   proRewardExpiresAt         DateTime?
-  referredBy                 User?            @relation("ReferredBy", fields: [referredByUserId], references: [id], onDelete: SetNull)
-  referralsReceived          User[]           @relation("ReferredBy")
-  invitesSent                Referral[]       @relation("InvitesSent")
-  invitesReceived            Referral[]       @relation("InvitedByReferral")
+  referredBy                 User?                     @relation("ReferredBy", fields: [referredByUserId], references: [id], onDelete: SetNull)
+  referralsReceived          User[]                    @relation("ReferredBy")
+  invitesSent                Referral[]                @relation("InvitesSent")
+  invitesReceived            Referral[]                @relation("InvitedByReferral")
   referralRewards            ReferralReward[]
   roleChangeLogs             RoleChangeLog[]
   enrollmentArchives         UserEnrollmentArchive[]
   hashtagFollows             HashtagFollow[]
   learningGoals              LearningGoal[]
   courseExams                CourseExam[]
-  sectionsTaught             Section[]              @relation("SectionTeacher")
-  sectionEnrollments         SectionEnrollment[]    @relation("SectionEnrollmentUser")
-  materialsAuthored          Material[]             @relation("MaterialTeacher")
+  sectionsTaught             Section[]                 @relation("SectionTeacher")
+  sectionEnrollments         SectionEnrollment[]       @relation("SectionEnrollmentUser")
+  materialsAuthored          Material[]                @relation("MaterialTeacher")
 
   @@index([role])
   @@index([emailHash])
@@ -212,14 +213,14 @@ model LegalAcceptance {
 model ShareLink {
   id          Int       @id @default(autoincrement())
   token       String    @unique @default(uuid())
-  contentType String                          // "sheet" or "note"
+  contentType String // "sheet" or "note"
   contentId   Int
   createdById Int
-  permission  String    @default("view")      // "view", "comment", "edit"
-  expiresAt   DateTime?                       // null = never expires
-  maxViews    Int?                            // null = unlimited
+  permission  String    @default("view") // "view", "comment", "edit"
+  expiresAt   DateTime? // null = never expires
+  maxViews    Int? // null = unlimited
   viewCount   Int       @default(0)
-  password    String?                         // optional password protection
+  password    String? // optional password protection
   active      Boolean   @default(true)
   createdAt   DateTime  @default(now())
 
@@ -231,13 +232,13 @@ model ShareLink {
 }
 
 model ContentShare {
-  id          Int      @id @default(autoincrement())
-  contentType String                          // "sheet" or "note"
-  contentId   Int
-  sharedById  Int
+  id           Int      @id @default(autoincrement())
+  contentType  String // "sheet" or "note"
+  contentId    Int
+  sharedById   Int
   sharedWithId Int
-  permission  String   @default("view")      // "view", "comment", "edit"
-  createdAt   DateTime @default(now())
+  permission   String   @default("view") // "view", "comment", "edit"
+  createdAt    DateTime @default(now())
 
   sharedBy   User @relation("ContentSharedBy", fields: [sharedById], references: [id])
   sharedWith User @relation("ContentSharedWith", fields: [sharedWithId], references: [id])
@@ -317,9 +318,9 @@ model StudySheet {
   allowEditing           Boolean      @default(false)
   contentHash            String?
   contentSimhash         String?
-  aiReviewDecision       String?      // "approve", "reject", "escalate", null
-  aiReviewConfidence     Int?         // 0-100
-  aiReviewScore          Int?         // 0-100 risk score
+  aiReviewDecision       String? // "approve", "reject", "escalate", null
+  aiReviewConfidence     Int? // 0-100
+  aiReviewScore          Int? // 0-100 risk score
   aiReviewFindings       String?      @db.Text // JSON findings array
   aiReviewReasoning      String?      @db.Text // 1-3 sentence reasoning
   aiReviewedAt           DateTime?
@@ -392,17 +393,17 @@ model RequestedCourse {
 }
 
 model Comment {
-  id               Int        @id @default(autoincrement())
+  id               Int                 @id @default(autoincrement())
   content          String
   sheetId          Int
   userId           Int
   parentId         Int?
-  moderationStatus String     @default("clean")
-  createdAt        DateTime   @default(now())
-  sheet            StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
-  author           User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent           Comment?   @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies          Comment[]  @relation("CommentReplies")
+  moderationStatus String              @default("clean")
+  createdAt        DateTime            @default(now())
+  sheet            StudySheet          @relation(fields: [sheetId], references: [id], onDelete: Cascade)
+  author           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           Comment?            @relation("CommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          Comment[]           @relation("CommentReplies")
   reactions        CommentReaction[]
   attachments      CommentAttachment[]
 
@@ -454,34 +455,34 @@ model Announcement {
 }
 
 model Note {
-  id               Int           @id @default(autoincrement())
+  id               Int            @id @default(autoincrement())
   title            String
-  content          String        @default("")
+  content          String         @default("")
   userId           Int
   courseId         Int?
-  private          Boolean       @default(true)
-  allowDownloads   Boolean       @default(false)
-  pinned           Boolean       @default(false)
-  tags             String        @default("[]")
-  moderationStatus String        @default("clean")
+  private          Boolean        @default(true)
+  allowDownloads   Boolean        @default(false)
+  pinned           Boolean        @default(false)
+  tags             String         @default("[]")
+  moderationStatus String         @default("clean")
   contentHash      String?
   contentSimhash   String?
-  createdAt        DateTime      @default(now())
-  updatedAt        DateTime      @updatedAt
-  author           User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  course           Course?       @relation(fields: [courseId], references: [id])
-  downloads        Int           @default(0)
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  author           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  course           Course?        @relation(fields: [courseId], references: [id])
+  downloads        Int            @default(0)
   noteComments     NoteComment[]
   noteStars        NoteStar[]
   noteVersions     NoteVersion[]
   noteReactions    NoteReaction[]
-  materials        Material[]    @relation("MaterialNote")
-  revision         Int           @default(0)
-  lastSaveId       String?       @db.Uuid
+  materials        Material[]     @relation("MaterialNote")
+  revision         Int            @default(0)
+  lastSaveId       String?        @db.Uuid
 }
 
 model NoteComment {
-  id               Int      @id @default(autoincrement())
+  id               Int                     @id @default(autoincrement())
   content          String
   noteId           Int
   userId           Int
@@ -489,13 +490,13 @@ model NoteComment {
   anchorText       String?
   anchorOffset     Int?
   anchorContext    String?
-  resolved         Boolean  @default(false)
-  moderationStatus String   @default("clean")
-  createdAt        DateTime @default(now())
-  note             Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
-  author           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent           NoteComment?  @relation("NoteCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies          NoteComment[] @relation("NoteCommentReplies")
+  resolved         Boolean                 @default(false)
+  moderationStatus String                  @default("clean")
+  createdAt        DateTime                @default(now())
+  note             Note                    @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  author           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           NoteComment?            @relation("NoteCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          NoteComment[]           @relation("NoteCommentReplies")
   reactions        NoteCommentReaction[]
   attachments      NoteCommentAttachment[]
 
@@ -624,17 +625,17 @@ model FeedPost {
 }
 
 model FeedPostComment {
-  id               Int      @id @default(autoincrement())
+  id               Int                         @id @default(autoincrement())
   content          String
   postId           Int
   userId           Int
   parentId         Int?
-  moderationStatus String   @default("clean")
-  createdAt        DateTime @default(now())
-  post             FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
-  author           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  parent           FeedPostComment?  @relation("FeedPostCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
-  replies          FeedPostComment[] @relation("FeedPostCommentReplies")
+  moderationStatus String                      @default("clean")
+  createdAt        DateTime                    @default(now())
+  post             FeedPost                    @relation(fields: [postId], references: [id], onDelete: Cascade)
+  author           User                        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  parent           FeedPostComment?            @relation("FeedPostCommentReplies", fields: [parentId], references: [id], onDelete: Cascade)
+  replies          FeedPostComment[]           @relation("FeedPostCommentReplies")
   reactions        FeedPostCommentReaction[]
   attachments      FeedPostCommentAttachment[]
 
@@ -666,22 +667,22 @@ model FeedPostReaction {
 }
 
 model SheetContribution {
-  id            Int        @id @default(autoincrement())
+  id            Int                   @id @default(autoincrement())
   targetSheetId Int
   forkSheetId   Int
   proposerId    Int
   reviewerId    Int?
-  status        String     @default("pending")
-  message       String     @default("")
-  reviewComment String     @default("")
-  baseChecksum  String     @default("")
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
+  status        String                @default("pending")
+  message       String                @default("")
+  reviewComment String                @default("")
+  baseChecksum  String                @default("")
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
   reviewedAt    DateTime?
-  targetSheet   StudySheet @relation("ContributionTarget", fields: [targetSheetId], references: [id], onDelete: Cascade)
-  forkSheet     StudySheet @relation("ContributionFork", fields: [forkSheetId], references: [id], onDelete: Cascade)
-  proposer      User       @relation("ContributionProposer", fields: [proposerId], references: [id], onDelete: Cascade)
-  reviewer      User?      @relation("ContributionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
+  targetSheet   StudySheet            @relation("ContributionTarget", fields: [targetSheetId], references: [id], onDelete: Cascade)
+  forkSheet     StudySheet            @relation("ContributionFork", fields: [forkSheetId], references: [id], onDelete: Cascade)
+  proposer      User                  @relation("ContributionProposer", fields: [proposerId], references: [id], onDelete: Cascade)
+  reviewer      User?                 @relation("ContributionReviewer", fields: [reviewerId], references: [id], onDelete: SetNull)
   comments      ContributionComment[]
 
   @@index([targetSheetId, status])
@@ -784,30 +785,30 @@ model EmailSuppressionAudit {
 }
 
 model UserPreferences {
-  id                   Int     @id @default(autoincrement())
-  userId               Int     @unique
-  emailDigest          Boolean @default(true)
-  emailMentions        Boolean @default(true)
-  emailContributions   Boolean @default(true)
-  emailComments        Boolean @default(true)
-  emailSocial          Boolean @default(true)
-  emailStudyGroups     Boolean @default(true)
-  inAppNotifications   Boolean @default(true)
-  inAppMentions        Boolean @default(true)
-  inAppComments        Boolean @default(true)
-  inAppSocial          Boolean @default(true)
-  inAppContributions   Boolean @default(true)
-  inAppStudyGroups     Boolean @default(true)
-  profileVisibility    String  @default("public")
-  profileFieldVisibility Json   @default("{}")
-  defaultDownloads     Boolean @default(true)
-  defaultContributions Boolean @default(true)
-  theme                String  @default("system")
-  fontSize             String  @default("medium")
-  alertOnNewCountry    Boolean @default(true)
-  alertOnNewCity       Boolean @default(false)
-  blockAnonymousIp     Boolean @default(false)
-  user                 User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                     Int     @id @default(autoincrement())
+  userId                 Int     @unique
+  emailDigest            Boolean @default(true)
+  emailMentions          Boolean @default(true)
+  emailContributions     Boolean @default(true)
+  emailComments          Boolean @default(true)
+  emailSocial            Boolean @default(true)
+  emailStudyGroups       Boolean @default(true)
+  inAppNotifications     Boolean @default(true)
+  inAppMentions          Boolean @default(true)
+  inAppComments          Boolean @default(true)
+  inAppSocial            Boolean @default(true)
+  inAppContributions     Boolean @default(true)
+  inAppStudyGroups       Boolean @default(true)
+  profileVisibility      String  @default("public")
+  profileFieldVisibility Json    @default("{}")
+  defaultDownloads       Boolean @default(true)
+  defaultContributions   Boolean @default(true)
+  theme                  String  @default("system")
+  fontSize               String  @default("medium")
+  alertOnNewCountry      Boolean @default(true)
+  alertOnNewCity         Boolean @default(false)
+  blockAnonymousIp       Boolean @default(false)
+  user                   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model ModerationCase {
@@ -1153,13 +1154,13 @@ model Message {
   deletedAt      DateTime? // soft delete
   createdAt      DateTime  @default(now())
 
-  conversation  Conversation       @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-  sender        User               @relation("MessageSender", fields: [senderId], references: [id])
-  replyTo       Message?           @relation("MessageReply", fields: [replyToId], references: [id])
-  replies       Message[]          @relation("MessageReply")
-  reactions     MessageReaction[]
-  attachments   MessageAttachment[]
-  poll          MessagePoll?
+  conversation Conversation        @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender       User                @relation("MessageSender", fields: [senderId], references: [id])
+  replyTo      Message?            @relation("MessageReply", fields: [replyToId], references: [id])
+  replies      Message[]           @relation("MessageReply")
+  reactions    MessageReaction[]
+  attachments  MessageAttachment[]
+  poll         MessagePoll?
 
   @@index([conversationId, createdAt(sort: Desc)])
   @@index([senderId])
@@ -1180,16 +1181,16 @@ model MessageReaction {
 }
 
 model MessageAttachment {
-  id        Int       @id @default(autoincrement())
+  id        Int      @id @default(autoincrement())
   messageId Int
-  type      String    @default("image") // "image", "file", "video"
+  type      String   @default("image") // "image", "file", "video"
   url       String
   fileName  String?
   fileSize  Int?
   mimeType  String?
   width     Int?
   height    Int?
-  createdAt DateTime  @default(now())
+  createdAt DateTime @default(now())
 
   message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
 
@@ -1197,14 +1198,14 @@ model MessageAttachment {
 }
 
 model MessagePoll {
-  id             Int       @id @default(autoincrement())
-  messageId      Int       @unique
-  question       String
-  allowMultiple  Boolean   @default(false)
-  closedAt       DateTime?
-  createdAt      DateTime  @default(now())
+  id            Int       @id @default(autoincrement())
+  messageId     Int       @unique
+  question      String
+  allowMultiple Boolean   @default(false)
+  closedAt      DateTime?
+  createdAt     DateTime  @default(now())
 
-  message Message                @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  message Message             @relation(fields: [messageId], references: [id], onDelete: Cascade)
   options MessagePollOption[]
   votes   MessagePollVote[]
 }
@@ -1215,21 +1216,21 @@ model MessagePollOption {
   text     String
   position Int    @default(0)
 
-  poll  MessagePoll     @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  poll  MessagePoll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
   votes MessagePollVote[]
 
   @@index([pollId])
 }
 
 model MessagePollVote {
-  pollId   Int
-  optionId Int
-  userId   Int
+  pollId    Int
+  optionId  Int
+  userId    Int
   createdAt DateTime @default(now())
 
-  poll   MessagePoll      @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  poll   MessagePoll       @relation(fields: [pollId], references: [id], onDelete: Cascade)
   option MessagePollOption @relation(fields: [optionId], references: [id], onDelete: Cascade)
-  user   User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User              @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@id([pollId, optionId, userId])
 }
@@ -1239,52 +1240,52 @@ model MessagePollVote {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model StudyGroup {
-  id               Int      @id @default(autoincrement())
-  name             String
-  description      String   @default("")
-  avatarUrl        String?
+  id                  Int       @id @default(autoincrement())
+  name                String
+  description         String    @default("")
+  avatarUrl           String?
   // Phase 4: owner-curated background for the group header.
   // `backgroundUrl` is either a relative /uploads/group-media/... path
   // (local dev) or a curated gallery asset path; `backgroundCredit` is
   // an optional freeform attribution line (e.g. "Pexels · Jane Doe").
-  backgroundUrl    String?
-  backgroundCredit String?
-  courseId         Int? // null = freeform group
-  privacy          String   @default("public") // "public", "private", "invite_only"
-  maxMembers       Int      @default(50)
-  createdById      Int
+  backgroundUrl       String?
+  backgroundCredit    String?
+  courseId            Int? // null = freeform group
+  privacy             String    @default("public") // "public", "private", "invite_only"
+  maxMembers          Int       @default(50)
+  createdById         Int
   // Phase 5 trust & safety:
   //   moderationStatus: 'active' | 'warned' | 'locked' | 'deleted'
   //   warnedUntil: auto-clears a warning banner after this timestamp
   //   lockedAt: set when an admin locks the group (read-only mode)
   //   deletedAt: soft-delete sentinel; a cron sweep hard-deletes after 30 days
   //   deletedById: which admin performed the soft-delete (audit)
-  moderationStatus String    @default("active")
-  warnedUntil      DateTime?
-  lockedAt         DateTime?
-  deletedAt        DateTime?
-  deletedById      Int?
+  moderationStatus    String    @default("active")
+  warnedUntil         DateTime?
+  lockedAt            DateTime?
+  deletedAt           DateTime?
+  deletedById         Int?
   // Phase 5 member-list visibility: when true, non-members cannot see
   // the member roster (admins/mods always see it regardless).
-  memberListPrivate Boolean  @default(false)
+  memberListPrivate   Boolean   @default(false)
   // Phase 5 post-approval queue: when true, new discussion posts enter
   // status 'pending_approval' and only become visible after a mod approves.
-  requirePostApproval Boolean @default(false)
-  createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
+  requirePostApproval Boolean   @default(false)
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  course    Course?               @relation(fields: [courseId], references: [id], onDelete: SetNull)
-  createdBy User                  @relation("StudyGroupCreator", fields: [createdById], references: [id])
-  deletedBy User?                 @relation("StudyGroupDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
-  members   StudyGroupMember[]
-  resources GroupResource[]
-  sessions  GroupSession[]
-  posts     GroupDiscussionPost[]
+  course     Course?               @relation(fields: [courseId], references: [id], onDelete: SetNull)
+  createdBy  User                  @relation("StudyGroupCreator", fields: [createdById], references: [id])
+  deletedBy  User?                 @relation("StudyGroupDeleter", fields: [deletedById], references: [id], onDelete: SetNull)
+  members    StudyGroupMember[]
+  resources  GroupResource[]
+  sessions   GroupSession[]
+  posts      GroupDiscussionPost[]
   mediaUsage GroupMediaUsage[]
-  reports   GroupReport[]
-  appeals   GroupAppeal[]
-  auditLog  GroupAuditLog[]
-  blocks    GroupBlock[]
+  reports    GroupReport[]
+  appeals    GroupAppeal[]
+  auditLog   GroupAuditLog[]
+  blocks     GroupBlock[]
 
   @@index([courseId])
   @@index([privacy, updatedAt(sort: Desc)])
@@ -1294,30 +1295,30 @@ model StudyGroup {
 }
 
 model StudyGroupMember {
-  id       Int      @id @default(autoincrement())
-  groupId  Int
-  userId   Int
-  role     String   @default("member") // "admin", "moderator", "member"
-  status   String   @default("active") // "active", "pending", "invited", "banned"
-  joinedAt DateTime @default(now())
+  id           Int       @id @default(autoincrement())
+  groupId      Int
+  userId       Int
+  role         String    @default("member") // "admin", "moderator", "member"
+  status       String    @default("active") // "active", "pending", "invited", "banned"
+  joinedAt     DateTime  @default(now())
   // Phase 5: join-gate message. Captured when a user requests to join a
   // private group so admins know why they want in. Cleared on approval.
-  joinMessage String @default("")
+  joinMessage  String    @default("")
   // Phase 5: mute window. When non-null and in the future, the user can
   // read the group but cannot post/comment/upload. Enforced by the
   // resources + discussions routes. `muteReason` is shown to the user.
-  mutedUntil DateTime?
-  mutedReason String   @default("")
-  mutedById   Int?
+  mutedUntil   DateTime?
+  mutedReason  String    @default("")
+  mutedById    Int?
   // Phase 5: strike counter for two-strikes auto-ban. Incremented when a
   // mod removes the user's post/resource. Auto-ban triggers at 2+ strikes
   // in a 30-day window (computed by service, not DB).
   lastStrikeAt DateTime?
-  strikeCount  Int      @default(0)
+  strikeCount  Int       @default(0)
 
-  group  StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mutedBy User?     @relation("StudyGroupMemberMutedBy", fields: [mutedById], references: [id], onDelete: SetNull)
+  group   StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user    User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  mutedBy User?      @relation("StudyGroupMemberMutedBy", fields: [mutedById], references: [id], onDelete: SetNull)
 
   @@unique([groupId, userId])
   @@index([userId, status])
@@ -1386,14 +1387,14 @@ model GroupSessionRsvp {
 }
 
 model GroupDiscussionPost {
-  id        Int      @id @default(autoincrement())
-  groupId   Int
-  userId    Int
-  title     String
-  content   String   @db.Text
-  type      String   @default("discussion") // "discussion", "question", "announcement", "poll"
-  pinned    Boolean  @default(false)
-  resolved  Boolean  @default(false) // for Q&A threads
+  id          Int       @id @default(autoincrement())
+  groupId     Int
+  userId      Int
+  title       String
+  content     String    @db.Text
+  type        String    @default("discussion") // "discussion", "question", "announcement", "poll"
+  pinned      Boolean   @default(false)
+  resolved    Boolean   @default(false) // for Q&A threads
   // Phase 4: optional media attachments. JSON array of
   //   [{ url, mime, bytes, kind: 'image'|'video'|'file' }]
   attachments Json?
@@ -1403,11 +1404,11 @@ model GroupDiscussionPost {
   //                        until a mod approves; only author + mods see it
   //   'removed'         — a mod removed it; kept for audit, shown as
   //                        "removed by moderator" to members
-  status    String   @default("published")
-  removedAt DateTime?
+  status      String    @default("published")
+  removedAt   DateTime?
   removedById Int?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
 
   group   StudyGroup             @relation(fields: [groupId], references: [id], onDelete: Cascade)
   author  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -1458,20 +1459,20 @@ model GroupMediaUsage {
 // enforces this at the DB level). Reports drive the admin review queue
 // and auto-lock escalation (5 unique reporters in 24h).
 model GroupReport {
-  id           Int      @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   groupId      Int
   reporterId   Int
   reason       String // 'spam' | 'harassment' | 'hate' | 'copyright' | 'impersonation' | 'sexual' | 'other'
-  details      String   @default("")
+  details      String    @default("")
   // Optional evidence attachments (JSON array, same shape as discussion post
   // attachments — { url, mime, bytes, kind }).
   attachments  Json?
-  status       String   @default("pending") // 'pending' | 'dismissed' | 'warned' | 'locked' | 'deleted' | 'escalated'
+  status       String    @default("pending") // 'pending' | 'dismissed' | 'warned' | 'locked' | 'deleted' | 'escalated'
   resolvedAt   DateTime?
   resolvedById Int?
-  resolution   String   @default("") // admin internal notes (not shown to reporter or group owner)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  resolution   String    @default("") // admin internal notes (not shown to reporter or group owner)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
 
   group      StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   reporter   User       @relation("GroupReportReporter", fields: [reporterId], references: [id], onDelete: Cascade)
@@ -1487,17 +1488,17 @@ model GroupReport {
 // One appeal per (group, user) pair. Admin accepts (restore) or rejects
 // (final). No second appeals.
 model GroupAppeal {
-  id             Int      @id @default(autoincrement())
+  id             Int       @id @default(autoincrement())
   groupId        Int
   appealerId     Int
   originalAction String // 'warned' | 'locked' | 'deleted'
-  message        String   @db.Text
-  status         String   @default("pending") // 'pending' | 'accepted' | 'rejected'
+  message        String    @db.Text
+  status         String    @default("pending") // 'pending' | 'accepted' | 'rejected'
   resolvedAt     DateTime?
   resolvedById   Int?
-  resolution     String   @default("")
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  resolution     String    @default("")
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   group      StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   appealer   User       @relation("GroupAppealAppealer", fields: [appealerId], references: [id], onDelete: Cascade)
@@ -1542,12 +1543,12 @@ model GroupAuditLog {
 // "You can't access this group." If they try to join, the join is
 // immediately rejected without notifying mods.
 model GroupBlock {
-  id         Int      @id @default(autoincrement())
-  groupId    Int
-  userId     Int
+  id          Int      @id @default(autoincrement())
+  groupId     Int
+  userId      Int
   blockedById Int
-  reason     String   @default("")
-  createdAt  DateTime @default(now())
+  reason      String   @default("")
+  createdAt   DateTime @default(now())
 
   group     StudyGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
   user      User       @relation("GroupBlockUser", fields: [userId], references: [id], onDelete: Cascade)
@@ -1584,7 +1585,7 @@ model AiConversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user     User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
   messages AiMessage[]
 
   @@index([userId, updatedAt(sort: Desc)])
@@ -1593,7 +1594,7 @@ model AiConversation {
 model AiMessage {
   id               Int      @id @default(autoincrement())
   conversationId   Int
-  role             String   // "user" or "assistant"
+  role             String // "user" or "assistant"
   content          String
   hasImage         Boolean  @default(false)
   imageDescription String?
@@ -1620,6 +1621,26 @@ model AiUsageLog {
 
   @@unique([userId, date])
   @@index([userId])
+}
+
+// Phase 3 — inline Hub AI suggestion card on UserProfilePage Overview.
+// One row per generated suggestion. The "current" suggestion is the
+// most recent row with dismissedAt = null and generatedAt within the
+// staleness window. Older rows are retained for analytics + dismissal
+// stickiness across sessions.
+model AiSuggestion {
+  id          Int       @id @default(autoincrement())
+  userId      Int
+  text        String    @db.VarChar(280)
+  ctaLabel    String    @db.VarChar(40)
+  ctaAction   String    @db.VarChar(40)
+  generatedAt DateTime  @default(now())
+  dismissedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, generatedAt])
+  @@index([userId, dismissedAt])
 }
 
 // ── Library / BookHub models ──────────────────────────────────
@@ -1710,23 +1731,23 @@ model Waitlist {
 // Each report links a sheet to one or more matched sheets, stores the
 // similarity score, match type, AI verdict, and user dispute status.
 model PlagiarismReport {
-  id                 Int       @id @default(autoincrement())
-  sheetId            Int
-  matchedSheetId     Int
-  similarityScore    Float
-  matchType          String    @default("simhash") // "exact" | "simhash" | "ai" | "ngram"
-  highlightedSections Json?    // JSON array of matched ranges
-  aiVerdict          String?   // AI-generated verdict text
-  aiConfidence       Float?    // 0-1
-  status             String    @default("pending") // "pending" | "confirmed" | "dismissed" | "disputed"
-  resolvedAt         DateTime?
-  resolvedById       Int?
-  createdAt          DateTime  @default(now())
-  updatedAt          DateTime  @updatedAt
+  id                  Int       @id @default(autoincrement())
+  sheetId             Int
+  matchedSheetId      Int
+  similarityScore     Float
+  matchType           String    @default("simhash") // "exact" | "simhash" | "ai" | "ngram"
+  highlightedSections Json? // JSON array of matched ranges
+  aiVerdict           String? // AI-generated verdict text
+  aiConfidence        Float? // 0-1
+  status              String    @default("pending") // "pending" | "confirmed" | "dismissed" | "disputed"
+  resolvedAt          DateTime?
+  resolvedById        Int?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
 
-  sheet        StudySheet @relation("PlagiarismReportSheet", fields: [sheetId], references: [id], onDelete: Cascade)
-  matchedSheet StudySheet @relation("PlagiarismReportMatched", fields: [matchedSheetId], references: [id], onDelete: Cascade)
-  resolvedBy   User?      @relation("PlagiarismReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+  sheet        StudySheet          @relation("PlagiarismReportSheet", fields: [sheetId], references: [id], onDelete: Cascade)
+  matchedSheet StudySheet          @relation("PlagiarismReportMatched", fields: [matchedSheetId], references: [id], onDelete: Cascade)
+  resolvedBy   User?               @relation("PlagiarismReportResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
   disputes     PlagiarismDispute[]
 
   @@unique([sheetId, matchedSheetId])
@@ -1746,28 +1767,28 @@ model PlagiarismDispute {
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
 
-  report     PlagiarismReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
-  user       User             @relation("PlagiarismDisputeFiler", fields: [userId], references: [id], onDelete: Cascade)
-  reviewer   User?            @relation("PlagiarismDisputeReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
+  report   PlagiarismReport @relation(fields: [reportId], references: [id], onDelete: Cascade)
+  user     User             @relation("PlagiarismDisputeFiler", fields: [userId], references: [id], onDelete: Cascade)
+  reviewer User?            @relation("PlagiarismDisputeReviewer", fields: [reviewedBy], references: [id], onDelete: SetNull)
 
   @@unique([reportId, userId])
   @@index([reportId, status])
 }
 
 model CachedBook {
-  id          Int      @id @default(autoincrement())
-  volumeId    String   @unique
-  title       String
-  authors     Json     @default("[]")
-  categories  Json     @default("[]")
-  language    String   @default("en")
-  pageCount   Int      @default(0)
-  coverUrl    String?
-  previewLink String?
-  description String?
+  id            Int      @id @default(autoincrement())
+  volumeId      String   @unique
+  title         String
+  authors       Json     @default("[]")
+  categories    Json     @default("[]")
+  language      String   @default("en")
+  pageCount     Int      @default(0)
+  coverUrl      String?
+  previewLink   String?
+  description   String?
   publishedDate String?
-  syncedAt    DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  syncedAt      DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   @@index([pageCount(sort: Desc)])
   @@index([language])
@@ -1778,27 +1799,27 @@ model CachedBook {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model Video {
-  id            Int       @id @default(autoincrement())
-  userId        Int
-  title         String?
-  description   String?
-  r2Key         String    @unique
-  status        String    @default("processing") // processing, ready, failed
-  duration      Float?
-  width         Int?
-  height        Int?
-  fileSize      Int?
-  mimeType      String?
-  thumbnailR2Key String?
-  variants      Json?     // { "360p": { key, width, height }, "720p": {...}, "1080p": {...} }
-  hlsManifestR2Key String?
-  processingStep   String?   // Current step: downloading, analyzing, thumbnail, transcoding, finalizing
-  processingProgress Int?    // 0-100 percentage
-  downloadable     Boolean   @default(true) // Whether viewers can download this video
-  contentHash       String?
-  watermarkPosition String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                 Int      @id @default(autoincrement())
+  userId             Int
+  title              String?
+  description        String?
+  r2Key              String   @unique
+  status             String   @default("processing") // processing, ready, failed
+  duration           Float?
+  width              Int?
+  height             Int?
+  fileSize           Int?
+  mimeType           String?
+  thumbnailR2Key     String?
+  variants           Json? // { "360p": { key, width, height }, "720p": {...}, "1080p": {...} }
+  hlsManifestR2Key   String?
+  processingStep     String? // Current step: downloading, analyzing, thumbnail, transcoding, finalizing
+  processingProgress Int? // 0-100 percentage
+  downloadable       Boolean  @default(true) // Whether viewers can download this video
+  contentHash        String?
+  watermarkPosition  String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
 
   user              User                @relation("UserVideos", fields: [userId], references: [id], onDelete: Cascade)
   captions          VideoCaption[]
@@ -1820,7 +1841,7 @@ model VideoCaption {
   vttR2Key  String
   createdAt DateTime @default(now())
 
-  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
+  video Video @relation(fields: [videoId], references: [id], onDelete: Cascade)
 
   @@unique([videoId, language])
   @@index([videoId])
@@ -1838,10 +1859,10 @@ model VideoAppeal {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  video           Video    @relation("VideoAppealVideo", fields: [videoId], references: [id], onDelete: Cascade)
-  uploader        User     @relation("VideoAppealUploader", fields: [uploaderId], references: [id])
-  originalVideo   Video    @relation("VideoAppealOriginal", fields: [originalVideoId], references: [id])
-  reviewer        User?    @relation("VideoAppealReviewer", fields: [reviewedBy], references: [id])
+  video         Video @relation("VideoAppealVideo", fields: [videoId], references: [id], onDelete: Cascade)
+  uploader      User  @relation("VideoAppealUploader", fields: [uploaderId], references: [id])
+  originalVideo Video @relation("VideoAppealOriginal", fields: [originalVideoId], references: [id])
+  reviewer      User? @relation("VideoAppealReviewer", fields: [reviewedBy], references: [id])
 
   @@index([videoId])
   @@index([uploaderId])
@@ -1849,20 +1870,20 @@ model VideoAppeal {
 }
 
 model AnnouncementMedia {
-  id              Int      @id @default(autoincrement())
-  announcementId  Int
-  type            String   // "image" or "video"
-  url             String
-  position        Int      @default(0)
-  videoId         Int?
-  fileName        String?
-  fileSize        Int?
-  width           Int?
-  height          Int?
-  createdAt       DateTime @default(now())
+  id             Int      @id @default(autoincrement())
+  announcementId Int
+  type           String // "image" or "video"
+  url            String
+  position       Int      @default(0)
+  videoId        Int?
+  fileName       String?
+  fileSize       Int?
+  width          Int?
+  height         Int?
+  createdAt      DateTime @default(now())
 
-  announcement    Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
-  video           Video?       @relation(fields: [videoId], references: [id], onDelete: SetNull)
+  announcement Announcement @relation(fields: [announcementId], references: [id], onDelete: Cascade)
+  video        Video?       @relation(fields: [videoId], references: [id], onDelete: SetNull)
 
   @@index([announcementId, position])
 }
@@ -1883,7 +1904,7 @@ model PageView {
   duration  Int      @default(0)
   createdAt DateTime @default(now())
 
-  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
   @@index([userId, createdAt])
@@ -1919,18 +1940,18 @@ model Subscription {
 }
 
 model Payment {
-  id                   Int      @id @default(autoincrement())
-  userId               Int
-  subscriptionId       Int?
-  stripePaymentIntentId String? @unique
-  stripeInvoiceId      String?  @unique
-  amount               Int      // cents
-  currency             String   @default("usd") @db.VarChar(3)
-  status               String   // "succeeded", "failed", "pending", "refunded"
-  description          String?
-  receiptUrl           String?
-  type                 String   @default("subscription") // "subscription", "donation"
-  createdAt            DateTime @default(now())
+  id                    Int      @id @default(autoincrement())
+  userId                Int
+  subscriptionId        Int?
+  stripePaymentIntentId String?  @unique
+  stripeInvoiceId       String?  @unique
+  amount                Int // cents
+  currency              String   @default("usd") @db.VarChar(3)
+  status                String // "succeeded", "failed", "pending", "refunded"
+  description           String?
+  receiptUrl            String?
+  type                  String   @default("subscription") // "subscription", "donation"
+  createdAt             DateTime @default(now())
 
   user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   subscription Subscription? @relation(fields: [subscriptionId], references: [id], onDelete: SetNull)
@@ -1941,17 +1962,17 @@ model Payment {
 }
 
 model Donation {
-  id                    Int       @id @default(autoincrement())
+  id                    Int      @id @default(autoincrement())
   userId                Int?
-  stripeSessionId       String    @unique
-  stripePaymentIntentId String?   @unique
-  amount                Int       // cents
-  currency              String    @default("usd") @db.VarChar(3)
-  status                String    @default("pending") // "pending", "completed", "failed"
+  stripeSessionId       String   @unique
+  stripePaymentIntentId String?  @unique
+  amount                Int // cents
+  currency              String   @default("usd") @db.VarChar(3)
+  status                String   @default("pending") // "pending", "completed", "failed"
   donorName             String?
-  donorMessage          String?   @db.VarChar(500)
-  anonymous             Boolean   @default(false)
-  createdAt             DateTime  @default(now())
+  donorMessage          String?  @db.VarChar(500)
+  anonymous             Boolean  @default(false)
+  createdAt             DateTime @default(now())
 
   user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
 
@@ -2011,18 +2032,18 @@ model NoteReaction {
 // ── Sprint E: Pro-level payment features ────────────────────────────────
 
 model ReferralCode {
-  id            Int       @id @default(autoincrement())
-  code          String    @unique
-  ownerId       Int
-  rewardType    String    @default("trial_extension") // "trial_extension", "discount_percent", "credit"
-  rewardValue   Int       @default(7) // days for trial_extension, percent for discount, cents for credit
-  maxUses       Int       @default(0) // 0 = unlimited
-  currentUses   Int       @default(0)
-  expiresAt     DateTime?
-  active        Boolean   @default(true)
-  createdAt     DateTime  @default(now())
+  id          Int       @id @default(autoincrement())
+  code        String    @unique
+  ownerId     Int
+  rewardType  String    @default("trial_extension") // "trial_extension", "discount_percent", "credit"
+  rewardValue Int       @default(7) // days for trial_extension, percent for discount, cents for credit
+  maxUses     Int       @default(0) // 0 = unlimited
+  currentUses Int       @default(0)
+  expiresAt   DateTime?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
 
-  owner    User              @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner       User                 @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   redemptions ReferralRedemption[]
 
   @@index([ownerId])
@@ -2030,10 +2051,10 @@ model ReferralCode {
 }
 
 model ReferralRedemption {
-  id             Int       @id @default(autoincrement())
+  id             Int      @id @default(autoincrement())
   referralCodeId Int
   redeemedById   Int
-  redeemedAt     DateTime  @default(now())
+  redeemedAt     DateTime @default(now())
 
   referralCode ReferralCode @relation(fields: [referralCodeId], references: [id], onDelete: Cascade)
   redeemedBy   User         @relation(fields: [redeemedById], references: [id], onDelete: Cascade)
@@ -2067,14 +2088,14 @@ model GiftSubscription {
 }
 
 model SubscriptionPause {
-  id           Int       @id @default(autoincrement())
-  userId       Int
-  reason       String?
-  pausedAt     DateTime  @default(now())
-  resumeAt     DateTime
-  resumedAt    DateTime?
-  status       String    @default("active") // "active", "resumed", "expired"
-  createdAt    DateTime  @default(now())
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  reason    String?
+  pausedAt  DateTime  @default(now())
+  resumeAt  DateTime
+  resumedAt DateTime?
+  status    String    @default("active") // "active", "resumed", "expired"
+  createdAt DateTime  @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -2089,10 +2110,10 @@ model SubscriptionPause {
 model UserReview {
   id               Int      @id @default(autoincrement())
   userId           Int
-  stars            Int      // 1-5
+  stars            Int // 1-5
   text             String   @db.VarChar(500)
   status           String   @default("pending") // "pending", "approved", "rejected"
-  aiClassification String?  // "positive", "negative", "neutral"
+  aiClassification String? // "positive", "negative", "neutral"
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
@@ -2108,17 +2129,17 @@ model UserReview {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model ReviewReport {
-  id             Int      @id @default(autoincrement())
-  periodStart    DateTime // start of the review period
-  periodEnd      DateTime // end of the review period
-  reviewCount    Int      // number of reviews analyzed
-  averageStars   Float    // average star rating in the period
-  strengths      String   @db.Text // AI-identified strengths (JSON array)
-  weaknesses     String   @db.Text // AI-identified weaknesses (JSON array)
-  improvements   String   @db.Text // AI-suggested actionable improvements (JSON array)
-  rawAnalysis    String   @db.Text // full AI analysis text
-  generatedBy    Int?     // admin user who triggered generation
-  createdAt      DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  periodStart  DateTime // start of the review period
+  periodEnd    DateTime // end of the review period
+  reviewCount  Int // number of reviews analyzed
+  averageStars Float // average star rating in the period
+  strengths    String   @db.Text // AI-identified strengths (JSON array)
+  weaknesses   String   @db.Text // AI-identified weaknesses (JSON array)
+  improvements String   @db.Text // AI-suggested actionable improvements (JSON array)
+  rawAnalysis  String   @db.Text // full AI analysis text
+  generatedBy  Int? // admin user who triggered generation
+  createdAt    DateTime @default(now())
 
   generatedByUser User? @relation("ReviewReportGenerator", fields: [generatedBy], references: [id], onDelete: SetNull)
 
@@ -2131,16 +2152,16 @@ model ReviewReport {
 // ═══════════════════════════════════════════════════════════════════════════
 
 model AiReviewLog {
-  id         String     @id @default(cuid())
+  id         String   @id @default(cuid())
   sheetId    Int
-  decision   String     // "approve", "reject", "escalate"
-  confidence Int        // 0-100
-  riskScore  Int        // 0-100
-  findings   String     @db.Text // JSON array of findings
-  reasoning  String     @db.Text
-  model      String     // which Claude model was used
-  inputTier  Int        // what tier the scanner assigned (1 or 2)
-  createdAt  DateTime   @default(now())
+  decision   String // "approve", "reject", "escalate"
+  confidence Int // 0-100
+  riskScore  Int // 0-100
+  findings   String   @db.Text // JSON array of findings
+  reasoning  String   @db.Text
+  model      String // which Claude model was used
+  inputTier  Int // what tier the scanner assigned (1 or 2)
+  createdAt  DateTime @default(now())
 
   sheet StudySheet @relation(fields: [sheetId], references: [id], onDelete: Cascade)
 
@@ -2351,15 +2372,15 @@ model ReferralReward {
 }
 
 model RoleChangeLog {
-  id               Int      @id @default(autoincrement())
-  userId           Int
-  fromAccountType  String
-  toAccountType    String
-  reason           String?  @db.VarChar(500)
-  wasRevert        Boolean  @default(false)
-  ip               String?
-  userAgent        String?
-  changedAt        DateTime @default(now())
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  fromAccountType String
+  toAccountType   String
+  reason          String?  @db.VarChar(500)
+  wasRevert       Boolean  @default(false)
+  ip              String?
+  userAgent       String?
+  changedAt       DateTime @default(now())
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

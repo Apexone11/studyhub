@@ -62,6 +62,12 @@ const mockTargets = new Map([
       authLimiter: fakeRateLimiter,
       writeLimiter: fakeRateLimiter,
       createAiMessageLimiter: () => fakeRateLimiter,
+      // Phase 3 — the AI module barrel now mounts the suggestions
+      // sub-router which pulls these. Without stubs the route file
+      // fails with "argument handler must be a function" at module load.
+      aiSuggestionsReadLimiter: fakeRateLimiter,
+      aiSuggestionsRefreshLimiter: fakeRateLimiter,
+      aiSuggestionsDismissLimiter: fakeRateLimiter,
     },
   ],
   [require.resolve('express-rate-limit'), () => fakeRateLimiter],

@@ -7,13 +7,18 @@
  *
  * Responses:
  *   - 403 + `REAUTH_REQUIRED` when the session is not linked to a verified
- *     TrustedDevice. The frontend catches this code and opens a step-up
- *     modal that routes the user through an email code before retrying.
+ *     TrustedDevice.
  *   - 503 + `REAUTH_REQUIRED` on a transient DB error (see "Outage
- *     behavior" below). Same code as the 403 path so the frontend's
- *     retry-after-step-up handler still triggers, but the 503 status
- *     surfaces "temporarily unavailable" to the user instead of
- *     pretending the device is untrusted.
+ *     behavior" below). We deliberately reuse the same application
+ *     error code on both paths because the user's required action is
+ *     identical (re-verify or retry); the HTTP status is what
+ *     distinguishes "device untrusted" from "service degraded".
+ *
+ * NOTE on client handling: the frontend does not currently special-case
+ * REAUTH_REQUIRED — affected requests fall through to the generic
+ * fetch error handler and surface a toast. A dedicated step-up modal
+ * is on the roadmap; until that ships, the error message string IS the
+ * user-facing UX. Keep it short and actionable.
  *
  * Outage behavior: this is a security gate on sensitive endpoints, so we
  * fail CLOSED on DB errors with 503 + REAUTH_REQUIRED. Failing open during

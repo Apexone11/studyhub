@@ -1011,6 +1011,50 @@ const examReadLimiter = rateLimit({
   message: { error: 'Too many requests. Please slow down.' },
 })
 
+/**
+ * AI suggestion reads — 60 per minute per user. Phase 3 of v2 design
+ * refresh (design_v2_ai_card). Independent from the AI message limiter
+ * because the suggestion endpoint is polled by the card on mount and
+ * shouldn't burn message budget.
+ */
+const aiSuggestionsReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai-suggestions-read-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many requests. Please slow down.' },
+})
+
+/**
+ * AI suggestion refresh — 5 per hour per user. Refresh is the
+ * UI-spam vector for quota burn (one click = one Anthropic call).
+ * The hourly cap is independent of the daily AI budget so even a
+ * Pro user can't spam-refresh the card.
+ */
+const aiSuggestionsRefreshLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai-suggestions-refresh-${req.user?.userId || 'anon'}`,
+  message: { error: 'You are refreshing too quickly. Try again later.' },
+})
+
+/**
+ * AI suggestion dismiss — 20 per hour per user. Dismiss is cheap
+ * (no AI call) but still write-sided; this stops a runaway client
+ * from hammering the dismiss endpoint.
+ */
+const aiSuggestionsDismissLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai-suggestions-dismiss-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many dismissals. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -1151,4 +1195,7 @@ module.exports = {
   // Exams module (Phase 2 of v2 design refresh)
   examWriteLimiter,
   examReadLimiter,
+  aiSuggestionsReadLimiter,
+  aiSuggestionsRefreshLimiter,
+  aiSuggestionsDismissLimiter,
 }

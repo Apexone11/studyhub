@@ -19,12 +19,11 @@ const mocks = vi.hoisted(() => {
   }
 })
 
-const mockTargets = new Map([
-  [require.resolve('../src/lib/prisma'), mocks.prisma],
-])
+const mockTargets = new Map([[require.resolve('../src/lib/prisma'), mocks.prisma]])
 
 const originalModuleLoad = Module._load
 let buildContext
+let redactPII
 
 beforeAll(() => {
   Module._load = function patchedModuleLoad(requestId, parent, isMain) {
@@ -37,6 +36,7 @@ beforeAll(() => {
   delete require.cache[contextPath]
   const mod = require('../src/modules/ai/ai.context')
   buildContext = mod.buildContext
+  redactPII = mod.redactPII
 })
 
 afterAll(() => {
@@ -124,7 +124,7 @@ describe('buildContext', () => {
           id: 99,
           OR: [{ userId: 5 }, { status: 'published' }],
         }),
-      })
+      }),
     )
   })
 
@@ -160,7 +160,7 @@ describe('buildContext', () => {
           id: 50,
           OR: [{ userId: 7 }, { visibility: 'public' }],
         }),
-      })
+      }),
     )
   })
 
@@ -241,5 +241,44 @@ describe('buildContext', () => {
 
     const result = await buildContext(1)
     expect(result).not.toContain('<user_recent_sheets>')
+  })
+})
+
+describe('redactPII (decision #17, locked Phase 3)', () => {
+  it('replaces email addresses with [redacted-email]', () => {
+    const out = redactPII('Contact me at student@example.edu for notes.')
+    expect(out).not.toContain('student@example.edu')
+    expect(out).toContain('[redacted-email]')
+  })
+
+  it('replaces multiple emails in a single string', () => {
+    const out = redactPII('a@b.com and c.d@e.io are both classmates')
+    expect(out).not.toContain('a@b.com')
+    expect(out).not.toContain('c.d@e.io')
+    expect(out.match(/\[redacted-email\]/g)?.length).toBe(2)
+  })
+
+  it('replaces NANP phone numbers (with and without separators)', () => {
+    expect(redactPII('Call 123-456-7890 today.')).toContain('[redacted-phone]')
+    expect(redactPII('Call (123) 456-7890 today.')).toContain('[redacted-phone]')
+    expect(redactPII('Call 1234567890 today.')).toContain('[redacted-phone]')
+  })
+
+  it('replaces international-style phone numbers starting with +', () => {
+    const out = redactPII('Reach me at +44 20 7946 0958.')
+    expect(out).toContain('[redacted-phone]')
+    expect(out).not.toContain('20 7946 0958')
+  })
+
+  it('returns "" for non-string input (defensive boundary)', () => {
+    expect(redactPII(undefined)).toBe('')
+    expect(redactPII(null)).toBe('')
+    expect(redactPII(42)).toBe('')
+    expect(redactPII({ x: 1 })).toBe('')
+  })
+
+  it('leaves PII-free strings unchanged', () => {
+    const text = 'Review chapters 1-6 before the midterm on May 5.'
+    expect(redactPII(text)).toBe(text)
   })
 })

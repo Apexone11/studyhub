@@ -49,19 +49,48 @@ const MAX_REDIRECTS = 5
 function download(url, outFile, redirectCount = 0) {
   return new Promise((resolve, reject) => {
     const file = fs.createWriteStream(outFile)
+    // settled guards against the multiple ways this promise can race
+    // to a terminal state: request error, response error, file error,
+    // timeout, or normal finish. Without it, a server that errors
+    // mid-stream after we've started piping could fire both an error
+    // path and a finish path, calling resolve+reject and turning a
+    // failure into a silent success.
+    let settled = false
+    const settle = (fn, value) => {
+      if (settled) return
+      settled = true
+      fn(value)
+    }
     const cleanup = () => {
       file.close()
       try {
         fs.unlinkSync(outFile)
       } catch {
-        /* ignore */
+        /* ignore — file may not exist if we never finished opening it */
       }
     }
+    const failWith = (err) => {
+      cleanup()
+      settle(reject, err)
+    }
+    // File-side errors (ENOSPC mid-write, EPERM on a locked file,
+    // etc.) used to bubble up as unhandled 'error' events. Bind a
+    // listener so the promise rejects deterministically.
+    file.on('error', failWith)
+
     const req = https.get(url, (res) => {
+      // Bind a listener BEFORE any branching so a server-side reset
+      // mid-pipe surfaces as a reject instead of an unhandled event.
+      res.on('error', failWith)
+
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        // Drain the redirect response body so the underlying socket
+        // can be released to the pool / closed cleanly. Leaving an
+        // un-consumed response stream alive is the standard cause of
+        // "first redirect works but the next request hangs" issues.
+        res.resume()
         if (redirectCount >= MAX_REDIRECTS) {
-          cleanup()
-          return reject(new Error(`Too many redirects (max ${MAX_REDIRECTS})`))
+          return failWith(new Error(`Too many redirects (max ${MAX_REDIRECTS})`))
         }
         // Resolve relative against the current request URL — Location
         // is allowed to be a relative reference per RFC 7231 §7.1.2,
@@ -69,19 +98,21 @@ function download(url, outFile, redirectCount = 0) {
         // misinterpret the host on a relative redirect.
         const redirectUrl = new URL(res.headers.location, url).toString()
         cleanup()
-        return download(redirectUrl, outFile, redirectCount + 1).then(resolve, reject)
+        return download(redirectUrl, outFile, redirectCount + 1).then(
+          (v) => settle(resolve, v),
+          (e) => settle(reject, e),
+        )
       }
       if (res.statusCode !== 200) {
-        cleanup()
-        return reject(new Error(`HTTP ${res.statusCode}`))
+        // Same drain-then-fail pattern for non-2xx responses. Without
+        // resume(), the body sits in a buffer until socket timeout.
+        res.resume()
+        return failWith(new Error(`HTTP ${res.statusCode}`))
       }
       res.pipe(file)
-      file.on('finish', () => file.close(resolve))
+      file.on('finish', () => file.close(() => settle(resolve)))
     })
-    req.on('error', (err) => {
-      cleanup()
-      reject(err)
-    })
+    req.on('error', failWith)
     req.setTimeout(REQUEST_TIMEOUT_MS, () => {
       req.destroy(new Error(`Request timed out after ${REQUEST_TIMEOUT_MS}ms`))
     })
