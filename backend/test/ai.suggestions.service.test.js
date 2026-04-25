@@ -29,6 +29,11 @@ const mocks = vi.hoisted(() => {
       create: vi.fn(),
       updateMany: vi.fn(),
     },
+    // The service uses prisma.$transaction(async (tx) => ...) to
+    // atomically retire prior un-dismissed rows and insert the new
+    // one. The test stub passes the same prisma stub through as `tx`
+    // so individual mock methods are still observable in assertions.
+    $transaction: vi.fn(async (cb) => cb(prisma)),
   }
   const aiContext = {
     buildContext: vi.fn(),
@@ -243,6 +248,78 @@ describe('generateSuggestion — PII redaction at I/O boundaries', () => {
     await service.generateSuggestion({ id: 7 })
 
     expect(mocks.aiService.incrementUsage).toHaveBeenCalledWith(7, 64)
+  })
+
+  it('retires every prior un-dismissed row in the same transaction (Codex P2 fix)', async () => {
+    // The "one suggestion at a time" guarantee is a write-time
+    // invariant: regenerating MUST mark every existing un-dismissed
+    // row as dismissed, otherwise dismissing the new card would let
+    // a previously-undismissed row resurface on the next GET.
+    mocks.aiContext.buildContext.mockResolvedValueOnce('')
+    mocks.messagesCreate.mockResolvedValueOnce(modelResponse(VALID_JSON))
+    mocks.prisma.aiSuggestion.create.mockResolvedValueOnce({ id: 99 })
+
+    await service.generateSuggestion({ id: 7 })
+
+    // The retire updateMany must use a userId-scoped, dismissedAt: null
+    // filter — anything broader would dismiss other users' rows or
+    // already-dismissed history.
+    expect(mocks.prisma.aiSuggestion.updateMany).toHaveBeenCalledWith({
+      where: { userId: 7, dismissedAt: null },
+      data: { dismissedAt: expect.any(Date) },
+    })
+    // And the whole retire+create must happen inside a single
+    // transaction so a partial state (retired but not created, or
+    // created without retiring) is impossible.
+    expect(mocks.prisma.$transaction).toHaveBeenCalledTimes(1)
+  })
+
+  it('does NOT charge quota when persist throws (Copilot fix: persist-before-increment)', async () => {
+    // The previous ordering incremented the daily counter BEFORE the
+    // DB write, which meant a transient prisma error charged the user
+    // for a suggestion they never received. Reordered so the
+    // transaction settles first; if it throws, increment is skipped.
+    mocks.aiContext.buildContext.mockResolvedValueOnce('')
+    mocks.messagesCreate.mockResolvedValueOnce(modelResponse(VALID_JSON))
+    mocks.prisma.$transaction.mockImplementationOnce(async () => {
+      throw new Error('db down')
+    })
+
+    await expect(service.generateSuggestion({ id: 7 })).rejects.toThrow(/db down/)
+    expect(mocks.aiService.incrementUsage).not.toHaveBeenCalled()
+  })
+
+  it('truncates redacted text/ctaLabel to column limits before persist (Codex P1 fix)', async () => {
+    // redactPII can EXPAND a short PII token into a longer sentinel
+    // (10 phone digits → 16-char `[redacted-phone]`). The model JSON
+    // validator runs BEFORE redaction, so a row that fits the limits
+    // raw can overflow them after redaction. Re-clamp post-redaction
+    // so prisma.create doesn't throw and we don't burn tokens for
+    // a never-persisted suggestion.
+    const longPii = '1234567890'.repeat(28) // 280 chars exactly, all phone-shaped
+    mocks.aiContext.buildContext.mockResolvedValueOnce('')
+    mocks.messagesCreate.mockResolvedValueOnce(
+      modelResponse(
+        JSON.stringify({
+          text: longPii,
+          ctaLabel: '1234567890123456789012345678901234567890', // 40 chars exact
+          ctaAction: 'open_chat',
+        }),
+      ),
+    )
+    let persistedData = null
+    mocks.prisma.aiSuggestion.create.mockImplementationOnce(({ data }) => {
+      persistedData = data
+      return Promise.resolve({ id: 1, ...data })
+    })
+
+    await service.generateSuggestion({ id: 7 })
+
+    expect(persistedData).not.toBeNull()
+    // Both columns must be within their VARCHAR limits even though
+    // the redacted strings would exceed them.
+    expect(persistedData.text.length).toBeLessThanOrEqual(280)
+    expect(persistedData.ctaLabel.length).toBeLessThanOrEqual(40)
   })
 })
 

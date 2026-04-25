@@ -3,9 +3,9 @@
   "appName": "GetStudyHub",
   "webDir": "dist",
   "android": {
-    "allowMixedContent": true,
+    "allowMixedContent": false,
     "captureInput": true,
-    "webContentsDebuggingEnabled": true
+    "webContentsDebuggingEnabled": false
   },
   "server": {
     "androidScheme": "https",

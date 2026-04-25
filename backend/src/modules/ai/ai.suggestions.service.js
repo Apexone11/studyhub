@@ -43,8 +43,14 @@ Output JSON only, no preamble, no trailing prose:
 Do not include the user's name, email, phone number, or any other PII. Do not reference other students or anyone besides the user themselves.`
 
 /**
- * Fetch the user's latest non-dismissed suggestion, or null if none
- * exist or the latest is stale. Pure read — does not generate.
+ * Fetch the user's most recent un-dismissed suggestion (or null).
+ *
+ * This is a pure DB read with NO staleness filtering — staleness is
+ * a fetch/serve concern, not a storage concern, and is applied by
+ * `fetchOrGenerate` further down. Callers that want only fresh rows
+ * must check the result against `isStale()` themselves. We keep the
+ * read separate so analytics + the dismiss path can see the latest
+ * row regardless of age.
  */
 async function getCurrentSuggestion(userId) {
   return prisma.aiSuggestion.findFirst({
@@ -154,18 +160,44 @@ async function generateSuggestion(user) {
     ctaAction: validated.ctaAction,
   }
 
-  // Increment shared daily counter BEFORE persist so a DB write
-  // failure on AiSuggestion can't double-charge quota.
-  await aiService.incrementUsage(userId, response?.usage?.output_tokens || 0)
+  // Re-check column-bounded lengths AFTER redaction. validateModelOutput
+  // checked the raw model JSON, but redactPII can EXPAND a short PII
+  // token into a longer sentinel — a 10-char phone number becomes
+  // `[redacted-phone]` (16 chars). If that pushes `text` over VARCHAR(280)
+  // or `ctaLabel` over VARCHAR(40) the prisma.create below would throw
+  // and we'd have already burned model tokens for nothing. Truncate
+  // conservatively here and trust validateModelOutput to have rejected
+  // anything close enough to the limit that this would matter.
+  if (safe.text.length > 280) safe.text = safe.text.slice(0, 280)
+  if (safe.ctaLabel.length > 40) safe.ctaLabel = safe.ctaLabel.slice(0, 40)
 
-  const created = await prisma.aiSuggestion.create({
-    data: {
-      userId,
-      text: safe.text,
-      ctaLabel: safe.ctaLabel,
-      ctaAction: safe.ctaAction,
-    },
+  // Persist, retire, then count quota — in that order. The previous
+  // ordering (increment-first) charged the user against quota even
+  // when the DB write failed, which meant a transient DB blip burned
+  // their daily budget for no result. By the time we increment, the
+  // suggestion row is durable.
+  //
+  // The retire step is what makes dismiss "sticky": every regeneration
+  // marks all prior un-dismissed rows as dismissed, so a user who
+  // refreshes three times and then dismisses sees an empty card —
+  // not the previous-but-one suggestion resurfacing. Single-suggestion-
+  // at-a-time semantics, enforced at write time.
+  const created = await prisma.$transaction(async (tx) => {
+    await tx.aiSuggestion.updateMany({
+      where: { userId, dismissedAt: null },
+      data: { dismissedAt: new Date() },
+    })
+    return tx.aiSuggestion.create({
+      data: {
+        userId,
+        text: safe.text,
+        ctaLabel: safe.ctaLabel,
+        ctaAction: safe.ctaAction,
+      },
+    })
   })
+
+  await aiService.incrementUsage(userId, response?.usage?.output_tokens || 0)
 
   return created
 }
@@ -190,7 +222,13 @@ async function fetchOrGenerate(user) {
 
   const hasBudget = await hasQuotaRemaining(user)
   if (!hasBudget) {
-    return { suggestion: current || null, quotaExhausted: true }
+    // Match the documented contract above: quota-exhausted ALWAYS
+    // returns suggestion=null. Returning a stale `current` here was
+    // the bug — the client would render a stale-but-visible
+    // suggestion alongside a quota_exhausted banner, which is
+    // confusing and breaks the test that pins the
+    // { suggestion: null, quotaExhausted: true } shape.
+    return { suggestion: null, quotaExhausted: true }
   }
 
   try {

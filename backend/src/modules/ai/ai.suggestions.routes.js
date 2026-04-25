@@ -22,8 +22,15 @@ const suggestions = require('./ai.suggestions.service')
 const router = express.Router()
 const requireTrustedOrigin = originAllowlist()
 
-// Strip the persisted row down to the fields the client needs. No
-// raw timestamps in display, no internal columns leaked.
+// Strip the persisted row down to the fields the client needs.
+// Internal columns we deliberately drop:
+//   - userId       (request is already user-scoped via auth; sending
+//                   it back is a small but pointless info-leak)
+//   - dismissedAt  (only un-dismissed rows reach this function; the
+//                   field would always be null and just adds noise)
+// Fields we deliberately KEEP:
+//   - generatedAt  (intentional — the client can show "5 min ago"
+//                   later. ISO strings, no timezone leak.)
 function shapeForClient(row) {
   if (!row) return null
   return {
