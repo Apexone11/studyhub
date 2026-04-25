@@ -35,10 +35,19 @@ const MAX_OUTPUT_TOKENS = 256
 
 const ALLOWED_CTA_ACTIONS = new Set(['open_chat', 'create_sheet', 'review_sheet'])
 
+// Prompt limits (PROMPT_TEXT_MAX / PROMPT_LABEL_MAX) are the UX target
+// we ASK the model to hit. Validator/DB limits (DB_TEXT_MAX / DB_LABEL_MAX)
+// are the larger safety net we ACCEPT — they match the AiSuggestion
+// VARCHAR widths so a model overshoot of ~2x doesn't crash the insert.
+const PROMPT_TEXT_MAX = 140
+const PROMPT_LABEL_MAX = 20
+const DB_TEXT_MAX = 280
+const DB_LABEL_MAX = 40
+
 const SYSTEM_PROMPT = `You are StudyHub's helpful study coach. Look at the student's recent activity and suggest ONE specific, actionable next step they could take.
 
 Output JSON only, no preamble, no trailing prose:
-{ "text": "<one sentence, ≤140 chars>", "ctaLabel": "<≤20 chars>", "ctaAction": "open_chat" | "create_sheet" | "review_sheet" }
+{ "text": "<one sentence, ≤${PROMPT_TEXT_MAX} chars>", "ctaLabel": "<≤${PROMPT_LABEL_MAX} chars>", "ctaAction": "open_chat" | "create_sheet" | "review_sheet" }
 
 Do not include the user's name, email, phone number, or any other PII. Do not reference other students or anyone besides the user themselves.`
 
@@ -89,8 +98,8 @@ function validateModelOutput(parsed) {
   const ctaLabel = parsed.ctaLabel.trim()
   const ctaAction = parsed.ctaAction.trim()
 
-  if (text.length === 0 || text.length > 280) return null
-  if (ctaLabel.length === 0 || ctaLabel.length > 40) return null
+  if (text.length === 0 || text.length > DB_TEXT_MAX) return null
+  if (ctaLabel.length === 0 || ctaLabel.length > DB_LABEL_MAX) return null
   if (!ALLOWED_CTA_ACTIONS.has(ctaAction)) return null
 
   return { text, ctaLabel, ctaAction }
@@ -168,8 +177,8 @@ async function generateSuggestion(user) {
   // and we'd have already burned model tokens for nothing. Truncate
   // conservatively here and trust validateModelOutput to have rejected
   // anything close enough to the limit that this would matter.
-  if (safe.text.length > 280) safe.text = safe.text.slice(0, 280)
-  if (safe.ctaLabel.length > 40) safe.ctaLabel = safe.ctaLabel.slice(0, 40)
+  if (safe.text.length > DB_TEXT_MAX) safe.text = safe.text.slice(0, DB_TEXT_MAX)
+  if (safe.ctaLabel.length > DB_LABEL_MAX) safe.ctaLabel = safe.ctaLabel.slice(0, DB_LABEL_MAX)
 
   // Persist, retire, then count quota — in that order. The previous
   // ordering (increment-first) charged the user against quota even

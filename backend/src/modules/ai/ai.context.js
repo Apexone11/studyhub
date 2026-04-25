@@ -203,11 +203,14 @@ ${list}
  *   inputs return ''.
  */
 const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g
-// Phone: optional + and country code, then 7+ digits with common
-// separators. Anchored on word boundaries to avoid matching arbitrary
-// digit runs inside IDs.
+// Phone: two alternations bounded by non-word/non-dash boundaries so we
+// don't snag IDs or hyphenated numeric ranges like "1-6".
+//   1) International form: '+' + 1-3 digit country code + 2-5 groups of
+//      1-4 digits with common separators. Covers e.g. "+44 20 7946 0958".
+//   2) NANP form: optional country/area, then 3-3-4 with separators.
+// INTL is listed first so it matches preferentially when both could apply.
 const PHONE_RE =
-  /(?<![\w-])(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4}(?![\w-])/g
+  /(?<![\w-])(?:\+\d{1,3}(?:[\s.-]?\d{1,4}){2,5}|(?:\+?\d{1,3}[\s.-]?)?(?:\(?\d{3}\)?[\s.-]?)?\d{3}[\s.-]?\d{4})(?![\w-])/g
 
 function redactPII(text) {
   if (typeof text !== 'string' || text.length === 0) return ''

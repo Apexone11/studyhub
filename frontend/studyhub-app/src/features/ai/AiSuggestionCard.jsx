@@ -82,6 +82,7 @@ export default function AiSuggestionCard() {
   const [suggestion, setSuggestion] = useState(null)
   const [refreshing, setRefreshing] = useState(false)
   const [refreshDisabled, setRefreshDisabled] = useState(false)
+  const [retrying, setRetrying] = useState(false)
 
   const applyResponseShape = useCallback((data) => {
     if (data?.quotaExhausted) {
@@ -98,30 +99,47 @@ export default function AiSuggestionCard() {
     setStatus('empty')
   }, [])
 
+  // Plain GET against the suggestions endpoint. Used by the initial
+  // mount AND by the error-state "Try again" button — a transient
+  // network blip should NOT escalate to a forced regeneration that
+  // burns model tokens + the hourly refresh limiter.
+  const loadSuggestion = useCallback(
+    async (signal) => {
+      try {
+        const res = await fetch(SUGGESTIONS_URL, { credentials: 'include', signal })
+        if (!res.ok) {
+          setStatus('error')
+          return
+        }
+        const data = await readJsonSafely(res, {})
+        applyResponseShape(data)
+      } catch (err) {
+        if (err?.name === 'AbortError') return
+        setStatus('error')
+      }
+    },
+    [applyResponseShape],
+  )
+
   // Initial fetch on mount once the flag is known to be on.
   useEffect(() => {
     if (!flagOn) return
-    let cancelled = false
     const controller = new AbortController()
     setStatus('loading')
-    fetch(SUGGESTIONS_URL, { credentials: 'include', signal: controller.signal })
-      .then(async (res) => {
-        if (!res.ok) throw new Error('Failed to load suggestion.')
-        return readJsonSafely(res, {})
-      })
-      .then((data) => {
-        if (cancelled) return
-        applyResponseShape(data)
-      })
-      .catch((err) => {
-        if (cancelled || err?.name === 'AbortError') return
-        setStatus('error')
-      })
-    return () => {
-      cancelled = true
-      controller.abort()
+    loadSuggestion(controller.signal)
+    return () => controller.abort()
+  }, [flagOn, loadSuggestion])
+
+  const handleRetry = useCallback(async () => {
+    if (retrying) return
+    setRetrying(true)
+    setStatus('loading')
+    try {
+      await loadSuggestion()
+    } finally {
+      setRetrying(false)
     }
-  }, [flagOn, applyResponseShape])
+  }, [retrying, loadSuggestion])
 
   const handleRefresh = useCallback(async () => {
     if (refreshing || refreshDisabled) return
@@ -203,9 +221,11 @@ export default function AiSuggestionCard() {
           <Chip variant="eyebrow" tone="brand-accent" size="sm">
             STUDY SUGGESTION
           </Chip>
-          {/* Refresh is hidden in the empty / quota states because
-              spamming it can't help the user there and would just
-              burn the hourly limiter. */}
+          {/* Header refresh icon is happy-state only. The empty state
+              shows its own footer "Refresh" button; the quota_exhausted
+              and error states deliberately don't expose refresh — the
+              former because retrying can't unlock more quota, the
+              latter because it uses a GET retry instead (handleRetry). */}
           {status === 'happy' ? (
             <Button
               size="sm"
@@ -279,8 +299,8 @@ export default function AiSuggestionCard() {
               <Button
                 size="sm"
                 variant="ghost"
-                onClick={handleRefresh}
-                loading={refreshing}
+                onClick={handleRetry}
+                loading={retrying}
                 aria-label="Retry"
               >
                 Try again
