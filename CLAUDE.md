@@ -252,6 +252,40 @@ Tables with migrations (safe to query):
 - Preserve the current HomePage visual language unless a task explicitly calls for a redesign.
 - UserAvatar component (`frontend/studyhub-app/src/components/UserAvatar.jsx`) must be used everywhere a user's profile picture is displayed. It handles fallback avatars automatically.
 
+## Comment Policy
+
+Comments answer **why**, not **what**. The code is the source of truth for what it does; comments earn their keep by capturing context that the code can't.
+
+**KEEP** — comments that explain WHY:
+
+- A business rule or invariant that isn't obvious from the code itself.
+- A non-obvious decision rationale or trade-off (with the reasoning).
+- A security or correctness constraint (e.g., "must run before X because Y").
+- A reference to an external spec, RFC, issue, or doc by URL.
+- A reference to a founder-locked decision (e.g., "decision #17", "decision #20") — these are anchors that future agents check against the master plan, not metadata.
+
+**DELETE** — comments that add noise:
+
+- Sprint number, cycle number, PR number, reviewer attribution ("Cycle 4", "Sprint X", "Copilot review #4", "fixed for round 3").
+- Version/date stamps on individual lines ("Added in v1.7.0", "Changed 2026-04-12") — git already has this.
+- Comments that restate what the code literally does (`// increment counter` above `counter++`).
+- Stale TODOs that no longer apply, or `TODO(name)` with departed-author handles.
+- Process meta-commentary ("done in this PR", "see chat", "as discussed").
+
+**CONVERT** — historical comments that contain a load-bearing fact:
+
+- "Changed in v1.7.0 to fix X" → either delete (if the rationale is obvious now) or keep just the rationale ("Order matters: must precede Y").
+- Date-stamped notes only when the date itself is the load-bearing fact (e.g., "Mobile work paused 2026-04-23, files preserved for resume").
+
+**Load-bearing exceptions** (do NOT sweep these even if they look like metadata):
+
+- Test-file names like `cycle36-decomposed-pages.smoke.spec.js` and Playwright grep tags like `@cycle36-smoke` — these are CI selectors.
+- `describe()` block names that contain a cycle/phase tag and surface as test IDs in CI output.
+- `Phase N` tags in `scripts/seedFeatureFlags.js` and on shipped `design_v2_*` flag definitions — these are the canonical pointer back to the master plan and required by CLAUDE.md §12.
+- Any constant whose name happens to match the metadata regex (e.g., `CYCLE_LENGTH_MS`, `PHASE_2_TIMEOUT`).
+
+When in doubt, leave the comment and flag it for the founder.
+
 ## Validation Commands
 
 Root workspace:
