@@ -71,10 +71,18 @@ export function Button({ children, secondary = false, danger = false, ...props }
 export function Message({ tone = 'error', children }) {
   const palette =
     tone === 'success'
-      ? { bg: 'var(--sh-success-bg)', border: 'var(--sh-success-border)', text: 'var(--sh-success-text)' }
+      ? {
+          bg: 'var(--sh-success-bg)',
+          border: 'var(--sh-success-border)',
+          text: 'var(--sh-success-text)',
+        }
       : tone === 'info'
         ? { bg: 'var(--sh-pill-bg)', border: 'var(--sh-border)', text: 'var(--sh-pill-text)' }
-        : { bg: 'var(--sh-danger-bg)', border: 'var(--sh-danger-border)', text: 'var(--sh-danger-text)' }
+        : {
+            bg: 'var(--sh-danger-bg)',
+            border: 'var(--sh-danger-border)',
+            text: 'var(--sh-danger-text)',
+          }
 
   return (
     <div
@@ -97,15 +105,13 @@ export function Message({ tone = 'error', children }) {
 export function FormField({ label, children, hint }) {
   return (
     <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--sh-subtext)' }}>
+      <label
+        style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--sh-subtext)' }}
+      >
         <span style={{ display: 'block', marginBottom: 6 }}>{label}</span>
         {children}
       </label>
-      {hint && (
-        <div style={{ marginTop: 5, fontSize: 12, color: 'var(--sh-muted)' }}>
-          {hint}
-        </div>
-      )}
+      {hint && <div style={{ marginTop: 5, fontSize: 12, color: 'var(--sh-muted)' }}>{hint}</div>}
     </div>
   )
 }
@@ -122,8 +128,20 @@ export function SectionCard({ title, subtitle, children, danger = false }) {
         marginBottom: 18,
       }}
     >
-      <h3 style={{ margin: '0 0 6px', fontSize: 17, color: danger ? 'var(--sh-danger)' : 'var(--sh-heading)' }}>{title}</h3>
-      {subtitle && <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--sh-muted)', lineHeight: 1.7 }}>{subtitle}</p>}
+      <h3
+        style={{
+          margin: '0 0 6px',
+          fontSize: 17,
+          color: danger ? 'var(--sh-danger)' : 'var(--sh-heading)',
+        }}
+      >
+        {title}
+      </h3>
+      {subtitle && (
+        <p style={{ margin: '0 0 18px', fontSize: 13, color: 'var(--sh-muted)', lineHeight: 1.7 }}>
+          {subtitle}
+        </p>
+      )}
       {children}
     </section>
   )
@@ -173,7 +191,9 @@ export function ToggleRow({ label, description, checked, onChange, disabled = fa
     >
       <div>
         <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sh-text)' }}>{label}</div>
-        {description && <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 2 }}>{description}</div>}
+        {description && (
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 2 }}>{description}</div>
+        )}
       </div>
       <input
         type="checkbox"

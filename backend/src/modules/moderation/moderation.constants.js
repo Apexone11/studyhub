@@ -31,4 +31,11 @@ const APPEAL_REASON_CATEGORIES = [
   'other',
 ]
 
-module.exports = { PAGE_SIZE, parsePage, appealLimiter, reportLimiter, REASON_CATEGORIES, APPEAL_REASON_CATEGORIES }
+module.exports = {
+  PAGE_SIZE,
+  parsePage,
+  appealLimiter,
+  reportLimiter,
+  REASON_CATEGORIES,
+  APPEAL_REASON_CATEGORIES,
+}

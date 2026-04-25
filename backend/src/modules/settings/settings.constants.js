@@ -19,7 +19,12 @@ const PREF_BOOLEAN_KEYS = [
   'inAppSocial',
   'inAppContributions',
   'inAppStudyGroups',
-  'defaultDownloads', 'defaultContributions',
+  'defaultDownloads',
+  'defaultContributions',
+  // Security alert prefs (Phase 3)
+  'alertOnNewCountry',
+  'alertOnNewCity',
+  'blockAnonymousIp',
 ]
 const PREF_ENUM_KEYS = {
   profileVisibility: ['public', 'enrolled', 'private'],

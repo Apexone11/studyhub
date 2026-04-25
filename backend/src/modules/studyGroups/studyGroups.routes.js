@@ -148,9 +148,13 @@ router.post('/:id/block/:userId', writeLimiter, requireAuth, async (req, res) =>
       return res.status(400).json({ error: 'You cannot block yourself.' })
     }
 
-    const reason = typeof req.body?.reason === 'string'
-      ? req.body.reason.replace(/<[^>]*>/g, '').trim().slice(0, 500)
-      : ''
+    const reason =
+      typeof req.body?.reason === 'string'
+        ? req.body.reason
+            .replace(/<[^>]*>/g, '')
+            .trim()
+            .slice(0, 500)
+        : ''
 
     // Upsert: if already blocked, just update reason.
     await prisma.groupBlock.upsert({
@@ -285,9 +289,13 @@ router.post('/:id/mute/:userId', writeLimiter, requireAuth, async (req, res) => 
     }
 
     const days = Math.min(Math.max(Number.parseInt(req.body?.days, 10) || 7, 1), 90)
-    const reason = typeof req.body?.reason === 'string'
-      ? req.body.reason.replace(/<[^>]*>/g, '').trim().slice(0, 500)
-      : ''
+    const reason =
+      typeof req.body?.reason === 'string'
+        ? req.body.reason
+            .replace(/<[^>]*>/g, '')
+            .trim()
+            .slice(0, 500)
+        : ''
 
     const mutedUntil = new Date(Date.now() + days * 24 * 60 * 60 * 1000)
 
@@ -306,7 +314,10 @@ router.post('/:id/mute/:userId', writeLimiter, requireAuth, async (req, res) => 
       req,
     })
 
-    res.json({ message: `User muted for ${days} day${days === 1 ? '' : 's'}.`, mutedUntil: mutedUntil.toISOString() })
+    res.json({
+      message: `User muted for ${days} day${days === 1 ? '' : 's'}.`,
+      mutedUntil: mutedUntil.toISOString(),
+    })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Server error.' })

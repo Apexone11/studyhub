@@ -1,0 +1,191 @@
+/* src/mobile/styles/motion.css
+ * Motion system — easing curves, durations, reduced-motion policy.
+ * See docs/internal/mobile-design-refresh-v3-spec.md §3.3
+ */
+
+body.sh-mobile {
+  /* Easing curves */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+  --ease-in-quart: cubic-bezier(0.76, 0, 0.74, 0);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* Durations */
+  --dur-instant: 120ms;
+  --dur-quick: 200ms;
+  --dur-base: 320ms;
+  --dur-slow: 520ms;
+  --dur-epic: 1200ms;
+}
+
+/* ── Reusable keyframes ──────────────────────────────────────────── */
+
+@keyframes sh-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sh-fade-in-up {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 16px, 0);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes sh-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes sh-slide-up {
+  from {
+    transform: translate3d(0, 100%, 0);
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+  }
+}
+
+@keyframes sh-slide-down {
+  from {
+    transform: translate3d(0, -100%, 0);
+    opacity: 0;
+  }
+  to {
+    transform: translate3d(0, 0, 0);
+    opacity: 1;
+  }
+}
+
+@keyframes sh-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes sh-orb-pulse {
+  0%,
+  100% {
+    transform: scale(1);
+    filter: brightness(1);
+  }
+  50% {
+    transform: scale(1.04);
+    filter: brightness(1.08);
+  }
+}
+
+@keyframes sh-mesh-shift {
+  0% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0% 50%;
+  }
+}
+
+@keyframes sh-shake {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  20%,
+  60% {
+    transform: translate3d(-4px, 0, 0);
+  }
+  40%,
+  80% {
+    transform: translate3d(4px, 0, 0);
+  }
+}
+
+@keyframes sh-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+  50% {
+    transform: translate3d(0, -4px, 0);
+  }
+}
+
+/* ── Utility classes ─────────────────────────────────────────────── */
+
+.sh-mobile-fade-in {
+  animation: sh-fade-in var(--dur-base) var(--ease-out-quart) both;
+}
+.sh-mobile-fade-in-up {
+  animation: sh-fade-in-up var(--dur-base) var(--ease-out-quart) both;
+}
+.sh-mobile-scale-in {
+  animation: sh-scale-in var(--dur-base) var(--ease-spring) both;
+}
+.sh-mobile-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    rgba(0, 0, 0, 0) 30%,
+    rgba(0, 0, 0, 0.06) 50%,
+    rgba(0, 0, 0, 0) 70%
+  );
+  background-size: 200% 100%;
+  animation: sh-shimmer 1.4s linear infinite;
+}
+.sh-mobile-float {
+  animation: sh-float 2s var(--ease-smooth) infinite;
+}
+
+/* ── Reduced motion policy ───────────────────────────────────────── */
+/* Downgrades every motion helper to opacity-only fades.
+ * Triggered by OS preference OR user toggle (body.sh-mobile-reduced-motion). */
+
+@media (prefers-reduced-motion: reduce) {
+  body.sh-mobile,
+  body.sh-mobile * {
+    animation-duration: var(--dur-quick) !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: var(--dur-quick) !important;
+  }
+  body.sh-mobile .sh-mobile-fade-in-up,
+  body.sh-mobile .sh-mobile-scale-in {
+    animation-name: sh-fade-in !important;
+  }
+  body.sh-mobile .sh-mobile-float,
+  body.sh-mobile .sh-mobile-shimmer {
+    animation: none !important;
+  }
+}
+
+body.sh-mobile-reduced-motion,
+body.sh-mobile-reduced-motion * {
+  animation-duration: var(--dur-quick) !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: var(--dur-quick) !important;
+}
+body.sh-mobile-reduced-motion .sh-mobile-fade-in-up,
+body.sh-mobile-reduced-motion .sh-mobile-scale-in {
+  animation-name: sh-fade-in !important;
+}
+body.sh-mobile-reduced-motion .sh-mobile-float,
+body.sh-mobile-reduced-motion .sh-mobile-shimmer {
+  animation: none !important;
+}

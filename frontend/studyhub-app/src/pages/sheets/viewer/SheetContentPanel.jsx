@@ -33,7 +33,14 @@ function RichTextContentBlock({ content }) {
 
   if (!content) {
     return (
-      <div style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
+      <div
+        style={{
+          padding: '24px 18px',
+          textAlign: 'center',
+          color: 'var(--sh-muted)',
+          fontSize: 13,
+        }}
+      >
         No content available.
       </div>
     )
@@ -44,15 +51,23 @@ function RichTextContentBlock({ content }) {
   return (
     <div
       style={{
-        borderRadius: 14, border: '1px solid var(--sh-border)',
-        background: 'var(--sh-surface)', overflow: 'hidden',
+        borderRadius: 14,
+        border: '1px solid var(--sh-border)',
+        background: 'var(--sh-surface)',
+        overflow: 'hidden',
       }}
     >
       <div
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '8px 16px', borderBottom: '1px solid var(--sh-border)',
-          background: 'var(--sh-soft)', fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 16px',
+          borderBottom: '1px solid var(--sh-border)',
+          background: 'var(--sh-soft)',
+          fontSize: 11,
+          color: 'var(--sh-muted)',
+          fontWeight: 600,
         }}
       >
         <span>Rich text</span>
@@ -71,7 +86,14 @@ function RichTextContentBlock({ content }) {
 function TextContentBlock({ content }) {
   if (!content) {
     return (
-      <div style={{ padding: '24px 18px', textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
+      <div
+        style={{
+          padding: '24px 18px',
+          textAlign: 'center',
+          color: 'var(--sh-muted)',
+          fontSize: 13,
+        }}
+      >
         No content available.
       </div>
     )
@@ -84,26 +106,40 @@ function TextContentBlock({ content }) {
   return (
     <div
       style={{
-        borderRadius: 14, border: '1px solid var(--sh-border)',
-        background: 'var(--sh-surface)', overflow: 'hidden',
+        borderRadius: 14,
+        border: '1px solid var(--sh-border)',
+        background: 'var(--sh-surface)',
+        overflow: 'hidden',
       }}
     >
       {/* Sticky header bar */}
       <div
         style={{
-          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-          padding: '8px 16px', borderBottom: '1px solid var(--sh-border)',
-          background: 'var(--sh-soft)', fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 16px',
+          borderBottom: '1px solid var(--sh-border)',
+          background: 'var(--sh-soft)',
+          fontSize: 11,
+          color: 'var(--sh-muted)',
+          fontWeight: 600,
         }}
       >
-        <span>{lines.length} {lines.length === 1 ? 'line' : 'lines'}</span>
+        <span>
+          {lines.length} {lines.length === 1 ? 'line' : 'lines'}
+        </span>
       </div>
 
       <div style={{ overflowX: 'auto' }}>
         <table
           style={{
-            width: '100%', borderCollapse: 'collapse', fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
-            fontSize: 13, lineHeight: 1.7, tableLayout: 'auto',
+            width: '100%',
+            borderCollapse: 'collapse',
+            fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace",
+            fontSize: 13,
+            lineHeight: 1.7,
+            tableLayout: 'auto',
           }}
           role="presentation"
         >
@@ -117,9 +153,15 @@ function TextContentBlock({ content }) {
               >
                 <td
                   style={{
-                    width: 1, padding: '1px 12px 1px 16px', textAlign: 'right',
-                    color: 'var(--sh-slate-400)', fontSize: 11, userSelect: 'none',
-                    verticalAlign: 'top', whiteSpace: 'nowrap', borderRight: '1px solid var(--sh-border)',
+                    width: 1,
+                    padding: '1px 12px 1px 16px',
+                    textAlign: 'right',
+                    color: 'var(--sh-slate-400)',
+                    fontSize: 11,
+                    userSelect: 'none',
+                    verticalAlign: 'top',
+                    whiteSpace: 'nowrap',
+                    borderRight: '1px solid var(--sh-border)',
                   }}
                   aria-hidden="true"
                 >
@@ -127,7 +169,9 @@ function TextContentBlock({ content }) {
                 </td>
                 <td
                   style={{
-                    padding: '1px 16px', whiteSpace: 'pre-wrap', wordBreak: 'break-word',
+                    padding: '1px 16px',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
                     color: 'var(--sh-text)',
                   }}
                 >
@@ -162,31 +206,99 @@ export default function SheetContentPanel({
 
   return (
     <section ref={sheetPanelRef} data-tutorial="viewer-content" style={panelStyle()}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 14 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          gap: 16,
+          flexWrap: 'wrap',
+          marginBottom: 14,
+        }}
+      >
         <div>
           <h1 style={{ margin: 0, fontSize: 30, color: 'var(--sh-heading)' }}>{sheet.title}</h1>
           <div style={{ marginTop: 6, color: 'var(--sh-subtext)', fontSize: 13 }}>
-            by {sheet.author?.username || 'Unknown'} • {sheet.course?.code || 'General'} • updated {timeAgo(sheet.updatedAt || sheet.createdAt)}
+            by {sheet.author?.username || 'Unknown'} • {sheet.course?.code || 'General'} • updated{' '}
+            {timeAgo(sheet.updatedAt || sheet.createdAt)}
           </div>
           {isHtmlSheet ? (
-            <div style={{ marginTop: 8, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--sh-brand-hover)', textTransform: 'uppercase' }}>
+            <div
+              style={{
+                marginTop: 8,
+                display: 'flex',
+                gap: 8,
+                alignItems: 'center',
+                flexWrap: 'wrap',
+              }}
+            >
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 800,
+                  color: 'var(--sh-brand-hover)',
+                  textTransform: 'uppercase',
+                }}
+              >
                 HTML sheet
               </span>
               {sheet.status === 'rejected' ? (
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-danger-text)', background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: 'var(--sh-danger-text)',
+                    background: 'var(--sh-danger-bg)',
+                    border: '1px solid var(--sh-danger-border)',
+                    borderRadius: 6,
+                    padding: '2px 8px',
+                    textTransform: 'uppercase',
+                  }}
+                >
                   Rejected
                 </span>
               ) : sheet.status === 'quarantined' ? (
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-danger-text)', background: 'var(--sh-danger-bg)', border: '1px solid var(--sh-danger-border)', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: 'var(--sh-danger-text)',
+                    background: 'var(--sh-danger-bg)',
+                    border: '1px solid var(--sh-danger-border)',
+                    borderRadius: 6,
+                    padding: '2px 8px',
+                    textTransform: 'uppercase',
+                  }}
+                >
                   Quarantined
                 </span>
               ) : sheet.status === 'pending_review' ? (
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-warning-text)', background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: 'var(--sh-warning-text)',
+                    background: 'var(--sh-warning-bg)',
+                    border: '1px solid var(--sh-warning-border)',
+                    borderRadius: 6,
+                    padding: '2px 8px',
+                    textTransform: 'uppercase',
+                  }}
+                >
                   Pending Review
                 </span>
               ) : previewMode === 'safe' ? (
-                <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--sh-warning)', background: 'var(--sh-warning-bg)', border: '1px solid var(--sh-warning-border)', borderRadius: 6, padding: '2px 8px', textTransform: 'uppercase' }}>
+                <span
+                  style={{
+                    fontSize: 10,
+                    fontWeight: 700,
+                    color: 'var(--sh-warning)',
+                    background: 'var(--sh-warning-bg)',
+                    border: '1px solid var(--sh-warning-border)',
+                    borderRadius: 6,
+                    padding: '2px 8px',
+                    textTransform: 'uppercase',
+                  }}
+                >
                   Flagged
                 </span>
               ) : null}
@@ -199,16 +311,31 @@ export default function SheetContentPanel({
           ) : null}
         </div>
         {sheet.forkSource ? (
-          <div style={{ display: 'inline-flex', gap: 6, alignItems: 'center', color: 'var(--sh-subtext)', fontSize: 12, flexWrap: 'wrap' }}>
+          <div
+            style={{
+              display: 'inline-flex',
+              gap: 6,
+              alignItems: 'center',
+              color: 'var(--sh-subtext)',
+              fontSize: 12,
+              flexWrap: 'wrap',
+            }}
+          >
             <IconFork size={13} />
             Forked from{' '}
-            <Link to={`/sheets/${sheet.forkSource.id}`} style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'none' }}>
+            <Link
+              to={`/sheets/${sheet.forkSource.id}`}
+              style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'none' }}
+            >
               {sheet.forkSource.title}
             </Link>
             {sheet.forkSource.author ? (
               <span>
                 by{' '}
-                <Link to={`/users/${sheet.forkSource.author.username}`} style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'none' }}>
+                <Link
+                  to={`/users/${sheet.forkSource.author.username}`}
+                  style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'none' }}
+                >
                   {sheet.forkSource.author.username}
                 </Link>
               </span>
@@ -218,40 +345,94 @@ export default function SheetContentPanel({
       </div>
 
       {sheet.description ? (
-        <p style={{ margin: '0 0 16px', color: 'var(--sh-subtext)', fontSize: 14, lineHeight: 1.7 }}>{sheet.description}</p>
+        <p
+          style={{ margin: '0 0 16px', color: 'var(--sh-subtext)', fontSize: 14, lineHeight: 1.7 }}
+        >
+          {sheet.description}
+        </p>
       ) : null}
 
       {sheet.contentFormat === 'richtext' ? (
         <RichTextContentBlock content={sheet.content} />
       ) : isHtmlSheet ? (
         previewMode === 'disabled' ? (
-          <div style={{ borderRadius: 16, border: '1px solid var(--sh-danger-border)', background: 'var(--sh-danger-bg)', padding: 24, textAlign: 'center' }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--sh-danger)', marginBottom: 8 }}>Quarantined</div>
+          <div
+            style={{
+              borderRadius: 16,
+              border: '1px solid var(--sh-danger-border)',
+              background: 'var(--sh-danger-bg)',
+              padding: 24,
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{ fontSize: 15, fontWeight: 800, color: 'var(--sh-danger)', marginBottom: 8 }}
+            >
+              Quarantined
+            </div>
             <div style={{ fontSize: 13, color: 'var(--sh-danger)', lineHeight: 1.6 }}>
-              This sheet has been quarantined because our scanner detected a security risk. Preview is disabled. If you believe this is an error, contact support.
+              This sheet has been quarantined because our scanner detected a security risk. Preview
+              is disabled. If you believe this is an error, contact support.
             </div>
           </div>
         ) : previewMode === 'restricted' && !canEdit ? (
-          <div style={{ borderRadius: 16, border: '1px solid var(--sh-warning-border)', background: 'var(--sh-warning-bg)', padding: 24, textAlign: 'center' }}>
-            <div style={{ fontSize: 15, fontWeight: 800, color: 'var(--sh-warning-text)', marginBottom: 8 }}>Pending Safety Review</div>
+          <div
+            style={{
+              borderRadius: 16,
+              border: '1px solid var(--sh-warning-border)',
+              background: 'var(--sh-warning-bg)',
+              padding: 24,
+              textAlign: 'center',
+            }}
+          >
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 800,
+                color: 'var(--sh-warning-text)',
+                marginBottom: 8,
+              }}
+            >
+              Pending Safety Review
+            </div>
             <div style={{ fontSize: 13, color: 'var(--sh-warning-text)', lineHeight: 1.6 }}>
-              This sheet is awaiting admin review. The preview is disabled until it has been approved.
+              This sheet is awaiting admin review. The preview is disabled until it has been
+              approved.
             </div>
           </div>
         ) : !htmlWarningAcked ? (
           <div
             style={{
               borderRadius: 16,
-              border: previewMode !== 'interactive' ? '1px solid var(--sh-warning-border)' : '1px solid var(--sh-border)',
+              border:
+                previewMode !== 'interactive'
+                  ? '1px solid var(--sh-warning-border)'
+                  : '1px solid var(--sh-border)',
               background: previewMode !== 'interactive' ? 'var(--sh-warning-bg)' : 'var(--sh-soft)',
               padding: 24,
               textAlign: 'center',
             }}
           >
-            <div style={{ fontSize: 15, fontWeight: 800, color: previewMode !== 'interactive' ? 'var(--sh-warning-text)' : 'var(--sh-heading)', marginBottom: 8 }}>
+            <div
+              style={{
+                fontSize: 15,
+                fontWeight: 800,
+                color:
+                  previewMode !== 'interactive' ? 'var(--sh-warning-text)' : 'var(--sh-heading)',
+                marginBottom: 8,
+              }}
+            >
               {previewMode !== 'interactive' ? 'Flagged HTML Sheet' : 'Interactive HTML Sheet'}
             </div>
-            <div style={{ fontSize: 13, color: previewMode !== 'interactive' ? 'var(--sh-warning-text)' : 'var(--sh-subtext)', lineHeight: 1.6, marginBottom: 16 }}>
+            <div
+              style={{
+                fontSize: 13,
+                color:
+                  previewMode !== 'interactive' ? 'var(--sh-warning-text)' : 'var(--sh-subtext)',
+                lineHeight: 1.6,
+                marginBottom: 16,
+              }}
+            >
               {previewMode !== 'interactive'
                 ? 'This sheet contains flagged HTML features. Scripts are disabled in the preview. It runs in a secure sandbox with no network access.'
                 : 'This sheet contains HTML with scripts. It runs in a secure sandbox with no network access, no popups, and no access to your session. Click below to load it.'}
@@ -275,8 +456,17 @@ export default function SheetContentPanel({
             </button>
           </div>
         ) : previewLoading || (viewerInteractive && runtimeLoading) ? (
-          <div style={{ borderRadius: 16, border: '1px solid var(--sh-border)', padding: 24, textAlign: 'center' }}>
-            <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>Loading {viewerInteractive ? 'interactive preview' : 'safe preview'}…</div>
+          <div
+            style={{
+              borderRadius: 16,
+              border: '1px solid var(--sh-border)',
+              padding: 24,
+              textAlign: 'center',
+            }}
+          >
+            <div style={{ fontSize: 13, color: 'var(--sh-subtext)' }}>
+              Loading {viewerInteractive ? 'interactive preview' : 'safe preview'}…
+            </div>
           </div>
         ) : safePreviewUrl ? (
           <div
@@ -288,13 +478,34 @@ export default function SheetContentPanel({
             }}
           >
             {canToggleInteractive && previewMode === 'interactive' ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 12px', borderBottom: '1px solid var(--sh-border)', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', borderRadius: 7, overflow: 'hidden', border: '1px solid var(--sh-border)' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 10,
+                  padding: '8px 12px',
+                  borderBottom: '1px solid var(--sh-border)',
+                  flexWrap: 'wrap',
+                }}
+              >
+                <div
+                  style={{
+                    display: 'flex',
+                    borderRadius: 7,
+                    overflow: 'hidden',
+                    border: '1px solid var(--sh-border)',
+                  }}
+                >
                   <button
                     type="button"
                     onClick={() => viewerInteractive && toggleViewerInteractive()}
                     style={{
-                      padding: '4px 12px', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FONT,
+                      padding: '4px 12px',
+                      border: 'none',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      fontFamily: FONT,
                       background: !viewerInteractive ? 'var(--sh-brand)' : 'var(--sh-soft)',
                       color: !viewerInteractive ? '#fff' : 'var(--sh-subtext)',
                     }}
@@ -305,7 +516,12 @@ export default function SheetContentPanel({
                     type="button"
                     onClick={() => !viewerInteractive && toggleViewerInteractive()}
                     style={{
-                      padding: '4px 12px', border: 'none', fontSize: 11, fontWeight: 700, cursor: 'pointer', fontFamily: FONT,
+                      padding: '4px 12px',
+                      border: 'none',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      fontFamily: FONT,
                       background: viewerInteractive ? 'var(--sh-brand)' : 'var(--sh-soft)',
                       color: viewerInteractive ? '#fff' : 'var(--sh-subtext)',
                     }}
@@ -329,8 +545,17 @@ export default function SheetContentPanel({
             />
           </div>
         ) : (
-          <div style={{ borderRadius: 16, border: '1px solid var(--sh-danger-border)', background: 'var(--sh-danger-bg)', padding: 18 }}>
-            <div style={{ fontSize: 13, color: 'var(--sh-danger)' }}>Could not load the sheet preview.</div>
+          <div
+            style={{
+              borderRadius: 16,
+              border: '1px solid var(--sh-danger-border)',
+              background: 'var(--sh-danger-bg)',
+              padding: 18,
+            }}
+          >
+            <div style={{ fontSize: 13, color: 'var(--sh-danger)' }}>
+              Could not load the sheet preview.
+            </div>
           </div>
         )
       ) : (

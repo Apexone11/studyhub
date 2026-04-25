@@ -59,7 +59,10 @@ export default function ReportModal({ open, targetType, targetId, onClose, onRep
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!category) { setError('Please select a reason.'); return }
+    if (!category) {
+      setError('Please select a reason.')
+      return
+    }
 
     setSubmitting(true)
     setError('')
@@ -129,7 +132,10 @@ export default function ReportModal({ open, targetType, targetId, onClose, onRep
                 <button
                   key={r.value}
                   type="button"
-                  onClick={() => { setCategory(r.value); setError('') }}
+                  onClick={() => {
+                    setCategory(r.value)
+                    setError('')
+                  }}
                   style={{
                     ...styles.reasonChip,
                     background: category === r.value ? 'var(--sh-brand)' : 'var(--sh-soft)',
@@ -157,7 +163,12 @@ export default function ReportModal({ open, targetType, targetId, onClose, onRep
             {error && <p style={styles.error}>{error}</p>}
 
             <div style={styles.actions}>
-              <button type="button" onClick={onClose} style={styles.cancelBtn} disabled={submitting}>
+              <button
+                type="button"
+                onClick={onClose}
+                style={styles.cancelBtn}
+                disabled={submitting}
+              >
                 Cancel
               </button>
               <button type="submit" style={styles.primaryBtn} disabled={submitting || !category}>

@@ -1,0 +1,108 @@
+.inputField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.inputField--fullWidth {
+  width: 100%;
+}
+
+.inputField__label {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: var(--type-sm);
+  font-weight: 500;
+  color: var(--sh-text);
+}
+
+.inputField__required {
+  color: var(--sh-danger);
+  margin-left: 2px;
+}
+
+.inputField__control {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-input-border);
+  border-radius: var(--radius-sm);
+  padding: 0 var(--space-3);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease;
+}
+
+.inputField--sm .inputField__control {
+  min-height: 32px;
+}
+.inputField--md .inputField__control {
+  min-height: 40px;
+}
+.inputField--lg .inputField__control {
+  min-height: 48px;
+}
+
+.inputField__control:focus-within {
+  border-color: var(--sh-input-focus);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sh-brand) 20%, transparent);
+}
+
+.inputField--error .inputField__control {
+  border-color: var(--sh-danger);
+}
+.inputField--error .inputField__control:focus-within {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sh-danger) 20%, transparent);
+}
+
+.inputField--disabled .inputField__control {
+  background: var(--sh-soft);
+  cursor: not-allowed;
+}
+
+.inputField__input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: var(--type-base);
+  color: var(--sh-text);
+  padding: 0;
+}
+.inputField__input:disabled {
+  color: var(--sh-muted);
+  cursor: not-allowed;
+}
+.inputField__input:read-only {
+  color: var(--sh-subtext);
+}
+.inputField__input::placeholder {
+  color: var(--sh-muted);
+}
+
+.inputField__leftIcon,
+.inputField__rightIcon {
+  display: inline-flex;
+  align-items: center;
+  color: var(--sh-subtext);
+  flex-shrink: 0;
+}
+
+.inputField__error {
+  font-size: var(--type-xs);
+  color: var(--sh-danger);
+  margin: 0;
+}
+.inputField__hint {
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+  margin: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .inputField__control {
+    transition: none;
+  }
+}

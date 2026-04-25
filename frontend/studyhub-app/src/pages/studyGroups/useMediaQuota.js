@@ -28,9 +28,16 @@ export default function useMediaQuota(groupId) {
     if (!groupId) return
     let cancelled = false
     fetchGroupMediaQuota(groupId)
-      .then((quota) => { if (!cancelled) setState({ loading: false, error: '', quota }) })
-      .catch((error) => { if (!cancelled) setState({ loading: false, error: error.message || 'Could not load quota.', quota: null }) })
-    return () => { cancelled = true }
+      .then((quota) => {
+        if (!cancelled) setState({ loading: false, error: '', quota })
+      })
+      .catch((error) => {
+        if (!cancelled)
+          setState({ loading: false, error: error.message || 'Could not load quota.', quota: null })
+      })
+    return () => {
+      cancelled = true
+    }
   }, [groupId])
 
   return {

@@ -19,6 +19,7 @@ const {
 } = require('../../lib/rateLimiters')
 const notesController = require('./notes.controller')
 
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 
 const mutateLimiter = notesMutateLimiter
@@ -97,11 +98,16 @@ router.post(
     const { type } = req.body || {}
 
     if (!Number.isInteger(noteId) || noteId < 1)
-      return res.status(400).json({ error: 'Invalid note id.' })
+      return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
     if (!Number.isInteger(commentId) || commentId < 1)
-      return res.status(400).json({ error: 'Invalid comment id.' })
+      return sendError(res, 400, 'Invalid comment id.', ERROR_CODES.BAD_REQUEST)
     if (!type || (type !== 'like' && type !== 'dislike')) {
-      return res.status(400).json({ error: 'Reaction type must be "like" or "dislike".' })
+      return sendError(
+        res,
+        400,
+        'Reaction type must be "like" or "dislike".',
+        ERROR_CODES.BAD_REQUEST,
+      )
     }
 
     try {
@@ -110,7 +116,7 @@ router.post(
         select: { id: true, noteId: true },
       })
       if (!comment || comment.noteId !== noteId)
-        return res.status(404).json({ error: 'Comment not found.' })
+        return sendError(res, 404, 'Comment not found.', ERROR_CODES.NOT_FOUND)
 
       // Verify note is readable
       const note = await prisma.note.findUnique({
@@ -118,7 +124,7 @@ router.post(
         select: { id: true, private: true, userId: true },
       })
       if (!note || !canReadNote(note, req.user)) {
-        return res.status(404).json({ error: 'Comment not found.' })
+        return sendError(res, 404, 'Comment not found.', ERROR_CODES.NOT_FOUND)
       }
 
       const existing = await prisma.noteCommentReaction.findUnique({
@@ -156,7 +162,7 @@ router.post(
       })
     } catch (err) {
       captureError(err, { route: req.originalUrl, method: req.method })
-      res.status(500).json({ error: 'Server error.' })
+      sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
     }
   },
 )
@@ -258,9 +264,9 @@ const noteImageUpload = multer({
 router.post('/:id/images', requireAuth, mutateLimiter, requireVerifiedEmail, (req, res) => {
   noteImageUpload.single('image')(req, res, async (err) => {
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-      return res.status(400).json({ error: 'Image must be 5 MB or smaller.' })
+      return sendError(res, 400, 'Image must be 5 MB or smaller.', ERROR_CODES.BAD_REQUEST)
     }
-    if (err) return res.status(400).json({ error: err.message })
+    if (err) return sendError(res, 400, err.message, ERROR_CODES.BAD_REQUEST)
     notesController.uploadNoteImage(req, res)
   })
 })
@@ -272,7 +278,7 @@ router.post('/:id/react', requireAuth, commentReactLimiter, async (req, res) => 
   const { type } = req.body || {}
 
   if (!['like', 'dislike'].includes(type)) {
-    return res.status(400).json({ error: 'Type must be "like" or "dislike".' })
+    return sendError(res, 400, 'Type must be "like" or "dislike".', ERROR_CODES.BAD_REQUEST)
   }
 
   try {
@@ -280,8 +286,9 @@ router.post('/:id/react', requireAuth, commentReactLimiter, async (req, res) => 
       where: { id: noteId },
       select: { id: true, private: true },
     })
-    if (!note) return res.status(404).json({ error: 'Note not found.' })
-    if (note.private) return res.status(403).json({ error: 'Cannot react to private notes.' })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    if (note.private)
+      return sendError(res, 403, 'Cannot react to private notes.', ERROR_CODES.FORBIDDEN)
 
     const existing = await prisma.noteReaction.findUnique({
       where: { userId_noteId: { userId, noteId } },
@@ -320,7 +327,7 @@ router.post('/:id/react', requireAuth, commentReactLimiter, async (req, res) => 
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -333,7 +340,7 @@ router.post('/:id/download', optionalAuth, readLimiter, async (req, res) => {
       select: { id: true, private: true, allowDownloads: true },
     })
     if (!note || note.private || !note.allowDownloads) {
-      return res.status(404).json({ error: 'Note not found or downloads not allowed.' })
+      return sendError(res, 404, 'Note not found or downloads not allowed.', ERROR_CODES.NOT_FOUND)
     }
 
     await prisma.note.update({
@@ -344,7 +351,7 @@ router.post('/:id/download', optionalAuth, readLimiter, async (req, res) => {
     res.json({ message: 'Download tracked.' })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

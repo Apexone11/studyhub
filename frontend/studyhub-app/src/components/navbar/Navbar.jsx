@@ -12,10 +12,7 @@
 
 import { useState, useEffect, Fragment, lazy, Suspense } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import {
-  LogoMark,
-  IconSearch,
-} from '../Icons'
+import { LogoMark, IconSearch } from '../Icons'
 const SearchModal = lazy(() => import('../search/SearchModal'))
 const ChatPanel = lazy(() => import('../ChatPanel'))
 import KeyboardShortcuts from '../KeyboardShortcuts'
@@ -52,12 +49,12 @@ export default function Navbar({
   autoSave = false,
   variant = 'app',
 }) {
-  const location  = useLocation()
-  const config    = getConfig(location.pathname)
+  const location = useLocation()
+  const config = getConfig(location.pathname)
 
   const { crumbs: configCrumbs, tabs: configTabs, backTo } = config
-  const crumbs    = crumbsProp ?? configCrumbs ?? []
-  const tabs      = (!hideTabs && (tabsProp ?? configTabs)) || null
+  const crumbs = crumbsProp ?? configCrumbs ?? []
+  const tabs = (!hideTabs && (tabsProp ?? configTabs)) || null
   const isLanding = variant === 'landing'
   const shellWidth = isLanding ? pageWidths.landing : pageWidths.app
 
@@ -92,11 +89,16 @@ export default function Navbar({
           const data = await res.json()
           setUnreadMessages(data.total || 0)
         }
-      } catch { /* silent */ }
+      } catch {
+        /* silent */
+      }
     }
     fetchCount()
     const interval = setInterval(fetchCount, 30000)
-    return () => { cancelled = true; clearInterval(interval) }
+    return () => {
+      cancelled = true
+      clearInterval(interval)
+    }
   }, [user])
 
   // Global Ctrl+K / Cmd+K shortcut to open search
@@ -161,221 +163,333 @@ export default function Navbar({
 
   return (
     <Fragment>
-    <nav style={S.nav} aria-label="Main navigation">
-      {/* — top row — */}
-      <div style={rowStyle}>
-
-        {/* logo */}
-        <Link to={user ? '/feed' : '/'} style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <LogoMark size={isLanding ? 34 : 28} />
-          <span style={wordmarkStyle}>
-            Study<span style={{ color: 'var(--sh-nav-tab-active)' }}>Hub</span>
-          </span>
-        </Link>
-
-        {/* breadcrumbs */}
-        {crumbs.map((crumb, i) => (
-          <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={S.sep}>/</span>
-            {crumb.to
-              ? <Link to={crumb.to} style={S.crumbLink}
-                  onMouseEnter={e => e.currentTarget.style.color = 'var(--sh-nav-muted-hover)'}
-                  onMouseLeave={e => e.currentTarget.style.color = 'var(--sh-nav-muted)'}
-                >{crumb.label}</Link>
-              : <span style={S.crumbActive}>{crumb.label}</span>
-            }
-          </span>
-        ))}
-
-        {/* dynamic extra crumb (e.g. sheet title on /sheets/:id) */}
-        {extraCrumb && (
-          <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={S.sep}>/</span>
-            <span style={{ ...S.crumbActive, maxWidth: 'clamp(120px, 30vw, 220px)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {extraCrumb}
+      <nav style={S.nav} aria-label="Main navigation">
+        {/* — top row — */}
+        <div style={rowStyle}>
+          {/* logo */}
+          <Link
+            to={user ? '/feed' : '/'}
+            style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}
+          >
+            <LogoMark size={isLanding ? 34 : 28} />
+            <span style={wordmarkStyle}>
+              Study<span style={{ color: 'var(--sh-nav-tab-active)' }}>Hub</span>
             </span>
-          </span>
-        )}
-
-        <div style={{ flex: 1 }} />
-
-        {/* auto-save indicator */}
-        {autoSave && (
-          <span style={{ fontSize: 11, color: 'var(--sh-nav-muted)', marginRight: 4 }}>
-            ✦ Auto-saving…
-          </span>
-        )}
-
-        {/* search box — hide on auth pages where it's irrelevant */}
-        {!hideSearch && location.pathname !== '/login' && location.pathname !== '/register'
-          && location.pathname !== '/forgot-password' && location.pathname !== '/reset-password' && (
-          <div
-            className={isLanding ? 'sh-landing-search' : undefined}
-            style={searchBoxStyle}
-            onClick={() => setSearchOpen(true)}
-            onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSearchOpen(true) } }}
-            role="button"
-            tabIndex={0}
-            aria-label="Open search"
-            data-search-trigger
-          >
-            <IconSearch size={13} style={{ color: 'var(--sh-nav-search-text)', flexShrink: 0 }} aria-hidden="true" />
-            <span style={searchTextStyle}>Search sheets, courses...</span>
-            <kbd className="sh-kbd-hint" aria-hidden="true">{navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl+'}K</kbd>
-          </div>
-        )}
-        {searchOpen && <Suspense fallback={null}><SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} /></Suspense>}
-        {chatOpen && <Suspense fallback={null}><ChatPanel open={chatOpen} onClose={() => {
-          setChatOpen(false)
-          // Re-fetch unread count after closing chat (user may have read messages)
-          if (user) {
-            fetch(`${API}/api/messages/unread-total`, {
-              credentials: 'include', headers: authHeaders(),
-            }).then(r => r.ok ? r.json() : null).then(d => {
-              if (d) setUnreadMessages(d.total || 0)
-            }).catch(() => {})
-          }
-        }} /></Suspense>}
-        <KeyboardShortcuts />
-
-        {!user && isLanding && <div style={{ flex: 1 }} />}
-
-        {/* actions slot (Upload button, Publish, etc.) */}
-        {actions}
-
-        {/* back link (when no actions) */}
-        {!actions && backTo && (
-          <Link to={backTo} style={{
-            fontSize: 12, color: 'var(--sh-nav-muted)', textDecoration: 'none',
-            display: 'flex', alignItems: 'center', gap: 5,
-            transition: 'color .15s',
-          }}
-            onMouseEnter={e => e.currentTarget.style.color = 'var(--sh-nav-accent)'}
-            onMouseLeave={e => e.currentTarget.style.color = 'var(--sh-nav-muted)'}
-          >
-            ← {backTo === '/feed' ? 'Feed' : backTo === '/sheets' ? 'Sheets' : 'Back'}
           </Link>
-        )}
 
-        {/* chat panel toggle */}
-        {user && (
-          <button
-            onClick={() => setChatOpen(true)}
-            aria-label={unreadMessages > 0 ? `Open messages (${unreadMessages} unread)` : 'Open messages'}
-            style={{ ...S.iconBtn, position: 'relative' }}
-            onMouseEnter={e => handleIconHover(e, true)}
-            onMouseLeave={e => handleIconHover(e, false)}
-          >
-            <IconMessages size={18} />
-            {unreadMessages > 0 && (
-              <span style={{
-                position: 'absolute',
-                top: -4,
-                right: -4,
-                minWidth: 16,
-                height: 16,
-                borderRadius: 99,
-                background: 'var(--sh-danger)',
-                color: '#fff',
-                fontSize: 10,
-                fontWeight: 700,
+          {/* breadcrumbs */}
+          {crumbs.map((crumb, i) => (
+            <span key={i} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={S.sep}>/</span>
+              {crumb.to ? (
+                <Link
+                  to={crumb.to}
+                  style={S.crumbLink}
+                  onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--sh-nav-muted-hover)')}
+                  onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--sh-nav-muted)')}
+                >
+                  {crumb.label}
+                </Link>
+              ) : (
+                <span style={S.crumbActive}>{crumb.label}</span>
+              )}
+            </span>
+          ))}
+
+          {/* dynamic extra crumb (e.g. sheet title on /sheets/:id) */}
+          {extraCrumb && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={S.sep}>/</span>
+              <span
+                style={{
+                  ...S.crumbActive,
+                  maxWidth: 'clamp(120px, 30vw, 220px)',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {extraCrumb}
+              </span>
+            </span>
+          )}
+
+          <div style={{ flex: 1 }} />
+
+          {/* auto-save indicator */}
+          {autoSave && (
+            <span style={{ fontSize: 11, color: 'var(--sh-nav-muted)', marginRight: 4 }}>
+              ✦ Auto-saving…
+            </span>
+          )}
+
+          {/* search box — hide on auth pages where it's irrelevant */}
+          {!hideSearch &&
+            location.pathname !== '/login' &&
+            location.pathname !== '/register' &&
+            location.pathname !== '/forgot-password' &&
+            location.pathname !== '/reset-password' && (
+              <div
+                className={isLanding ? 'sh-landing-search' : undefined}
+                style={searchBoxStyle}
+                onClick={() => setSearchOpen(true)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    setSearchOpen(true)
+                  }
+                }}
+                role="button"
+                tabIndex={0}
+                aria-label="Open search"
+                data-search-trigger
+              >
+                <IconSearch
+                  size={13}
+                  style={{ color: 'var(--sh-nav-search-text)', flexShrink: 0 }}
+                  aria-hidden="true"
+                />
+                <span style={searchTextStyle}>Search sheets, courses...</span>
+                <kbd className="sh-kbd-hint" aria-hidden="true">
+                  {navigator.platform?.includes('Mac') ? '⌘' : 'Ctrl+'}K
+                </kbd>
+              </div>
+            )}
+          {searchOpen && (
+            <Suspense fallback={null}>
+              <SearchModal open={searchOpen} onClose={() => setSearchOpen(false)} />
+            </Suspense>
+          )}
+          {chatOpen && (
+            <Suspense fallback={null}>
+              <ChatPanel
+                open={chatOpen}
+                onClose={() => {
+                  setChatOpen(false)
+                  // Re-fetch unread count after closing chat (user may have read messages)
+                  if (user) {
+                    fetch(`${API}/api/messages/unread-total`, {
+                      credentials: 'include',
+                      headers: authHeaders(),
+                    })
+                      .then((r) => (r.ok ? r.json() : null))
+                      .then((d) => {
+                        if (d) setUnreadMessages(d.total || 0)
+                      })
+                      .catch(() => {})
+                  }
+                }}
+              />
+            </Suspense>
+          )}
+          <KeyboardShortcuts />
+
+          {!user && isLanding && <div style={{ flex: 1 }} />}
+
+          {/* actions slot (Upload button, Publish, etc.) */}
+          {actions}
+
+          {/* back link (when no actions) */}
+          {!actions && backTo && (
+            <Link
+              to={backTo}
+              style={{
+                fontSize: 12,
+                color: 'var(--sh-nav-muted)',
+                textDecoration: 'none',
                 display: 'flex',
                 alignItems: 'center',
-                justifyContent: 'center',
-                padding: '0 4px',
-                lineHeight: 1,
-                border: '2px solid var(--sh-nav-bg, #0f172a)',
-                pointerEvents: 'none',
-              }}>
-                {unreadMessages > 9 ? '9+' : unreadMessages}
-              </span>
-            )}
-          </button>
-        )}
-
-        {/* notification bell */}
-        <NavbarNotifications />
-
-        {/* user avatar + dropdown menu */}
-        {user && <NavbarUserMenu user={user} />}
-
-        {/* larger landing auth actions */}
-        {!user && isLanding && (
-          <div className="sh-landing-actions">
-            <Link
-              to="/login"
-              style={publicGhostBtn}
-              onMouseEnter={e => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.22)'
+                gap: 5,
+                transition: 'color .15s',
               }}
-              onMouseLeave={e => {
-                e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
-                e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'
-              }}
+              onMouseEnter={(e) => (e.currentTarget.style.color = 'var(--sh-nav-accent)')}
+              onMouseLeave={(e) => (e.currentTarget.style.color = 'var(--sh-nav-muted)')}
             >
-              Log in
+              ← {backTo === '/feed' ? 'Feed' : backTo === '/sheets' ? 'Sheets' : 'Back'}
             </Link>
-            <Link
-              to="/register"
-              style={publicPrimaryBtn}
-              onMouseEnter={e => { e.currentTarget.style.background = 'var(--sh-brand-hover, #2563eb)' }}
-              onMouseLeave={e => { e.currentTarget.style.background = 'var(--sh-brand)' }}
+          )}
+
+          {/* chat panel toggle */}
+          {user && (
+            <button
+              onClick={() => setChatOpen(true)}
+              aria-label={
+                unreadMessages > 0 ? `Open messages (${unreadMessages} unread)` : 'Open messages'
+              }
+              style={{ ...S.iconBtn, position: 'relative' }}
+              onMouseEnter={(e) => handleIconHover(e, true)}
+              onMouseLeave={(e) => handleIconHover(e, false)}
             >
-              Get Started
-            </Link>
-          </div>
-        )}
-
-        {/* contextual auth links on public pages */}
-        {!user && !isLanding && (
-          location.pathname === '/login' ? (
-            <Link to="/register" style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-nav-tab-active)', textDecoration: 'none' }}>
-              Create account →
-            </Link>
-          ) : location.pathname === '/register' ? (
-            <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-nav-tab-active)', textDecoration: 'none' }}>
-              Sign in →
-            </Link>
-          ) : location.pathname === '/forgot-password' || location.pathname === '/reset-password' ? (
-            <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-nav-tab-active)', textDecoration: 'none' }}>
-              Back to login
-            </Link>
-          ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <Link to="/login" style={{ fontSize: 12, fontWeight: 600, color: 'var(--sh-nav-accent)', textDecoration: 'none' }}>Log in</Link>
-              <Link to="/register" style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-nav-text)', textDecoration: 'none', background: 'var(--sh-brand)', padding: '5px 12px', borderRadius: 7 }}>Get Started</Link>
-            </div>
-          )
-        )}
-
-      </div>
-
-      {/* — tabs row (only if tabs configured) — */}
-      {tabs && (
-        <div style={{ borderTop: '1px solid var(--sh-nav-border)' }}>
-          <div style={{ ...S.tabsRow, maxWidth: pageWidths.app, padding: '0 clamp(16px, 2.5vw, 40px)' }}>
-            {tabs.map(tab => {
-              const isActive = location.pathname + location.search === tab.to
-                || (tab.to === '/sheets' && location.pathname === '/sheets' && !location.search)
-              return (
-                <Link
-                  key={tab.label}
-                  to={tab.to}
+              <IconMessages size={18} />
+              {unreadMessages > 0 && (
+                <span
                   style={{
-                    ...S.tab,
-                    ...(isActive ? S.tabActive : {}),
+                    position: 'absolute',
+                    top: -4,
+                    right: -4,
+                    minWidth: 16,
+                    height: 16,
+                    borderRadius: 99,
+                    background: 'var(--sh-danger)',
+                    color: '#fff',
+                    fontSize: 10,
+                    fontWeight: 700,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '0 4px',
+                    lineHeight: 1,
+                    border: '2px solid var(--sh-nav-bg, #0f172a)',
+                    pointerEvents: 'none',
                   }}
                 >
-                  {tab.label}
+                  {unreadMessages > 9 ? '9+' : unreadMessages}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* notification bell */}
+          <NavbarNotifications />
+
+          {/* user avatar + dropdown menu */}
+          {user && <NavbarUserMenu user={user} />}
+
+          {/* larger landing auth actions */}
+          {!user && isLanding && (
+            <div className="sh-landing-actions">
+              <Link
+                to="/login"
+                style={publicGhostBtn}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.08)'
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.22)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(255,255,255,0.04)'
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.16)'
+                }}
+              >
+                Log in
+              </Link>
+              <Link
+                to="/register"
+                style={publicPrimaryBtn}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--sh-brand-hover, #2563eb)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--sh-brand)'
+                }}
+              >
+                Get Started
+              </Link>
+            </div>
+          )}
+
+          {/* contextual auth links on public pages */}
+          {!user &&
+            !isLanding &&
+            (location.pathname === '/login' ? (
+              <Link
+                to="/register"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--sh-nav-tab-active)',
+                  textDecoration: 'none',
+                }}
+              >
+                Create account →
+              </Link>
+            ) : location.pathname === '/register' ? (
+              <Link
+                to="/login"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--sh-nav-tab-active)',
+                  textDecoration: 'none',
+                }}
+              >
+                Sign in →
+              </Link>
+            ) : location.pathname === '/forgot-password' ||
+              location.pathname === '/reset-password' ? (
+              <Link
+                to="/login"
+                style={{
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: 'var(--sh-nav-tab-active)',
+                  textDecoration: 'none',
+                }}
+              >
+                Back to login
+              </Link>
+            ) : (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <Link
+                  to="/login"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 600,
+                    color: 'var(--sh-nav-accent)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  Log in
                 </Link>
-              )
-            })}
-          </div>
+                <Link
+                  to="/register"
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: 'var(--sh-nav-text)',
+                    textDecoration: 'none',
+                    background: 'var(--sh-brand)',
+                    padding: '5px 12px',
+                    borderRadius: 7,
+                  }}
+                >
+                  Get Started
+                </Link>
+              </div>
+            ))}
         </div>
-      )}
-    </nav>
-    {!isLanding && <EmailVerificationBanner />}
+
+        {/* — tabs row (only if tabs configured) — */}
+        {tabs && (
+          <div style={{ borderTop: '1px solid var(--sh-nav-border)' }}>
+            <div
+              style={{
+                ...S.tabsRow,
+                maxWidth: pageWidths.app,
+                padding: '0 clamp(16px, 2.5vw, 40px)',
+              }}
+            >
+              {tabs.map((tab) => {
+                const isActive =
+                  location.pathname + location.search === tab.to ||
+                  (tab.to === '/sheets' && location.pathname === '/sheets' && !location.search)
+                return (
+                  <Link
+                    key={tab.label}
+                    to={tab.to}
+                    style={{
+                      ...S.tab,
+                      ...(isActive ? S.tabActive : {}),
+                    }}
+                  >
+                    {tab.label}
+                  </Link>
+                )
+              })}
+            </div>
+          </div>
+        )}
+      </nav>
+      {!isLanding && <EmailVerificationBanner />}
     </Fragment>
   )
 }

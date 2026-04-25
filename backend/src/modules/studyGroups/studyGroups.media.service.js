@@ -47,11 +47,9 @@ function resolveQuotaForPlan(plan) {
  * Exported so tests can pin the week boundary deterministically.
  */
 function getWeekStart(reference = new Date()) {
-  const date = new Date(Date.UTC(
-    reference.getUTCFullYear(),
-    reference.getUTCMonth(),
-    reference.getUTCDate(),
-  ))
+  const date = new Date(
+    Date.UTC(reference.getUTCFullYear(), reference.getUTCMonth(), reference.getUTCDate()),
+  )
   // getUTCDay: 0 = Sunday, 1 = Monday ... 6 = Saturday.
   // Shift so Monday is the start: Sunday (0) → -6 days, Monday (1) → 0, etc.
   const dayOfWeek = date.getUTCDay()

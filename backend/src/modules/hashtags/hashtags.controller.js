@@ -1,6 +1,7 @@
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const MAX_HASHTAG_LENGTH = 40
 const HASHTAG_REGEX = /^[a-z0-9_]{1,40}$/
 const MAX_FOLLOWS_PER_USER = 50
@@ -30,7 +31,7 @@ async function listMyFollows(req, res) {
     })
   } catch (err) {
     captureError(err, { where: 'listMyFollows' })
-    return res.status(500).json({ error: 'Failed to load topic follows' })
+    return sendError(res, 500, 'Failed to load topic follows', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -38,7 +39,12 @@ async function listMyFollows(req, res) {
 async function followHashtag(req, res) {
   const name = normalizeName(req.body?.name)
   if (!name) {
-    return res.status(400).json({ error: 'name must be 1-40 chars, a-z/0-9/underscore only' })
+    return sendError(
+      res,
+      400,
+      'name must be 1-40 chars, a-z/0-9/underscore only',
+      ERROR_CODES.BAD_REQUEST,
+    )
   }
 
   try {
@@ -46,9 +52,12 @@ async function followHashtag(req, res) {
       where: { userId: req.user.userId },
     })
     if (existingFollowCount >= MAX_FOLLOWS_PER_USER) {
-      return res.status(409).json({
-        error: `You can follow at most ${MAX_FOLLOWS_PER_USER} topics. Unfollow one to continue.`,
-      })
+      return sendError(
+        res,
+        409,
+        `You can follow at most ${MAX_FOLLOWS_PER_USER} topics. Unfollow one to continue.`,
+        ERROR_CODES.CONFLICT,
+      )
     }
 
     const hashtag = await prisma.hashtag.upsert({
@@ -67,7 +76,7 @@ async function followHashtag(req, res) {
     return res.status(201).json({ hashtag })
   } catch (err) {
     captureError(err, { where: 'followHashtag' })
-    return res.status(500).json({ error: 'Failed to follow topic' })
+    return sendError(res, 500, 'Failed to follow topic', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -75,7 +84,7 @@ async function followHashtag(req, res) {
 async function unfollowHashtag(req, res) {
   const name = normalizeName(req.params.name)
   if (!name) {
-    return res.status(400).json({ error: 'Invalid topic name' })
+    return sendError(res, 400, 'Invalid topic name', ERROR_CODES.BAD_REQUEST)
   }
   try {
     const hashtag = await prisma.hashtag.findUnique({
@@ -89,7 +98,7 @@ async function unfollowHashtag(req, res) {
     return res.json({ ok: true })
   } catch (err) {
     captureError(err, { where: 'unfollowHashtag' })
-    return res.status(500).json({ error: 'Failed to unfollow topic' })
+    return sendError(res, 500, 'Failed to unfollow topic', ERROR_CODES.INTERNAL)
   }
 }
 

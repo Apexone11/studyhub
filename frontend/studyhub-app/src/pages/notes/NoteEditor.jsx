@@ -611,6 +611,14 @@ export default function NoteEditor({
       {showVersions && (
         <NoteVersionHistory
           noteId={activeNote.id}
+          // Before creating a manual version, flush any pending debounced
+          // save so the snapshot includes the latest in-editor content.
+          // Without this, a user who clicks "Save Version" within 800ms of
+          // their last keystroke gets a version snapshot missing that typing.
+          // Uses trigger='pre-version' (not 'manual') so the backend doesn't
+          // create a duplicate MANUAL snapshot — the POST /versions call
+          // that follows is the authoritative manual version.
+          flushPendingSave={hardeningEnabled ? () => persistence.saveNow?.('pre-version') : null}
           onRestore={(restored) => {
             handleRestore?.(restored)
             // Update persistence hook's baseRevision so the next save

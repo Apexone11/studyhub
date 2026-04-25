@@ -7,7 +7,7 @@ export default function AdminModal({ open, onClose, title, size = 'md', children
     (e) => {
       if (e.key === 'Escape') onClose()
     },
-    [onClose]
+    [onClose],
   )
 
   useEffect(() => {
@@ -24,10 +24,7 @@ export default function AdminModal({ open, onClose, title, size = 'md', children
 
   return (
     <div className="admin-modal-overlay" onClick={onClose} role="dialog" aria-modal="true">
-      <div
-        className={`admin-modal admin-modal--${size}`}
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className={`admin-modal admin-modal--${size}`} onClick={(e) => e.stopPropagation()}>
         <div className="admin-modal__header">
           <h2 className="admin-modal__title">{title}</h2>
           <button className="admin-modal__close" onClick={onClose} aria-label="Close">

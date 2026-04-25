@@ -35,7 +35,14 @@ function buildFormState(user) {
 
 function ProfileLinkRow({ link, index, onChange, onRemove, disableRemove }) {
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 180px) minmax(0, 1fr) auto', gap: 10, marginBottom: 10 }}>
+    <div
+      style={{
+        display: 'grid',
+        gridTemplateColumns: 'minmax(0, 180px) minmax(0, 1fr) auto',
+        gap: 10,
+        marginBottom: 10,
+      }}
+    >
       <Input
         value={link.label}
         placeholder="Instagram"
@@ -61,7 +68,13 @@ function ProfileLinkRow({ link, index, onChange, onRemove, disableRemove }) {
   )
 }
 
-export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverChange, onUserChange }) {
+export default function ProfileTab({
+  user,
+  sessionUser,
+  onAvatarChange,
+  onCoverChange,
+  onUserChange,
+}) {
   const [showCrop, setShowCrop] = useState(false)
   const [showCoverCrop, setShowCoverCrop] = useState(false)
   const [imgError, setImgError] = useState(false)
@@ -141,9 +154,7 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
     setMessage(null)
 
     try {
-      const profileLinks = form.profileLinks.filter(
-        (link) => link.label.trim() || link.url.trim(),
-      )
+      const profileLinks = form.profileLinks.filter((link) => link.label.trim() || link.url.trim())
 
       const response = await fetch(`${API}/api/settings/profile`, {
         method: 'PATCH',
@@ -181,7 +192,14 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
   return (
     <>
       <SectionCard title="Cover Image" subtitle="Add a banner image to your profile page.">
-        <div style={{ borderRadius: 14, overflow: 'hidden', border: '1px solid var(--sh-border)', marginBottom: 14 }}>
+        <div
+          style={{
+            borderRadius: 14,
+            overflow: 'hidden',
+            border: '1px solid var(--sh-border)',
+            marginBottom: 14,
+          }}
+        >
           {coverUrl && !coverImgError ? (
             <img
               src={coverUrl.startsWith('http') ? coverUrl : `${API}${coverUrl}`}
@@ -191,8 +209,19 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
               style={{ width: '100%', height: 120, objectFit: 'cover', display: 'block' }}
             />
           ) : (
-            <div style={{ width: '100%', height: 120, background: 'var(--sh-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: 13, color: 'var(--sh-muted)', fontWeight: 600 }}>No cover image</span>
+            <div
+              style={{
+                width: '100%',
+                height: 120,
+                background: 'var(--sh-soft)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <span style={{ fontSize: 13, color: 'var(--sh-muted)', fontWeight: 600 }}>
+                No cover image
+              </span>
             </div>
           )}
         </div>
@@ -201,9 +230,14 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
             type="button"
             onClick={() => setShowCoverCrop(true)}
             style={{
-              padding: '9px 18px', borderRadius: 10, border: 'none',
-              background: 'var(--sh-brand)', color: '#fff',
-              fontSize: 13, fontWeight: 700, cursor: 'pointer',
+              padding: '9px 18px',
+              borderRadius: 10,
+              border: 'none',
+              background: 'var(--sh-brand)',
+              color: '#fff',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
               fontFamily: 'inherit',
             }}
           >
@@ -215,10 +249,13 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
               disabled={removingCover}
               onClick={handleRemoveCover}
               style={{
-                padding: '9px 18px', borderRadius: 10,
+                padding: '9px 18px',
+                borderRadius: 10,
                 border: '1px solid var(--sh-danger-border)',
-                background: 'var(--sh-danger-bg)', color: 'var(--sh-danger)',
-                fontSize: 13, fontWeight: 700,
+                background: 'var(--sh-danger-bg)',
+                color: 'var(--sh-danger)',
+                fontSize: 13,
+                fontWeight: 700,
                 cursor: removingCover ? 'not-allowed' : 'pointer',
                 opacity: removingCover ? 0.6 : 1,
                 fontFamily: 'inherit',
@@ -233,31 +270,53 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
         </p>
       </SectionCard>
 
-      <SectionCard title="Profile Photo" subtitle="Upload a photo so other students can recognize you.">
+      <SectionCard
+        title="Profile Photo"
+        subtitle="Upload a photo so other students can recognize you."
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
           <div
             data-tutorial="settings-avatar"
             style={{
-              width: 64, height: 64, borderRadius: '50%',
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
               background: 'var(--sh-avatar-bg)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0, overflow: 'hidden',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              flexShrink: 0,
+              overflow: 'hidden',
               border: '2px solid var(--sh-border)',
             }}
           >
-            {avatarUrl && !imgError
-              ? <img src={avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`} alt={user?.username || ''} loading="lazy" onError={() => setImgError(true)} style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-              : <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--sh-avatar-text)' }}>{initials}</span>
-            }
+            {avatarUrl && !imgError ? (
+              <img
+                src={avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`}
+                alt={user?.username || ''}
+                loading="lazy"
+                onError={() => setImgError(true)}
+                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+              />
+            ) : (
+              <span style={{ fontSize: 20, fontWeight: 800, color: 'var(--sh-avatar-text)' }}>
+                {initials}
+              </span>
+            )}
           </div>
           <div>
             <button
               type="button"
               onClick={() => setShowCrop(true)}
               style={{
-                padding: '9px 18px', borderRadius: 10, border: 'none',
-                background: 'var(--sh-brand)', color: '#fff',
-                fontSize: 13, fontWeight: 700, cursor: 'pointer',
+                padding: '9px 18px',
+                borderRadius: 10,
+                border: 'none',
+                background: 'var(--sh-brand)',
+                color: '#fff',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
                 fontFamily: 'inherit',
               }}
             >
@@ -270,7 +329,10 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
         </div>
       </SectionCard>
 
-      <SectionCard title="Profile Details" subtitle="Choose what appears on your public profile and what stays visible only to you.">
+      <SectionCard
+        title="Profile Details"
+        subtitle="Choose what appears on your public profile and what stays visible only to you."
+      >
         {message && <Message tone={message.tone}>{message.text}</Message>}
 
         <FormField label="Display Name" hint="Optional name shown alongside your username.">
@@ -282,7 +344,10 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
           />
         </FormField>
 
-        <FormField label="Profile Description" hint="This description stays visible even when your account is private.">
+        <FormField
+          label="Profile Description"
+          hint="This description stays visible even when your account is private."
+        >
           <textarea
             value={form.bio}
             maxLength={500}
@@ -306,8 +371,17 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
           />
         </FormField>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
-          <FormField label="Age" hint="Optional and stored securely with your private profile data.">
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+            gap: 14,
+          }}
+        >
+          <FormField
+            label="Age"
+            hint="Optional and stored securely with your private profile data."
+          >
             <Input
               type="number"
               min={13}
@@ -357,7 +431,13 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
           title="Visibility"
           subtitle="Private accounts still show your profile photo, cover image, and description. These controls apply when your profile content is viewable."
         >
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 14 }}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+              gap: 14,
+            }}
+          >
             <FormField label="Display Name Visibility">
               <Select
                 value={form.profileFieldVisibility.displayName}
@@ -407,21 +487,50 @@ export default function ProfileTab({ user, sessionUser, onAvatarChange, onCoverC
         </div>
       </SectionCard>
 
-      <SectionCard title="Profile Info" subtitle="This is the current account state coming from your authenticated session.">
+      <SectionCard
+        title="Profile Info"
+        subtitle="This is the current account state coming from your authenticated session."
+      >
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
           {[
             ['Username', user?.username || '\u2014'],
             ['Email', user?.email || 'Not set'],
-            ['Email Status', user?.email ? (user.emailVerified ? 'Verified' : 'Verification required') : 'No email on file'],
+            [
+              'Email Status',
+              user?.email
+                ? user.emailVerified
+                  ? 'Verified'
+                  : 'Verification required'
+                : 'No email on file',
+            ],
             ['Role', user?.role || 'student'],
             ['Courses', user?._count?.enrollments ?? sessionUser?._count?.enrollments ?? 0],
             ['Study Sheets', user?._count?.studySheets ?? sessionUser?._count?.studySheets ?? 0],
           ].map(([label, value]) => (
-            <div key={label} style={{ padding: '14px 16px', borderRadius: 12, background: 'var(--sh-soft, #f8fafc)', border: '1px solid var(--sh-border, #e2e8f0)' }}>
-              <div style={{ marginBottom: 6, fontSize: 12, fontWeight: 700, color: 'var(--sh-muted, #94a3b8)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+            <div
+              key={label}
+              style={{
+                padding: '14px 16px',
+                borderRadius: 12,
+                background: 'var(--sh-soft, #f8fafc)',
+                border: '1px solid var(--sh-border, #e2e8f0)',
+              }}
+            >
+              <div
+                style={{
+                  marginBottom: 6,
+                  fontSize: 12,
+                  fontWeight: 700,
+                  color: 'var(--sh-muted, #94a3b8)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                }}
+              >
                 {label}
               </div>
-              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading, #0f172a)' }}>{value}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading, #0f172a)' }}>
+                {value}
+              </div>
             </div>
           ))}
         </div>

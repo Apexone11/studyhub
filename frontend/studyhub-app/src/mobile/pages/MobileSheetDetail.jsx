@@ -48,8 +48,11 @@ export default function MobileSheetDetail() {
   const [error, setError] = useState(null)
   const [starred, setStarred] = useState(false)
   const [showPreview, setShowPreview] = useState(false)
+  const [previewUrl, setPreviewUrl] = useState('')
+  const [previewError, setPreviewError] = useState('')
 
   const contentRef = useRef(null)
+  const previewFetchRef = useRef(false)
 
   useEffect(() => {
     let active = true
@@ -99,6 +102,45 @@ export default function MobileSheetDetail() {
     navigate(`/m/sheets/${sheetId}/fork`)
   }, [sheetId, navigate])
 
+  // Fetch the signed preview URL lazily the first time the user taps
+  // "Preview". The backend endpoint `/api/sheets/:id/html-preview` returns
+  // JSON containing a short-lived `previewUrl` that points at the sandboxed
+  // `/preview/html?token=...` route — we can only put THAT url in an iframe.
+  // (Pointing the iframe at `/api/sheets/:id/html-preview` directly caused
+  // ERR_BLOCKED_BY_RESPONSE because the JSON endpoint lives on the app
+  // surface, which sets `X-Frame-Options: DENY` and `frame-ancestors 'none'`.)
+  useEffect(() => {
+    if (!showPreview || previewUrl || previewError) return
+    if (!sheet || sheet.contentFormat !== 'html') return
+    if (previewFetchRef.current) return
+
+    previewFetchRef.current = true
+    let active = true
+
+    fetch(`${API}/api/sheets/${sheetId}/html-preview`, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}))
+        if (!active) return
+        if (!res.ok || !data?.previewUrl) {
+          throw new Error(data?.error || 'Could not load preview.')
+        }
+        setPreviewUrl(data.previewUrl)
+      })
+      .catch((err) => {
+        if (active) setPreviewError(err.message || 'Could not load preview.')
+      })
+      .finally(() => {
+        previewFetchRef.current = false
+      })
+
+    return () => {
+      active = false
+    }
+  }, [showPreview, previewUrl, previewError, sheet, sheetId])
+
   if (loading) {
     return (
       <>
@@ -126,7 +168,6 @@ export default function MobileSheetDetail() {
 
   const authorName = sheet.author?.username || 'Anonymous'
   const courseTag = sheet.course?.code || sheet.course?.name || null
-  const previewUrl = `${API}/api/sheets/${sheetId}/html-preview`
 
   return (
     <div className="mob-sheet">
@@ -237,12 +278,23 @@ export default function MobileSheetDetail() {
         {/* Preview iframe */}
         {showPreview && (
           <div className="mob-sheet-preview">
-            <iframe
-              src={previewUrl}
-              title="Sheet preview"
-              className="mob-sheet-iframe"
-              sandbox=""
-            />
+            {!previewUrl && !previewError && (
+              <div className="mob-sheet-preview-state">Loading preview…</div>
+            )}
+            {previewError && !previewUrl && (
+              <div className="mob-sheet-preview-state mob-sheet-preview-state--error">
+                {previewError}
+              </div>
+            )}
+            {previewUrl && (
+              <iframe
+                src={previewUrl}
+                title="Sheet preview"
+                className="mob-sheet-iframe"
+                sandbox=""
+                referrerPolicy="no-referrer"
+              />
+            )}
           </div>
         )}
       </div>

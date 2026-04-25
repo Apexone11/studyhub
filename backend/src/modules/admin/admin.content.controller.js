@@ -1,6 +1,10 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
-const { isHtmlUploadsEnabled, setHtmlUploadsEnabled, readEnvOverride } = require('../../lib/html/htmlKillSwitch')
+const {
+  isHtmlUploadsEnabled,
+  setHtmlUploadsEnabled,
+  readEnvOverride,
+} = require('../../lib/html/htmlKillSwitch')
 const prisma = require('../../lib/prisma')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
 
@@ -29,7 +33,8 @@ router.get('/announcements', async (req, res) => {
 // ── POST /api/admin/announcements ────────────────────────────
 router.post('/announcements', async (req, res) => {
   const { title, body, pinned } = req.body || {}
-  if (!title?.trim() || !body?.trim()) return res.status(400).json({ error: 'Title and body are required.' })
+  if (!title?.trim() || !body?.trim())
+    return res.status(400).json({ error: 'Title and body are required.' })
   try {
     const announcement = await prisma.announcement.create({
       data: {

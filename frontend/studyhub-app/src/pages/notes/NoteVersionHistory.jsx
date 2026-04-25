@@ -201,7 +201,7 @@ function VersionItem({ version, onViewDiff, onRestore }) {
   )
 }
 
-export default function NoteVersionHistory({ noteId, onRestore, onClose }) {
+export default function NoteVersionHistory({ noteId, onRestore, onClose, flushPendingSave }) {
   const [versions, setVersions] = useState([])
   const [loading, setLoading] = useState(true)
   const [saveMessage, setSaveMessage] = useState('')
@@ -271,6 +271,20 @@ export default function NoteVersionHistory({ noteId, onRestore, onClose }) {
     setSavingVersion(true)
 
     try {
+      // Flush any pending debounced save so the version snapshot the server
+      // takes includes the latest in-editor content. Without this, clicking
+      // "Save Version" within 800ms of the last keystroke creates a version
+      // that's missing the most recent typing.
+      if (typeof flushPendingSave === 'function') {
+        try {
+          await flushPendingSave()
+        } catch {
+          /* swallow — we still try to create the version even if the
+             flush failed; the user sees an error from the versions POST
+             if the server rejects it. */
+        }
+      }
+
       const response = await fetch(`${API}/api/notes/${noteId}/versions`, {
         method: 'POST',
         credentials: 'include',

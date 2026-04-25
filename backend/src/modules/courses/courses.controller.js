@@ -4,7 +4,11 @@ const { sendForbidden } = require('../../lib/accessControl')
 const { sendCourseRequestNotice } = require('../../lib/email/email')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { POPULAR_THRESHOLD, RECOMMENDATION_LIMIT, parseOptionalInteger } = require('./courses.constants')
+const {
+  POPULAR_THRESHOLD,
+  RECOMMENDATION_LIMIT,
+  parseOptionalInteger,
+} = require('./courses.constants')
 
 const router = express.Router()
 
@@ -15,7 +19,7 @@ router.get('/recommendations', requireAuth, async (req, res) => {
 
     const myEnrollments = await prisma.enrollment.findMany({
       where: { userId },
-      select: { courseId: true }
+      select: { courseId: true },
     })
 
     const myCourseIds = myEnrollments.map((enrollment) => enrollment.courseId)
@@ -25,20 +29,22 @@ router.get('/recommendations', requireAuth, async (req, res) => {
         by: ['courseId'],
         _count: { courseId: true },
         orderBy: { _count: { courseId: 'desc' } },
-        take: RECOMMENDATION_LIMIT
+        take: RECOMMENDATION_LIMIT,
       })
 
       const popularCourseIds = popular.map((entry) => entry.courseId)
       const courses = await prisma.course.findMany({
         where: { id: { in: popularCourseIds } },
-        include: { school: true }
+        include: { school: true },
       })
 
-      const popularMap = new Map(popular.map((entry) => [entry.courseId, entry._count?.courseId || 0]))
+      const popularMap = new Map(
+        popular.map((entry) => [entry.courseId, entry._count?.courseId || 0]),
+      )
       const withScores = courses
         .map((course) => ({
           ...course,
-          score: popularMap.get(course.id) || 0
+          score: popularMap.get(course.id) || 0,
         }))
         .sort((a, b) => b.score - a.score)
 
@@ -48,7 +54,7 @@ router.get('/recommendations', requireAuth, async (req, res) => {
     const similarUsers = await prisma.enrollment.findMany({
       where: {
         courseId: { in: myCourseIds },
-        userId: { not: userId }
+        userId: { not: userId },
       },
       select: { userId: true },
       distinct: ['userId'],
@@ -65,23 +71,25 @@ router.get('/recommendations', requireAuth, async (req, res) => {
       by: ['courseId'],
       where: {
         userId: { in: similarUserIds },
-        courseId: { notIn: myCourseIds }
+        courseId: { notIn: myCourseIds },
       },
       _count: { courseId: true },
       orderBy: { _count: { courseId: 'desc' } },
-      take: RECOMMENDATION_LIMIT
+      take: RECOMMENDATION_LIMIT,
     })
 
     const recommended = await prisma.course.findMany({
       where: { id: { in: theirEnrollments.map((enrollment) => enrollment.courseId) } },
-      include: { school: true }
+      include: { school: true },
     })
 
-    const enrollmentMap = new Map(theirEnrollments.map((enrollment) => [enrollment.courseId, enrollment._count?.courseId || 0]))
+    const enrollmentMap = new Map(
+      theirEnrollments.map((enrollment) => [enrollment.courseId, enrollment._count?.courseId || 0]),
+    )
     const withScores = recommended
       .map((course) => ({
         ...course,
-        score: enrollmentMap.get(course.id) || 0
+        score: enrollmentMap.get(course.id) || 0,
       }))
       .sort((a, b) => b.score - a.score)
 
@@ -89,7 +97,7 @@ router.get('/recommendations', requireAuth, async (req, res) => {
   } catch (error) {
     captureError(error, {
       route: req.originalUrl,
-      method: req.method
+      method: req.method,
     })
 
     console.error(error)
@@ -122,8 +130,8 @@ router.post('/request', requireAuth, async (req, res) => {
     const existing = await prisma.requestedCourse.findFirst({
       where: {
         name: { equals: rawName, mode: 'insensitive' },
-        schoolId: parsedSchoolId
-      }
+        schoolId: parsedSchoolId,
+      },
     })
 
     let result
@@ -134,8 +142,8 @@ router.post('/request', requireAuth, async (req, res) => {
         where: { id: existing.id },
         data: {
           count: newCount,
-          flagged: newCount >= POPULAR_THRESHOLD
-        }
+          flagged: newCount >= POPULAR_THRESHOLD,
+        },
       })
     } else {
       result = await prisma.requestedCourse.create({
@@ -144,8 +152,8 @@ router.post('/request', requireAuth, async (req, res) => {
           code: rawCode || null,
           schoolId: parsedSchoolId,
           count: 1,
-          flagged: false
-        }
+          flagged: false,
+        },
       })
     }
 
@@ -157,14 +165,14 @@ router.post('/request', requireAuth, async (req, res) => {
       const [requester, school] = await Promise.all([
         prisma.user.findUnique({
           where: { id: req.user.userId },
-          select: { username: true, email: true }
+          select: { username: true, email: true },
         }),
         parsedSchoolId === null
           ? Promise.resolve(null)
           : prisma.school.findUnique({
               where: { id: parsedSchoolId },
-              select: { name: true, short: true }
-            })
+              select: { name: true, short: true },
+            }),
       ])
 
       await sendCourseRequestNotice({
@@ -188,12 +196,12 @@ router.post('/request', requireAuth, async (req, res) => {
     return res.status(201).json({
       message,
       request: result,
-      threshold: POPULAR_THRESHOLD
+      threshold: POPULAR_THRESHOLD,
     })
   } catch (error) {
     captureError(error, {
       route: req.originalUrl,
-      method: req.method
+      method: req.method,
     })
 
     console.error('Course request failed:', error.message || 'unknown error')
@@ -209,18 +217,18 @@ router.get('/requested', requireAuth, async (req, res) => {
     }
 
     const requested = await prisma.requestedCourse.findMany({
-      orderBy: [{ flagged: 'desc' }, { count: 'desc' }]
+      orderBy: [{ flagged: 'desc' }, { count: 'desc' }],
     })
 
     return res.json({
       total: requested.length,
       flagged: requested.filter((course) => course.flagged).length,
-      courses: requested
+      courses: requested,
     })
   } catch (error) {
     captureError(error, {
       route: req.originalUrl,
-      method: req.method
+      method: req.method,
     })
 
     console.error(error)

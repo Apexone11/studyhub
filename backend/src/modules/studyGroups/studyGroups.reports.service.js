@@ -48,7 +48,9 @@ function isValidReason(reason) {
  */
 function captureRequestFingerprint(req) {
   if (!req) return { ipAddress: null, userAgent: null }
-  const forwarded = String(req.headers['x-forwarded-for'] || '').split(',')[0].trim()
+  const forwarded = String(req.headers['x-forwarded-for'] || '')
+    .split(',')[0]
+    .trim()
   const ipAddress = forwarded || req.ip || req.socket?.remoteAddress || null
   const userAgent = String(req.headers['user-agent'] || '').slice(0, 500) || null
   return { ipAddress, userAgent }
@@ -75,7 +77,12 @@ async function writeAuditLog({ groupId, actorId, action, targetType, targetId, c
       },
     })
   } catch (error) {
-    captureError(error, { location: 'studyGroups.reports.service/writeAuditLog', groupId, actorId, action })
+    captureError(error, {
+      location: 'studyGroups.reports.service/writeAuditLog',
+      groupId,
+      actorId,
+      action,
+    })
   }
 }
 
@@ -86,7 +93,10 @@ async function writeAuditLog({ groupId, actorId, action, targetType, targetId, c
  */
 function sanitizeDetails(input, maxLength = 500) {
   if (typeof input !== 'string') return ''
-  return input.replace(/<[^>]*>/g, '').trim().slice(0, maxLength)
+  return input
+    .replace(/<[^>]*>/g, '')
+    .trim()
+    .slice(0, maxLength)
 }
 
 /**
@@ -215,14 +225,17 @@ async function createReport({ groupId, reporterId, reason, details, attachments,
     // Do not notify the reporter even if they happen to be an admin.
     recipientIds.delete(reporterId)
     if (recipientIds.size > 0) {
-      await createNotifications(prisma, Array.from(recipientIds).map((userId) => ({
-        userId,
-        type: 'group_reported',
-        message: `Your group "${group.name}" has been reported. Our team will review it.`,
-        // actorId intentionally NOT set to preserve reporter anonymity
-        linkPath: `/study-groups/${groupId}`,
-        priority: 'medium',
-      })))
+      await createNotifications(
+        prisma,
+        Array.from(recipientIds).map((userId) => ({
+          userId,
+          type: 'group_reported',
+          message: `Your group "${group.name}" has been reported. Our team will review it.`,
+          // actorId intentionally NOT set to preserve reporter anonymity
+          linkPath: `/study-groups/${groupId}`,
+          priority: 'medium',
+        })),
+      )
     }
   } catch (error) {
     captureError(error, { location: 'studyGroups.reports.service/createReport/notify' })
@@ -318,9 +331,7 @@ async function maybeEscalate(groupId, req) {
  *   - 'delete'  → soft delete for 30 days. Owner notified with
  *                  appeal window.
  */
-async function resolveReport({
-  reportId, actorId, action, resolution = '', req,
-}) {
+async function resolveReport({ reportId, actorId, action, resolution = '', req }) {
   const allowed = ['dismiss', 'warn', 'lock', 'delete']
   if (!allowed.includes(action)) {
     const err = new Error('Invalid action.')
@@ -451,7 +462,10 @@ async function getHiddenGroupIdsForReporter(userId) {
     })
     return new Set(rows.map((r) => r.groupId))
   } catch (error) {
-    captureError(error, { location: 'studyGroups.reports.service/getHiddenGroupIdsForReporter', userId })
+    captureError(error, {
+      location: 'studyGroups.reports.service/getHiddenGroupIdsForReporter',
+      userId,
+    })
     return new Set()
   }
 }

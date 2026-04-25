@@ -15,9 +15,20 @@ import { authHeaders, validateAttachment } from './uploadSheetConstants'
 
 /* ── Save draft now ──────────────────────────────────────────────────── */
 export function useSaveDraftNow({
-  courseId, title, content, description, allowDownloads,
-  draftId, legacyMarkdownMode, autosaveTimer,
-  setError, setSaved, setDraftId, setStatus, setScanState, setHasUnsavedChanges,
+  courseId,
+  title,
+  content,
+  description,
+  allowDownloads,
+  draftId,
+  legacyMarkdownMode,
+  autosaveTimer,
+  setError,
+  setSaved,
+  setDraftId,
+  setStatus,
+  setScanState,
+  setHasUnsavedChanges,
 }) {
   return useCallback(async () => {
     if (!courseId || (!title.trim() && !content.trim())) {
@@ -32,7 +43,15 @@ export function useSaveDraftNow({
           method: 'POST',
           headers: authHeaders(),
           credentials: 'include',
-          body: JSON.stringify({ id: draftId, title, courseId: Number.parseInt(courseId, 10), content, contentFormat: 'markdown', description, allowDownloads }),
+          body: JSON.stringify({
+            id: draftId,
+            title,
+            courseId: Number.parseInt(courseId, 10),
+            content,
+            contentFormat: 'markdown',
+            description,
+            allowDownloads,
+          }),
         })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(data.error || 'Draft save failed.')
@@ -42,7 +61,13 @@ export function useSaveDraftNow({
           method: 'PATCH',
           headers: authHeaders(),
           credentials: 'include',
-          body: JSON.stringify({ title, courseId: Number.parseInt(courseId, 10), description, allowDownloads, html: content }),
+          body: JSON.stringify({
+            title,
+            courseId: Number.parseInt(courseId, 10),
+            description,
+            allowDownloads,
+            html: content,
+          }),
         })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(data.error || 'Draft save failed.')
@@ -53,7 +78,15 @@ export function useSaveDraftNow({
           method: 'POST',
           headers: authHeaders(),
           credentials: 'include',
-          body: JSON.stringify({ id: null, title, courseId: Number.parseInt(courseId, 10), content, contentFormat: 'html', description, allowDownloads }),
+          body: JSON.stringify({
+            id: null,
+            title,
+            courseId: Number.parseInt(courseId, 10),
+            content,
+            contentFormat: 'html',
+            description,
+            allowDownloads,
+          }),
         })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) throw new Error(data.error || 'Draft save failed.')
@@ -64,37 +97,58 @@ export function useSaveDraftNow({
     } catch (err) {
       setError(err.message || 'Draft save failed.')
     }
-  }, [allowDownloads, autosaveTimer, content, courseId, description, draftId, legacyMarkdownMode, setDraftId, setError, setHasUnsavedChanges, setSaved, setScanState, setStatus, title])
+  }, [
+    allowDownloads,
+    autosaveTimer,
+    content,
+    courseId,
+    description,
+    draftId,
+    legacyMarkdownMode,
+    setDraftId,
+    setError,
+    setHasUnsavedChanges,
+    setSaved,
+    setScanState,
+    setStatus,
+    title,
+  ])
 }
 
 /* ── Attachment upload ───────────────────────────────────────────────── */
 export function useUploadAttachment({ attachFile, setAttachUploading }) {
-  return useCallback(async (sheetIdToUpload) => {
-    if (!attachFile) return
+  return useCallback(
+    async (sheetIdToUpload) => {
+      if (!attachFile) return
 
-    setAttachUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('attachment', attachFile)
+      setAttachUploading(true)
+      try {
+        const formData = new FormData()
+        formData.append('attachment', attachFile)
 
-      const uploadResponse = await fetch(`${API}/api/upload/attachment/${sheetIdToUpload}`, {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
-      })
-      const uploadData = await uploadResponse.json().catch(() => ({}))
-      if (!uploadResponse.ok) {
-        throw new Error(uploadData.error || 'Attachment upload failed.')
+        const uploadResponse = await fetch(`${API}/api/upload/attachment/${sheetIdToUpload}`, {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        })
+        const uploadData = await uploadResponse.json().catch(() => ({}))
+        if (!uploadResponse.ok) {
+          throw new Error(uploadData.error || 'Attachment upload failed.')
+        }
+      } finally {
+        setAttachUploading(false)
       }
-    } finally {
-      setAttachUploading(false)
-    }
-  }, [attachFile, setAttachUploading])
+    },
+    [attachFile, setAttachUploading],
+  )
 }
 
 /* ── Attachment select ───────────────────────────────────────────────── */
 export function makeHandleAttachmentSelect({
-  setAttachErr, setAttachFile, setRemoveExistingAttachment, setHasUnsavedChanges,
+  setAttachErr,
+  setAttachFile,
+  setRemoveExistingAttachment,
+  setHasUnsavedChanges,
 }) {
   return async function handleAttachmentSelect(event) {
     const file = event.target.files?.[0]
@@ -135,11 +189,27 @@ export function makeClearAttachFile({ setAttachFile, setAttachErr, attachmentInp
 
 /* ── Discard draft ───────────────────────────────────────────────────── */
 export function makeDiscardDraft({
-  draftId, setTitle, setDescription, setContent, setCourseId,
-  setAllowDownloads, setContentFormat, setLegacyMarkdownMode, setStatus,
-  setAttachFile, setAttachErr, setExistingAttachment, setRemoveExistingAttachment,
-  setHasUnsavedChanges, setSaved, setError, setDraftId,
-  setScanState, setDraftReloadKey, setDiscarding, setShowDiscardDialog,
+  draftId,
+  setTitle,
+  setDescription,
+  setContent,
+  setCourseId,
+  setAllowDownloads,
+  setContentFormat,
+  setLegacyMarkdownMode,
+  setStatus,
+  setAttachFile,
+  setAttachErr,
+  setExistingAttachment,
+  setRemoveExistingAttachment,
+  setHasUnsavedChanges,
+  setSaved,
+  setError,
+  setDraftId,
+  setScanState,
+  setDraftReloadKey,
+  setDiscarding,
+  setShowDiscardDialog,
   onAfterDiscard,
 }) {
   return async function discardDraft() {
@@ -209,9 +279,19 @@ export function makeDiscardDraft({
 
 /* ── HTML import ─────────────────────────────────────────────────────── */
 export function makeHandleHtmlImport({
-  courseId, draftId, title, description, allowDownloads,
-  setError, setLoading, setDraftId, setScanState,
-  setScanModalDismissed, setSaved, setHasUnsavedChanges, hydrateFromSheet,
+  courseId,
+  draftId,
+  title,
+  description,
+  allowDownloads,
+  setError,
+  setLoading,
+  setDraftId,
+  setScanState,
+  setScanModalDismissed,
+  setSaved,
+  setHasUnsavedChanges,
+  hydrateFromSheet,
 }) {
   return async function handleHtmlImport(event) {
     const file = event.target.files?.[0]
@@ -259,7 +339,7 @@ export function makeHandleHtmlImport({
       if (data.scan) {
         setScanState((prev) => reduceScanState(prev, data.scan))
       }
-      showToast('Security scan started. We\'ll show details only if something is flagged.', 'info')
+      showToast("Security scan started. We'll show details only if something is flagged.", 'info')
       setScanModalDismissed(false)
       setSaved(true)
       setHasUnsavedChanges(false)
@@ -274,7 +354,10 @@ export function makeHandleHtmlImport({
 
 /* ── Scan acknowledgement ────────────────────────────────────────────── */
 export function makeAcknowledgeScanAndDismiss({
-  activeSheetId, setScanModalDismissed, setShowScanModal, setScanAckChecked,
+  activeSheetId,
+  setScanModalDismissed,
+  setShowScanModal,
+  setScanAckChecked,
 }) {
   return async function acknowledgeScanAndDismiss() {
     if (!Number.isInteger(activeSheetId)) {
@@ -300,31 +383,48 @@ export function makeAcknowledgeScanAndDismiss({
 
 /* ── Submit / publish ────────────────────────────────────────────────── */
 export function useHandleSubmit({
-  activeSheetId, allowDownloads, attachFile, canSubmitHtml,
-  content, courseId, description, draftId, isEditing,
-  legacyMarkdownMode, navigate, removeExistingAttachment, sheetId, title,
+  activeSheetId,
+  allowDownloads,
+  attachFile,
+  canSubmitHtml,
+  content,
+  courseId,
+  description,
+  draftId,
+  isEditing,
+  legacyMarkdownMode,
+  navigate,
+  removeExistingAttachment,
+  sheetId,
+  title,
   uploadAttachment,
-  setError, setLoading, setHasUnsavedChanges, setVerificationRequired,
+  setError,
+  setLoading,
+  setHasUnsavedChanges,
+  setVerificationRequired,
 }) {
-  const navigateAfterHtmlSubmit = useCallback((data) => {
-    if (isEditableSheetStatus(data?.status)) {
-      navigate(`/sheets/upload?draft=${data.id}`, {
-        replace: true,
-        state: {
-          postSubmitNotice: {
-            id: data.id,
-            title: data.title || title,
-            status: data.status,
-            htmlRiskTier: data.htmlRiskTier || 0,
-            message: data.message || '',
+  const navigateAfterHtmlSubmit = useCallback(
+    (data) => {
+      if (isEditableSheetStatus(data?.status)) {
+        navigate(`/sheets/upload?draft=${data.id}`, {
+          replace: true,
+          state: {
+            postSubmitNotice: {
+              id: data.id,
+              title: data.title || title,
+              status: data.status,
+              htmlRiskTier: data.htmlRiskTier || 0,
+              message: data.message || '',
+            },
           },
-        },
-      })
-      return
-    }
+        })
+        return
+      }
 
-    navigate(`/sheets/${data.id}`)
-  }, [navigate, title])
+      navigate(`/sheets/${data.id}`)
+    },
+    [navigate, title],
+  )
 
   return useCallback(async () => {
     setError('')
@@ -359,7 +459,10 @@ export function useHandleSubmit({
         })
         const data = await response.json().catch(() => ({}))
         if (!response.ok) {
-          if (data?.code === 'EMAIL_NOT_VERIFIED') { setVerificationRequired(true); return }
+          if (data?.code === 'EMAIL_NOT_VERIFIED') {
+            setVerificationRequired(true)
+            return
+          }
           throw new Error(data.error || 'Failed to save sheet.')
         }
 
@@ -380,7 +483,9 @@ export function useHandleSubmit({
       return
     }
     if (!canSubmitHtml) {
-      setError('Complete required fields and either pass the security scan or acknowledge the findings before submit.')
+      setError(
+        'Complete required fields and either pass the security scan or acknowledge the findings before submit.',
+      )
       return
     }
 
@@ -393,11 +498,21 @@ export function useHandleSubmit({
       })
       const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        if (data?.code === 'EMAIL_NOT_VERIFIED') { setVerificationRequired(true); return }
+        if (data?.code === 'EMAIL_NOT_VERIFIED') {
+          setVerificationRequired(true)
+          return
+        }
         const findings = Array.isArray(data.findings)
-          ? data.findings.map((entry) => entry?.message || entry).filter(Boolean).join(' | ')
+          ? data.findings
+              .map((entry) => entry?.message || entry)
+              .filter(Boolean)
+              .join(' | ')
           : ''
-        throw new Error(findings ? `${data.error || 'Could not submit sheet.'} ${findings}` : (data.error || 'Could not submit sheet.'))
+        throw new Error(
+          findings
+            ? `${data.error || 'Could not submit sheet.'} ${findings}`
+            : data.error || 'Could not submit sheet.',
+        )
       }
 
       if (attachFile) {

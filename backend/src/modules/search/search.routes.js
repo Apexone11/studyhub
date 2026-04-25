@@ -249,8 +249,17 @@ router.get('/', optionalAuth, cacheControl(30, { staleWhileRevalidate: 60 }), as
       return res.json(result)
     }
 
-    // Hide blocked users and their content from search results
-    const blockedIds = await getBlockedUserIds(prisma, req.user?.userId)
+    // Hide blocked users and their content from search results.
+    // Wrap in dedicated try/catch with empty-array fallback so search does not
+    // 500 when the UserBlock table is transiently unavailable. Mirrors the
+    // pattern in feed.list.controller.js. See CLAUDE.md Pitfall #6.
+    let blockedIds = []
+    try {
+      blockedIds = await getBlockedUserIds(prisma, req.user?.userId)
+    } catch (filterErr) {
+      captureError(filterErr, { route: req.originalUrl, context: 'search-block-filter' })
+      blockedIds = []
+    }
     const blockedIdSet = new Set(blockedIds)
 
     const sections = []

@@ -35,18 +35,15 @@ export function NoteContentRenderer({ content }) {
 
   if (!html) {
     return (
-      <div style={{ color: 'var(--sh-muted)', fontSize: 13, fontStyle: 'italic', padding: '8px 0' }}>
+      <div
+        style={{ color: 'var(--sh-muted)', fontSize: 13, fontStyle: 'italic', padding: '8px 0' }}
+      >
         Start typing to see preview…
       </div>
     )
   }
 
-  return (
-    <div
-      className="notes-markdown-preview"
-      dangerouslySetInnerHTML={{ __html: html }}
-    />
-  )
+  return <div className="notes-markdown-preview" dangerouslySetInnerHTML={{ __html: html }} />
 }
 
 /* ── Backward-compatible alias ───────────────────────────────────────── */

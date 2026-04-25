@@ -31,9 +31,9 @@ const {
 
 // ── Watermark position presets ──────────────────────────────────────────
 const WATERMARK_POSITIONS = {
-  'top-left':     { x: 'w*0.03', y: 'h*0.03' },
-  'top-right':    { x: 'w*0.97-tw', y: 'h*0.03' },
-  'bottom-left':  { x: 'w*0.03', y: 'h*0.95' },
+  'top-left': { x: 'w*0.03', y: 'h*0.03' },
+  'top-right': { x: 'w*0.97-tw', y: 'h*0.03' },
+  'bottom-left': { x: 'w*0.03', y: 'h*0.95' },
   'bottom-right': { x: 'w*0.97-tw', y: 'h*0.95' },
 }
 

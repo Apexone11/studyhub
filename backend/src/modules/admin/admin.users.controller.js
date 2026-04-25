@@ -163,12 +163,10 @@ router.patch('/users/:id/role', async (req, res) => {
     // Protect the super admin from being demoted by other admins
     const targetId = parseInt(req.params.id)
     if (role !== 'admin' && (await isSuperAdmin(targetId))) {
-      return res
-        .status(403)
-        .json({
-          error: 'The super admin account cannot be demoted.',
-          code: 'SUPER_ADMIN_PROTECTED',
-        })
+      return res.status(403).json({
+        error: 'The super admin account cannot be demoted.',
+        code: 'SUPER_ADMIN_PROTECTED',
+      })
     }
     const user = await prisma.user.update({
       where: { id: targetId },
@@ -197,12 +195,10 @@ router.patch('/users/:id/trust-level', async (req, res) => {
 
   try {
     if (trustLevel === 'restricted' && (await isSuperAdmin(targetId))) {
-      return res
-        .status(403)
-        .json({
-          error: 'The super admin account cannot be restricted.',
-          code: 'SUPER_ADMIN_PROTECTED',
-        })
+      return res.status(403).json({
+        error: 'The super admin account cannot be restricted.',
+        code: 'SUPER_ADMIN_PROTECTED',
+      })
     }
 
     const data = { trustLevel }
@@ -246,12 +242,10 @@ router.delete('/users/:id', async (req, res) => {
   try {
     // Protect the super admin from being deleted by other admins
     if (await isSuperAdmin(targetId)) {
-      return res
-        .status(403)
-        .json({
-          error: 'The super admin account cannot be deleted.',
-          code: 'SUPER_ADMIN_PROTECTED',
-        })
+      return res.status(403).json({
+        error: 'The super admin account cannot be deleted.',
+        code: 'SUPER_ADMIN_PROTECTED',
+      })
     }
 
     const targetUser = await prisma.user.findUnique({

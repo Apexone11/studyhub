@@ -14,10 +14,22 @@
 // This is intentionally short for v1; the GSB integration will cover
 // the long tail.
 const BLOCKED_TLDS = new Set([
-  '.tk', '.ml', '.ga', '.cf', '.gq',       // Freenom free TLDs (90%+ spam)
-  '.top', '.buzz', '.work', '.loan',        // high-spam generic TLDs
-  '.racing', '.download', '.stream',
-  '.click', '.link', '.date', '.cricket',
+  '.tk',
+  '.ml',
+  '.ga',
+  '.cf',
+  '.gq', // Freenom free TLDs (90%+ spam)
+  '.top',
+  '.buzz',
+  '.work',
+  '.loan', // high-spam generic TLDs
+  '.racing',
+  '.download',
+  '.stream',
+  '.click',
+  '.link',
+  '.date',
+  '.cricket',
 ])
 
 // Exact-domain blocks for known-bad hosts.
@@ -32,12 +44,7 @@ const BLOCKED_DOMAINS = new Set([
 
 // Suspicious path patterns (regex). Catches things like /wp-login.php
 // clones and common credential-harvesting paths.
-const SUSPICIOUS_PATTERNS = [
-  /\/wp-login\.php/i,
-  /\/\.env$/i,
-  /\/phpmyadmin/i,
-  /\/xmlrpc\.php/i,
-]
+const SUSPICIOUS_PATTERNS = [/\/wp-login\.php/i, /\/\.env$/i, /\/phpmyadmin/i, /\/xmlrpc\.php/i]
 
 function checkUrl(rawUrl) {
   if (!rawUrl || typeof rawUrl !== 'string') return { safe: true }

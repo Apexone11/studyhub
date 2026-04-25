@@ -25,9 +25,7 @@ function attachQueryLogger(prisma) {
   prisma.$on('query', (event) => {
     const durationMs = Number(event.duration)
     if (durationMs >= SLOW_QUERY_THRESHOLD_MS) {
-      console.warn(
-        `[SLOW QUERY] ${durationMs}ms | ${event.query} | params: ${event.params}`
-      )
+      console.warn(`[SLOW QUERY] ${durationMs}ms | ${event.query} | params: ${event.params}`)
     }
   })
 }

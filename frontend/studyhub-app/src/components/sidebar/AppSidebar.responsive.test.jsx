@@ -2,9 +2,8 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
-import AppSidebar from './AppSidebar'
 
-vi.mock('../lib/session-context', () => ({
+vi.mock('../../lib/session-context', () => ({
   useSession: () => ({
     user: {
       id: 1,
@@ -16,6 +15,28 @@ vi.mock('../lib/session-context', () => ({
     },
   }),
 }))
+
+vi.mock('../../lib/designV2Flags', () => ({
+  useDesignV2Flags: () => ({
+    phase1Dashboard: false,
+    phase2Triage: false,
+    aiCard: false,
+    sheetsGrid: false,
+    authSplit: false,
+    onboarding: false,
+    feedPolish: false,
+    homeHero: false,
+    loading: false,
+  }),
+  clearDesignV2FlagCache: () => {},
+  FLAG_NAMES: {},
+}))
+
+vi.mock('../../lib/prefetch', () => ({
+  prefetchForRoute: vi.fn(),
+}))
+
+import AppSidebar from './AppSidebar'
 
 describe('AppSidebar responsive mode', () => {
   it('renders drawer trigger and opens/closes dialog in drawer mode', async () => {
@@ -31,7 +52,7 @@ describe('AppSidebar responsive mode', () => {
     expect(screen.getByRole('dialog', { name: 'Sidebar navigation' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Feed' })).toBeInTheDocument()
 
-    await user.click(screen.getByRole('button', { name: 'Close' }))
+    await user.click(screen.getByRole('button', { name: 'Close navigation' }))
     expect(screen.queryByRole('dialog', { name: 'Sidebar navigation' })).not.toBeInTheDocument()
   })
 

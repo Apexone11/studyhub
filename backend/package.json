@@ -1,6 +1,6 @@
 {
   "name": "studyhub-backend",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "main": "src/index.js",
   "scripts": {
@@ -16,6 +16,7 @@
     "seed:beta": "node scripts/seedBetaUsers.js",
     "preview:fixture": "node scripts/ensurePreviewFixture.js",
     "seed:admin": "node scripts/seedAdmin.js",
+    "seed:flags": "node scripts/seedFeatureFlags.js",
     "seed:roles-v2-flags": "node scripts/seedRolesV2Flags.js",
     "seed:notes-hardening-flag": "node scripts/seedNotesHardeningFlag.js",
     "backfill:note-version-bytes": "node scripts/backfillNoteVersionBytes.js",
@@ -27,6 +28,8 @@
     "capture:feed-network": "node scripts/captureFeedNetwork.js",
     "load:test": "node scripts/loadTraffic.js",
     "archive:html-originals": "node scripts/archiveHtmlOriginals.js",
+    "update-geoip-db": "node scripts/updateGeoipDb.js",
+    "sweep-inactive-sessions": "node scripts/sweepInactiveSessions.js",
     "test": "vitest run",
     "test:watch": "vitest"
   },
@@ -50,6 +53,7 @@
     "google-auth-library": "^10.6.2",
     "helmet": "^8.1.0",
     "jsonwebtoken": "^9.0.3",
+    "maxmind": "^5.0.6",
     "multer": "^2.1.1",
     "nodemailer": "^8.0.4",
     "pino": "^9.6.0",

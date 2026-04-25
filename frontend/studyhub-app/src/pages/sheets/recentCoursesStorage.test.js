@@ -15,7 +15,13 @@ describe('recentCoursesStorage', () => {
     ])
 
     expect(parseRecentCourses(raw, now)).toEqual([
-      { id: 1, code: 'CMSC131', schoolId: '', schoolLabel: '', viewedAt: '2026-04-08T11:30:00.000Z' },
+      {
+        id: 1,
+        code: 'CMSC131',
+        schoolId: '',
+        schoolLabel: '',
+        viewedAt: '2026-04-08T11:30:00.000Z',
+      },
     ])
   })
 
@@ -24,14 +30,18 @@ describe('recentCoursesStorage', () => {
     const entries = Array.from({ length: MAX_RECENT_COURSES }, (_, index) => ({
       id: index + 1,
       code: `COURSE${index + 1}`,
-      viewedAt: new Date(now - ((index + 1) * 1000)).toISOString(),
+      viewedAt: new Date(now - (index + 1) * 1000).toISOString(),
     }))
 
-    const updated = recordRecentCourse(entries, {
-      id: 3,
-      code: 'COURSE3',
-      school: { id: 22, short: 'UMBC' },
-    }, now + 500)
+    const updated = recordRecentCourse(
+      entries,
+      {
+        id: 3,
+        code: 'COURSE3',
+        school: { id: 22, short: 'UMBC' },
+      },
+      now + 500,
+    )
 
     expect(updated).toHaveLength(MAX_RECENT_COURSES)
     expect(updated[0]).toMatchObject({ id: 3, code: 'COURSE3', schoolId: 22, schoolLabel: 'UMBC' })
@@ -40,13 +50,25 @@ describe('recentCoursesStorage', () => {
 
   it('keeps only entries from the last hour when recording a course', () => {
     const now = Date.parse('2026-04-08T12:00:00.000Z')
-    const updated = recordRecentCourse([
-      { id: 1, code: 'CMSC131', viewedAt: new Date(now - RECENT_COURSES_TTL_MS + 1000).toISOString() },
-      { id: 2, code: 'MATH151', viewedAt: new Date(now - RECENT_COURSES_TTL_MS - 1000).toISOString() },
-    ], {
-      id: 3,
-      code: 'PHYS121',
-    }, now)
+    const updated = recordRecentCourse(
+      [
+        {
+          id: 1,
+          code: 'CMSC131',
+          viewedAt: new Date(now - RECENT_COURSES_TTL_MS + 1000).toISOString(),
+        },
+        {
+          id: 2,
+          code: 'MATH151',
+          viewedAt: new Date(now - RECENT_COURSES_TTL_MS - 1000).toISOString(),
+        },
+      ],
+      {
+        id: 3,
+        code: 'PHYS121',
+      },
+      now,
+    )
 
     expect(updated.map((entry) => entry.id)).toEqual([3, 1])
   })

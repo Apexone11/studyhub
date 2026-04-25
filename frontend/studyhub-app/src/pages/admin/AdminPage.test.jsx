@@ -42,7 +42,15 @@ function renderAdminPage() {
     <MemoryRouter initialEntries={['/admin']}>
       <SessionProvider>
         <Routes>
-          <Route path="/admin" element={<><LocationProbe /><AdminPage /></>} />
+          <Route
+            path="/admin"
+            element={
+              <>
+                <LocationProbe />
+                <AdminPage />
+              </>
+            }
+          />
           <Route path="/feed" element={<div>Feed ready</div>} />
           <Route path="/login" element={<div>Login ready</div>} />
         </Routes>
@@ -58,9 +66,7 @@ afterEach(() => {
 describe('AdminPage', () => {
   it('keeps signed-in students on /admin and shows the warning card', async () => {
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
-        HttpResponse.json(sessionUser())
-      )),
+      http.get('http://localhost:4000/api/auth/me', () => HttpResponse.json(sessionUser())),
     )
 
     renderAdminPage()
@@ -76,15 +82,17 @@ describe('AdminPage', () => {
 
   it('renders the admin overview for admin users', async () => {
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
-        HttpResponse.json(sessionUser({
-          username: 'studyhub_owner',
-          role: 'admin',
-          email: 'studyhub_owner@studyhub.test',
-          twoFaEnabled: true,
-        }))
-      )),
-      http.get('http://localhost:4000/api/admin/stats', () => (
+      http.get('http://localhost:4000/api/auth/me', () =>
+        HttpResponse.json(
+          sessionUser({
+            username: 'studyhub_owner',
+            role: 'admin',
+            email: 'studyhub_owner@studyhub.test',
+            twoFaEnabled: true,
+          }),
+        ),
+      ),
+      http.get('http://localhost:4000/api/admin/stats', () =>
         HttpResponse.json({
           totalUsers: 36,
           totalSheets: 19,
@@ -94,8 +102,8 @@ describe('AdminPage', () => {
           totalNotes: 0,
           totalFollows: 28,
           totalReactions: 4,
-        })
-      )),
+        }),
+      ),
     )
 
     renderAdminPage()
@@ -109,20 +117,19 @@ describe('AdminPage', () => {
 
   it('surfaces admin 403 errors without clearing the session or redirecting', async () => {
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
-        HttpResponse.json(sessionUser({
-          username: 'studyhub_owner',
-          role: 'admin',
-          email: 'studyhub_owner@studyhub.test',
-          twoFaEnabled: true,
-        }))
-      )),
-      http.get('http://localhost:4000/api/admin/stats', () => (
+      http.get('http://localhost:4000/api/auth/me', () =>
         HttpResponse.json(
-          { error: 'Admin access required.', code: 'FORBIDDEN' },
-          { status: 403 },
-        )
-      )),
+          sessionUser({
+            username: 'studyhub_owner',
+            role: 'admin',
+            email: 'studyhub_owner@studyhub.test',
+            twoFaEnabled: true,
+          }),
+        ),
+      ),
+      http.get('http://localhost:4000/api/admin/stats', () =>
+        HttpResponse.json({ error: 'Admin access required.', code: 'FORBIDDEN' }, { status: 403 }),
+      ),
     )
 
     renderAdminPage()
@@ -141,15 +148,17 @@ describe('AdminPage', () => {
     const userAction = userEvent.setup()
 
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
-        HttpResponse.json(sessionUser({
-          username: 'studyhub_owner',
-          role: 'admin',
-          email: 'studyhub_owner@studyhub.test',
-          twoFaEnabled: true,
-        }))
-      )),
-      http.get('http://localhost:4000/api/admin/stats', () => (
+      http.get('http://localhost:4000/api/auth/me', () =>
+        HttpResponse.json(
+          sessionUser({
+            username: 'studyhub_owner',
+            role: 'admin',
+            email: 'studyhub_owner@studyhub.test',
+            twoFaEnabled: true,
+          }),
+        ),
+      ),
+      http.get('http://localhost:4000/api/admin/stats', () =>
         HttpResponse.json({
           totalUsers: 36,
           totalSheets: 19,
@@ -159,9 +168,9 @@ describe('AdminPage', () => {
           totalNotes: 0,
           totalFollows: 28,
           totalReactions: 4,
-        })
-      )),
-      http.get('http://localhost:4000/api/admin/email-suppressions', () => (
+        }),
+      ),
+      http.get('http://localhost:4000/api/admin/email-suppressions', () =>
         HttpResponse.json({
           suppressions: [
             {
@@ -177,9 +186,9 @@ describe('AdminPage', () => {
           ],
           total: 1,
           page: 1,
-        })
-      )),
-      http.get('http://localhost:4000/api/admin/email-suppressions/:id/audit', () => (
+        }),
+      ),
+      http.get('http://localhost:4000/api/admin/email-suppressions/:id/audit', () =>
         HttpResponse.json({
           suppression: {
             id: 7,
@@ -200,8 +209,8 @@ describe('AdminPage', () => {
           ],
           total: 1,
           page: 1,
-        })
-      )),
+        }),
+      ),
     )
 
     renderAdminPage()
@@ -212,7 +221,9 @@ describe('AdminPage', () => {
     await screen.findByText('suppressed_user@studyhub.test')
     expect(screen.getByText('Email bounced')).toBeInTheDocument()
 
-    await userAction.click(screen.getByRole('button', { name: 'View audit for suppressed_user@studyhub.test' }))
+    await userAction.click(
+      screen.getByRole('button', { name: 'View audit for suppressed_user@studyhub.test' }),
+    )
 
     await screen.findByText('Audit timeline')
     expect(screen.getByText('Mailbox recovered and confirmed by support.')).toBeInTheDocument()
@@ -225,15 +236,17 @@ describe('AdminPage', () => {
     let suppressionActive = true
 
     server.use(
-      http.get('http://localhost:4000/api/auth/me', () => (
-        HttpResponse.json(sessionUser({
-          username: 'studyhub_owner',
-          role: 'admin',
-          email: 'studyhub_owner@studyhub.test',
-          twoFaEnabled: true,
-        }))
-      )),
-      http.get('http://localhost:4000/api/admin/stats', () => (
+      http.get('http://localhost:4000/api/auth/me', () =>
+        HttpResponse.json(
+          sessionUser({
+            username: 'studyhub_owner',
+            role: 'admin',
+            email: 'studyhub_owner@studyhub.test',
+            twoFaEnabled: true,
+          }),
+        ),
+      ),
+      http.get('http://localhost:4000/api/admin/stats', () =>
         HttpResponse.json({
           totalUsers: 36,
           totalSheets: 19,
@@ -243,8 +256,8 @@ describe('AdminPage', () => {
           totalNotes: 0,
           totalFollows: 28,
           totalReactions: 4,
-        })
-      )),
+        }),
+      ),
       http.get('http://localhost:4000/api/admin/email-suppressions', ({ request }) => {
         const url = new URL(request.url)
         const status = url.searchParams.get('status') || 'active'
@@ -270,25 +283,28 @@ describe('AdminPage', () => {
           page: 1,
         })
       }),
-      http.patch('http://localhost:4000/api/admin/email-suppressions/:id/unsuppress', async ({ request }) => {
-        unsuppressCalls += 1
-        const body = await request.json()
-        if (!body?.reason || body.reason.trim().length < 8) {
-          return HttpResponse.json(
-            { error: 'Provide an unsuppress reason with at least 8 characters.' },
-            { status: 400 },
-          )
-        }
+      http.patch(
+        'http://localhost:4000/api/admin/email-suppressions/:id/unsuppress',
+        async ({ request }) => {
+          unsuppressCalls += 1
+          const body = await request.json()
+          if (!body?.reason || body.reason.trim().length < 8) {
+            return HttpResponse.json(
+              { error: 'Provide an unsuppress reason with at least 8 characters.' },
+              { status: 400 },
+            )
+          }
 
-        suppressionActive = false
-        return HttpResponse.json({
-          message: 'Recipient unsuppressed successfully.',
-          suppression: {
-            id: 7,
-            active: false,
-          },
-        })
-      }),
+          suppressionActive = false
+          return HttpResponse.json({
+            message: 'Recipient unsuppressed successfully.',
+            suppression: {
+              id: 7,
+              active: false,
+            },
+          })
+        },
+      ),
     )
 
     renderAdminPage()
@@ -297,20 +313,22 @@ describe('AdminPage', () => {
     await userAction.click(screen.getByRole('button', { name: 'Email Suppressions' }))
     await screen.findByText('suppressed_user@studyhub.test')
 
-    fireEvent.change(
-      screen.getByLabelText('Unsuppress reason for suppressed_user@studyhub.test'),
-      { target: { value: 'short' } },
+    fireEvent.change(screen.getByLabelText('Unsuppress reason for suppressed_user@studyhub.test'), {
+      target: { value: 'short' },
+    })
+    await userAction.click(
+      screen.getByRole('button', { name: 'Unsuppress suppressed_user@studyhub.test' }),
     )
-    await userAction.click(screen.getByRole('button', { name: 'Unsuppress suppressed_user@studyhub.test' }))
 
     await screen.findByText('Provide an unsuppress reason with at least 8 characters.')
     expect(unsuppressCalls).toBe(0)
 
-    fireEvent.change(
-      screen.getByLabelText('Unsuppress reason for suppressed_user@studyhub.test'),
-      { target: { value: 'Mailbox recovered and confirmed by support.' } },
+    fireEvent.change(screen.getByLabelText('Unsuppress reason for suppressed_user@studyhub.test'), {
+      target: { value: 'Mailbox recovered and confirmed by support.' },
+    })
+    await userAction.click(
+      screen.getByRole('button', { name: 'Unsuppress suppressed_user@studyhub.test' }),
     )
-    await userAction.click(screen.getByRole('button', { name: 'Unsuppress suppressed_user@studyhub.test' }))
 
     await waitFor(() => {
       expect(unsuppressCalls).toBe(1)

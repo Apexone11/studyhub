@@ -31,9 +31,7 @@ export function useLivePolling(task, options = {}) {
 
     try {
       const startTransition =
-        typeof reactStartTransition === 'function'
-          ? reactStartTransition
-          : undefined
+        typeof reactStartTransition === 'function' ? reactStartTransition : undefined
 
       await taskRef.current({
         signal: controller?.signal,

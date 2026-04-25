@@ -38,6 +38,8 @@ import GoalTriageCard from './GoalTriageCard'
 import InterestChipRow from './InterestChipRow'
 import { roleCopy, isSelfLearner } from '../../lib/roleCopy'
 import { useRolesV2Flags } from '../../lib/rolesV2Flags'
+import { useDesignV2Flags } from '../../lib/designV2Flags'
+import UpcomingExamsCard from '../../features/exams/UpcomingExamsCard'
 
 export default function FeedPage() {
   usePageTitle('Feed')
@@ -45,6 +47,8 @@ export default function FeedPage() {
   const layout = useResponsiveAppLayout()
   const { core: rolesV2Core } = useRolesV2Flags()
   const showSelfLearnerExtras = isSelfLearner(user?.accountType) && rolesV2Core
+  const v2Flags = useDesignV2Flags()
+  const phase1On = v2Flags.phase1Dashboard
   const [searchParams, setSearchParams] = useSearchParams()
 
   const activeFilter = FILTERS.includes(searchParams.get('filter'))
@@ -183,6 +187,54 @@ export default function FeedPage() {
               id="main-content"
               style={{ display: 'grid', gap: 18 }}
             >
+              {phase1On && user ? (
+                <section
+                  aria-labelledby="feed-welcome-heading"
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 6,
+                    paddingBottom: 4,
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 11,
+                      fontWeight: 700,
+                      letterSpacing: '0.14em',
+                      textTransform: 'uppercase',
+                      color: 'var(--sh-muted)',
+                    }}
+                  >
+                    {roleCopy('dashboardHeroEyebrow', user.accountType)}
+                  </div>
+                  <h1
+                    id="feed-welcome-heading"
+                    style={{
+                      margin: 0,
+                      fontSize: 24,
+                      fontWeight: 800,
+                      color: 'var(--sh-heading)',
+                      letterSpacing: '-0.02em',
+                    }}
+                  >
+                    Welcome back, {user.displayName || user.username}.
+                  </h1>
+                  <p
+                    style={{
+                      margin: 0,
+                      fontSize: 14,
+                      color: 'var(--sh-text-secondary)',
+                      lineHeight: 1.55,
+                    }}
+                  >
+                    {roleCopy('dashboardWelcomeContext', user.accountType)}
+                  </p>
+                </section>
+              ) : null}
+              {v2Flags.upcomingExams && user && !isSelfLearner(user.accountType) ? (
+                <UpcomingExamsCard />
+              ) : null}
               <GettingStartedCard user={user} />
               {showSelfLearnerExtras ? <GoalTriageCard /> : null}
               {showSelfLearnerExtras ? <InterestChipRow /> : null}

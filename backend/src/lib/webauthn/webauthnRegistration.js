@@ -30,8 +30,8 @@ function generateRegistrationOptions(user) {
       displayName: user.username,
     },
     pubKeyCredParams: [
-      { alg: -7, type: 'public-key' },   // ES256 (ECDSA w/ SHA-256)
-      { alg: -257, type: 'public-key' },  // RS256 (RSASSA-PKCS1-v1_5 w/ SHA-256)
+      { alg: -7, type: 'public-key' }, // ES256 (ECDSA w/ SHA-256)
+      { alg: -257, type: 'public-key' }, // RS256 (RSASSA-PKCS1-v1_5 w/ SHA-256)
     ],
     timeout: 60000,
     authenticatorSelection: {
@@ -71,7 +71,10 @@ function verifyRegistration(credential, userId) {
     return { verified: false, error: 'Challenge mismatch.' }
   }
   if (clientData.origin !== ORIGIN) {
-    return { verified: false, error: `Origin mismatch: expected ${ORIGIN}, got ${clientData.origin}.` }
+    return {
+      verified: false,
+      error: `Origin mismatch: expected ${ORIGIN}, got ${clientData.origin}.`,
+    }
   }
 
   // 3. Parse attestationObject (CBOR)

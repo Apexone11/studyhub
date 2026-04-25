@@ -70,7 +70,13 @@ function getInitialModerationStatus(_user) {
  * @param {Date|string}  [params.createdAt]          — account creation timestamp (for age-based check)
  * @returns {boolean}
  */
-function meetsPromotionCriteria({ hasEmail, confirmedViolations, activeStrikes, hasActiveRestriction, createdAt }) {
+function meetsPromotionCriteria({
+  hasEmail,
+  confirmedViolations,
+  activeStrikes,
+  hasActiveRestriction,
+  createdAt,
+}) {
   // Hard blocks: any moderation issue prevents promotion
   if (confirmedViolations > 0) return false
   if (activeStrikes > 0) return false
@@ -112,8 +118,10 @@ async function checkAndPromoteTrust(userId) {
   if (!user) return { promoted: false, trustLevel: null }
 
   // Already at a terminal state — nothing to do.
-  if (user.trustLevel === TRUST_LEVELS.TRUSTED) return { promoted: false, trustLevel: TRUST_LEVELS.TRUSTED }
-  if (user.trustLevel === TRUST_LEVELS.RESTRICTED) return { promoted: false, trustLevel: TRUST_LEVELS.RESTRICTED }
+  if (user.trustLevel === TRUST_LEVELS.TRUSTED)
+    return { promoted: false, trustLevel: TRUST_LEVELS.TRUSTED }
+  if (user.trustLevel === TRUST_LEVELS.RESTRICTED)
+    return { promoted: false, trustLevel: TRUST_LEVELS.RESTRICTED }
 
   const [activeStrikes, activeRestriction, confirmedViolations] = await Promise.all([
     countActiveStrikes(userId),

@@ -154,29 +154,32 @@ export function useMessagingData(socket, currentUserId) {
   }, [])
 
   /* ── Unarchive conversation ─────────────────────────────────────────── */
-  const unarchiveConversation = useCallback(async (id) => {
-    try {
-      const response = await fetch(`${API}/api/messages/conversations/${id}/unarchive`, {
-        method: 'POST',
-        headers: authHeaders(),
-        credentials: 'include',
-      })
-      if (!response.ok) {
+  const unarchiveConversation = useCallback(
+    async (id) => {
+      try {
+        const response = await fetch(`${API}/api/messages/conversations/${id}/unarchive`, {
+          method: 'POST',
+          headers: authHeaders(),
+          credentials: 'include',
+        })
+        if (!response.ok) {
+          showToast('Failed to unarchive conversation', 'error')
+          return
+        }
+        // Move from archived to main list
+        const conv = archivedConversations.find((c) => c.id === id)
+        setArchivedConversations((prev) => prev.filter((c) => c.id !== id))
+        setArchivedCount((prev) => Math.max(0, prev - 1))
+        if (conv) {
+          setConversations((prev) => [conv, ...prev])
+        }
+        showToast('Conversation unarchived', 'success')
+      } catch {
         showToast('Failed to unarchive conversation', 'error')
-        return
       }
-      // Move from archived to main list
-      const conv = archivedConversations.find((c) => c.id === id)
-      setArchivedConversations((prev) => prev.filter((c) => c.id !== id))
-      setArchivedCount((prev) => Math.max(0, prev - 1))
-      if (conv) {
-        setConversations((prev) => [conv, ...prev])
-      }
-      showToast('Conversation unarchived', 'success')
-    } catch {
-      showToast('Failed to unarchive conversation', 'error')
-    }
-  }, [archivedConversations])
+    },
+    [archivedConversations],
+  )
 
   /* ── Block user (DM context) ────────────────────────────────────────── */
   const blockUser = useCallback(async (username) => {

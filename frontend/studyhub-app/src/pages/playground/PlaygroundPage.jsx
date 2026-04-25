@@ -75,10 +75,7 @@ export default function PlaygroundPage() {
   usePageTitle('Playground')
 
   return (
-    <PageShell
-      nav={<Navbar />}
-      sidebar={<AppSidebar />}
-    >
+    <PageShell nav={<Navbar />} sidebar={<AppSidebar />}>
       {/* Hero */}
       <section className="playground-hero">
         <div className="playground-hero__watermark">
@@ -132,9 +129,7 @@ export default function PlaygroundPage() {
           <div className="playground-features__grid">
             {FEATURES.map((feature, i) => (
               <div key={i} className="playground-feature-card">
-                <div className="playground-feature-card__icon">
-                  {getFeatureIcon(feature.icon)}
-                </div>
+                <div className="playground-feature-card__icon">{getFeatureIcon(feature.icon)}</div>
                 <h3 className="playground-feature-card__title">{feature.title}</h3>
                 <p className="playground-feature-card__desc">{feature.desc}</p>
               </div>
@@ -147,18 +142,30 @@ export default function PlaygroundPage() {
       <section className="playground-cta">
         <div className="playground-cta__inner">
           <p className="playground-cta__text">Want to be the first to try it?</p>
-          <Link to="/pricing" className="playground-cta__button">Notify Me</Link>
+          <Link to="/pricing" className="playground-cta__button">
+            Notify Me
+          </Link>
         </div>
       </section>
 
       {/* Footer */}
       <footer className="playground-footer">
         <div className="playground-footer__links">
-          <Link to="/" className="playground-footer__link">Home</Link>
-          <Link to="/feed" className="playground-footer__link">Browse</Link>
-          <Link to="/privacy" className="playground-footer__link">Privacy</Link>
-          <Link to="/terms" className="playground-footer__link">Terms</Link>
-          <Link to="/guidelines" className="playground-footer__link">Guidelines</Link>
+          <Link to="/" className="playground-footer__link">
+            Home
+          </Link>
+          <Link to="/feed" className="playground-footer__link">
+            Browse
+          </Link>
+          <Link to="/privacy" className="playground-footer__link">
+            Privacy
+          </Link>
+          <Link to="/terms" className="playground-footer__link">
+            Terms
+          </Link>
+          <Link to="/guidelines" className="playground-footer__link">
+            Guidelines
+          </Link>
         </div>
         <p className="playground-footer__copy">Code Playground -- StudyHub -- Open Source</p>
       </footer>
@@ -173,7 +180,12 @@ function getFeatureIcon(name) {
     viewBox: '0 0 24 24',
     fill: 'none',
     xmlns: 'http://www.w3.org/2000/svg',
-    style: { stroke: 'currentColor', strokeWidth: '1.8', strokeLinecap: 'round', strokeLinejoin: 'round' },
+    style: {
+      stroke: 'currentColor',
+      strokeWidth: '1.8',
+      strokeLinecap: 'round',
+      strokeLinejoin: 'round',
+    },
   }
 
   switch (name) {
@@ -225,9 +237,18 @@ function getFeatureIcon(name) {
     case 'ai':
       return (
         <svg {...iconProps}>
-          <path d="M12 3 L13.7 8.3 L19 10 L13.7 11.7 L12 17 L10.3 11.7 L5 10 L10.3 8.3 Z" fill="none" />
-          <path d="M18.5 3.5 L19.3 5.7 L21.5 6.5 L19.3 7.3 L18.5 9.5 L17.7 7.3 L15.5 6.5 L17.7 5.7 Z" fill="currentColor" />
-          <path d="M5.5 15.5 L6.2 17.1 L7.8 17.8 L6.2 18.5 L5.5 20.1 L4.8 18.5 L3.2 17.8 L4.8 17.1 Z" fill="currentColor" />
+          <path
+            d="M12 3 L13.7 8.3 L19 10 L13.7 11.7 L12 17 L10.3 11.7 L5 10 L10.3 8.3 Z"
+            fill="none"
+          />
+          <path
+            d="M18.5 3.5 L19.3 5.7 L21.5 6.5 L19.3 7.3 L18.5 9.5 L17.7 7.3 L15.5 6.5 L17.7 5.7 Z"
+            fill="currentColor"
+          />
+          <path
+            d="M5.5 15.5 L6.2 17.1 L7.8 17.8 L6.2 18.5 L5.5 20.1 L4.8 18.5 L3.2 17.8 L4.8 17.1 Z"
+            fill="currentColor"
+          />
         </svg>
       )
     case 'history':

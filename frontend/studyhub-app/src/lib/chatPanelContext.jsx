@@ -23,9 +23,5 @@ export function ChatPanelProvider({ children }) {
 
   const value = useMemo(() => ({ isOpen, setOpen }), [isOpen, setOpen])
 
-  return (
-    <ChatPanelContext.Provider value={value}>
-      {children}
-    </ChatPanelContext.Provider>
-  )
+  return <ChatPanelContext.Provider value={value}>{children}</ChatPanelContext.Provider>
 }

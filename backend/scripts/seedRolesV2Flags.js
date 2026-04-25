@@ -1,5 +1,5 @@
 /**
- * Seed the three Roles v2 feature flags (docs/roles-and-permissions-plan.md §13).
+ * Seed the three Roles v2 feature flags (docs/internal/roles-and-permissions-plan.md §13).
  *
  * Safe to run multiple times — uses upsert, so existing rows keep their
  * `enabled` state. New rows are created with `enabled: true` so rollout

@@ -11,7 +11,7 @@ async function disableTutorials(page) {
   })
 }
 
-test.describe.skip('My Courses Page', () => {
+test.describe('My Courses Page', () => {
   test.beforeEach(async ({ page }) => {
     await disableTutorials(page)
   })

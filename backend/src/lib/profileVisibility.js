@@ -36,7 +36,9 @@ async function getVisibilityByUserId(prisma, userIds) {
 }
 
 async function getSharedCourseUserIds(prisma, viewerUserId, targetUserIds) {
-  const uniqueTargetUserIds = [...new Set(targetUserIds.filter((userId) => Number.isInteger(userId)))]
+  const uniqueTargetUserIds = [
+    ...new Set(targetUserIds.filter((userId) => Number.isInteger(userId))),
+  ]
 
   if (!viewerUserId || !uniqueTargetUserIds.length) {
     return new Set()

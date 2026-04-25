@@ -46,6 +46,10 @@ export default defineConfig(async ({ mode }) => {
             'react-router',
             'react-router-dom',
             '@testing-library/react',
+            // Inline animejs so vi.mock('animejs', ...) intercepts the
+            // dynamic import inside src/lib/animations.js. Without this, the
+            // package is externalized and mocks are bypassed.
+            'animejs',
           ],
         },
       },
@@ -153,6 +157,14 @@ export default defineConfig(async ({ mode }) => {
       },
       reportCompressedSize: false,
       cssCodeSplit: true,
+      // CSS minify disabled. lightningcss (Vite 8 / rolldown default) trips on
+      // our concatenated @keyframes blocks from mobile/styles/motion.css with
+      // "Unknown at rule: @keyframes" during minify. esbuild is only a peer-
+      // optional with rolldown-vite and is not hoisted into node_modules, so
+      // switching minifiers would require an explicit install. Tracked as tech
+      // debt — revisit when lightningcss ships a fix or we decide to add
+      // esbuild as a dep.
+      cssMinify: false,
     },
   }
 })

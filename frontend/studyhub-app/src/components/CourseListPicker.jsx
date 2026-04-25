@@ -34,7 +34,9 @@ function HighlightMatch({ text, query }) {
   return (
     <>
       {text.slice(0, index)}
-      <strong style={{ color: 'var(--sh-pill-text)' }}>{text.slice(index, index + query.length)}</strong>
+      <strong style={{ color: 'var(--sh-pill-text)' }}>
+        {text.slice(index, index + query.length)}
+      </strong>
       {text.slice(index + query.length)}
     </>
   )
@@ -97,9 +99,20 @@ export default function CourseListPicker({
         />
         {/* Search icon */}
         <svg
-          width="16" height="16" viewBox="0 0 24 24" fill="none"
-          stroke="var(--sh-muted)" strokeWidth="2" strokeLinecap="round"
-          style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none' }}
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="var(--sh-muted)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          style={{
+            position: 'absolute',
+            right: 12,
+            top: '50%',
+            transform: 'translateY(-50%)',
+            pointerEvents: 'none',
+          }}
         >
           <circle cx="11" cy="11" r="8" />
           <path d="M21 21l-4.35-4.35" />
@@ -107,10 +120,16 @@ export default function CourseListPicker({
       </div>
 
       {/* ── Selection count ────────────────────────────────────────── */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        marginBottom: 6, fontSize: 12, color: 'var(--sh-muted)',
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 6,
+          fontSize: 12,
+          color: 'var(--sh-muted)',
+        }}
+      >
         <span>
           {selectedCount} of {maxSelections} selected
         </span>
@@ -132,10 +151,14 @@ export default function CourseListPicker({
         }}
       >
         {filteredCourses.length === 0 && (
-          <div style={{
-            padding: '24px 14px', textAlign: 'center',
-            fontSize: 13, color: 'var(--sh-muted)',
-          }}>
+          <div
+            style={{
+              padding: '24px 14px',
+              textAlign: 'center',
+              fontSize: 13,
+              color: 'var(--sh-muted)',
+            }}
+          >
             {trimmed
               ? `No courses match "${filter.trim()}"`
               : 'No courses available for this school.'}
@@ -172,7 +195,15 @@ export default function CourseListPicker({
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-text)' }}>
                   <HighlightMatch text={course.code} query={trimmed} />
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--sh-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--sh-muted)',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace: 'nowrap',
+                  }}
+                >
                   <HighlightMatch text={course.name} query={trimmed} />
                   {course.department ? ` · ${course.department}` : ''}
                 </div>

@@ -72,9 +72,7 @@ const API_SPEC = {
       description: 'Request password reset email',
       auth: 'none',
       params: {
-        body: [
-          { name: 'email', type: 'string', required: true, description: 'User email' },
-        ],
+        body: [{ name: 'email', type: 'string', required: true, description: 'User email' }],
       },
       response: { type: 'object', description: 'Reset email sent confirmation' },
     },
@@ -99,9 +97,7 @@ const API_SPEC = {
       description: 'Google OAuth authentication',
       auth: 'none',
       params: {
-        body: [
-          { name: 'token', type: 'string', required: true, description: 'Google ID token' },
-        ],
+        body: [{ name: 'token', type: 'string', required: true, description: 'Google ID token' }],
       },
       response: { type: 'object', description: 'User session from Google auth' },
     },
@@ -117,14 +113,54 @@ const API_SPEC = {
       auth: 'optional',
       params: {
         query: [
-          { name: 'search', type: 'string', required: false, description: 'Search sheets by title, description, content' },
-          { name: 'courseId', type: 'integer', required: false, description: 'Filter by course ID' },
-          { name: 'schoolId', type: 'integer', required: false, description: 'Filter by school ID' },
-          { name: 'mine', type: 'boolean', required: false, description: 'Show only user sheets (requires auth)' },
-          { name: 'starred', type: 'boolean', required: false, description: 'Show only starred sheets (requires auth)' },
-          { name: 'sort', type: 'string', required: false, description: 'Sort by: recent, popular, stars' },
-          { name: 'page', type: 'integer', required: false, description: 'Page number (default 1)' },
-          { name: 'limit', type: 'integer', required: false, description: 'Results per page (max 100)' },
+          {
+            name: 'search',
+            type: 'string',
+            required: false,
+            description: 'Search sheets by title, description, content',
+          },
+          {
+            name: 'courseId',
+            type: 'integer',
+            required: false,
+            description: 'Filter by course ID',
+          },
+          {
+            name: 'schoolId',
+            type: 'integer',
+            required: false,
+            description: 'Filter by school ID',
+          },
+          {
+            name: 'mine',
+            type: 'boolean',
+            required: false,
+            description: 'Show only user sheets (requires auth)',
+          },
+          {
+            name: 'starred',
+            type: 'boolean',
+            required: false,
+            description: 'Show only starred sheets (requires auth)',
+          },
+          {
+            name: 'sort',
+            type: 'string',
+            required: false,
+            description: 'Sort by: recent, popular, stars',
+          },
+          {
+            name: 'page',
+            type: 'integer',
+            required: false,
+            description: 'Page number (default 1)',
+          },
+          {
+            name: 'limit',
+            type: 'integer',
+            required: false,
+            description: 'Results per page (max 100)',
+          },
         ],
       },
       response: {
@@ -141,7 +177,12 @@ const API_SPEC = {
       auth: 'optional',
       params: {
         query: [
-          { name: 'limit', type: 'integer', required: false, description: 'Number of results (max 100)' },
+          {
+            name: 'limit',
+            type: 'integer',
+            required: false,
+            description: 'Number of results (max 100)',
+          },
         ],
       },
       response: { type: 'array', description: 'List of top study sheets' },
@@ -153,9 +194,7 @@ const API_SPEC = {
       description: 'Get a single study sheet by ID',
       auth: 'optional',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Sheet ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Sheet ID' }],
       },
       response: { type: 'object', description: 'Study sheet object with full content' },
     },
@@ -167,10 +206,30 @@ const API_SPEC = {
       auth: 'required',
       params: {
         body: [
-          { name: 'title', type: 'string', required: true, description: 'Sheet title (max 200 chars)' },
-          { name: 'description', type: 'string', required: false, description: 'Short description' },
-          { name: 'content', type: 'string', required: true, description: 'Sheet content (HTML rich text)' },
-          { name: 'courseId', type: 'integer', required: false, description: 'Associated course ID' },
+          {
+            name: 'title',
+            type: 'string',
+            required: true,
+            description: 'Sheet title (max 200 chars)',
+          },
+          {
+            name: 'description',
+            type: 'string',
+            required: false,
+            description: 'Short description',
+          },
+          {
+            name: 'content',
+            type: 'string',
+            required: true,
+            description: 'Sheet content (HTML rich text)',
+          },
+          {
+            name: 'courseId',
+            type: 'integer',
+            required: false,
+            description: 'Associated course ID',
+          },
         ],
       },
       response: { type: 'object', description: 'Created study sheet' },
@@ -182,9 +241,7 @@ const API_SPEC = {
       description: 'Update an existing study sheet',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Sheet ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Sheet ID' }],
         body: [
           { name: 'title', type: 'string', required: false, description: 'New title' },
           { name: 'description', type: 'string', required: false, description: 'New description' },
@@ -200,9 +257,7 @@ const API_SPEC = {
       description: 'Delete a study sheet',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Sheet ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Sheet ID' }],
       },
       response: { type: 'object', description: 'Deletion confirmation' },
     },
@@ -213,9 +268,7 @@ const API_SPEC = {
       description: 'Fork a study sheet',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Source sheet ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Source sheet ID' }],
       },
       response: { type: 'object', description: 'Forked study sheet' },
     },
@@ -226,9 +279,7 @@ const API_SPEC = {
       description: 'Star a study sheet',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Sheet ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Sheet ID' }],
       },
       response: { type: 'object', description: 'Star count and status' },
     },
@@ -239,9 +290,7 @@ const API_SPEC = {
       description: 'Unstar a study sheet',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Sheet ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Sheet ID' }],
       },
       response: { type: 'object', description: 'Star count and status' },
     },
@@ -256,12 +305,20 @@ const API_SPEC = {
       description: 'Get comments on a study sheet',
       auth: 'optional',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Sheet ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Sheet ID' }],
         query: [
-          { name: 'limit', type: 'integer', required: false, description: 'Number of comments (default 50)' },
-          { name: 'offset', type: 'integer', required: false, description: 'Pagination offset (default 0)' },
+          {
+            name: 'limit',
+            type: 'integer',
+            required: false,
+            description: 'Number of comments (default 50)',
+          },
+          {
+            name: 'offset',
+            type: 'integer',
+            required: false,
+            description: 'Pagination offset (default 0)',
+          },
         ],
       },
       response: { type: 'object', description: 'Comments array and pagination' },
@@ -273,11 +330,14 @@ const API_SPEC = {
       description: 'Add a comment to a study sheet',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Sheet ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Sheet ID' }],
         body: [
-          { name: 'content', type: 'string', required: true, description: 'Comment text (max 500 chars)' },
+          {
+            name: 'content',
+            type: 'string',
+            required: true,
+            description: 'Comment text (max 500 chars)',
+          },
         ],
       },
       response: { type: 'object', description: 'Created comment' },
@@ -311,7 +371,12 @@ const API_SPEC = {
           { name: 'q', type: 'string', required: false, description: 'Search query' },
           { name: 'courseId', type: 'integer', required: false, description: 'Filter by course' },
           { name: 'shared', type: 'boolean', required: false, description: 'Show shared notes' },
-          { name: 'private', type: 'boolean', required: false, description: 'Filter by private status' },
+          {
+            name: 'private',
+            type: 'boolean',
+            required: false,
+            description: 'Filter by private status',
+          },
           { name: 'page', type: 'integer', required: false, description: 'Page number' },
           { name: 'limit', type: 'integer', required: false, description: 'Results per page' },
         ],
@@ -325,9 +390,7 @@ const API_SPEC = {
       description: 'Get a single note',
       auth: 'optional',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Note ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Note ID' }],
       },
       response: { type: 'object', description: 'Note object' },
     },
@@ -339,10 +402,25 @@ const API_SPEC = {
       auth: 'required',
       params: {
         body: [
-          { name: 'title', type: 'string', required: true, description: 'Note title (max 120 chars)' },
-          { name: 'content', type: 'string', required: true, description: 'Note content (max 50000 chars)' },
+          {
+            name: 'title',
+            type: 'string',
+            required: true,
+            description: 'Note title (max 120 chars)',
+          },
+          {
+            name: 'content',
+            type: 'string',
+            required: true,
+            description: 'Note content (max 50000 chars)',
+          },
           { name: 'courseId', type: 'integer', required: false, description: 'Associated course' },
-          { name: 'private', type: 'boolean', required: false, description: 'Private note (default true)' },
+          {
+            name: 'private',
+            type: 'boolean',
+            required: false,
+            description: 'Private note (default true)',
+          },
         ],
       },
       response: { type: 'object', description: 'Created note' },
@@ -354,9 +432,7 @@ const API_SPEC = {
       description: 'Update a note',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Note ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Note ID' }],
         body: [
           { name: 'title', type: 'string', required: false, description: 'New title' },
           { name: 'content', type: 'string', required: false, description: 'New content' },
@@ -372,9 +448,7 @@ const API_SPEC = {
       description: 'Delete a note',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Note ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Note ID' }],
       },
       response: { type: 'object', description: 'Deletion confirmation' },
     },
@@ -390,7 +464,12 @@ const API_SPEC = {
       auth: 'optional',
       params: {
         query: [
-          { name: 'search', type: 'string', required: false, description: 'Search by code or name' },
+          {
+            name: 'search',
+            type: 'string',
+            required: false,
+            description: 'Search by code or name',
+          },
           { name: 'schoolId', type: 'integer', required: false, description: 'Filter by school' },
           { name: 'limit', type: 'integer', required: false, description: 'Results limit' },
         ],
@@ -404,9 +483,7 @@ const API_SPEC = {
       description: 'Get a single course',
       auth: 'optional',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Course ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Course ID' }],
       },
       response: { type: 'object', description: 'Course object with enrollment info' },
     },
@@ -417,9 +494,7 @@ const API_SPEC = {
       description: 'Enroll in a course',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Course ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Course ID' }],
       },
       response: { type: 'object', description: 'Enrollment confirmation' },
     },
@@ -430,9 +505,7 @@ const API_SPEC = {
       description: 'Drop from a course',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Course ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Course ID' }],
       },
       response: { type: 'object', description: 'Unenrollment confirmation' },
     },
@@ -447,9 +520,7 @@ const API_SPEC = {
       description: 'Get user profile',
       auth: 'optional',
       params: {
-        path: [
-          { name: 'username', type: 'string', required: true, description: 'Username' },
-        ],
+        path: [{ name: 'username', type: 'string', required: true, description: 'Username' }],
       },
       response: { type: 'object', description: 'User profile with stats' },
     },
@@ -460,11 +531,14 @@ const API_SPEC = {
       description: 'Get user activity history',
       auth: 'optional',
       params: {
-        path: [
-          { name: 'username', type: 'string', required: true, description: 'Username' },
-        ],
+        path: [{ name: 'username', type: 'string', required: true, description: 'Username' }],
         query: [
-          { name: 'weeks', type: 'integer', required: false, description: 'Number of weeks (max 52)' },
+          {
+            name: 'weeks',
+            type: 'integer',
+            required: false,
+            description: 'Number of weeks (max 52)',
+          },
         ],
       },
       response: { type: 'array', description: 'Daily activity records' },
@@ -476,9 +550,7 @@ const API_SPEC = {
       description: 'Get user contribution statistics',
       auth: 'optional',
       params: {
-        path: [
-          { name: 'username', type: 'string', required: true, description: 'Username' },
-        ],
+        path: [{ name: 'username', type: 'string', required: true, description: 'Username' }],
       },
       response: { type: 'object', description: 'Contribution stats' },
     },
@@ -489,9 +561,7 @@ const API_SPEC = {
       description: 'Get user followers',
       auth: 'optional',
       params: {
-        path: [
-          { name: 'username', type: 'string', required: true, description: 'Username' },
-        ],
+        path: [{ name: 'username', type: 'string', required: true, description: 'Username' }],
       },
       response: { type: 'array', description: 'List of followers' },
     },
@@ -532,7 +602,12 @@ const API_SPEC = {
           { name: 'username', type: 'string', required: true, description: 'Username to block' },
         ],
         body: [
-          { name: 'reason', type: 'string', required: false, description: 'Block reason (max 500 chars)' },
+          {
+            name: 'reason',
+            type: 'string',
+            required: false,
+            description: 'Block reason (max 500 chars)',
+          },
         ],
       },
       response: { type: 'object', description: 'Block status' },
@@ -576,9 +651,7 @@ const API_SPEC = {
       description: 'Get recommended sheets for user',
       auth: 'required',
       params: {
-        query: [
-          { name: 'limit', type: 'integer', required: false, description: 'Results limit' },
-        ],
+        query: [{ name: 'limit', type: 'integer', required: false, description: 'Results limit' }],
       },
       response: { type: 'array', description: 'Recommended sheets' },
     },
@@ -595,8 +668,18 @@ const API_SPEC = {
       params: {
         query: [
           { name: 'q', type: 'string', required: true, description: 'Search query (2-200 chars)' },
-          { name: 'type', type: 'string', required: false, description: 'Type filter: all, sheets, courses, users, notes, groups' },
-          { name: 'limit', type: 'integer', required: false, description: 'Results per type (max 20)' },
+          {
+            name: 'type',
+            type: 'string',
+            required: false,
+            description: 'Type filter: all, sheets, courses, users, notes, groups',
+          },
+          {
+            name: 'limit',
+            type: 'integer',
+            required: false,
+            description: 'Results per type (max 20)',
+          },
           { name: 'fts', type: 'boolean', required: false, description: 'Use full-text search' },
         ],
       },
@@ -631,9 +714,7 @@ const API_SPEC = {
       description: 'Mark notification as read',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'Notification ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'Notification ID' }],
       },
       response: { type: 'object', description: 'Updated notification' },
     },
@@ -662,9 +743,7 @@ const API_SPEC = {
       description: 'Get messages in a conversation',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'string', required: true, description: 'Conversation ID' },
-        ],
+        path: [{ name: 'id', type: 'string', required: true, description: 'Conversation ID' }],
         query: [
           { name: 'limit', type: 'integer', required: false, description: 'Results limit' },
           { name: 'offset', type: 'integer', required: false, description: 'Pagination offset' },
@@ -679,12 +758,8 @@ const API_SPEC = {
       description: 'Send a message in conversation',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'string', required: true, description: 'Conversation ID' },
-        ],
-        body: [
-          { name: 'content', type: 'string', required: true, description: 'Message text' },
-        ],
+        path: [{ name: 'id', type: 'string', required: true, description: 'Conversation ID' }],
+        body: [{ name: 'content', type: 'string', required: true, description: 'Message text' }],
       },
       response: { type: 'object', description: 'Created message' },
     },
@@ -713,9 +788,7 @@ const API_SPEC = {
       description: 'Get a study group',
       auth: 'optional',
       params: {
-        path: [
-          { name: 'id', type: 'string', required: true, description: 'Group ID' },
-        ],
+        path: [{ name: 'id', type: 'string', required: true, description: 'Group ID' }],
       },
       response: { type: 'object', description: 'Study group details' },
     },
@@ -728,7 +801,12 @@ const API_SPEC = {
       params: {
         body: [
           { name: 'name', type: 'string', required: true, description: 'Group name' },
-          { name: 'description', type: 'string', required: false, description: 'Group description' },
+          {
+            name: 'description',
+            type: 'string',
+            required: false,
+            description: 'Group description',
+          },
           { name: 'privacy', type: 'string', required: false, description: 'public or private' },
           { name: 'courseId', type: 'integer', required: false, description: 'Associated course' },
         ],
@@ -742,9 +820,7 @@ const API_SPEC = {
       description: 'Join a study group',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'string', required: true, description: 'Group ID' },
-        ],
+        path: [{ name: 'id', type: 'string', required: true, description: 'Group ID' }],
       },
       response: { type: 'object', description: 'Join confirmation' },
     },
@@ -773,9 +849,7 @@ const API_SPEC = {
       description: 'Update user role (admin only)',
       auth: 'required',
       params: {
-        path: [
-          { name: 'id', type: 'integer', required: true, description: 'User ID' },
-        ],
+        path: [{ name: 'id', type: 'integer', required: true, description: 'User ID' }],
         body: [
           { name: 'role', type: 'string', required: true, description: 'user, moderator, admin' },
         ],
@@ -789,9 +863,7 @@ const API_SPEC = {
       description: 'Get content moderation queue (admin only)',
       auth: 'required',
       params: {
-        query: [
-          { name: 'limit', type: 'integer', required: false, description: 'Results limit' },
-        ],
+        query: [{ name: 'limit', type: 'integer', required: false, description: 'Results limit' }],
       },
       response: { type: 'array', description: 'Items pending review' },
     },

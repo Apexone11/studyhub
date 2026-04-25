@@ -4,8 +4,13 @@
 import { Link } from 'react-router-dom'
 
 export default function SheetsAside({
-  sheetsTotal, catalogCount, enrollmentCount,
-  popularCourses, recentCourses, activeCourseId, onCourseFilter,
+  sheetsTotal,
+  catalogCount,
+  enrollmentCount,
+  popularCourses,
+  recentCourses,
+  activeCourseId,
+  onCourseFilter,
 }) {
   const handleCourseClick = (course) => {
     const isActive = String(course.id) === String(activeCourseId)
@@ -24,7 +29,11 @@ export default function SheetsAside({
           <div>{enrollmentCount} courses in your profile</div>
         </div>
         {enrollmentCount === 0 ? (
-          <Link to="/settings?tab=courses" className="sh-btn sh-btn--primary sh-btn--sm" style={{ marginTop: 10 }}>
+          <Link
+            to="/settings?tab=courses"
+            className="sh-btn sh-btn--primary sh-btn--sm"
+            style={{ marginTop: 10 }}
+          >
             Add your courses
           </Link>
         ) : null}
@@ -43,7 +52,9 @@ export default function SheetsAside({
                 onClick={() => handleCourseClick(course)}
               >
                 {course.code}
-                {course.schoolLabel ? <span className="sheets-page__course-chip-school">{course.schoolLabel}</span> : null}
+                {course.schoolLabel ? (
+                  <span className="sheets-page__course-chip-school">{course.schoolLabel}</span>
+                ) : null}
               </button>
             ))}
           </div>
@@ -63,7 +74,9 @@ export default function SheetsAside({
                 onClick={() => handleCourseClick(course)}
               >
                 <span className="sheets-page__popular-code">{course.code}</span>
-                <span className="sheets-page__popular-school">{course.school?.short || course.school?.name || ''}</span>
+                <span className="sheets-page__popular-school">
+                  {course.school?.short || course.school?.name || ''}
+                </span>
                 <span className="sheets-page__popular-count">{course.sheetCount}</span>
               </button>
             ))}
@@ -74,7 +87,8 @@ export default function SheetsAside({
       <section className="sh-card">
         <h2 className="sh-card-title">How to use</h2>
         <p className="sheets-page__aside-copy">
-          Filter by school or course to find what you need. Star sheets you want to revisit, or fork one to build on it.
+          Filter by school or course to find what you need. Star sheets you want to revisit, or fork
+          one to build on it.
         </p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
           <Link to="/sheets/upload" className="sh-btn sh-btn--primary sh-btn--sm">

@@ -4,7 +4,7 @@ import { API } from '../../config'
 
 /**
  * MyLearningTab — Self-learner replacement for the Study tab.
- * See docs/roles-and-permissions-plan.md §7.1. No course progress, no
+ * See docs/internal/roles-and-permissions-plan.md §7.1. No course progress, no
  * class schedule — just the four things Self-learners actually need:
  *   - Current learning goal (editable)
  *   - Topics followed

@@ -9,6 +9,7 @@ const prisma = require('../../lib/prisma')
 const { checkAndAwardBadges } = require('../../lib/badges')
 const { getUserStreak, getWeeklyActivity } = require('../../lib/streaks')
 const { enrichUserWithBadges } = require('../../lib/userBadges')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const {
   CURRENT_LEGAL_VERSION,
   acceptCurrentLegalDocuments,
@@ -44,7 +45,7 @@ const getMyActivity = async (req, res) => {
     res.json(rows)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -55,7 +56,7 @@ const getActivityByUsername = async (req, res) => {
       where: { username: req.params.username },
       select: { id: true },
     })
-    if (!user) return res.status(404).json({ error: 'User not found.' })
+    if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     const weeksParam = Math.min(Number(req.query.weeks) || 12, 52)
     const since = new Date()
@@ -70,7 +71,7 @@ const getActivityByUsername = async (req, res) => {
     res.json(rows)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -97,7 +98,7 @@ const getMyBadges = async (req, res) => {
     res.json(badges.map((ub) => ({ ...ub.badge, unlockedAt: ub.unlockedAt })))
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -108,7 +109,7 @@ const getBadgesByUsername = async (req, res) => {
       where: { username: req.params.username },
       select: { id: true },
     })
-    if (!user) return res.status(404).json({ error: 'User not found.' })
+    if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     const badges = await prisma.userBadge.findMany({
       where: { userId: user.id },
@@ -130,7 +131,7 @@ const getBadgesByUsername = async (req, res) => {
     res.json(badges.map((ub) => ({ ...ub.badge, unlockedAt: ub.unlockedAt })))
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -159,7 +160,7 @@ const getMyPinnedSheets = async (req, res) => {
     res.json(pins)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -167,7 +168,7 @@ const getMyPinnedSheets = async (req, res) => {
 const addPinnedSheet = async (req, res) => {
   const { sheetId } = req.body || {}
   if (!sheetId || !Number.isInteger(Number(sheetId))) {
-    return res.status(400).json({ error: 'sheetId is required.' })
+    return sendError(res, 400, 'sheetId is required.', ERROR_CODES.BAD_REQUEST)
   }
 
   try {
@@ -175,14 +176,14 @@ const addPinnedSheet = async (req, res) => {
       where: { id: Number(sheetId) },
       select: { id: true, userId: true, status: true },
     })
-    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!sheet) return sendError(res, 404, 'Sheet not found.', ERROR_CODES.NOT_FOUND)
     if (sheet.userId !== req.user.userId) {
-      return res.status(403).json({ error: 'You can only pin your own sheets.' })
+      return sendError(res, 403, 'You can only pin your own sheets.', ERROR_CODES.FORBIDDEN)
     }
 
     const existing = await prisma.userPinnedSheet.count({ where: { userId: req.user.userId } })
     if (existing >= 6) {
-      return res.status(400).json({ error: 'You can pin up to 6 sheets.' })
+      return sendError(res, 400, 'You can pin up to 6 sheets.', ERROR_CODES.BAD_REQUEST)
     }
 
     const pin = await prisma.userPinnedSheet.upsert({
@@ -194,7 +195,7 @@ const addPinnedSheet = async (req, res) => {
     res.status(201).json(pin)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -208,7 +209,7 @@ const deletePinnedSheet = async (req, res) => {
     res.json({ removed: true })
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -216,7 +217,7 @@ const deletePinnedSheet = async (req, res) => {
 const reorderPinnedSheets = async (req, res) => {
   const { order } = req.body || {}
   if (!Array.isArray(order)) {
-    return res.status(400).json({ error: 'order must be an array of sheetIds.' })
+    return sendError(res, 400, 'order must be an array of sheetIds.', ERROR_CODES.BAD_REQUEST)
   }
 
   try {
@@ -231,7 +232,7 @@ const reorderPinnedSheets = async (req, res) => {
     res.json({ reordered: true })
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -271,7 +272,7 @@ const getUserByUsername = async (req, res) => {
       },
     })
 
-    if (!user) return res.status(404).json({ error: 'User not found.' })
+    if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     const accessDecision = await getProfileAccessDecision(prisma, req.user, user.id)
 
@@ -281,7 +282,7 @@ const getUserByUsername = async (req, res) => {
           ? 'This profile is private.'
           : 'This profile is only visible to classmates.'
 
-      return res.status(403).json({ error: errorMessage })
+      return sendError(res, 403, errorMessage, ERROR_CODES.FORBIDDEN)
     }
 
     // Compute follower/following counts with status: 'active' filter
@@ -482,7 +483,7 @@ const getUserByUsername = async (req, res) => {
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -493,9 +494,9 @@ const followUser = async (req, res) => {
       where: { username: req.params.username },
       select: { id: true, username: true, isPrivate: true },
     })
-    if (!target) return res.status(404).json({ error: 'User not found.' })
+    if (!target) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
     if (target.id === req.user.userId)
-      return res.status(400).json({ error: 'You cannot follow yourself.' })
+      return sendError(res, 400, 'You cannot follow yourself.', ERROR_CODES.BAD_REQUEST)
 
     // Check if there's already a pending or active follow
     const existing = await prisma.userFollow.findUnique({
@@ -503,9 +504,9 @@ const followUser = async (req, res) => {
     })
     if (existing) {
       if (existing.status === 'pending') {
-        return res.status(409).json({ error: 'Follow request already pending.' })
+        return sendError(res, 409, 'Follow request already pending.', ERROR_CODES.CONFLICT)
       }
-      return res.status(409).json({ error: 'Already following this user.' })
+      return sendError(res, 409, 'Already following this user.', ERROR_CODES.CONFLICT)
     }
 
     const isPending = target.isPrivate === true
@@ -541,9 +542,10 @@ const followUser = async (req, res) => {
     checkAndAwardBadges(prisma, target.id)
     res.json({ following: true, followerCount })
   } catch (err) {
-    if (err.code === 'P2002') return res.status(409).json({ error: 'Already following this user.' })
+    if (err.code === 'P2002')
+      return sendError(res, 409, 'Already following this user.', ERROR_CODES.CONFLICT)
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -555,7 +557,7 @@ const unfollowUser = async (req, res) => {
       where: { username: req.params.username },
       select: { id: true },
     })
-    if (!target) return res.status(404).json({ error: 'User not found.' })
+    if (!target) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     await prisma.userFollow.delete({
       where: { followerId_followingId: { followerId: req.user.userId, followingId: target.id } },
@@ -566,9 +568,10 @@ const unfollowUser = async (req, res) => {
     })
     res.json({ following: false, followerCount })
   } catch (err) {
-    if (err.code === 'P2025') return res.status(404).json({ error: 'Not following this user.' })
+    if (err.code === 'P2025')
+      return sendError(res, 404, 'Not following this user.', ERROR_CODES.NOT_FOUND)
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -579,7 +582,7 @@ const getFollowers = async (req, res) => {
       where: { username: req.params.username },
       select: { id: true },
     })
-    if (!user) return res.status(404).json({ error: 'User not found.' })
+    if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     const follows = await prisma.userFollow.findMany({
       where: { followingId: user.id, status: 'active' },
@@ -595,7 +598,7 @@ const getFollowers = async (req, res) => {
     res.json(follows.map((f) => f.follower))
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -606,7 +609,7 @@ const getFollowing = async (req, res) => {
       where: { username: req.params.username },
       select: { id: true },
     })
-    if (!user) return res.status(404).json({ error: 'User not found.' })
+    if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     const follows = await prisma.userFollow.findMany({
       where: { followerId: user.id, status: 'active' },
@@ -622,7 +625,7 @@ const getFollowing = async (req, res) => {
     res.json(follows.map((f) => f.following))
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -633,7 +636,7 @@ const getMyStreak = async (req, res) => {
     res.json(streakData)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -644,7 +647,7 @@ const getMyWeeklyActivity = async (req, res) => {
     res.json(weeklyData)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -689,7 +692,7 @@ const getMe = async (req, res) => {
       },
     })
 
-    if (!user) return res.status(404).json({ error: 'User not found.' })
+    if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     const pii = await loadProfilePii(user.id, req)
     const profilePresentation = buildProfilePresentation({
@@ -717,7 +720,7 @@ const getMe = async (req, res) => {
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -808,7 +811,7 @@ const getFollowSuggestions = async (req, res) => {
     )
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -833,7 +836,7 @@ const getBlockedUsers = async (req, res) => {
       return res.json([])
     }
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -858,7 +861,7 @@ const getMutedUsers = async (req, res) => {
       return res.json([])
     }
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -870,9 +873,9 @@ const blockUser = async (req, res) => {
       where: { username: { equals: req.params.username, mode: 'insensitive' } },
       select: { id: true },
     })
-    if (!target) return res.status(404).json({ error: 'User not found.' })
+    if (!target) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
     if (target.id === req.user.userId)
-      return res.status(400).json({ error: 'Cannot block yourself.' })
+      return sendError(res, 400, 'Cannot block yourself.', ERROR_CODES.BAD_REQUEST)
 
     await prisma.userBlock.create({
       data: { blockerId: req.user.userId, blockedId: target.id },
@@ -893,10 +896,10 @@ const blockUser = async (req, res) => {
     // Unique constraint = already blocked
     if (err.code === 'P2002') return res.json({ blocked: true })
     if (err.code === 'P2021' || err.message?.includes('does not exist')) {
-      return res.status(500).json({ error: 'Block feature is not available yet.' })
+      return sendError(res, 500, 'Block feature is not available yet.', ERROR_CODES.INTERNAL)
     }
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -908,7 +911,7 @@ const unblockUser = async (req, res) => {
       where: { username: { equals: req.params.username, mode: 'insensitive' } },
       select: { id: true },
     })
-    if (!target) return res.status(404).json({ error: 'User not found.' })
+    if (!target) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     await prisma.userBlock.deleteMany({
       where: { blockerId: req.user.userId, blockedId: target.id },
@@ -920,7 +923,7 @@ const unblockUser = async (req, res) => {
       return res.json({ blocked: false })
     }
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -932,9 +935,9 @@ const muteUser = async (req, res) => {
       where: { username: { equals: req.params.username, mode: 'insensitive' } },
       select: { id: true },
     })
-    if (!target) return res.status(404).json({ error: 'User not found.' })
+    if (!target) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
     if (target.id === req.user.userId)
-      return res.status(400).json({ error: 'Cannot mute yourself.' })
+      return sendError(res, 400, 'Cannot mute yourself.', ERROR_CODES.BAD_REQUEST)
 
     await prisma.userMute.create({
       data: { muterId: req.user.userId, mutedId: target.id },
@@ -944,10 +947,10 @@ const muteUser = async (req, res) => {
   } catch (err) {
     if (err.code === 'P2002') return res.json({ muted: true })
     if (err.code === 'P2021' || err.message?.includes('does not exist')) {
-      return res.status(500).json({ error: 'Mute feature is not available yet.' })
+      return sendError(res, 500, 'Mute feature is not available yet.', ERROR_CODES.INTERNAL)
     }
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -959,7 +962,7 @@ const unmuteUser = async (req, res) => {
       where: { username: { equals: req.params.username, mode: 'insensitive' } },
       select: { id: true },
     })
-    if (!target) return res.status(404).json({ error: 'User not found.' })
+    if (!target) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     await prisma.userMute.deleteMany({
       where: { muterId: req.user.userId, mutedId: target.id },
@@ -971,7 +974,7 @@ const unmuteUser = async (req, res) => {
       return res.json({ muted: false })
     }
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1005,7 +1008,7 @@ const getFollowRequests = async (req, res) => {
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1016,7 +1019,7 @@ const acceptFollowRequest = async (req, res) => {
       where: { username: req.params.username },
       select: { id: true, username: true },
     })
-    if (!requester) return res.status(404).json({ error: 'User not found.' })
+    if (!requester) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     const follow = await prisma.userFollow.findUnique({
       where: {
@@ -1025,7 +1028,7 @@ const acceptFollowRequest = async (req, res) => {
     })
 
     if (!follow || follow.status !== 'pending') {
-      return res.status(404).json({ error: 'No pending follow request from this user.' })
+      return sendError(res, 404, 'No pending follow request from this user.', ERROR_CODES.NOT_FOUND)
     }
 
     await prisma.userFollow.update({
@@ -1047,7 +1050,7 @@ const acceptFollowRequest = async (req, res) => {
     res.json({ accepted: true })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1058,7 +1061,7 @@ const declineFollowRequest = async (req, res) => {
       where: { username: req.params.username },
       select: { id: true },
     })
-    if (!requester) return res.status(404).json({ error: 'User not found.' })
+    if (!requester) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     const follow = await prisma.userFollow.findUnique({
       where: {
@@ -1067,7 +1070,7 @@ const declineFollowRequest = async (req, res) => {
     })
 
     if (!follow || follow.status !== 'pending') {
-      return res.status(404).json({ error: 'No pending follow request from this user.' })
+      return sendError(res, 404, 'No pending follow request from this user.', ERROR_CODES.NOT_FOUND)
     }
 
     await prisma.userFollow.delete({
@@ -1079,7 +1082,7 @@ const declineFollowRequest = async (req, res) => {
     res.json({ declined: true })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1088,7 +1091,7 @@ const updatePrivacy = async (req, res) => {
   try {
     const { isPrivate } = req.body || {}
     if (typeof isPrivate !== 'boolean') {
-      return res.status(400).json({ error: 'isPrivate must be a boolean.' })
+      return sendError(res, 400, 'isPrivate must be a boolean.', ERROR_CODES.BAD_REQUEST)
     }
 
     const updated = await prisma.user.update({
@@ -1108,7 +1111,7 @@ const updatePrivacy = async (req, res) => {
     res.json({ isPrivate: updated.isPrivate })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1125,7 +1128,7 @@ const getTermsStatus = async (req, res) => {
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1143,7 +1146,7 @@ const acceptTerms = async (req, res) => {
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1181,6 +1184,7 @@ module.exports = {
   getAccountTypeStatus,
   getLearningGoal,
   setLearningGoal,
+  getOnboardingState,
 }
 
 const MAX_LEARNING_GOAL_LENGTH = 500
@@ -1195,7 +1199,7 @@ async function getLearningGoal(req, res) {
     return res.json({ goal: latest || null })
   } catch (err) {
     captureError(err, { where: 'getLearningGoal' })
-    return res.status(500).json({ error: 'Failed to load learning goal' })
+    return sendError(res, 500, 'Failed to load learning goal', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1203,7 +1207,7 @@ async function setLearningGoal(req, res) {
   try {
     const raw = typeof req.body?.goal === 'string' ? req.body.goal.trim() : ''
     if (!raw) {
-      return res.status(400).json({ error: 'goal is required' })
+      return sendError(res, 400, 'goal is required', ERROR_CODES.BAD_REQUEST)
     }
     if (raw.length > MAX_LEARNING_GOAL_LENGTH) {
       return res
@@ -1221,12 +1225,12 @@ async function setLearningGoal(req, res) {
     return res.status(201).json({ goal: created })
   } catch (err) {
     captureError(err, { where: 'setLearningGoal' })
-    return res.status(500).json({ error: 'Failed to save learning goal' })
+    return sendError(res, 500, 'Failed to save learning goal', ERROR_CODES.INTERNAL)
   }
 }
 
 // ── Account type change: 2-day revert + 3 changes/30 days rate cap ──────────
-// See docs/roles-and-permissions-plan.md §8.
+// See docs/internal/roles-and-permissions-plan.md §8.
 
 const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -1300,9 +1304,12 @@ async function requestAccountTypeChange(req, res) {
   try {
     const { accountType, reason } = req.body || {}
     if (!accountType || !VALID_ACCOUNT_TYPES.includes(accountType)) {
-      return res.status(400).json({
-        error: `Account type must be one of: ${VALID_ACCOUNT_TYPES.join(', ')}`,
-      })
+      return sendError(
+        res,
+        400,
+        `Account type must be one of: ${VALID_ACCOUNT_TYPES.join(', ')}`,
+        ERROR_CODES.BAD_REQUEST,
+      )
     }
 
     const userId = req.user.userId
@@ -1314,10 +1321,10 @@ async function requestAccountTypeChange(req, res) {
         roleRevertDeadline: true,
       },
     })
-    if (!user) return res.status(404).json({ error: 'User not found.' })
+    if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     if (user.accountType === accountType) {
-      return res.status(400).json({ error: 'You already have this account type.' })
+      return sendError(res, 400, 'You already have this account type.', ERROR_CODES.BAD_REQUEST)
     }
 
     const inRevert = isInRevertWindow(user)
@@ -1336,11 +1343,15 @@ async function requestAccountTypeChange(req, res) {
         const retryAfter = oldestWithinWindow
           ? new Date(oldestWithinWindow.changedAt.getTime() + RATE_CAP_WINDOW_MS).toISOString()
           : null
-        return res.status(409).json({
-          error: `You can only change your role ${RATE_CAP_MAX_CHANGES} times every 30 days.`,
-          code: 'COOLDOWN',
-          retryAfter,
-        })
+        return sendError(
+          res,
+          409,
+          `You can only change your role ${RATE_CAP_MAX_CHANGES} times every 30 days.`,
+          'COOLDOWN',
+          {
+            retryAfter,
+          },
+        )
       }
     }
 
@@ -1421,7 +1432,7 @@ async function requestAccountTypeChange(req, res) {
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 }
 
@@ -1437,7 +1448,7 @@ async function getAccountTypeStatus(req, res) {
         accountTypeChangedAt: true,
       },
     })
-    if (!user) return res.status(404).json({ error: 'User not found.' })
+    if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     // Expire stale revert windows so the client doesn't see fake state.
     let previousAccountType = user.previousAccountType
@@ -1464,6 +1475,161 @@ async function getAccountTypeStatus(req, res) {
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+  }
+}
+
+// ── GET /api/users/me/onboarding-state ──────────────────────────────────────
+//
+// Per-role Getting Started checklist state. Every signal here is derived from
+// existing tables — no new schema. The shape matches the `testFn(state)`
+// contract in frontend/studyhub-app/src/features/onboarding/checklistConfig.js.
+//
+// Each Prisma call is wrapped in safeCount/safeFirst below so a missing table
+// (e.g., if a migration is lagging in a preview env) degrades gracefully to
+// 0 / false rather than throwing. The per-call fallbacks are also why this
+// endpoint is safe to ship before every downstream feature (Sections, topic
+// follow scoreboard, learning-goal task engine) has landed — those counters
+// will stay at 0 until the underlying tables ship in later weeks.
+//
+// See docs/internal/design-refresh-v2-week2-brainstorm.md §7 and
+//     docs/internal/design-refresh-v2-week2-to-week5-execution.md.
+async function getOnboardingState(req, res) {
+  const userId = req.user?.userId
+  if (!userId) {
+    return sendError(res, 401, 'Not authenticated', ERROR_CODES.UNAUTHORIZED)
+  }
+
+  /** Run a Prisma promise and return `fallback` if it rejects. */
+  const safe = async (thunk, fallback) => {
+    try {
+      return await thunk()
+    } catch (err) {
+      captureError(err, { where: 'getOnboardingState', userId, note: 'safe fallback' })
+      return fallback
+    }
+  }
+
+  try {
+    const [
+      userRow,
+      onboarding,
+      enrollmentCount,
+      starCount,
+      examCount,
+      groupMembershipCount,
+      publishedMaterialCount,
+      problemQueuePostCount,
+      hashtagFollowCount,
+      learningGoalRow,
+      noteCount,
+      sectionCount,
+      scheduledSessionCount,
+    ] = await Promise.all([
+      safe(
+        () =>
+          prisma.user.findUnique({
+            where: { id: userId },
+            select: { accountType: true, trustLevel: true, learningGoal: true },
+          }),
+        null,
+      ),
+      safe(
+        () =>
+          prisma.onboardingProgress.findUnique({
+            where: { userId },
+            select: { schoolSelected: true, coursesAdded: true, completedAt: true },
+          }),
+        null,
+      ),
+      safe(() => prisma.enrollment.count({ where: { userId } }), 0),
+      safe(() => prisma.starredSheet.count({ where: { userId } }), 0),
+      safe(() => prisma.courseExam.count({ where: { userId } }), 0),
+      safe(() => prisma.studyGroupMember.count({ where: { userId, status: 'active' } }), 0),
+      safe(() => prisma.studySheet.count({ where: { userId, status: 'published' } }), 0),
+      safe(
+        () =>
+          prisma.groupDiscussionPost.count({
+            where: { userId, type: { in: ['question', 'announcement'] } },
+          }),
+        0,
+      ),
+      safe(() => prisma.hashtagFollow.count({ where: { userId } }), 0),
+      safe(
+        () =>
+          prisma.learningGoal.findFirst({
+            where: { userId },
+            orderBy: { createdAt: 'desc' },
+            select: { id: true },
+          }),
+        null,
+      ),
+      safe(() => prisma.note.count({ where: { userId } }), 0),
+      // Sections the user is enrolled in (as a student) OR teaches.
+      // Counted via SectionEnrollment (student side) and Section (teacher
+      // side); we prefer whichever is greater because an "onboarded" user
+      // has at least one relationship either way.
+      safe(async () => {
+        const [enrolled, taught] = await Promise.all([
+          prisma.sectionEnrollment.count({ where: { userId } }),
+          prisma.section.count({ where: { teacherId: userId, archived: false } }),
+        ])
+        return Math.max(enrolled, taught)
+      }, 0),
+      // Scheduled sessions the user has RSVP'd to with "going" or "maybe".
+      // Proxy for "has this user engaged with any scheduled session yet?"
+      safe(
+        () =>
+          prisma.groupSessionRsvp.count({
+            where: { userId, status: { in: ['going', 'maybe'] } },
+          }),
+        0,
+      ),
+    ])
+
+    const accountType = userRow?.accountType || 'student'
+    // hasSchool: true if onboarding has a recorded school selection OR the
+    // user has at least one enrollment (because enrollment implies a school).
+    const hasSchool = Boolean(onboarding?.schoolSelected) || enrollmentCount > 0
+    // hasMajor is not yet a first-class field — v2 Week 3 will add a
+    // `major` column under the Settings → Profile polish pass. Until then
+    // this is false and the checklist item stays unchecked.
+    const hasMajor = false
+    // teacherVerified proxies off trustLevel >= 2 for now. When the full
+    // StaffVerification model lands (v2 Week 4+), swap in the real lookup.
+    const teacherVerified = (userRow?.trustLevel ?? 0) >= 2
+
+    return res.json({
+      accountType,
+      hasSchool,
+      hasMajor,
+      courseFollowCount: enrollmentCount,
+      starCount,
+      examCount,
+      groupMembershipCount,
+      teacherVerified,
+      publishedMaterialCount,
+      // Live counters — wired 2026-04-23 per tech-debt handoff §14.
+      // SectionEnrollment + Section (teacher) + GroupSessionRsvp come from
+      // the main Prisma query above; wrapped in `safe()` for graceful
+      // degradation if any table is unreachable.
+      sectionCount,
+      scheduledSessionCount,
+      problemQueuePostCount,
+      topicFollowCount: hashtagFollowCount,
+      hasLearningGoal: Boolean(learningGoalRow) || Boolean(userRow?.learningGoal),
+      // Goal task engine (Week 4 of master plan) — stays 0 until the
+      // GoalTask model lands. Explicitly called out so future work finds it.
+      completedGoalTaskCount: 0,
+      noteCount,
+      // Non-checklist metadata the client uses for copy + analytics.
+      meta: {
+        onboardingCompleted: Boolean(onboarding?.completedAt),
+        generatedAt: new Date().toISOString(),
+      },
+    })
+  } catch (err) {
+    captureError(err, { where: 'getOnboardingState', userId })
+    return sendError(res, 500, 'Failed to load onboarding state', ERROR_CODES.INTERNAL)
   }
 }

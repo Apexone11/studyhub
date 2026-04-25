@@ -7,6 +7,7 @@ const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const r2 = require('../../lib/r2Storage')
 
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 
 router.use(readLimiter)
@@ -73,7 +74,7 @@ router.get('/', async (req, res) => {
     res.json(announcements)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -88,10 +89,15 @@ router.post('/', requireAuth, async (req, res) => {
   const pinned = !!req.body.pinned
   const videoId = req.body.videoId ? Number.parseInt(req.body.videoId, 10) : null
 
-  if (!title) return res.status(400).json({ error: 'Title is required.' })
-  if (!body) return res.status(400).json({ error: 'Body is required.' })
+  if (!title) return sendError(res, 400, 'Title is required.', ERROR_CODES.BAD_REQUEST)
+  if (!body) return sendError(res, 400, 'Body is required.', ERROR_CODES.BAD_REQUEST)
   if (title.length > MAX_TITLE_LENGTH) {
-    return res.status(400).json({ error: `Title must be ${MAX_TITLE_LENGTH} characters or fewer.` })
+    return sendError(
+      res,
+      400,
+      `Title must be ${MAX_TITLE_LENGTH} characters or fewer.`,
+      ERROR_CODES.BAD_REQUEST,
+    )
   }
   if (body.length > MAX_BODY_LENGTH) {
     return res
@@ -106,7 +112,7 @@ router.post('/', requireAuth, async (req, res) => {
         where: { id: videoId },
         select: { id: true, status: true },
       })
-      if (!video) return res.status(404).json({ error: 'Video not found.' })
+      if (!video) return sendError(res, 404, 'Video not found.', ERROR_CODES.NOT_FOUND)
     }
 
     const announcement = await prisma.announcement.create({
@@ -137,7 +143,7 @@ router.post('/', requireAuth, async (req, res) => {
     res.status(201).json(announcement)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -154,17 +160,20 @@ router.post(
   imageUpload.array('images', MAX_IMAGES),
   async (req, res) => {
     const announcementId = parseInt(req.params.id, 10)
-    if (isNaN(announcementId)) return res.status(400).json({ error: 'Invalid announcement ID.' })
+    if (isNaN(announcementId))
+      return sendError(res, 400, 'Invalid announcement ID.', ERROR_CODES.BAD_REQUEST)
 
     try {
       const announcement = await prisma.announcement.findUnique({
         where: { id: announcementId },
         select: { id: true },
       })
-      if (!announcement) return res.status(404).json({ error: 'Announcement not found.' })
+      if (!announcement)
+        return sendError(res, 404, 'Announcement not found.', ERROR_CODES.NOT_FOUND)
 
       const files = req.files || []
-      if (files.length === 0) return res.status(400).json({ error: 'No images provided.' })
+      if (files.length === 0)
+        return sendError(res, 400, 'No images provided.', ERROR_CODES.BAD_REQUEST)
 
       // Check existing media count
       const existingCount = await prisma.announcementMedia.count({
@@ -183,7 +192,7 @@ router.post(
 
         // Upload to R2
         if (!r2.isR2Configured()) {
-          return res.status(503).json({ error: 'File storage is not configured.' })
+          return sendError(res, 503, 'File storage is not configured.', ERROR_CODES.INTERNAL)
         }
 
         const r2Key = r2.generateAnnouncementImageKey(announcementId, file.originalname)
@@ -207,10 +216,10 @@ router.post(
       res.status(201).json({ media: mediaRecords })
     } catch (err) {
       if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-        return res.status(400).json({ error: 'Each image must be under 10 MB.' })
+        return sendError(res, 400, 'Each image must be under 10 MB.', ERROR_CODES.BAD_REQUEST)
       }
       captureError(err, { route: req.originalUrl, method: req.method })
-      res.status(500).json({ error: 'Failed to upload images.' })
+      sendError(res, 500, 'Failed to upload images.', ERROR_CODES.INTERNAL)
     }
   },
 )
@@ -224,7 +233,7 @@ router.delete('/:id/media/:mediaId', requireAuth, async (req, res) => {
   const announcementId = parseInt(req.params.id, 10)
   const mediaId = parseInt(req.params.mediaId, 10)
   if (isNaN(announcementId) || isNaN(mediaId)) {
-    return res.status(400).json({ error: 'Invalid ID.' })
+    return sendError(res, 400, 'Invalid ID.', ERROR_CODES.BAD_REQUEST)
   }
 
   try {
@@ -233,7 +242,7 @@ router.delete('/:id/media/:mediaId', requireAuth, async (req, res) => {
       select: { id: true, announcementId: true, url: true, type: true },
     })
     if (!media || media.announcementId !== announcementId) {
-      return res.status(404).json({ error: 'Media not found.' })
+      return sendError(res, 404, 'Media not found.', ERROR_CODES.NOT_FOUND)
     }
 
     // Try to delete from R2 if it's an image with a URL
@@ -250,7 +259,7 @@ router.delete('/:id/media/:mediaId', requireAuth, async (req, res) => {
     res.json({ message: 'Media removed.' })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -263,28 +272,34 @@ router.post('/:id/video', requireAuth, async (req, res) => {
   const announcementId = parseInt(req.params.id, 10)
   const videoId = req.body.videoId ? parseInt(req.body.videoId, 10) : null
 
-  if (isNaN(announcementId)) return res.status(400).json({ error: 'Invalid announcement ID.' })
-  if (!videoId) return res.status(400).json({ error: 'videoId is required.' })
+  if (isNaN(announcementId))
+    return sendError(res, 400, 'Invalid announcement ID.', ERROR_CODES.BAD_REQUEST)
+  if (!videoId) return sendError(res, 400, 'videoId is required.', ERROR_CODES.BAD_REQUEST)
 
   try {
     const announcement = await prisma.announcement.findUnique({
       where: { id: announcementId },
       select: { id: true },
     })
-    if (!announcement) return res.status(404).json({ error: 'Announcement not found.' })
+    if (!announcement) return sendError(res, 404, 'Announcement not found.', ERROR_CODES.NOT_FOUND)
 
     const video = await prisma.video.findUnique({
       where: { id: videoId },
       select: { id: true },
     })
-    if (!video) return res.status(404).json({ error: 'Video not found.' })
+    if (!video) return sendError(res, 404, 'Video not found.', ERROR_CODES.NOT_FOUND)
 
     // Check if this announcement already has a video
     const existingVideo = await prisma.announcementMedia.findFirst({
       where: { announcementId, type: 'video' },
     })
     if (existingVideo) {
-      return res.status(400).json({ error: 'Announcement already has a video. Remove it first.' })
+      return sendError(
+        res,
+        400,
+        'Announcement already has a video. Remove it first.',
+        ERROR_CODES.BAD_REQUEST,
+      )
     }
 
     const maxPos = await prisma.announcementMedia.aggregate({
@@ -320,7 +335,7 @@ router.post('/:id/video', requireAuth, async (req, res) => {
     res.status(201).json(record)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -331,7 +346,7 @@ router.delete('/:id', requireAuth, async (req, res) => {
   }
 
   const announcementId = parseInt(req.params.id, 10)
-  if (isNaN(announcementId)) return res.status(400).json({ error: 'Invalid ID.' })
+  if (isNaN(announcementId)) return sendError(res, 400, 'Invalid ID.', ERROR_CODES.BAD_REQUEST)
 
   try {
     // Clean up R2 images before deleting
@@ -356,9 +371,10 @@ router.delete('/:id', requireAuth, async (req, res) => {
     await prisma.announcement.delete({ where: { id: announcementId } })
     res.json({ message: 'Announcement deleted.' })
   } catch (err) {
-    if (err.code === 'P2025') return res.status(404).json({ error: 'Announcement not found.' })
+    if (err.code === 'P2025')
+      return sendError(res, 404, 'Announcement not found.', ERROR_CODES.NOT_FOUND)
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

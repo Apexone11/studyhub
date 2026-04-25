@@ -22,7 +22,13 @@ import { GroupDiscussionsTab } from './GroupDiscussionsTab'
 import { GroupMembersTab } from './GroupMembersTab'
 
 // Re-export tab components for backward compatibility — StudyGroupsPage imports them from here
-export { GroupOverviewTab, GroupResourcesTab, GroupSessionsTab, GroupDiscussionsTab, GroupMembersTab }
+export {
+  GroupOverviewTab,
+  GroupResourcesTab,
+  GroupSessionsTab,
+  GroupDiscussionsTab,
+  GroupMembersTab,
+}
 
 const tabNavStyle = {
   display: 'flex',

@@ -18,6 +18,7 @@ const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { cacheControl } = require('../../lib/cacheControl')
 const { feedDiscoveryLimiter } = require('../../lib/rateLimiters')
 const { getBoostedIdsForUser } = require('../../lib/rolePersonalization')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const {
   DURATION_24H_MS,
   DURATION_7D_MS,
@@ -119,7 +120,7 @@ router.get(
       res.json(result)
     } catch (err) {
       captureError(err, { route: req.originalUrl })
-      res.status(500).json({ error: 'Server error.' })
+      sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
     }
   },
 )
@@ -134,7 +135,12 @@ router.get(
 router.get('/recommended', discoveryLimiter, optionalAuth, async (req, res) => {
   try {
     if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required for recommendations.' })
+      return sendError(
+        res,
+        401,
+        'Authentication required for recommendations.',
+        ERROR_CODES.UNAUTHORIZED,
+      )
     }
 
     const userId = req.user.userId
@@ -193,7 +199,7 @@ router.get('/recommended', discoveryLimiter, optionalAuth, async (req, res) => {
     res.json(results)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -223,7 +229,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
 
     const userId = req.user.userId
     // Resolve the per-role boost set: enrolled course IDs for students/teachers,
-    // followed hashtag IDs for Self-learners. See docs/roles-and-permissions-plan.md §6.5.
+    // followed hashtag IDs for Self-learners. See docs/internal/roles-and-permissions-plan.md §6.5.
     const requester = await prisma.user.findUnique({
       where: { id: userId },
       select: { id: true, accountType: true },
@@ -518,7 +524,12 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     res.json(results)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Could not load personalized content. Please try again.' })
+    sendError(
+      res,
+      500,
+      'Could not load personalized content. Please try again.',
+      ERROR_CODES.INTERNAL,
+    )
   }
 })
 
@@ -532,7 +543,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
 router.get('/recommended-groups', discoveryLimiter, optionalAuth, async (req, res) => {
   try {
     if (!req.user) {
-      return res.status(401).json({ error: 'Authentication required.' })
+      return sendError(res, 401, 'Authentication required.', ERROR_CODES.UNAUTHORIZED)
     }
 
     const userId = req.user.userId
@@ -619,7 +630,7 @@ router.get('/recommended-groups', discoveryLimiter, optionalAuth, async (req, re
     res.json(result)
   } catch (err) {
     captureError(err, { route: req.originalUrl })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -635,7 +646,8 @@ router.get(
   cacheControl(300, { public: true, staleWhileRevalidate: 600 }),
   async (req, res) => {
     const courseId = Number.parseInt(req.params.courseId, 10)
-    if (!Number.isFinite(courseId)) return res.status(400).json({ error: 'Invalid course ID.' })
+    if (!Number.isFinite(courseId))
+      return sendError(res, 400, 'Invalid course ID.', ERROR_CODES.BAD_REQUEST)
 
     try {
       const course = await prisma.course.findUnique({
@@ -647,7 +659,7 @@ router.get(
           school: { select: { id: true, name: true, short: true } },
         },
       })
-      if (!course) return res.status(404).json({ error: 'Course not found.' })
+      if (!course) return sendError(res, 404, 'Course not found.', ERROR_CODES.NOT_FOUND)
 
       const limit = Math.min(Number.parseInt(req.query.limit, 10) || 20, 50)
 
@@ -703,7 +715,7 @@ router.get(
       })
     } catch (err) {
       captureError(err, { route: req.originalUrl })
-      res.status(500).json({ error: 'Server error.' })
+      sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
     }
   },
 )

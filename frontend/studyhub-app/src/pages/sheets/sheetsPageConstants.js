@@ -27,7 +27,11 @@ export function authHeaders() {
 }
 
 export function isEditableSheetStatus(status) {
-  return EDITABLE_SHEET_STATUSES.has(String(status || '').trim().toLowerCase())
+  return EDITABLE_SHEET_STATUSES.has(
+    String(status || '')
+      .trim()
+      .toLowerCase(),
+  )
 }
 
 export function timeAgo(value) {

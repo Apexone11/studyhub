@@ -4,7 +4,7 @@
  * Returns the IDs that personalize feed/search ranking for a given user.
  * For students/teachers it's the enrolled course IDs. For Self-learners
  * (accountType === 'other') it's the followed hashtag IDs. Same ranker,
- * different input set — see docs/roles-and-permissions-plan.md §6.5/§10.2.
+ * different input set — see docs/internal/roles-and-permissions-plan.md §6.5/§10.2.
  *
  * The shape is `{ kind: 'course' | 'hashtag', ids: number[] }` so callers
  * can branch their own scoring logic if needed (e.g., joining `Sheet.courseId`

@@ -3,13 +3,25 @@ import { useNavigate } from 'react-router-dom'
 import { IconSearch, IconX } from '../Icons'
 import { API } from '../../config'
 import { DEBOUNCE_MS, styles } from './searchModalConstants'
-import { SheetResults, NoteResults, CourseResults, UserResults, GroupResults } from './SearchResultItems'
+import {
+  SheetResults,
+  NoteResults,
+  CourseResults,
+  UserResults,
+  GroupResults,
+} from './SearchResultItems'
 import { trackEvent } from '../../lib/telemetry'
 import { useFocusTrap } from '../../lib/useFocusTrap'
 
 export default function SearchModal({ open, onClose }) {
   const [query, setQuery] = useState('')
-  const [results, setResults] = useState({ sheets: [], courses: [], users: [], notes: [], groups: [] })
+  const [results, setResults] = useState({
+    sheets: [],
+    courses: [],
+    users: [],
+    notes: [],
+    groups: [],
+  })
   const [loading, setLoading] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
   const inputRef = useRef(null)
@@ -49,13 +61,17 @@ export default function SearchModal({ open, onClose }) {
     try {
       const res = await fetch(
         `${API}/api/search?q=${encodeURIComponent(searchQuery)}&type=all&limit=6`,
-        { signal: controller.signal, credentials: 'include' }
+        { signal: controller.signal, credentials: 'include' },
       )
       if (!res.ok) return
       const data = await res.json()
       const apiLatencyMs = Math.round(performance.now() - fetchStart)
-      const totalResults = (data.results?.sheets?.length || 0) + (data.results?.courses?.length || 0) +
-        (data.results?.users?.length || 0) + (data.results?.notes?.length || 0) + (data.results?.groups?.length || 0)
+      const totalResults =
+        (data.results?.sheets?.length || 0) +
+        (data.results?.courses?.length || 0) +
+        (data.results?.users?.length || 0) +
+        (data.results?.notes?.length || 0) +
+        (data.results?.groups?.length || 0)
       trackEvent('page_timing', { page: 'search', apiLatencyMs, totalResults })
       setResults({
         sheets: data.results?.sheets || [],
@@ -124,9 +140,16 @@ export default function SearchModal({ open, onClose }) {
 
   return (
     <div style={styles.overlay} onClick={onClose} role="presentation">
-      <div ref={trapRef} style={styles.modal} onClick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-label="Search sheets, courses, and users">
+      <div
+        ref={trapRef}
+        style={styles.modal}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Search sheets, courses, and users"
+      >
         {/* Search input */}
-        <div style={styles.inputRow}>
+        <div className="sh-search-input-row" style={styles.inputRow}>
           <IconSearch size={16} style={{ color: 'var(--sh-slate-500, #64748b)', flexShrink: 0 }} />
           <input
             ref={inputRef}
@@ -136,13 +159,18 @@ export default function SearchModal({ open, onClose }) {
             onKeyDown={handleKeyDown}
             placeholder="Search sheets, notes, courses, users..."
             aria-label="Search sheets, notes, courses, and users"
+            className="sh-search-input"
             style={styles.input}
             autoComplete="off"
             spellCheck={false}
           />
           {query && (
             <button
-              onClick={() => { setQuery(''); setResults({ sheets: [], courses: [], users: [], notes: [], groups: [] }); inputRef.current?.focus() }}
+              onClick={() => {
+                setQuery('')
+                setResults({ sheets: [], courses: [], users: [], notes: [], groups: [] })
+                inputRef.current?.focus()
+              }}
               style={styles.clearBtn}
               title="Clear"
               aria-label="Clear search"
@@ -155,17 +183,13 @@ export default function SearchModal({ open, onClose }) {
 
         {/* Results */}
         <div style={styles.resultsContainer}>
-          {loading && hasQuery && (
-            <div style={styles.statusMsg}>Searching...</div>
-          )}
+          {loading && hasQuery && <div style={styles.statusMsg}>Searching...</div>}
 
           {!loading && hasQuery && !hasResults && (
             <div style={styles.statusMsg}>No results found for &ldquo;{query}&rdquo;</div>
           )}
 
-          {!hasQuery && (
-            <div style={styles.statusMsg}>Type at least 2 characters to search</div>
-          )}
+          {!hasQuery && <div style={styles.statusMsg}>Type at least 2 characters to search</div>}
 
           <SheetResults
             sheets={results.sheets}

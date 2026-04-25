@@ -36,13 +36,49 @@ function parseDeviceLabel(ua) {
 }
 
 /**
+ * Classify a user-agent into a coarse device type.
+ * Returns one of: "laptop" | "mobile" | "tablet" | "watch" | "unknown".
+ * Used by the sessions UI to pick the right device icon.
+ *
+ * We can't reliably distinguish desktop vs laptop from a UA alone, so all
+ * non-mobile / non-tablet / non-watch Windows/Mac/Linux/CrOS UAs get "laptop"
+ * as a single sensible default — the function never returns "desktop".
+ * Callers that need finer-grained detection can parse `deviceLabel` ("Chrome
+ * on Windows") instead of relying on deviceKind.
+ */
+function deriveDeviceKind(ua) {
+  if (!ua || typeof ua !== 'string') return 'unknown'
+  if (/Apple Watch|Watch OS/i.test(ua)) return 'watch'
+  if (/iPad/i.test(ua)) return 'tablet'
+  if (/Android/i.test(ua) && !/Mobile/i.test(ua)) return 'tablet'
+  if (/iPhone|iPod|Windows Phone/i.test(ua)) return 'mobile'
+  if (/Android/i.test(ua) && /Mobile/i.test(ua)) return 'mobile'
+  if (/Macintosh|Mac OS|Windows|Linux|CrOS/i.test(ua)) return 'laptop'
+  return 'unknown'
+}
+
+/**
  * Create a new session row in the database.
  * Returns { jti } so the caller can embed it in the JWT payload.
+ *
+ * Optional fields `trustedDeviceId`, `country`, `region`, `city`, `riskScore`
+ * are populated by the login controller once Phase 1b/2 are wired.
+ * Omitting them keeps the column NULL and is fully supported.
  */
-async function createSession({ userId, userAgent, ipAddress }) {
+async function createSession({
+  userId,
+  userAgent,
+  ipAddress,
+  trustedDeviceId,
+  country,
+  region,
+  city,
+  riskScore,
+}) {
   const jti = generateJti()
   const expiresAt = new Date(Date.now() + SESSION_EXPIRY_MS)
   const deviceLabel = parseDeviceLabel(userAgent)
+  const deviceKind = deriveDeviceKind(userAgent)
 
   const session = await prisma.session.create({
     data: {
@@ -51,6 +87,18 @@ async function createSession({ userId, userAgent, ipAddress }) {
       userAgent: userAgent ? userAgent.slice(0, 512) : null,
       ipAddress: ipAddress ? ipAddress.slice(0, 45) : null,
       deviceLabel: deviceLabel.slice(0, 100),
+      deviceKind,
+      country: country ? String(country).slice(0, 2) : null,
+      region: region ? String(region).slice(0, 10) : null,
+      city: city ? String(city).slice(0, 128) : null,
+      // Session.riskScore is an Int? column — floats would fail at the
+      // Prisma boundary. Current scoreLogin() only sums integer weights,
+      // so this is defensive for a future signal that produces a float
+      // (decay multipliers, probability-weighted boosts, etc.). Round
+      // instead of truncate so an edge-case 29.6 lands at 30 ("notify"
+      // band) instead of silently downgrading to 29 ("normal").
+      riskScore: Number.isFinite(riskScore) ? Math.round(riskScore) : null,
+      trustedDeviceId: trustedDeviceId || null,
       expiresAt,
     },
   })
@@ -88,16 +136,37 @@ async function touchSession(jti) {
 /**
  * Revoke a single session by its ID.
  * Only the owning user (or an admin) should call this.
+ *
+ * When the session is linked to a TrustedDevice, we also mark the device
+ * revoked — the next login from that browser will be treated as a new
+ * device by the risk-scoring layer.
  */
 async function revokeSession(sessionId, userId) {
-  const session = await prisma.session.findUnique({ where: { id: sessionId } })
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    include: { trustedDevice: true },
+  })
   if (!session || session.userId !== userId) return null
   if (session.revokedAt) return session // already revoked
 
-  return prisma.session.update({
-    where: { id: sessionId },
-    data: { revokedAt: new Date() },
-  })
+  const now = new Date()
+  const ops = [
+    prisma.session.update({
+      where: { id: sessionId },
+      data: { revokedAt: now },
+    }),
+  ]
+  if (session.trustedDevice && !session.trustedDevice.revokedAt) {
+    ops.push(
+      prisma.trustedDevice.update({
+        where: { id: session.trustedDevice.id },
+        data: { revokedAt: now },
+      }),
+    )
+  }
+  await prisma.$transaction(ops)
+
+  return prisma.session.findUnique({ where: { id: sessionId } })
 }
 
 /**
@@ -142,7 +211,11 @@ async function getActiveSessions(userId) {
     select: {
       id: true,
       deviceLabel: true,
+      deviceKind: true,
       ipAddress: true,
+      country: true,
+      region: true,
+      city: true,
       lastActiveAt: true,
       createdAt: true,
       jti: true,
@@ -174,5 +247,6 @@ module.exports = {
   getActiveSessions,
   cleanupExpiredSessions,
   parseDeviceLabel,
+  deriveDeviceKind,
   generateJti,
 }

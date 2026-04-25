@@ -18,10 +18,18 @@ function detectHtmlFeatures(html) {
   const features = []
 
   if (!value.trim()) {
-    features.push({ category: 'validation', severity: 'high', message: 'HTML content cannot be empty.' })
+    features.push({
+      category: 'validation',
+      severity: 'high',
+      message: 'HTML content cannot be empty.',
+    })
   }
   if (value.length > MAX_HTML_CHARS) {
-    features.push({ category: 'validation', severity: 'high', message: `HTML content must be ${MAX_HTML_CHARS.toLocaleString()} characters or fewer.` })
+    features.push({
+      category: 'validation',
+      severity: 'high',
+      message: `HTML content must be ${MAX_HTML_CHARS.toLocaleString()} characters or fewer.`,
+    })
   }
 
   const suspiciousTags = containsSuspiciousTag(lowered)
@@ -37,7 +45,8 @@ function detectHtmlFeatures(html) {
     features.push({
       category: 'inline-handler',
       severity: 'medium',
-      message: 'HTML contains inline event handlers (on*= attributes). These are allowed but flagged.',
+      message:
+        'HTML contains inline event handlers (on*= attributes). These are allowed but flagged.',
     })
   }
 
@@ -45,7 +54,8 @@ function detectHtmlFeatures(html) {
     features.push({
       category: 'dangerous-url',
       severity: 'medium',
-      message: 'HTML contains javascript:, vbscript:, or data: URLs. These are allowed but flagged.',
+      message:
+        'HTML contains javascript:, vbscript:, or data: URLs. These are allowed but flagged.',
     })
   }
 
@@ -104,8 +114,10 @@ function detectHighRiskBehaviors(html) {
   }
 
   // Hidden redirects: window.location manipulation
-  if (/\b(?:window\s*\.\s*)?location\s*\.\s*(?:href|replace|assign)\s*=/gi.test(value)
-    || /\bwindow\s*\.\s*location\s*=/gi.test(value)) {
+  if (
+    /\b(?:window\s*\.\s*)?location\s*\.\s*(?:href|replace|assign)\s*=/gi.test(value) ||
+    /\bwindow\s*\.\s*location\s*=/gi.test(value)
+  ) {
     behaviors.push({
       category: 'redirect',
       severity: 'high',
@@ -124,12 +136,14 @@ function detectHighRiskBehaviors(html) {
 
   // Keylogging: key event listeners combined with storage or network
   const hasKeyListener = /addEventListener\s*\(\s*["']key(?:down|press|up)["']/gi.test(value)
-  const hasStorageOrNetwork = /\b(?:localStorage|sessionStorage|fetch|XMLHttpRequest|sendBeacon)\b/gi.test(value)
+  const hasStorageOrNetwork =
+    /\b(?:localStorage|sessionStorage|fetch|XMLHttpRequest|sendBeacon)\b/gi.test(value)
   if (hasKeyListener && hasStorageOrNetwork) {
     behaviors.push({
       category: 'keylogging',
       severity: 'high',
-      message: 'Keypress listener combined with storage or network API detected — possible keylogging.',
+      message:
+        'Keypress listener combined with storage or network API detected — possible keylogging.',
     })
   }
 
@@ -141,7 +155,10 @@ function detectHighRiskBehaviors(html) {
       message: 'Known crypto-miner signature detected.',
     })
   }
-  if (/WebAssembly\s*\.\s*instantiate/gi.test(value) && /\b(?:hash|nonce|mining|worker)\b/gi.test(value)) {
+  if (
+    /WebAssembly\s*\.\s*instantiate/gi.test(value) &&
+    /\b(?:hash|nonce|mining|worker)\b/gi.test(value)
+  ) {
     behaviors.push({
       category: 'crypto-miner',
       severity: 'high',
@@ -151,12 +168,16 @@ function detectHighRiskBehaviors(html) {
 
   // Credential capture: external form with password/sensitive inputs (critical)
   const hasExternalForm = /<form[^>]+action\s*=\s*["']?\s*https?:\/\//gi.test(value)
-  const hasSensitiveInput = /<input[^>]+(?:type\s*=\s*["']?password|name\s*=\s*["']?(?:passw(?:or)?d|credit|card|ssn|cvv|pin|secret|token))\b/gi.test(value)
+  const hasSensitiveInput =
+    /<input[^>]+(?:type\s*=\s*["']?password|name\s*=\s*["']?(?:passw(?:or)?d|credit|card|ssn|cvv|pin|secret|token))\b/gi.test(
+      value,
+    )
   if (hasExternalForm && hasSensitiveInput) {
     behaviors.push({
       category: 'credential-capture',
       severity: 'critical',
-      message: 'External form with password or sensitive input fields detected — possible credential harvesting.',
+      message:
+        'External form with password or sensitive input fields detected — possible credential harvesting.',
     })
   }
 
@@ -214,7 +235,8 @@ function classifyHtmlRisk(html) {
     if (b.severity === 'high' || b.severity === 'critical') highCategories.add(b.category)
   }
   // crypto-miner + obfuscation = coordinated malicious payload
-  const hasMinerWithObfuscation = highCategories.has('crypto-miner') && highCategories.has('obfuscation')
+  const hasMinerWithObfuscation =
+    highCategories.has('crypto-miner') && highCategories.has('obfuscation')
 
   let tier = RISK_TIER.CLEAN
   if (hasCritical || highCategories.size >= 3 || hasMinerWithObfuscation) {
@@ -227,9 +249,10 @@ function classifyHtmlRisk(html) {
     tier = RISK_TIER.FLAGGED
   }
 
-  const summary = tier === RISK_TIER.CLEAN
-    ? 'No suspicious patterns detected.'
-    : `${TIER_LABELS[tier]}: ${findings.length} finding(s) detected.`
+  const summary =
+    tier === RISK_TIER.CLEAN
+      ? 'No suspicious patterns detected.'
+      : `${TIER_LABELS[tier]}: ${findings.length} finding(s) detected.`
 
   return { tier, findings, summary }
 }
@@ -238,19 +261,19 @@ function classifyHtmlRisk(html) {
  * Human-readable labels for finding categories.
  */
 const CATEGORY_LABELS = {
-  'validation': 'Structural Issues',
+  validation: 'Structural Issues',
   'suspicious-tag': 'Suspicious Tags',
   'inline-handler': 'Inline Event Handlers',
   'dangerous-url': 'Dangerous URLs',
-  'obfuscation': 'Code Obfuscation',
-  'redirect': 'Page Redirects',
-  'exfiltration': 'Data Exfiltration',
-  'keylogging': 'Keylogging',
+  obfuscation: 'Code Obfuscation',
+  redirect: 'Page Redirects',
+  exfiltration: 'Data Exfiltration',
+  keylogging: 'Keylogging',
   'crypto-miner': 'Crypto Mining',
   'credential-capture': 'Credential Capture',
   'js-risk': 'Risky JavaScript',
-  'av': 'Antivirus Detection',
-  'system': 'System',
+  av: 'Antivirus Detection',
+  system: 'System',
 }
 
 /**
@@ -303,14 +326,14 @@ function generateRiskSummary(tier, findings) {
     'suspicious-tag': 'advanced HTML tags',
     'inline-handler': 'inline event handlers',
     'dangerous-url': 'suspicious URLs',
-    'obfuscation': 'obfuscated JavaScript',
-    'redirect': 'page redirect behavior',
-    'exfiltration': 'data exfiltration indicators',
-    'keylogging': 'keystroke capture patterns',
+    obfuscation: 'obfuscated JavaScript',
+    redirect: 'page redirect behavior',
+    exfiltration: 'data exfiltration indicators',
+    keylogging: 'keystroke capture patterns',
     'crypto-miner': 'crypto-mining signatures',
     'credential-capture': 'credential capture indicators',
     'js-risk': 'risky JavaScript patterns',
-    'av': 'antivirus-flagged content',
+    av: 'antivirus-flagged content',
   }
 
   const phrases = []

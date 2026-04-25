@@ -42,43 +42,52 @@ export function useFocusTrap({
   const containerRef = useRef(null)
   const previousFocusRef = useRef(null)
 
-  const handleKeyDown = useCallback((e) => {
-    if (!containerRef.current) return
+  const handleKeyDown = useCallback(
+    (e) => {
+      if (!containerRef.current) return
 
-    // Escape key
-    if (e.key === 'Escape' && escapeCloses && onClose) {
-      e.preventDefault()
-      e.stopPropagation()
-      onClose()
-      return
-    }
-
-    // Tab trapping
-    if (e.key === 'Tab') {
-      const focusable = containerRef.current.querySelectorAll(FOCUSABLE_SELECTOR)
-      if (focusable.length === 0) {
+      // Escape key
+      if (e.key === 'Escape' && escapeCloses && onClose) {
         e.preventDefault()
+        e.stopPropagation()
+        onClose()
         return
       }
 
-      const first = focusable[0]
-      const last = focusable[focusable.length - 1]
-
-      if (e.shiftKey) {
-        // Shift+Tab: if on first element, wrap to last
-        if (document.activeElement === first || !containerRef.current.contains(document.activeElement)) {
+      // Tab trapping
+      if (e.key === 'Tab') {
+        const focusable = containerRef.current.querySelectorAll(FOCUSABLE_SELECTOR)
+        if (focusable.length === 0) {
           e.preventDefault()
-          last.focus()
+          return
         }
-      } else {
-        // Tab: if on last element, wrap to first
-        if (document.activeElement === last || !containerRef.current.contains(document.activeElement)) {
-          e.preventDefault()
-          first.focus()
+
+        const first = focusable[0]
+        const last = focusable[focusable.length - 1]
+
+        if (e.shiftKey) {
+          // Shift+Tab: if on first element, wrap to last
+          if (
+            document.activeElement === first ||
+            !containerRef.current.contains(document.activeElement)
+          ) {
+            e.preventDefault()
+            last.focus()
+          }
+        } else {
+          // Tab: if on last element, wrap to first
+          if (
+            document.activeElement === last ||
+            !containerRef.current.contains(document.activeElement)
+          ) {
+            e.preventDefault()
+            first.focus()
+          }
         }
       }
-    }
-  }, [escapeCloses, onClose])
+    },
+    [escapeCloses, onClose],
+  )
 
   useEffect(() => {
     if (!active) return

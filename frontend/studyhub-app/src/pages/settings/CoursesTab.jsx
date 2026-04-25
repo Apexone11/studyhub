@@ -7,11 +7,11 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
   const [catalog, setCatalog] = useState([])
   const [catalogLoading, setCatalogLoading] = useState(false)
   const [catalogError, setCatalogError] = useState('')
-  const [courseSchoolId, setCourseSchoolId] = useState(
-    () => String(user?.enrollments?.[0]?.course?.schoolId || '')
+  const [courseSchoolId, setCourseSchoolId] = useState(() =>
+    String(user?.enrollments?.[0]?.course?.schoolId || ''),
   )
-  const [selectedCourseIds, setSelectedCourseIds] = useState(
-    () => (user?.enrollments || []).map((e) => e.courseId)
+  const [selectedCourseIds, setSelectedCourseIds] = useState(() =>
+    (user?.enrollments || []).map((e) => e.courseId),
   )
   const [coursesMsg, setCoursesMsg] = useState(null)
 
@@ -40,7 +40,9 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
         if (active) setCatalogLoading(false)
       })
 
-    return () => { active = false }
+    return () => {
+      active = false
+    }
   }, [catalog.length, catalogLoading])
 
   const selectedSchool = useMemo(
@@ -92,21 +94,46 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
         >
           <option value="">Select a school</option>
           {catalog.map((school) => (
-            <option key={school.id} value={school.id}>{school.short} — {school.name}{school.city ? `, ${school.city}` : ''}</option>
+            <option key={school.id} value={school.id}>
+              {school.short} — {school.name}
+              {school.city ? `, ${school.city}` : ''}
+            </option>
           ))}
         </Select>
       </FormField>
 
-      {catalogLoading && <div style={{ marginBottom: 14, color: 'var(--sh-muted)', fontSize: 13 }}>Loading course catalog...</div>}
+      {catalogLoading && (
+        <div style={{ marginBottom: 14, color: 'var(--sh-muted)', fontSize: 13 }}>
+          Loading course catalog...
+        </div>
+      )}
 
       {catalogError && (
-        <div style={{ marginBottom: 14, color: 'var(--sh-danger)', fontSize: 13, display: 'flex', alignItems: 'center', gap: 10 }}>
+        <div
+          style={{
+            marginBottom: 14,
+            color: 'var(--sh-danger)',
+            fontSize: 13,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
           <span>{catalogError}</span>
           <button
-            onClick={() => { setCatalogError(''); setCatalog([]); }}
+            onClick={() => {
+              setCatalogError('')
+              setCatalog([])
+            }}
             style={{
-              background: 'var(--sh-brand)', color: 'var(--sh-btn-primary-text)', border: 'none', borderRadius: 8,
-              padding: '5px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer',
+              background: 'var(--sh-brand)',
+              color: 'var(--sh-btn-primary-text)',
+              border: 'none',
+              borderRadius: 8,
+              padding: '5px 12px',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
             }}
           >
             Retry
@@ -120,13 +147,13 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
             courses={selectedSchool.courses || []}
             selectedIds={selectedCourseIds}
             onToggle={(courseId) => {
-              setSelectedCourseIds((current) => (
+              setSelectedCourseIds((current) =>
                 current.includes(courseId)
                   ? current.filter((id) => id !== courseId)
                   : current.length < 10
                     ? [...current, courseId]
-                    : current
-              ))
+                    : current,
+              )
             }}
             maxSelections={10}
             maxHeight={320}

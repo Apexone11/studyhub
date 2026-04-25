@@ -46,7 +46,7 @@ async function checkRestrictions(req, res, next) {
       where: {
         userId: req.user.userId,
         OR: [
-          { endsAt: null },        // permanent restriction
+          { endsAt: null }, // permanent restriction
           { endsAt: { gt: now } }, // time-bound restriction still active
         ],
       },

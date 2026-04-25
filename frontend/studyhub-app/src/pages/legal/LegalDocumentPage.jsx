@@ -81,7 +81,9 @@ export default function LegalDocumentPage({
   const intro = legalDocument?.intro || fallbackIntro
   const updated = legalDocument?.updatedLabel || fallbackUpdated
   const policyUrl = legalDocument?.termlyUrl || POLICY_URLS[slug] || null
-  const showFallback = Boolean(legalDocument && (!legalDocument.termlyEmbedId || termlyEmbed.timedOut))
+  const showFallback = Boolean(
+    legalDocument && (!legalDocument.termlyEmbedId || termlyEmbed.timedOut),
+  )
   const showFallbackBadge = Boolean(legalDocument?.termlyEmbedId && termlyEmbed.timedOut)
 
   let content = null
@@ -103,9 +105,7 @@ export default function LegalDocumentPage({
   } else if (legalDocument?.termlyEmbedId) {
     content = (
       <>
-        {!termlyEmbed.loaded && (
-          <div style={styles.loading}>Loading legal document...</div>
-        )}
+        {!termlyEmbed.loaded && <div style={styles.loading}>Loading legal document...</div>}
         <div
           ref={containerRef}
           style={{

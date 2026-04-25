@@ -17,9 +17,5 @@ const STATUS_MAP = {
 
 export default function AdminPill({ status, children }) {
   const variant = STATUS_MAP[status] || 'info'
-  return (
-    <span className={`admin-pill admin-pill--${variant}`}>
-      {children || status}
-    </span>
-  )
+  return <span className={`admin-pill admin-pill--${variant}`}>{children || status}</span>
 }

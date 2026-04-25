@@ -27,7 +27,15 @@ function MutedBadge({ mutedUntil }) {
 }
 
 /* ── Confirmation modal shared by block and mute actions ───────────────── */
-function ActionModal({ title, description, onConfirm, onCancel, confirmLabel, confirmDanger, children }) {
+function ActionModal({
+  title,
+  description,
+  onConfirm,
+  onCancel,
+  confirmLabel,
+  confirmDanger,
+  children,
+}) {
   return createPortal(
     <div style={styles.modalOverlay} onClick={onCancel}>
       <div
@@ -38,7 +46,13 @@ function ActionModal({ title, description, onConfirm, onCancel, confirmLabel, co
       >
         <h3 style={styles.sectionTitle}>{title}</h3>
         {description && (
-          <p style={{ fontSize: 'var(--type-sm)', color: 'var(--sh-subtext)', marginBottom: 'var(--space-4)' }}>
+          <p
+            style={{
+              fontSize: 'var(--type-sm)',
+              color: 'var(--sh-subtext)',
+              marginBottom: 'var(--space-4)',
+            }}
+          >
             {description}
           </p>
         )}
@@ -64,7 +78,7 @@ function ActionModal({ title, description, onConfirm, onCancel, confirmLabel, co
         </div>
       </div>
     </div>,
-    document.body
+    document.body,
   )
 }
 
@@ -163,26 +177,32 @@ export function GroupMembersTab({
     setMuteReason('')
   }, [muteTarget, muteDays, muteReason, onMute])
 
-  const handleUnblock = useCallback(async (userId) => {
-    if (!onUnblock) return
-    if (!window.confirm('Unblock this user? They will be able to rejoin the group.')) return
-    try {
-      await onUnblock(userId)
-      // Reload blocked list
-      if (onLoadBlocked) onLoadBlocked()
-    } catch {
-      // Toast already shown by hook
-    }
-  }, [onUnblock, onLoadBlocked])
+  const handleUnblock = useCallback(
+    async (userId) => {
+      if (!onUnblock) return
+      if (!window.confirm('Unblock this user? They will be able to rejoin the group.')) return
+      try {
+        await onUnblock(userId)
+        // Reload blocked list
+        if (onLoadBlocked) onLoadBlocked()
+      } catch {
+        // Toast already shown by hook
+      }
+    },
+    [onUnblock, onLoadBlocked],
+  )
 
-  const handleUnmute = useCallback(async (userId) => {
-    if (!onUnmute) return
-    try {
-      await onUnmute(userId)
-    } catch {
-      // Toast already shown by hook
-    }
-  }, [onUnmute])
+  const handleUnmute = useCallback(
+    async (userId) => {
+      if (!onUnmute) return
+      try {
+        await onUnmute(userId)
+      } catch {
+        // Toast already shown by hook
+      }
+    },
+    [onUnmute],
+  )
 
   const isMuted = (member) => {
     if (!member.mutedUntil) return false
@@ -193,7 +213,9 @@ export function GroupMembersTab({
     return (
       <div style={styles.tabContainer}>
         <div style={styles.emptyState}>
-          <div style={styles.emptyIcon} aria-label="People icon">Members</div>
+          <div style={styles.emptyIcon} aria-label="People icon">
+            Members
+          </div>
           <div style={styles.emptyTitle}>No Members</div>
           <p style={styles.emptyText}>
             {isAdminOrMod ? 'Invite your first member!' : 'No members yet'}
@@ -218,7 +240,9 @@ export function GroupMembersTab({
                 aria-modal="true"
                 aria-labelledby="invite-member-title"
               >
-                <h3 style={styles.sectionTitle} id="invite-member-title">Invite Member</h3>
+                <h3 style={styles.sectionTitle} id="invite-member-title">
+                  Invite Member
+                </h3>
                 {error && <div style={styles.error}>{error}</div>}
                 <form onSubmit={handleSubmit}>
                   <div style={styles.formGroup}>
@@ -256,7 +280,7 @@ export function GroupMembersTab({
               </div>
             </div>
           ),
-          document.body
+          document.body,
         )}
       </div>
     )
@@ -273,7 +297,15 @@ export function GroupMembersTab({
   return (
     <div style={styles.tabContainer}>
       {/* Top bar: invite + search */}
-      <div style={{ display: 'flex', gap: 'var(--space-3)', marginBottom: 'var(--space-4)', alignItems: 'center', flexWrap: 'wrap' }}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 'var(--space-3)',
+          marginBottom: 'var(--space-4)',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+        }}
+      >
         {isAdminOrMod && (
           <button
             onClick={handleInviteClick}
@@ -300,161 +332,213 @@ export function GroupMembersTab({
           { label: 'Admins', list: adminMembers },
           { label: 'Moderators', list: modMembers },
           { label: 'Members', list: regularMembers },
-        ].filter((g) => g.list.length > 0).map((group) => (
-          <div key={group.label} style={{ marginBottom: 'var(--space-4)' }}>
-            <h3 style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-muted)', marginBottom: 'var(--space-3)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
-              {group.label} ({group.list.length})
-            </h3>
-            <div style={styles.memberGrid}>
-              {group.list.map((member) => {
-                const canUpdateRole = isAdmin && member.userId !== currentUserId
-                const canApproveMember = isAdmin && member.status === 'pending'
-                const canRemoveMember = isAdminOrMod
-                  && member.userId !== currentUserId
-                  && !(viewerRole === 'moderator' && member.role === 'admin')
-                const canModerate = isAdminOrMod
-                  && member.userId !== currentUserId
-                  && member.role !== 'admin'
-                const statusBadge = member.status === 'invited'
-                  ? { label: 'Invited', style: styles.badgeOrange }
-                  : member.status === 'pending'
-                    ? { label: 'Pending', style: styles.badgeOrange }
-                    : member.status === 'banned'
-                      ? { label: 'Banned', style: styles.badgeRed }
-                      : null
+        ]
+          .filter((g) => g.list.length > 0)
+          .map((group) => (
+            <div key={group.label} style={{ marginBottom: 'var(--space-4)' }}>
+              <h3
+                style={{
+                  fontSize: 'var(--type-sm)',
+                  fontWeight: 600,
+                  color: 'var(--sh-muted)',
+                  marginBottom: 'var(--space-3)',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.04em',
+                }}
+              >
+                {group.label} ({group.list.length})
+              </h3>
+              <div style={styles.memberGrid}>
+                {group.list.map((member) => {
+                  const canUpdateRole = isAdmin && member.userId !== currentUserId
+                  const canApproveMember = isAdmin && member.status === 'pending'
+                  const canRemoveMember =
+                    isAdminOrMod &&
+                    member.userId !== currentUserId &&
+                    !(viewerRole === 'moderator' && member.role === 'admin')
+                  const canModerate =
+                    isAdminOrMod && member.userId !== currentUserId && member.role !== 'admin'
+                  const statusBadge =
+                    member.status === 'invited'
+                      ? { label: 'Invited', style: styles.badgeOrange }
+                      : member.status === 'pending'
+                        ? { label: 'Pending', style: styles.badgeOrange }
+                        : member.status === 'banned'
+                          ? { label: 'Banned', style: styles.badgeRed }
+                          : null
 
-                return (
-                  <div key={member.id || member.userId} style={styles.memberCard}>
-                    <div style={{ display: 'flex', justifyContent: 'center', marginBottom: 'var(--space-2)' }}>
-                      <UserAvatar username={member.username || 'User'} avatarUrl={member.avatarUrl || member.user?.avatarUrl} size={48} />
-                    </div>
-                    <div style={styles.memberName}>{member.username || member.user?.username || 'Unknown'}</div>
-                    <div style={{ display: 'flex', gap: 4, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 'var(--space-2)' }}>
-                      <span style={{ ...styles.badge, display: 'inline-block' }}>
-                        {getRoleLabel(member.role)}
-                      </span>
-                      {statusBadge && (
-                        <span style={{ ...styles.badge, ...statusBadge.style, display: 'inline-block' }}>
-                          {statusBadge.label}
+                  return (
+                    <div key={member.id || member.userId} style={styles.memberCard}>
+                      <div
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'center',
+                          marginBottom: 'var(--space-2)',
+                        }}
+                      >
+                        <UserAvatar
+                          username={member.username || 'User'}
+                          avatarUrl={member.avatarUrl || member.user?.avatarUrl}
+                          size={48}
+                        />
+                      </div>
+                      <div style={styles.memberName}>
+                        {member.username || member.user?.username || 'Unknown'}
+                      </div>
+                      <div
+                        style={{
+                          display: 'flex',
+                          gap: 4,
+                          justifyContent: 'center',
+                          flexWrap: 'wrap',
+                          marginBottom: 'var(--space-2)',
+                        }}
+                      >
+                        <span style={{ ...styles.badge, display: 'inline-block' }}>
+                          {getRoleLabel(member.role)}
                         </span>
-                      )}
-                      <MutedBadge mutedUntil={member.mutedUntil} />
-                    </div>
-                    <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)', marginBottom: 'var(--space-2)' }}>
-                      Joined {formatRelativeTime(member.joinedAt)}
-                    </div>
-
-                    {(canUpdateRole || canApproveMember || canRemoveMember || canModerate) && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)' }}>
-                        {canUpdateRole ? (
-                          <select
-                            value={member.role}
-                            onChange={(e) => onUpdateMember(member.userId, { role: e.target.value })}
+                        {statusBadge && (
+                          <span
                             style={{
-                              ...styles.select,
-                              fontSize: 'var(--type-xs)',
-                              padding: '0.375rem',
+                              ...styles.badge,
+                              ...statusBadge.style,
+                              display: 'inline-block',
                             }}
                           >
-                            <option value="member">Member</option>
-                            <option value="moderator">Moderator</option>
-                            <option value="admin">Admin</option>
-                          </select>
-                        ) : null}
-                        {canApproveMember ? (
-                          <button
-                            onClick={() => onUpdateMember(member.userId, { status: 'active' })}
-                            style={{
-                              ...styles.button,
-                              ...styles.buttonPrimary,
-                              ...styles.buttonSmall,
-                              fontSize: 'var(--type-xs)',
-                            }}
-                          >
-                            Approve
-                          </button>
-                        ) : null}
+                            {statusBadge.label}
+                          </span>
+                        )}
+                        <MutedBadge mutedUntil={member.mutedUntil} />
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 'var(--type-xs)',
+                          color: 'var(--sh-muted)',
+                          marginBottom: 'var(--space-2)',
+                        }}
+                      >
+                        Joined {formatRelativeTime(member.joinedAt)}
+                      </div>
 
-                        {/* Mute / Unmute button */}
-                        {canModerate && member.status === 'active' ? (
-                          isMuted(member) ? (
+                      {(canUpdateRole || canApproveMember || canRemoveMember || canModerate) && (
+                        <div
+                          style={{
+                            display: 'flex',
+                            flexDirection: 'column',
+                            gap: 'var(--space-2)',
+                          }}
+                        >
+                          {canUpdateRole ? (
+                            <select
+                              value={member.role}
+                              onChange={(e) =>
+                                onUpdateMember(member.userId, { role: e.target.value })
+                              }
+                              style={{
+                                ...styles.select,
+                                fontSize: 'var(--type-xs)',
+                                padding: '0.375rem',
+                              }}
+                            >
+                              <option value="member">Member</option>
+                              <option value="moderator">Moderator</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          ) : null}
+                          {canApproveMember ? (
                             <button
-                              onClick={() => handleUnmute(member.userId)}
+                              onClick={() => onUpdateMember(member.userId, { status: 'active' })}
                               style={{
                                 ...styles.button,
-                                ...styles.buttonSecondary,
+                                ...styles.buttonPrimary,
                                 ...styles.buttonSmall,
                                 fontSize: 'var(--type-xs)',
                               }}
                             >
-                              Unmute
+                              Approve
                             </button>
-                          ) : (
+                          ) : null}
+
+                          {/* Mute / Unmute button */}
+                          {canModerate && member.status === 'active' ? (
+                            isMuted(member) ? (
+                              <button
+                                onClick={() => handleUnmute(member.userId)}
+                                style={{
+                                  ...styles.button,
+                                  ...styles.buttonSecondary,
+                                  ...styles.buttonSmall,
+                                  fontSize: 'var(--type-xs)',
+                                }}
+                              >
+                                Unmute
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => {
+                                  setMuteTarget(member)
+                                  setMuteDays(7)
+                                  setMuteReason('')
+                                }}
+                                style={{
+                                  ...styles.button,
+                                  ...styles.buttonSecondary,
+                                  ...styles.buttonSmall,
+                                  fontSize: 'var(--type-xs)',
+                                  borderColor: 'var(--sh-warning-border)',
+                                  color: 'var(--sh-warning-text)',
+                                }}
+                              >
+                                Mute
+                              </button>
+                            )
+                          ) : null}
+
+                          {/* Block button */}
+                          {canModerate ? (
                             <button
                               onClick={() => {
-                                setMuteTarget(member)
-                                setMuteDays(7)
-                                setMuteReason('')
+                                setBlockTarget(member)
+                                setBlockReason('')
                               }}
                               style={{
                                 ...styles.button,
-                                ...styles.buttonSecondary,
+                                ...styles.buttonDanger,
                                 ...styles.buttonSmall,
                                 fontSize: 'var(--type-xs)',
-                                borderColor: 'var(--sh-warning-border)',
-                                color: 'var(--sh-warning-text)',
                               }}
                             >
-                              Mute
+                              Block
                             </button>
-                          )
-                        ) : null}
+                          ) : null}
 
-                        {/* Block button */}
-                        {canModerate ? (
-                          <button
-                            onClick={() => {
-                              setBlockTarget(member)
-                              setBlockReason('')
-                            }}
-                            style={{
-                              ...styles.button,
-                              ...styles.buttonDanger,
-                              ...styles.buttonSmall,
-                              fontSize: 'var(--type-xs)',
-                            }}
-                          >
-                            Block
-                          </button>
-                        ) : null}
-
-                        {canRemoveMember ? (
-                          <button
-                            onClick={() => {
-                              if (window.confirm('Remove this member?')) {
-                                onRemoveMember(member.userId)
-                              }
-                            }}
-                            style={{
-                              ...styles.button,
-                              ...styles.buttonSmall,
-                              fontSize: 'var(--type-xs)',
-                              backgroundColor: 'transparent',
-                              color: 'var(--sh-muted)',
-                              border: '1px solid var(--sh-border)',
-                            }}
-                          >
-                            Remove
-                          </button>
-                        ) : null}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
+                          {canRemoveMember ? (
+                            <button
+                              onClick={() => {
+                                if (window.confirm('Remove this member?')) {
+                                  onRemoveMember(member.userId)
+                                }
+                              }}
+                              style={{
+                                ...styles.button,
+                                ...styles.buttonSmall,
+                                fontSize: 'var(--type-xs)',
+                                backgroundColor: 'transparent',
+                                color: 'var(--sh-muted)',
+                                border: '1px solid var(--sh-border)',
+                              }}
+                            >
+                              Remove
+                            </button>
+                          ) : null}
+                        </div>
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
 
         {filteredMembers.length === 0 && (
           <div style={styles.emptyState}>
@@ -481,7 +565,16 @@ export function GroupMembersTab({
               fontFamily: 'inherit',
             }}
           >
-            <h3 style={{ fontSize: 'var(--type-sm)', fontWeight: 600, color: 'var(--sh-muted)', textTransform: 'uppercase', letterSpacing: '0.04em', margin: 0 }}>
+            <h3
+              style={{
+                fontSize: 'var(--type-sm)',
+                fontWeight: 600,
+                color: 'var(--sh-muted)',
+                textTransform: 'uppercase',
+                letterSpacing: '0.04em',
+                margin: 0,
+              }}
+            >
               {showBlocked ? '\u25BE' : '\u25B8'} Blocked Users
               {blockedUsers && blockedUsers.length > 0 ? ` (${blockedUsers.length})` : ''}
             </h3>
@@ -490,7 +583,9 @@ export function GroupMembersTab({
           {showBlocked && (
             <div style={{ marginTop: 'var(--space-4)' }}>
               {blockedLoading && (
-                <div style={{ fontSize: 'var(--type-sm)', color: 'var(--sh-muted)' }}>Loading...</div>
+                <div style={{ fontSize: 'var(--type-sm)', color: 'var(--sh-muted)' }}>
+                  Loading...
+                </div>
               )}
               {!blockedLoading && (!blockedUsers || blockedUsers.length === 0) && (
                 <div style={{ fontSize: 'var(--type-sm)', color: 'var(--sh-muted)' }}>
@@ -518,7 +613,13 @@ export function GroupMembersTab({
                         size={36}
                       />
                       <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 'var(--type-sm)', fontWeight: 500, color: 'var(--sh-heading)' }}>
+                        <div
+                          style={{
+                            fontSize: 'var(--type-sm)',
+                            fontWeight: 500,
+                            color: 'var(--sh-heading)',
+                          }}
+                        >
                           {block.user?.username || 'Unknown'}
                         </div>
                         <div style={{ fontSize: 'var(--type-xs)', color: 'var(--sh-muted)' }}>
@@ -556,7 +657,10 @@ export function GroupMembersTab({
           description="This will remove them from the group and prevent them from rejoining. You can unblock them later."
           confirmLabel="Block"
           confirmDanger
-          onCancel={() => { setBlockTarget(null); setBlockReason('') }}
+          onCancel={() => {
+            setBlockTarget(null)
+            setBlockReason('')
+          }}
           onConfirm={handleBlockConfirm}
         >
           <div style={styles.formGroup}>
@@ -580,7 +684,10 @@ export function GroupMembersTab({
           description="Muted users can still read group content but cannot post, reply, or upload until the mute expires."
           confirmLabel={`Mute for ${MUTE_DURATIONS.find((d) => d.value === muteDays)?.label || muteDays + ' days'}`}
           confirmDanger={false}
-          onCancel={() => { setMuteTarget(null); setMuteReason('') }}
+          onCancel={() => {
+            setMuteTarget(null)
+            setMuteReason('')
+          }}
           onConfirm={handleMuteConfirm}
         >
           <div style={styles.formGroup}>
@@ -591,7 +698,9 @@ export function GroupMembersTab({
               onChange={(e) => setMuteDays(Number(e.target.value))}
             >
               {MUTE_DURATIONS.map((d) => (
-                <option key={d.value} value={d.value}>{d.label}</option>
+                <option key={d.value} value={d.value}>
+                  {d.label}
+                </option>
               ))}
             </select>
           </div>
@@ -620,7 +729,9 @@ export function GroupMembersTab({
               aria-modal="true"
               aria-labelledby="invite-member-title-2"
             >
-              <h3 style={styles.sectionTitle} id="invite-member-title-2">Invite Member</h3>
+              <h3 style={styles.sectionTitle} id="invite-member-title-2">
+                Invite Member
+              </h3>
               {error && <div style={styles.error}>{error}</div>}
               <form onSubmit={handleSubmit}>
                 <div style={styles.formGroup}>
@@ -658,7 +769,7 @@ export function GroupMembersTab({
             </div>
           </div>
         ),
-        document.body
+        document.body,
       )}
     </div>
   )

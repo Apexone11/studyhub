@@ -23,7 +23,9 @@ function buildSheetWhereSql({ status, courseId, userId }) {
  */
 function sanitizeSearchQuery(input) {
   // Cap input length to prevent ReDoS on extremely long tsquery strings.
-  return String(input || '').trim().slice(0, 500)
+  return String(input || '')
+    .trim()
+    .slice(0, 500)
     .split(/\s+/)
     .filter(Boolean)
     .map((w) => w.replace(/[^\p{L}\p{N}-]/gu, ''))
@@ -35,7 +37,10 @@ function sanitizeSearchQuery(input) {
  * Full-text search for sheets using GIN indexes.
  * Uses PostgreSQL to_tsvector / to_tsquery for ranked search results.
  */
-async function searchSheetsFTS(query, { courseId, userId, status = 'published', page = 1, limit = 20 } = {}) {
+async function searchSheetsFTS(
+  query,
+  { courseId, userId, status = 'published', page = 1, limit = 20 } = {},
+) {
   const tsquery = sanitizeSearchQuery(query)
   if (!tsquery) return { sheets: [], total: 0, page, totalPages: 0 }
 

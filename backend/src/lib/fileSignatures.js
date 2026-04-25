@@ -46,7 +46,13 @@ function detectFileSignature(filePath) {
       return { mime: 'image/webp', type: 'image' }
     }
     // ZIP-based formats (DOCX, XLSX, PPTX, plain ZIP)
-    if (head.length >= 4 && head[0] === 0x50 && head[1] === 0x4b && head[2] === 0x03 && head[3] === 0x04) {
+    if (
+      head.length >= 4 &&
+      head[0] === 0x50 &&
+      head[1] === 0x4b &&
+      head[2] === 0x03 &&
+      head[3] === 0x04
+    ) {
       return { mime: 'application/zip', type: 'archive' }
     }
 
@@ -108,9 +114,7 @@ function signatureMatchesExpected(filePath, expectedMimes = []) {
   }
 
   const normalizedExpected = new Set(
-    expectedMimes
-      .map((value) => String(value || '').toLowerCase())
-      .filter(Boolean),
+    expectedMimes.map((value) => String(value || '').toLowerCase()).filter(Boolean),
   )
 
   return {
@@ -127,10 +131,10 @@ function signatureMatchesExpected(filePath, expectedMimes = []) {
  */
 const SVG_DANGEROUS_PATTERNS = [
   /<script[\s>]/i,
-  /\bon\w+\s*=/i,                     // onclick=, onerror=, onload=, etc.
-  /javascript\s*:/i,                   // javascript: URIs
-  /data\s*:\s*text\/html/i,            // data:text/html embeds
-  /<foreignObject[\s>]/i,              // can embed arbitrary HTML
+  /\bon\w+\s*=/i, // onclick=, onerror=, onload=, etc.
+  /javascript\s*:/i, // javascript: URIs
+  /data\s*:\s*text\/html/i, // data:text/html embeds
+  /<foreignObject[\s>]/i, // can embed arbitrary HTML
   /<iframe[\s>]/i,
   /<embed[\s>]/i,
   /<object[\s>]/i,
@@ -148,7 +152,10 @@ function validateSvgContent(filePath) {
 
     for (const pattern of SVG_DANGEROUS_PATTERNS) {
       if (pattern.test(content)) {
-        return { safe: false, reason: `SVG contains potentially dangerous content: ${pattern.source}` }
+        return {
+          safe: false,
+          reason: `SVG contains potentially dangerous content: ${pattern.source}`,
+        }
       }
     }
 

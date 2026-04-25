@@ -25,7 +25,9 @@ const TEXT_EXTENSIONS = new Set([
 function attachmentExtension(name = '') {
   const dotIndex = String(name).lastIndexOf('.')
   if (dotIndex < 0) return ''
-  return String(name).slice(dotIndex + 1).toLowerCase()
+  return String(name)
+    .slice(dotIndex + 1)
+    .toLowerCase()
 }
 
 export function attachmentPreviewKind(item) {
@@ -33,8 +35,14 @@ export function attachmentPreviewKind(item) {
   const extension = attachmentExtension(item?.attachmentName)
 
   if (rawType === 'pdf' || extension === 'pdf') return 'pdf'
-  if (rawType === 'image' || rawType.startsWith('image/') || IMAGE_EXTENSIONS.has(extension)) return 'image'
-  if (TEXT_EXTENSIONS.has(extension) || rawType.startsWith('text/') || rawType.includes('json') || rawType.includes('xml')) {
+  if (rawType === 'image' || rawType.startsWith('image/') || IMAGE_EXTENSIONS.has(extension))
+    return 'image'
+  if (
+    TEXT_EXTENSIONS.has(extension) ||
+    rawType.startsWith('text/') ||
+    rawType.includes('json') ||
+    rawType.includes('xml')
+  ) {
     return 'text'
   }
   return 'document'

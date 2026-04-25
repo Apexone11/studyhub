@@ -44,36 +44,39 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
   }, [sheet?.id]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Save function — includes contentFormat so the backend knows the storage type
-  const save = useCallback(async (contentToSave, titleToSave, descToSave, formatToSave) => {
-    if (!sheet?.id) return
-    setSaving(true)
-    try {
-      const body = {
-        title: titleToSave,
-        description: descToSave,
-        content: contentToSave,
+  const save = useCallback(
+    async (contentToSave, titleToSave, descToSave, formatToSave) => {
+      if (!sheet?.id) return
+      setSaving(true)
+      try {
+        const body = {
+          title: titleToSave,
+          description: descToSave,
+          content: contentToSave,
+        }
+        // Include contentFormat if it changed (e.g., upgraded from markdown to richtext)
+        if (formatToSave && formatToSave !== (sheet.contentFormat || 'markdown')) {
+          body.contentFormat = formatToSave
+        }
+        const response = await fetch(`${API}/api/sheets/${sheet.id}`, {
+          method: 'PATCH',
+          headers: authHeaders(),
+          credentials: 'include',
+          body: JSON.stringify(body),
+        })
+        const data = await readJsonSafely(response, {})
+        if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not save.'))
+        setDirty(false)
+        setLastSaved(new Date())
+        if (onContentSaved) onContentSaved()
+      } catch (err) {
+        showToast(err.message, 'error')
+      } finally {
+        setSaving(false)
       }
-      // Include contentFormat if it changed (e.g., upgraded from markdown to richtext)
-      if (formatToSave && formatToSave !== (sheet.contentFormat || 'markdown')) {
-        body.contentFormat = formatToSave
-      }
-      const response = await fetch(`${API}/api/sheets/${sheet.id}`, {
-        method: 'PATCH',
-        headers: authHeaders(),
-        credentials: 'include',
-        body: JSON.stringify(body),
-      })
-      const data = await readJsonSafely(response, {})
-      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not save.'))
-      setDirty(false)
-      setLastSaved(new Date())
-      if (onContentSaved) onContentSaved()
-    } catch (err) {
-      showToast(err.message, 'error')
-    } finally {
-      setSaving(false)
-    }
-  }, [sheet?.id, sheet?.contentFormat, onContentSaved])
+    },
+    [sheet?.id, sheet?.contentFormat, onContentSaved],
+  )
 
   // Publish or revert to draft — saves content first, then toggles status
   const handleTogglePublish = async () => {
@@ -93,7 +96,8 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
         body: JSON.stringify({ status: newStatus }),
       })
       const data = await readJsonSafely(response, {})
-      if (!response.ok) throw new Error(getApiErrorMessage(data, `Could not ${isDraft ? 'publish' : 'unpublish'}.`))
+      if (!response.ok)
+        throw new Error(getApiErrorMessage(data, `Could not ${isDraft ? 'publish' : 'unpublish'}.`))
       setSheetStatus(newStatus)
       showToast(isDraft ? 'Sheet published!' : 'Sheet moved back to draft.', 'success')
       if (onContentSaved) onContentSaved()
@@ -111,13 +115,18 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
     autosaveTimer.current = setTimeout(() => {
       save(content, title, description, activeFormat)
     }, AUTOSAVE_DELAY)
-    return () => { if (autosaveTimer.current) clearTimeout(autosaveTimer.current) }
+    return () => {
+      if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
+    }
   }, [content, title, description, dirty, save, activeFormat])
 
   // Unsaved changes warning
   useEffect(() => {
     if (!dirty) return
-    const handler = (e) => { e.preventDefault(); e.returnValue = '' }
+    const handler = (e) => {
+      e.preventDefault()
+      e.returnValue = ''
+    }
     window.addEventListener('beforeunload', handler)
     return () => window.removeEventListener('beforeunload', handler)
   }, [dirty])
@@ -152,20 +161,32 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
   // logic and hands us the next (format, content) pair. We just flip state
   // and mark the sheet dirty so the new contentFormat gets persisted on the
   // next autosave.
-  const handleFormatChange = useCallback((nextFormat, nextContent) => {
-    if (nextFormat === activeFormat && nextContent === content) return
-    setActiveFormat(nextFormat)
-    if (typeof nextContent === 'string' && nextContent !== content) {
-      setContent(nextContent)
-    }
-    setDirty(true)
-    showToast(`Switched to ${nextFormat === 'richtext' ? 'Rich Text' : 'HTML/Code'} mode.`, 'success')
-  }, [activeFormat, content])
+  const handleFormatChange = useCallback(
+    (nextFormat, nextContent) => {
+      if (nextFormat === activeFormat && nextContent === content) return
+      setActiveFormat(nextFormat)
+      if (typeof nextContent === 'string' && nextContent !== content) {
+        setContent(nextContent)
+      }
+      setDirty(true)
+      showToast(
+        `Switched to ${nextFormat === 'richtext' ? 'Rich Text' : 'HTML/Code'} mode.`,
+        'success',
+      )
+    },
+    [activeFormat, content],
+  )
 
   return (
     <div style={{ display: 'grid', gap: 14 }}>
       {/* Title + description fields */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+      <div
+        style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+          gap: 12,
+        }}
+      >
         <div>
           <label style={labelStyle}>Title</label>
           <input
@@ -191,30 +212,51 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
       </div>
 
       {/* Save status bar */}
-      <div style={{
-        display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-        padding: '8px 12px', borderRadius: 10,
-        background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
-        fontSize: 12, color: 'var(--sh-muted)',
-        flexWrap: 'wrap', gap: 8,
-      }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          padding: '8px 12px',
+          borderRadius: 10,
+          background: 'var(--sh-soft)',
+          border: '1px solid var(--sh-border)',
+          fontSize: 12,
+          color: 'var(--sh-muted)',
+          flexWrap: 'wrap',
+          gap: 8,
+        }}
+      >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {/* Draft / Published status indicator */}
           <span
             role="status"
             aria-label={isDraft ? 'Sheet status: draft' : 'Sheet status: published'}
             style={{
-              padding: '2px 8px', borderRadius: 6, fontWeight: 700, fontSize: 10,
+              padding: '2px 8px',
+              borderRadius: 6,
+              fontWeight: 700,
+              fontSize: 10,
               textTransform: 'uppercase',
-              background: isDraft ? 'var(--sh-warning-bg, #fffbeb)' : 'var(--sh-success-bg, #f0fdf4)',
-              color: isDraft ? 'var(--sh-warning-text, #92400e)' : 'var(--sh-success-text, #166534)',
+              background: isDraft
+                ? 'var(--sh-warning-bg, #fffbeb)'
+                : 'var(--sh-success-bg, #f0fdf4)',
+              color: isDraft
+                ? 'var(--sh-warning-text, #92400e)'
+                : 'var(--sh-success-text, #166534)',
               border: `1px solid ${isDraft ? 'var(--sh-warning-border, #fde68a)' : 'var(--sh-success-border, #bbf7d0)'}`,
             }}
           >
             {isDraft ? 'Draft' : 'Published'}
           </span>
           <span>
-            {saving ? 'Saving…' : dirty ? 'Unsaved changes' : lastSaved ? `Saved ${formatTime(lastSaved)}` : 'No changes'}
+            {saving
+              ? 'Saving…'
+              : dirty
+                ? 'Unsaved changes'
+                : lastSaved
+                  ? `Saved ${formatTime(lastSaved)}`
+                  : 'No changes'}
           </span>
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
@@ -229,10 +271,15 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
             onClick={handleManualSave}
             disabled={!dirty || saving}
             style={{
-              border: 'none', borderRadius: 8, padding: '6px 14px',
+              border: 'none',
+              borderRadius: 8,
+              padding: '6px 14px',
               background: dirty ? 'var(--sh-brand-accent)' : 'var(--sh-border)',
               color: dirty ? 'var(--sh-nav-text)' : 'var(--sh-muted)',
-              fontWeight: 700, fontSize: 11, cursor: dirty ? 'pointer' : 'default', minHeight: 32,
+              fontWeight: 700,
+              fontSize: 11,
+              cursor: dirty ? 'pointer' : 'default',
+              minHeight: 32,
               fontFamily: 'inherit',
             }}
           >
@@ -242,12 +289,21 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
             type="button"
             onClick={handleTogglePublish}
             disabled={publishing || saving}
-            aria-label={isDraft ? (sheet?.forkOf ? 'Contribute your changes back to the original sheet' : 'Publish this sheet to make it visible to others') : 'Revert this sheet back to draft status'}
+            aria-label={
+              isDraft
+                ? sheet?.forkOf
+                  ? 'Contribute your changes back to the original sheet'
+                  : 'Publish this sheet to make it visible to others'
+                : 'Revert this sheet back to draft status'
+            }
             style={{
-              borderRadius: 8, padding: '6px 14px',
+              borderRadius: 8,
+              padding: '6px 14px',
               background: isDraft ? 'var(--sh-success, #16a34a)' : 'var(--sh-warning-bg, #fffbeb)',
               color: isDraft ? 'var(--sh-nav-text)' : 'var(--sh-warning-dark-text)',
-              fontWeight: 700, fontSize: 11, minHeight: 32,
+              fontWeight: 700,
+              fontSize: 11,
+              minHeight: 32,
               cursor: publishing ? 'wait' : 'pointer',
               fontFamily: 'inherit',
               border: isDraft ? 'none' : '1px solid var(--sh-warning-border, #fde68a)',
@@ -255,7 +311,8 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
           >
             {(() => {
               const isFork = Boolean(sheet?.forkOf)
-              if (publishing) return isDraft ? (isFork ? 'Contributing…' : 'Publishing…') : 'Saving…'
+              if (publishing)
+                return isDraft ? (isFork ? 'Contributing…' : 'Publishing…') : 'Saving…'
               if (!isDraft) return 'Revert to draft'
               return isFork ? 'Contribute' : 'Publish'
             })()}
@@ -276,16 +333,25 @@ export default function SheetLabEditor({ sheet, onContentSaved }) {
 /* ── Helpers ────────────────────────────────────────────────── */
 
 const labelStyle = {
-  display: 'block', fontSize: 12, fontWeight: 700,
-  color: 'var(--sh-muted)', marginBottom: 4, textTransform: 'uppercase',
+  display: 'block',
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'var(--sh-muted)',
+  marginBottom: 4,
+  textTransform: 'uppercase',
   letterSpacing: '0.3px',
 }
 
 const inputStyle = {
-  width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-  borderRadius: 10, border: '1px solid var(--sh-border)',
-  background: 'var(--sh-surface)', color: 'var(--sh-heading)',
-  fontSize: 13, fontFamily: 'inherit',
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-surface)',
+  color: 'var(--sh-heading)',
+  fontSize: 13,
+  fontFamily: 'inherit',
 }
 
 function formatTime(date) {

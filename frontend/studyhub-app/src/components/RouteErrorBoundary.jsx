@@ -23,11 +23,13 @@ function isChunkLoadError(error) {
   if (!error) return false
   const name = error.name || ''
   const msg = (error.message || '').toLowerCase()
-  return name === 'ChunkLoadError'
-    || msg.includes('loading chunk')
-    || msg.includes('dynamically imported module')
-    || msg.includes('failed to fetch dynamically imported module')
-    || msg.includes('importing a module script failed')
+  return (
+    name === 'ChunkLoadError' ||
+    msg.includes('loading chunk') ||
+    msg.includes('dynamically imported module') ||
+    msg.includes('failed to fetch dynamically imported module') ||
+    msg.includes('importing a module script failed')
+  )
 }
 
 const CHUNK_RELOAD_KEY = 'sh_chunk_reload'
@@ -59,7 +61,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
   const retries = useMemo(
     () => parseInt(sessionStorage.getItem(RETRY_COUNT_KEY) || '0', 10),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- re-evaluate on each new error
-    [error]
+    [error],
   )
   const shouldAutoRetry = retries < MAX_AUTO_RETRIES && !isChunkLoadError(error)
   const initialCountdown = shouldAutoRetry ? Math.ceil(AUTO_RETRY_DELAY / 1000) : 0
@@ -83,7 +85,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
       sessionStorage.setItem(RETRY_COUNT_KEY, String(retries + 1))
 
       countdownRef.current = setInterval(() => {
-        setCountdown(prev => {
+        setCountdown((prev) => {
           if (prev <= 1) {
             clearInterval(countdownRef.current)
             return 0
@@ -142,7 +144,14 @@ function ErrorFallback({ error, resetErrorBoundary }) {
         <h1 style={{ margin: '0 0 10px', fontSize: 24, color: 'var(--sh-slate-900, #0f172a)' }}>
           {isChunk ? 'Update available' : 'This page crashed.'}
         </h1>
-        <p style={{ margin: '0 0 18px', fontSize: 14, color: 'var(--sh-slate-500, #64748b)', lineHeight: 1.7 }}>
+        <p
+          style={{
+            margin: '0 0 18px',
+            fontSize: 14,
+            color: 'var(--sh-slate-500, #64748b)',
+            lineHeight: 1.7,
+          }}
+        >
           {isChunk
             ? 'StudyHub was updated since you last loaded the page. A refresh should fix this.'
             : countdown > 0
@@ -150,7 +159,14 @@ function ErrorFallback({ error, resetErrorBoundary }) {
               : 'StudyHub recovered the app shell, but this route hit a runtime error. You can retry the route or jump back to a stable page.'}
         </p>
         {eventId ? (
-          <p style={{ margin: '0 0 18px', fontSize: 12, color: 'var(--sh-slate-600, #475569)', lineHeight: 1.7 }}>
+          <p
+            style={{
+              margin: '0 0 18px',
+              fontSize: 12,
+              color: 'var(--sh-slate-600, #475569)',
+              lineHeight: 1.7,
+            }}
+          >
             Reference ID: <strong>{eventId}</strong>
           </p>
         ) : null}
@@ -158,7 +174,10 @@ function ErrorFallback({ error, resetErrorBoundary }) {
           {isChunk ? (
             <button
               type="button"
-              onClick={() => { sessionStorage.removeItem(CHUNK_RELOAD_KEY); window.location.reload() }}
+              onClick={() => {
+                sessionStorage.removeItem(CHUNK_RELOAD_KEY)
+                window.location.reload()
+              }}
               style={{
                 padding: '10px 18px',
                 borderRadius: 10,

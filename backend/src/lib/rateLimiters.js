@@ -18,6 +18,23 @@ const {
 // ── CATEGORY: Generic Base Limiters ────────────────────────────────────────
 
 /**
+ * Global app limiter — applied to every request from backend/src/index.js.
+ * 1000 requests per 15 minutes per IP.
+ * Skips: '/', '/health', '/uploads/avatars/*'.
+ *
+ * Extracted here because CLAUDE.md requires rate limiters to live in this
+ * file and not inline in route files.
+ */
+const globalLimiter = rateLimit({
+  windowMs: WINDOW_15_MIN,
+  max: 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) =>
+    req.path === '/' || req.path === '/health' || req.path.startsWith('/uploads/avatars/'),
+})
+
+/**
  * Generic auth endpoints — strict limits.
  * 15 requests per 15-minute window per IP.
  */
@@ -159,7 +176,7 @@ const authGoogleLimiter = rateLimit({
 /**
  * Google OAuth complete endpoint — 10 requests per hour per IP.
  * Used after a pending Google signup picks a role. See
- * docs/roles-and-permissions-plan.md §4.2.
+ * docs/internal/roles-and-permissions-plan.md §4.2.
  */
 const googleCompleteLimiter = rateLimit({
   windowMs: WINDOW_1_HOUR,
@@ -172,7 +189,7 @@ const googleCompleteLimiter = rateLimit({
 /**
  * Role-change IP bucket — 10 writes per hour per IP. Sits on top of the
  * per-user 3-changes-per-30-days DB rule enforced in users.controller.js.
- * See docs/roles-and-permissions-plan.md §8.8.
+ * See docs/internal/roles-and-permissions-plan.md §8.8.
  */
 const roleChangeLimiter = rateLimit({
   windowMs: WINDOW_1_HOUR,
@@ -180,6 +197,22 @@ const roleChangeLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { error: 'Too many role-change attempts. Please try again later.' },
+})
+
+/**
+ * Panic ("kill the house lights") endpoint — 3 requests per hour per user.
+ * Keyed by userId so a shared-IP household is not locked out when one member
+ * triggers the flow. Panics revoke every session + trusted device and fire a
+ * password-reset email, so abuse or misfires must be rate-bounded.
+ * See backend/src/modules/auth/panic.controller.js for the handler.
+ */
+const panicLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `panic-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many panic requests. Please wait an hour.' },
 })
 
 // ── CATEGORY: Feed Module ──────────────────────────────────────────────────
@@ -940,10 +973,93 @@ const sessionRevokeLimiter = rateLimit({
   message: { error: 'Too many session revocation requests. Please slow down.' },
 })
 
+/**
+ * Login activity read — 30 requests per 5 minutes per user.
+ * Powers the Security-tab "Login activity" list.
+ */
+const loginActivityLimiter = rateLimit({
+  windowMs: WINDOW_5_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `login-activity-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many login activity requests. Please slow down.' },
+})
+
+/**
+ * Exam writes — 10 per minute per user.
+ * Phase 2 of v2 design refresh (design_v2_upcoming_exams).
+ */
+const examWriteLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `exam-write-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many exam changes. Please slow down.' },
+})
+
+/**
+ * Exam reads — 60 per minute per user.
+ */
+const examReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `exam-read-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many requests. Please slow down.' },
+})
+
+/**
+ * AI suggestion reads — 60 per minute per user. Phase 3 of v2 design
+ * refresh (design_v2_ai_card). Independent from the AI message limiter
+ * because the suggestion endpoint is polled by the card on mount and
+ * shouldn't burn message budget.
+ */
+const aiSuggestionsReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai-suggestions-read-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many requests. Please slow down.' },
+})
+
+/**
+ * AI suggestion refresh — 5 per hour per user. Refresh is the
+ * UI-spam vector for quota burn (one click = one Anthropic call).
+ * The hourly cap is independent of the daily AI budget so even a
+ * Pro user can't spam-refresh the card.
+ */
+const aiSuggestionsRefreshLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai-suggestions-refresh-${req.user?.userId || 'anon'}`,
+  message: { error: 'You are refreshing too quickly. Try again later.' },
+})
+
+/**
+ * AI suggestion dismiss — 20 per hour per user. Dismiss is cheap
+ * (no AI call) but still write-sided; this stops a runaway client
+ * from hammering the dismiss endpoint.
+ */
+const aiSuggestionsDismissLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai-suggestions-dismiss-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many dismissals. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
   // Base limiters
+  globalLimiter,
   authLimiter,
   writeLimiter,
   readLimiter,
@@ -960,6 +1076,7 @@ module.exports = {
   authGoogleLimiter,
   googleCompleteLimiter,
   roleChangeLimiter,
+  panicLimiter,
 
   // Feed module
   feedReactLimiter,
@@ -1073,4 +1190,12 @@ module.exports = {
   // Session management
   sessionListLimiter,
   sessionRevokeLimiter,
+  loginActivityLimiter,
+
+  // Exams module (Phase 2 of v2 design refresh)
+  examWriteLimiter,
+  examReadLimiter,
+  aiSuggestionsReadLimiter,
+  aiSuggestionsRefreshLimiter,
+  aiSuggestionsDismissLimiter,
 }

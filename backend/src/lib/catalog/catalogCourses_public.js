@@ -4,7 +4,11 @@ const COURSES_PUBLIC = {
   // UMBC (40 courses)
   UMBC: [
     { name: 'Introduction to Computer Science I', code: 'CMSC201', department: 'Computer Science' },
-    { name: 'Introduction to Computer Science II', code: 'CMSC202', department: 'Computer Science' },
+    {
+      name: 'Introduction to Computer Science II',
+      code: 'CMSC202',
+      department: 'Computer Science',
+    },
     { name: 'Discrete Structures', code: 'CMSC203', department: 'Computer Science' },
     { name: 'Computer Organization', code: 'CMSC313', department: 'Computer Science' },
     { name: 'Data Structures', code: 'CMSC341', department: 'Computer Science' },

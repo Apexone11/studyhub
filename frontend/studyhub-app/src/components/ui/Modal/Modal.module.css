@@ -1,0 +1,147 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--sh-modal-overlay);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-4);
+  z-index: 999;
+  animation: overlayFade 200ms ease-out;
+}
+
+.modal {
+  /* position:relative anchors the absolutely-positioned floating
+     close button to the modal body when there's no header, instead
+     of to the fixed overlay (which would pin it to the viewport). */
+  position: relative;
+  background: var(--sh-surface);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-lg);
+  width: 100%;
+  max-width: min(420px, 90vw);
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: modalEnter 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.modal--wide {
+  max-width: min(600px, 90vw);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-4);
+  padding: var(--space-6) var(--space-6) var(--space-2) var(--space-6);
+}
+
+.headerText {
+  flex: 1;
+  min-width: 0;
+}
+
+.title {
+  margin: 0;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: var(--type-md);
+  font-weight: 700;
+  color: var(--sh-heading);
+}
+
+.description {
+  margin: var(--space-1) 0 0;
+  font-size: var(--type-sm);
+  color: var(--sh-subtext);
+}
+
+.closeBtn {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-sm);
+  border: none;
+  background: transparent;
+  color: var(--sh-subtext);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition:
+    background-color 0.15s ease,
+    color 0.15s ease;
+}
+.closeBtn:hover {
+  background: var(--sh-soft);
+  color: var(--sh-text);
+}
+.closeBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sh-brand) 30%, transparent);
+}
+
+/* Floating variant — used when the modal has no title/description
+   header. Anchors to the `.modal` container (which is position:relative)
+   so it lands in the top-right of the dialog body, not the viewport. */
+.closeBtn--floating {
+  position: absolute;
+  top: var(--space-3);
+  right: var(--space-3);
+  z-index: 1;
+}
+
+.body {
+  padding: var(--space-4) var(--space-6) var(--space-6) var(--space-6);
+  overflow-y: auto;
+  color: var(--sh-text);
+  font-size: var(--type-base);
+  line-height: 1.5;
+}
+
+.body--noHeader {
+  padding-top: var(--space-6);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-6);
+  border-top: 1px solid var(--sh-border);
+  background: var(--sh-soft);
+}
+
+@keyframes overlayFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .overlay,
+  .modal {
+    animation: none;
+  }
+  .closeBtn {
+    transition: none;
+  }
+}

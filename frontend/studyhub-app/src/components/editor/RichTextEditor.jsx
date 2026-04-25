@@ -49,7 +49,9 @@ export default function RichTextEditor({
   themeAware = false,
 }) {
   const onUpdateRef = useRef(onUpdate)
-  useEffect(() => { onUpdateRef.current = onUpdate })
+  useEffect(() => {
+    onUpdateRef.current = onUpdate
+  })
 
   const editor = useEditor({
     extensions: [
@@ -154,4 +156,3 @@ export default function RichTextEditor({
     </div>
   )
 }
-

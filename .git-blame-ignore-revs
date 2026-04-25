@@ -1,0 +1,16 @@
+# .git-blame-ignore-revs
+#
+# Commits listed here are skipped by `git blame` / `git log --follow` when
+# the local clone is configured with:
+#
+#   git config blame.ignoreRevsFile .git-blame-ignore-revs
+#
+# GitHub honors this file automatically in PR diffs and blame views.
+#
+# Add a new rev (hash + date + one-line reason) whenever a purely mechanical
+# commit lands that would otherwise pollute blame — reformats, mass renames,
+# automated codemods.
+
+# 2026-04-23 — Prettier big-bang reformat (no logic changes).
+# First run after adding .prettierrc.json in Day 4 of the tech-debt week.
+11af34ffcd514fb4eaf0b07c28ed4fb6193debd6

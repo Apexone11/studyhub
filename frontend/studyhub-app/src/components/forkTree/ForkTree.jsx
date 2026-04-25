@@ -28,7 +28,12 @@ function TreeNode({ node, depth, linkMode }) {
         {depth > 0 && (
           <span className="lineage-node__branch" aria-hidden="true">
             <svg width="16" height="20" viewBox="0 0 16 20" fill="none">
-              <path d="M0 0 V10 H12" stroke="var(--sh-border, #cbd5e1)" strokeWidth="1.5" fill="none" />
+              <path
+                d="M0 0 V10 H12"
+                stroke="var(--sh-border, #cbd5e1)"
+                strokeWidth="1.5"
+                fill="none"
+              />
             </svg>
           </span>
         )}
@@ -37,9 +42,7 @@ function TreeNode({ node, depth, linkMode }) {
             <Link to={href} className="lineage-node__title">
               {node.title || 'Untitled'}
             </Link>
-            {node.isCurrent && (
-              <span className="lineage-node__you-badge">current</span>
-            )}
+            {node.isCurrent && <span className="lineage-node__you-badge">current</span>}
             {node.status ? (
               <span className={`sheet-lab__status-badge sheet-lab__status-badge--${node.status}`}>
                 {node.status.replace('_', ' ')}
@@ -64,21 +67,30 @@ function TreeNode({ node, depth, linkMode }) {
             )}
             {node.stars > 0 && (
               <span className="lineage-node__stat">
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                <svg
+                  width="11"
+                  height="11"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
                   <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26" />
                 </svg>
                 {node.stars}
               </span>
             )}
             {node.updatedAt || node.createdAt ? (
-              <span className="lineage-node__time">{timeAgo(node.updatedAt || node.createdAt)}</span>
+              <span className="lineage-node__time">
+                {timeAgo(node.updatedAt || node.createdAt)}
+              </span>
             ) : null}
           </div>
         </div>
       </div>
-      {node.children?.length > 0 && node.children.map((child) => (
-        <TreeNode key={child.id} node={child} depth={depth + 1} linkMode={linkMode} />
-      ))}
+      {node.children?.length > 0 &&
+        node.children.map((child) => (
+          <TreeNode key={child.id} node={child} depth={depth + 1} linkMode={linkMode} />
+        ))}
     </>
   )
 }

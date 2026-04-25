@@ -7,8 +7,11 @@ function startHtmlArchiveScheduler() {
   if (process.env.NODE_ENV === 'test') return
   if (archiveInterval) return
 
-  const parsedIntervalMs = Number.parseInt(process.env.HTML_ARCHIVE_INTERVAL_MS || String(6 * 60 * 60 * 1000), 10)
-  const intervalMs = Number.isFinite(parsedIntervalMs) ? parsedIntervalMs : (6 * 60 * 60 * 1000)
+  const parsedIntervalMs = Number.parseInt(
+    process.env.HTML_ARCHIVE_INTERVAL_MS || String(6 * 60 * 60 * 1000),
+    10,
+  )
+  const intervalMs = Number.isFinite(parsedIntervalMs) ? parsedIntervalMs : 6 * 60 * 60 * 1000
 
   const runArchive = async () => {
     try {

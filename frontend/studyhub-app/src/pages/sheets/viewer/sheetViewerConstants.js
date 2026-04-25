@@ -26,14 +26,17 @@ function timeAgo(value) {
 function attachmentExtension(name = '') {
   const dotIndex = String(name).lastIndexOf('.')
   if (dotIndex < 0) return ''
-  return String(name).slice(dotIndex + 1).toLowerCase()
+  return String(name)
+    .slice(dotIndex + 1)
+    .toLowerCase()
 }
 
 function attachmentPreviewKind(attachmentType, attachmentName) {
   const normalized = String(attachmentType || '').toLowerCase()
   const extension = attachmentExtension(attachmentName)
   if (normalized === 'pdf' || extension === 'pdf') return 'pdf'
-  if (normalized === 'image' || normalized.startsWith('image/') || IMAGE_EXTENSIONS.has(extension)) return 'image'
+  if (normalized === 'image' || normalized.startsWith('image/') || IMAGE_EXTENSIONS.has(extension))
+    return 'image'
   return 'document'
 }
 
@@ -87,18 +90,38 @@ function statusBadge(status) {
   }
   const c = colors[status] || colors.pending
   return {
-    fontSize: 11, fontWeight: 800, textTransform: 'uppercase',
-    padding: '2px 8px', borderRadius: 6,
-    background: c.bg, color: c.color,
+    fontSize: 11,
+    fontWeight: 800,
+    textTransform: 'uppercase',
+    padding: '2px 8px',
+    borderRadius: 6,
+    background: c.bg,
+    color: c.color,
   }
 }
 
 function statusPill(status) {
   const colorMap = {
-    published: { bg: 'var(--sh-success-bg)', color: 'var(--sh-success)', border: 'var(--sh-success-border)' },
-    pending_review: { bg: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)', border: 'var(--sh-warning-border)' },
-    rejected: { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger)', border: 'var(--sh-danger-border)' },
-    quarantined: { bg: 'var(--sh-danger-bg)', color: 'var(--sh-danger)', border: 'var(--sh-danger-border)' },
+    published: {
+      bg: 'var(--sh-success-bg)',
+      color: 'var(--sh-success)',
+      border: 'var(--sh-success-border)',
+    },
+    pending_review: {
+      bg: 'var(--sh-warning-bg)',
+      color: 'var(--sh-warning-text)',
+      border: 'var(--sh-warning-border)',
+    },
+    rejected: {
+      bg: 'var(--sh-danger-bg)',
+      color: 'var(--sh-danger)',
+      border: 'var(--sh-danger-border)',
+    },
+    quarantined: {
+      bg: 'var(--sh-danger-bg)',
+      color: 'var(--sh-danger)',
+      border: 'var(--sh-danger-border)',
+    },
     draft: { bg: 'var(--sh-soft)', color: 'var(--sh-muted)', border: 'var(--sh-border)' },
   }
   const c = colorMap[status] || colorMap.draft

@@ -50,7 +50,9 @@ export default function ReviewTab() {
     }
   }, [])
 
-  useEffect(() => { loadReview() }, [loadReview])
+  useEffect(() => {
+    loadReview()
+  }, [loadReview])
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -87,11 +89,16 @@ export default function ReviewTab() {
           Your review
         </h3>
 
-        <div style={{
-          padding: '16px 18px', borderRadius: 14,
-          background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
-          display: 'grid', gap: 10,
-        }}>
+        <div
+          style={{
+            padding: '16px 18px',
+            borderRadius: 14,
+            background: 'var(--sh-soft)',
+            border: '1px solid var(--sh-border)',
+            display: 'grid',
+            gap: 10,
+          }}
+        >
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <StarDisplay count={review.stars} />
             <span style={statusBadge(review.status)}>{review.status}</span>
@@ -103,10 +110,7 @@ export default function ReviewTab() {
             Submitted {new Date(review.createdAt).toLocaleDateString()}
           </div>
           {review.status === 'pending' ? (
-            <button
-              onClick={() => setEditing(true)}
-              style={editBtnStyle}
-            >
+            <button onClick={() => setEditing(true)} style={editBtnStyle}>
               Edit review
             </button>
           ) : null}
@@ -122,8 +126,7 @@ export default function ReviewTab() {
         {review ? 'Edit your review' : 'Leave a review'}
       </h3>
       <p style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: 'var(--sh-muted)' }}>
-        Tell us what you think about StudyHub. Your review will be visible
-        after approval.
+        Tell us what you think about StudyHub. Your review will be visible after approval.
       </p>
 
       {/* Star picker */}
@@ -139,27 +142,40 @@ export default function ReviewTab() {
               onMouseLeave={() => setHoverStars(0)}
               aria-label={`${n} star${n !== 1 ? 's' : ''}`}
               style={{
-                background: 'none', border: 'none', cursor: 'pointer',
-                fontSize: 28, lineHeight: 1, padding: 0,
-                color: (hoverStars || stars) >= n ? 'var(--sh-warning, #f59e0b)' : 'var(--sh-border)',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontSize: 28,
+                lineHeight: 1,
+                padding: 0,
+                color:
+                  (hoverStars || stars) >= n ? 'var(--sh-warning, #f59e0b)' : 'var(--sh-border)',
                 transition: 'color 0.15s, transform 0.15s',
                 transform: (hoverStars || stars) >= n ? 'scale(1.15)' : 'scale(1)',
               }}
             >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <svg
+                width="28"
+                height="28"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+                aria-hidden="true"
+              >
                 <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26" />
               </svg>
             </button>
           ))}
         </div>
-        {stars === 0 ? <div style={{ fontSize: 11, color: 'var(--sh-danger)', marginTop: 4 }}>Please select a rating.</div> : null}
+        {stars === 0 ? (
+          <div style={{ fontSize: 11, color: 'var(--sh-danger)', marginTop: 4 }}>
+            Please select a rating.
+          </div>
+        ) : null}
       </div>
 
       {/* Text area */}
       <div>
-        <label style={labelStyle}>
-          Your feedback ({MAX_TEXT - text.length} chars left)
-        </label>
+        <label style={labelStyle}>Your feedback ({MAX_TEXT - text.length} chars left)</label>
         <textarea
           value={text}
           onChange={(e) => setText(e.target.value.slice(0, MAX_TEXT))}
@@ -176,8 +192,8 @@ export default function ReviewTab() {
           disabled={stars < 1 || submitting}
           style={{
             ...submitBtnStyle,
-            opacity: (stars < 1 || submitting) ? 0.5 : 1,
-            cursor: (stars < 1 || submitting) ? 'not-allowed' : 'pointer',
+            opacity: stars < 1 || submitting ? 0.5 : 1,
+            cursor: stars < 1 || submitting ? 'not-allowed' : 'pointer',
           }}
         >
           {submitting ? 'Submitting...' : review ? 'Update review' : 'Submit review'}
@@ -219,39 +235,72 @@ function statusBadge(status) {
   }
   const s = map[status] || map.pending
   return {
-    padding: '2px 8px', borderRadius: 6, fontSize: 10, fontWeight: 700,
-    textTransform: 'uppercase', background: s.bg, color: s.color,
+    padding: '2px 8px',
+    borderRadius: 6,
+    fontSize: 10,
+    fontWeight: 700,
+    textTransform: 'uppercase',
+    background: s.bg,
+    color: s.color,
   }
 }
 
 const labelStyle = {
-  display: 'block', fontSize: 12, fontWeight: 700, color: 'var(--sh-muted)',
-  textTransform: 'uppercase', letterSpacing: '0.3px', marginBottom: 4,
+  display: 'block',
+  fontSize: 12,
+  fontWeight: 700,
+  color: 'var(--sh-muted)',
+  textTransform: 'uppercase',
+  letterSpacing: '0.3px',
+  marginBottom: 4,
 }
 
 const textareaStyle = {
-  width: '100%', boxSizing: 'border-box', padding: '10px 12px',
-  borderRadius: 10, border: '1px solid var(--sh-border)',
-  background: 'var(--sh-surface)', color: 'var(--sh-heading)',
-  fontSize: 13, fontFamily: 'inherit', resize: 'vertical', minHeight: 80,
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '10px 12px',
+  borderRadius: 10,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-surface)',
+  color: 'var(--sh-heading)',
+  fontSize: 13,
+  fontFamily: 'inherit',
+  resize: 'vertical',
+  minHeight: 80,
 }
 
 const submitBtnStyle = {
-  padding: '10px 18px', borderRadius: 10, border: 'none',
-  background: 'var(--sh-brand)', color: 'var(--sh-btn-primary-text, #fff)',
-  fontSize: 13, fontWeight: 700, fontFamily: 'inherit',
+  padding: '10px 18px',
+  borderRadius: 10,
+  border: 'none',
+  background: 'var(--sh-brand)',
+  color: 'var(--sh-btn-primary-text, #fff)',
+  fontSize: 13,
+  fontWeight: 700,
+  fontFamily: 'inherit',
 }
 
 const cancelBtnStyle = {
-  padding: '10px 18px', borderRadius: 10,
-  border: '1px solid var(--sh-border)', background: 'var(--sh-surface)',
-  color: 'var(--sh-heading)', fontSize: 13, fontWeight: 700,
-  cursor: 'pointer', fontFamily: 'inherit',
+  padding: '10px 18px',
+  borderRadius: 10,
+  border: '1px solid var(--sh-border)',
+  background: 'var(--sh-surface)',
+  color: 'var(--sh-heading)',
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
 }
 
 const editBtnStyle = {
-  padding: '8px 14px', borderRadius: 8,
-  border: '1px solid var(--sh-brand)', background: 'transparent',
-  color: 'var(--sh-brand)', fontSize: 12, fontWeight: 700,
-  cursor: 'pointer', fontFamily: 'inherit', justifySelf: 'start',
+  padding: '8px 14px',
+  borderRadius: 8,
+  border: '1px solid var(--sh-brand)',
+  background: 'transparent',
+  color: 'var(--sh-brand)',
+  fontSize: 12,
+  fontWeight: 700,
+  cursor: 'pointer',
+  fontFamily: 'inherit',
+  justifySelf: 'start',
 }

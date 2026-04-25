@@ -10,7 +10,15 @@ export function PageShell({ nav, sidebar, children }) {
     : sidebar
 
   return (
-    <div className="sh-page-shell" style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: PAGE_FONT, overflowX: 'hidden' }}>
+    <div
+      className="sh-page-shell"
+      style={{
+        minHeight: '100vh',
+        background: 'var(--sh-bg)',
+        fontFamily: PAGE_FONT,
+        overflowX: 'hidden',
+      }}
+    >
       {nav}
       <div className="sh-ambient-shell" style={pageShell('app')}>
         <div
@@ -22,10 +30,18 @@ export function PageShell({ nav, sidebar, children }) {
             alignItems: 'start',
           }}
         >
-          <div className="sh-page-shell__sidebar" style={{ position: layout.isCompact ? 'static' : 'sticky', top: layout.isCompact ? undefined : 74 }}>
+          <div
+            className="sh-page-shell__sidebar"
+            style={{
+              position: layout.isCompact ? 'static' : 'sticky',
+              top: layout.isCompact ? undefined : 74,
+            }}
+          >
             {responsiveSidebar}
           </div>
-          <main className="sh-page-shell__main sh-ambient-main" id="main-content">{children}</main>
+          <main className="sh-page-shell__main sh-ambient-main" id="main-content">
+            {children}
+          </main>
         </div>
       </div>
     </div>
@@ -60,8 +76,20 @@ export function TeaserCard({ title, sub, chips = [] }) {
       >
         Version 2
       </span>
-      <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-text)', marginBottom: 5, paddingRight: 64 }}>{title}</div>
-      <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.55, marginBottom: 8 }}>{sub}</div>
+      <div
+        style={{
+          fontSize: 14,
+          fontWeight: 700,
+          color: 'var(--sh-text)',
+          marginBottom: 5,
+          paddingRight: 64,
+        }}
+      >
+        {title}
+      </div>
+      <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.55, marginBottom: 8 }}>
+        {sub}
+      </div>
       <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
         {chips.map((chip, index) => (
           <span
@@ -86,10 +114,15 @@ export function TeaserCard({ title, sub, chips = [] }) {
 
 export function MiniPreview({ md }) {
   if (!md) {
-    return <div style={{ fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>Start typing to see a live preview...</div>
+    return (
+      <div style={{ fontSize: 12, color: 'var(--sh-muted)', fontStyle: 'italic' }}>
+        Start typing to see a live preview...
+      </div>
+    )
   }
 
-  const escapeHtml = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const escapeHtml = (value) =>
+    value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   const lines = md.split('\n')
   const nodes = []
   let index = 0
@@ -131,9 +164,39 @@ export function MiniPreview({ md }) {
       }
 
       nodes.push(
-        <div key={index} style={{ background: 'var(--sh-slate-900)', borderRadius: 9, padding: '12px 14px', marginBottom: 10 }}>
-          {language ? <div style={{ fontSize: 9, color: 'var(--sh-slate-500)', letterSpacing: '.08em', marginBottom: 6 }}>{language.toUpperCase()}</div> : null}
-          <pre style={{ margin: 0, fontFamily: 'monospace', fontSize: 11, color: 'var(--sh-slate-200)', lineHeight: 1.7, overflowX: 'auto' }}>{code}</pre>
+        <div
+          key={index}
+          style={{
+            background: 'var(--sh-slate-900)',
+            borderRadius: 9,
+            padding: '12px 14px',
+            marginBottom: 10,
+          }}
+        >
+          {language ? (
+            <div
+              style={{
+                fontSize: 9,
+                color: 'var(--sh-slate-500)',
+                letterSpacing: '.08em',
+                marginBottom: 6,
+              }}
+            >
+              {language.toUpperCase()}
+            </div>
+          ) : null}
+          <pre
+            style={{
+              margin: 0,
+              fontFamily: 'monospace',
+              fontSize: 11,
+              color: 'var(--sh-slate-200)',
+              lineHeight: 1.7,
+              overflowX: 'auto',
+            }}
+          >
+            {code}
+          </pre>
         </div>,
       )
       index += 1
@@ -152,7 +215,9 @@ export function MiniPreview({ md }) {
             marginBottom: 8,
           }}
         >
-          <div style={{ fontSize: 12, color: 'var(--sh-info-text)', fontStyle: 'italic' }}>{line.slice(2)}</div>
+          <div style={{ fontSize: 12, color: 'var(--sh-info-text)', fontStyle: 'italic' }}>
+            {line.slice(2)}
+          </div>
         </div>,
       )
       index += 1
@@ -184,7 +249,10 @@ export function MiniPreview({ md }) {
     }
 
     nodes.push(
-      <p key={index} style={{ fontSize: 12, color: 'var(--sh-text)', lineHeight: 1.7, margin: '0 0 6px' }}>
+      <p
+        key={index}
+        style={{ fontSize: 12, color: 'var(--sh-text)', lineHeight: 1.7, margin: '0 0 6px' }}
+      >
         {line}
       </p>,
     )

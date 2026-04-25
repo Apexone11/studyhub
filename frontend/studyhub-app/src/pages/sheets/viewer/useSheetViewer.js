@@ -19,7 +19,12 @@ export default function useSheetViewer() {
   usePageTitle('Sheet Viewer')
   const { user, clearSession } = useSession()
   const [sheetState, setSheetState] = useState({ sheet: null, loading: true, error: '' })
-  const [commentsState, setCommentsState] = useState({ comments: [], total: 0, loading: true, error: '' })
+  const [commentsState, setCommentsState] = useState({
+    comments: [],
+    total: 0,
+    loading: true,
+    error: '',
+  })
   const [commentDraft, setCommentDraft] = useState('')
   const [commentAttachments, setCommentAttachments] = useState([])
   const [commentSaving, setCommentSaving] = useState(false)
@@ -61,115 +66,142 @@ export default function useSheetViewer() {
     setCommentsState({ comments: [], total: 0, loading: false, error: '' })
   }, [sheetId])
 
-  const loadSheet = useCallback(async ({ signal, startTransition } = {}) => {
-    const apply = startTransition || ((fn) => fn())
+  const loadSheet = useCallback(
+    async ({ signal, startTransition } = {}) => {
+      const apply = startTransition || ((fn) => fn())
 
-    timing.markFetchStart()
-    try {
-      const response = await fetch(`${API}/api/sheets/${sheetId}`, {
-        headers: authHeaders(),
-        credentials: 'include',
-        signal,
-      })
+      timing.markFetchStart()
+      try {
+        const response = await fetch(`${API}/api/sheets/${sheetId}`, {
+          headers: authHeaders(),
+          credentials: 'include',
+          signal,
+        })
 
-      const data = await readJsonSafely(response, {})
-      timing.markFetchEnd()
+        const data = await readJsonSafely(response, {})
+        timing.markFetchEnd()
 
-      if (isAuthSessionFailure(response, data)) {
-        clearSession()
-        navigate('/login', { replace: true })
-        return
-      }
-
-      if (response.status === 403) {
-        removeRecentlyViewedEntry(sheetId)
-        apply(() => setSheetState({
-          sheet: null,
-          loading: false,
-          error: getApiErrorMessage(data, 'This sheet is private or you don\u2019t have permission to view it.'),
-        }))
-        return
-      }
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          // Soft-retry once to absorb the brief race that can happen right
-          // after a fork or upload, then fall back to a friendlier message.
-          await new Promise((resolve) => setTimeout(resolve, 800))
-          const retry = await fetch(`${API}/api/sheets/${sheetId}`, {
-            headers: authHeaders(),
-            credentials: 'include',
-            signal,
-          })
-          const retryData = await readJsonSafely(retry, {})
-          if (retry.ok) {
-            apply(() => setSheetState({ sheet: retryData, loading: false, error: '' }))
-            return
-          }
-          removeRecentlyViewedEntry(sheetId)
-          throw new Error(getApiErrorMessage(retryData, 'Hang tight \u2014 this sheet is still loading. If it does not appear in a moment, it may have been removed.'))
+        if (isAuthSessionFailure(response, data)) {
+          clearSession()
+          navigate('/login', { replace: true })
+          return
         }
-        throw new Error(getApiErrorMessage(data, 'Could not load this sheet. Please try again.'))
-      }
 
-      apply(() => setSheetState({ sheet: data, loading: false, error: '' }))
-    } catch (error) {
-      if (error?.name === 'AbortError') return
-      apply(() => setSheetState({ sheet: null, loading: false, error: error.message || 'Could not load this sheet.' }))
-    }
-  }, [clearSession, navigate, sheetId, timing])
+        if (response.status === 403) {
+          removeRecentlyViewedEntry(sheetId)
+          apply(() =>
+            setSheetState({
+              sheet: null,
+              loading: false,
+              error: getApiErrorMessage(
+                data,
+                'This sheet is private or you don\u2019t have permission to view it.',
+              ),
+            }),
+          )
+          return
+        }
+
+        if (!response.ok) {
+          if (response.status === 404) {
+            // Soft-retry once to absorb the brief race that can happen right
+            // after a fork or upload, then fall back to a friendlier message.
+            await new Promise((resolve) => setTimeout(resolve, 800))
+            const retry = await fetch(`${API}/api/sheets/${sheetId}`, {
+              headers: authHeaders(),
+              credentials: 'include',
+              signal,
+            })
+            const retryData = await readJsonSafely(retry, {})
+            if (retry.ok) {
+              apply(() => setSheetState({ sheet: retryData, loading: false, error: '' }))
+              return
+            }
+            removeRecentlyViewedEntry(sheetId)
+            throw new Error(
+              getApiErrorMessage(
+                retryData,
+                'Hang tight \u2014 this sheet is still loading. If it does not appear in a moment, it may have been removed.',
+              ),
+            )
+          }
+          throw new Error(getApiErrorMessage(data, 'Could not load this sheet. Please try again.'))
+        }
+
+        apply(() => setSheetState({ sheet: data, loading: false, error: '' }))
+      } catch (error) {
+        if (error?.name === 'AbortError') return
+        apply(() =>
+          setSheetState({
+            sheet: null,
+            loading: false,
+            error: error.message || 'Could not load this sheet.',
+          }),
+        )
+      }
+    },
+    [clearSession, navigate, sheetId, timing],
+  )
 
   // Report timing when sheet content arrives
   useEffect(() => {
     if (!sheetState.loading && sheetState.sheet) timing.markContentVisible()
   }, [sheetState.loading, sheetState.sheet, timing])
 
-  const loadComments = useCallback(async ({ signal, startTransition } = {}) => {
-    const apply = startTransition || ((fn) => fn())
+  const loadComments = useCallback(
+    async ({ signal, startTransition } = {}) => {
+      const apply = startTransition || ((fn) => fn())
 
-    try {
-      const response = await fetch(`${API}/api/sheets/${sheetId}/comments?limit=20`, {
-        headers: authHeaders(),
-        credentials: 'include',
-        signal,
-      })
-      const data = await readJsonSafely(response, {})
+      try {
+        const response = await fetch(`${API}/api/sheets/${sheetId}/comments?limit=20`, {
+          headers: authHeaders(),
+          credentials: 'include',
+          signal,
+        })
+        const data = await readJsonSafely(response, {})
 
-      if (isAuthSessionFailure(response, data)) {
-        clearSession()
-        navigate('/login', { replace: true })
-        return
-      }
+        if (isAuthSessionFailure(response, data)) {
+          clearSession()
+          navigate('/login', { replace: true })
+          return
+        }
 
-      if (response.status === 403) {
+        if (response.status === 403) {
+          apply(() => {
+            setCommentsState((current) => ({
+              ...current,
+              loading: false,
+              error: getApiErrorMessage(data, 'You do not have access to these comments.'),
+            }))
+          })
+          return
+        }
+
+        if (!response.ok) {
+          throw new Error(getApiErrorMessage(data, 'Could not load comments.'))
+        }
         apply(() => {
-          setCommentsState((current) => ({
-            ...current,
+          setCommentsState({
+            comments: Array.isArray(data.comments) ? data.comments : [],
+            total: data.total || 0,
             loading: false,
-            error: getApiErrorMessage(data, 'You do not have access to these comments.'),
-          }))
+            error: '',
+          })
         })
-        return
-      }
-
-      if (!response.ok) {
-        throw new Error(getApiErrorMessage(data, 'Could not load comments.'))
-      }
-      apply(() => {
-        setCommentsState({
-          comments: Array.isArray(data.comments) ? data.comments : [],
-          total: data.total || 0,
-          loading: false,
-          error: '',
+      } catch (error) {
+        if (error?.name === 'AbortError') return
+        apply(() => {
+          setCommentsState({
+            comments: [],
+            total: 0,
+            loading: false,
+            error: error.message || 'Could not load comments.',
+          })
         })
-      })
-    } catch (error) {
-      if (error?.name === 'AbortError') return
-      apply(() => {
-        setCommentsState({ comments: [], total: 0, loading: false, error: error.message || 'Could not load comments.' })
-      })
-    }
-  }, [clearSession, navigate, sheetId])
+      }
+    },
+    [clearSession, navigate, sheetId],
+  )
 
   useLivePolling(loadSheet, {
     enabled: Number.isInteger(sheetId),
@@ -182,7 +214,10 @@ export default function useSheetViewer() {
   })
 
   const { sheet } = sheetState
-  const canEdit = useMemo(() => user && sheet && (user.role === 'admin' || user.id === sheet.userId), [sheet, user])
+  const canEdit = useMemo(
+    () => user && sheet && (user.role === 'admin' || user.id === sheet.userId),
+    [sheet, user],
+  )
   const canToggleInteractive = useMemo(() => Boolean(user && sheet), [sheet, user])
   const isHtmlSheet = sheet?.contentFormat === 'html'
   const previewKind = attachmentPreviewKind(sheet?.attachmentType, sheet?.attachmentName)
@@ -204,7 +239,9 @@ export default function useSheetViewer() {
         }
       })
       .catch(() => {})
-    return () => { controller.abort() }
+    return () => {
+      controller.abort()
+    }
   }, [sheet?.course?.id, sheet?.id])
 
   /* ── README extras (contributors, latest commit) ────────────── */
@@ -218,7 +255,7 @@ export default function useSheetViewer() {
           credentials: 'include',
           signal: controller.signal,
         })
-        if (!response.ok) return          // Non-200 — readme section simply won't render
+        if (!response.ok) return // Non-200 — readme section simply won't render
         const data = await readJsonSafely(response, null)
         if (!controller.signal.aborted && data) setReadmeData(data)
       } catch (err) {
@@ -226,7 +263,9 @@ export default function useSheetViewer() {
         /* README is supplementary — don't block the page for it */
       }
     })()
-    return () => { controller.abort() }
+    return () => {
+      controller.abort()
+    }
   }, [sheet?.id])
 
   /* ── HTML runtime URL + warning gate ──────────────────────── */
@@ -251,8 +290,12 @@ export default function useSheetViewer() {
         if (!controller.signal.aborted && data?.previewUrl) setSafePreviewUrl(data.previewUrl)
       })
       .catch(() => {})
-      .finally(() => { if (!controller.signal.aborted) setPreviewLoading(false) })
-    return () => { controller.abort() }
+      .finally(() => {
+        if (!controller.signal.aborted) setPreviewLoading(false)
+      })
+    return () => {
+      controller.abort()
+    }
   }, [isHtmlSheet, htmlWarningAcked, sheet?.id])
 
   /* Load interactive runtime URL on demand (owner/admin only) */
@@ -268,8 +311,12 @@ export default function useSheetViewer() {
         if (data?.runtimeUrl) setRuntimeUrl(data.runtimeUrl)
         else setViewerInteractive(false)
       })
-      .catch(() => { setViewerInteractive(false) })
-      .finally(() => { setRuntimeLoading(false) })
+      .catch(() => {
+        setViewerInteractive(false)
+      })
+      .finally(() => {
+        setRuntimeLoading(false)
+      })
   }, [isHtmlSheet, sheet?.id, runtimeUrl])
 
   const toggleViewerInteractive = useCallback(() => {
@@ -308,11 +355,14 @@ export default function useSheetViewer() {
       }
       setSheetState((current) => ({
         ...current,
-        sheet: current.sheet ? { ...current.sheet, starred: data.starred, stars: data.stars } : current.sheet,
+        sheet: current.sheet
+          ? { ...current.sheet, starred: data.starred, stars: data.stars }
+          : current.sheet,
         error: '',
       }))
       trackEvent(data.starred ? 'sheet_starred' : 'sheet_unstarred', { sheetId: sheet.id })
-      if (data.starred) showToast('Starred! Find it in your feed sidebar or browse starred sheets.', 'success')
+      if (data.starred)
+        showToast('Starred! Find it in your feed sidebar or browse starred sheets.', 'success')
     } catch (error) {
       showToast(error.message || 'Could not update the star.', 'error')
     }
@@ -365,7 +415,8 @@ export default function useSheetViewer() {
   }
 
   const handleShare = () => {
-    navigator.clipboard.writeText(window.location.href)
+    navigator.clipboard
+      .writeText(window.location.href)
       .then(() => {
         showToast('Link copied to clipboard!', 'success')
         trackEvent('sheet_shared', { sheetId: sheet?.id, method: 'copy_link' })
@@ -407,7 +458,8 @@ export default function useSheetViewer() {
         body: JSON.stringify({ action }),
       })
       const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(getApiErrorMessage(data, `Could not ${action} contribution.`))
+      if (!response.ok)
+        throw new Error(getApiErrorMessage(data, `Could not ${action} contribution.`))
       showToast(`Contribution ${action}ed`, 'success')
       loadSheet()
     } catch (error) {
@@ -445,10 +497,15 @@ export default function useSheetViewer() {
       }))
       setSheetState((current) => ({
         ...current,
-        sheet: current.sheet ? { ...current.sheet, commentCount: (current.sheet.commentCount || 0) + 1 } : current.sheet,
+        sheet: current.sheet
+          ? { ...current.sheet, commentCount: (current.sheet.commentCount || 0) + 1 }
+          : current.sheet,
       }))
     } catch (error) {
-      setCommentsState((current) => ({ ...current, error: error.message || 'Could not post the comment.' }))
+      setCommentsState((current) => ({
+        ...current,
+        error: error.message || 'Could not post the comment.',
+      }))
     } finally {
       setCommentSaving(false)
     }
@@ -472,7 +529,9 @@ export default function useSheetViewer() {
       }))
       setSheetState((current) => ({
         ...current,
-        sheet: current.sheet ? { ...current.sheet, commentCount: Math.max(0, (current.sheet.commentCount || 1) - 1) } : current.sheet,
+        sheet: current.sheet
+          ? { ...current.sheet, commentCount: Math.max(0, (current.sheet.commentCount || 1) - 1) }
+          : current.sheet,
       }))
     } catch (error) {
       setCommentsState((current) => ({ ...current, error: error.message }))

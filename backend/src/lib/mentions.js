@@ -17,14 +17,7 @@ function extractMentionUsernames(text = '') {
 
 async function notifyMentionedUsers(
   prisma,
-  {
-    text,
-    actorId,
-    actorUsername,
-    message,
-    linkPath,
-    excludeUserIds = [],
-  }
+  { text, actorId, actorUsername, message, linkPath, excludeUserIds = [] },
 ) {
   const usernames = extractMentionUsernames(text)
   if (usernames.length === 0) return []
@@ -40,15 +33,19 @@ async function notifyMentionedUsers(
 
   const excluded = new Set([actorId, ...excludeUserIds].filter(Boolean))
 
-  await Promise.all(users
-    .filter((user) => !excluded.has(user.id))
-    .map((user) => createNotification(prisma, {
-      userId: user.id,
-      type: 'mention',
-      message: message || `${actorUsername} mentioned you.`,
-      actorId,
-      linkPath,
-    })))
+  await Promise.all(
+    users
+      .filter((user) => !excluded.has(user.id))
+      .map((user) =>
+        createNotification(prisma, {
+          userId: user.id,
+          type: 'mention',
+          message: message || `${actorUsername} mentioned you.`,
+          actorId,
+          linkPath,
+        }),
+      ),
+  )
 
   return users
 }

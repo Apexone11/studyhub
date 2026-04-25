@@ -1,0 +1,907 @@
+/* src/mobile/styles/primitives.css
+ * Styles for P2 primitives: AuroraCard, MobileButton, MobileInput,
+ * SegmentedNav, Chip, EmptyState, Skeleton, Toast.
+ * See docs/internal/mobile-design-refresh-v3-spec.md §4.
+ */
+
+/* ─────────────────────────────────────────────────────────────────
+ * AuroraCard
+ * ───────────────────────────────────────────────────────────────── */
+
+.sh-m-card {
+  position: relative;
+  display: block;
+  width: 100%;
+  border-radius: 20px;
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  box-shadow: var(--shadow-card-rest);
+  transition:
+    transform var(--dur-instant) var(--ease-spring),
+    box-shadow var(--dur-quick) var(--ease-smooth);
+  overflow: hidden;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sh-m-card--pressable {
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.sh-m-card--pressable:active {
+  transform: scale(0.98);
+  box-shadow: var(--shadow-card-press);
+}
+
+.sh-m-card--sheet {
+  position: relative;
+  background:
+    linear-gradient(var(--sh-surface), var(--sh-surface)) padding-box,
+    var(--sh-ai-gradient) border-box;
+  border: 1px solid transparent;
+}
+
+.sh-m-card--ai {
+  color: var(--sh-btn-primary-text);
+  background: var(--sh-ai-gradient);
+  box-shadow: var(--shadow-float);
+}
+
+.sh-m-card--photo {
+  overflow: hidden;
+}
+
+.sh-m-card__body {
+  padding: 16px;
+}
+.sh-m-card__body--lg {
+  padding: 20px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * MobileButton
+ * ───────────────────────────────────────────────────────────────── */
+
+.sh-m-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-button);
+  font-family: var(--font);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  transition:
+    transform var(--dur-instant) var(--ease-spring),
+    background var(--dur-quick) var(--ease-smooth),
+    color var(--dur-quick) var(--ease-smooth),
+    box-shadow var(--dur-quick) var(--ease-smooth);
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.sh-m-btn:active {
+  transform: scale(0.97);
+}
+.sh-m-btn[disabled] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.sh-m-btn--s {
+  height: 36px;
+  padding: 0 14px;
+  font-size: 0.88rem;
+}
+.sh-m-btn--m {
+  height: 44px;
+  padding: 0 18px;
+  font-size: 0.98rem;
+}
+.sh-m-btn--l {
+  height: 56px;
+  padding: 0 22px;
+  font-size: 1.02rem;
+}
+.sh-m-btn--block {
+  width: 100%;
+}
+
+.sh-m-btn--primary {
+  background: var(--sh-btn-primary-bg);
+  color: var(--sh-btn-primary-text);
+  box-shadow: var(--shadow-card-rest);
+}
+.sh-m-btn--primary:hover {
+  background: var(--sh-brand-hover);
+}
+
+.sh-m-btn--secondary {
+  background: var(--sh-brand-soft-bg);
+  color: var(--sh-brand-hover);
+}
+
+.sh-m-btn--ghost {
+  background: transparent;
+  color: var(--sh-text);
+  border-color: var(--sh-border);
+}
+.sh-m-btn--ghost:hover {
+  background: var(--sh-soft);
+}
+
+.sh-m-btn--danger {
+  background: var(--sh-danger, #dc2626);
+  color: var(--sh-btn-primary-text);
+}
+
+.sh-m-btn--floating {
+  height: 56px;
+  width: 56px;
+  padding: 0;
+  border-radius: var(--radius-full);
+  background: var(--sh-ai-gradient);
+  color: var(--sh-btn-primary-text);
+  box-shadow: var(--shadow-float);
+}
+
+.sh-m-btn__spinner {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  animation: mob-spin 0.7s linear infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * MobileInput
+ * ───────────────────────────────────────────────────────────────── */
+
+.sh-m-input {
+  position: relative;
+  width: 100%;
+}
+
+.sh-m-input__control {
+  width: 100%;
+  height: 56px;
+  padding: 18px 14px 8px;
+  border: 1px solid var(--sh-input-border);
+  border-radius: var(--radius-input);
+  background: var(--sh-input-bg);
+  color: var(--sh-input-text);
+  font-family: var(--font);
+  font-size: 1rem;
+  line-height: 1.2;
+  transition:
+    border-color var(--dur-quick) var(--ease-smooth),
+    box-shadow var(--dur-quick) var(--ease-smooth);
+  outline: none;
+  -webkit-appearance: none;
+}
+
+.sh-m-input__control:focus {
+  border-color: var(--sh-input-focus);
+  box-shadow: 0 0 0 4px var(--sh-input-focus-ring);
+}
+
+.sh-m-input__label {
+  position: absolute;
+  left: 14px;
+  top: 18px;
+  font-family: var(--font);
+  font-size: 1rem;
+  color: var(--sh-input-placeholder);
+  pointer-events: none;
+  transform-origin: left top;
+  transition:
+    transform var(--dur-quick) var(--ease-smooth),
+    color var(--dur-quick) var(--ease-smooth);
+}
+
+.sh-m-input--filled .sh-m-input__label,
+.sh-m-input__control:focus + .sh-m-input__label {
+  transform: translateY(-10px) scale(0.75);
+  color: var(--sh-subtext);
+}
+
+.sh-m-input__control:focus + .sh-m-input__label {
+  color: var(--sh-input-focus);
+}
+
+.sh-m-input--error .sh-m-input__control {
+  border-color: var(--sh-danger, #dc2626);
+}
+
+.sh-m-input__error {
+  margin-top: 6px;
+  font-size: var(--m-type-meta);
+  color: var(--sh-danger, #dc2626);
+  animation: sh-slide-down var(--dur-quick) var(--ease-out-quart) both;
+}
+
+.sh-m-input--shake .sh-m-input__control {
+  animation: sh-shake 0.32s var(--ease-smooth);
+}
+
+.sh-m-input__eye {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: transparent;
+  color: var(--sh-subtext);
+  cursor: pointer;
+  border-radius: var(--radius-pill);
+  -webkit-tap-highlight-color: transparent;
+  transition: transform var(--dur-instant) var(--ease-spring);
+}
+.sh-m-input__eye:active {
+  transform: translateY(-50%) scale(0.9);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * SegmentedNav
+ * ───────────────────────────────────────────────────────────────── */
+
+.sh-m-seg {
+  position: relative;
+  display: inline-flex;
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  border-radius: var(--radius-pill);
+  padding: 4px;
+  overflow: hidden;
+  max-width: 100%;
+}
+
+.sh-m-seg--block {
+  display: flex;
+  width: 100%;
+}
+
+.sh-m-seg__indicator {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  height: calc(100% - 8px);
+  border-radius: var(--radius-pill);
+  background: var(--sh-surface);
+  box-shadow: var(--shadow-card-rest);
+  transition:
+    transform var(--dur-base) var(--ease-spring),
+    width var(--dur-base) var(--ease-spring);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.sh-m-seg__item {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 auto;
+  min-width: 72px;
+  height: 36px;
+  padding: 0 14px;
+  border: none;
+  background: transparent;
+  font-family: var(--font);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--sh-subtext);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color var(--dur-quick) var(--ease-smooth);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sh-m-seg__item--active {
+  color: var(--sh-heading);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Chip
+ * ───────────────────────────────────────────────────────────────── */
+
+.sh-m-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--radius-pill);
+  font-family: var(--font);
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  cursor: default;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.sh-m-chip--soft {
+  background: var(--sh-mobile-chip-soft-bg);
+  color: var(--sh-mobile-chip-soft-text);
+}
+.sh-m-chip--outline {
+  background: transparent;
+  color: var(--sh-text);
+  border-color: var(--sh-border);
+}
+.sh-m-chip--solid {
+  background: var(--sh-btn-primary-bg);
+  color: var(--sh-btn-primary-text);
+}
+.sh-m-chip--pressable {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+.sh-m-chip--pressable:active {
+  transform: scale(0.96);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * EmptyState
+ * ───────────────────────────────────────────────────────────────── */
+
+.sh-m-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 24px;
+  gap: 16px;
+  animation: sh-scale-in var(--dur-slow) var(--ease-out-quart) both;
+}
+.sh-m-empty__art {
+  width: 160px;
+  height: 160px;
+  color: var(--sh-brand);
+  opacity: 0.85;
+}
+.sh-m-empty__title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--sh-heading);
+}
+.sh-m-empty__desc {
+  font-size: 0.92rem;
+  color: var(--sh-subtext);
+  max-width: 320px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Skeleton
+ * ───────────────────────────────────────────────────────────────── */
+
+.sh-m-skel {
+  display: block;
+  background: var(--sh-soft);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+}
+.sh-m-skel::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    100deg,
+    rgba(0, 0, 0, 0) 30%,
+    rgba(0, 0, 0, 0.06) 50%,
+    rgba(0, 0, 0, 0) 70%
+  );
+  background-size: 200% 100%;
+  animation: sh-shimmer 1.4s linear infinite;
+}
+.sh-m-skel--text {
+  height: 14px;
+  border-radius: 6px;
+}
+.sh-m-skel--title {
+  height: 22px;
+  border-radius: 6px;
+}
+.sh-m-skel--avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+}
+.sh-m-skel--card {
+  height: 160px;
+  border-radius: 20px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Toast
+ * ───────────────────────────────────────────────────────────────── */
+
+.sh-m-toast-host {
+  position: fixed;
+  top: calc(var(--sh-mobile-safe-top) + 12px);
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  z-index: 2147483645;
+  pointer-events: none;
+  padding: 0 16px;
+}
+
+.sh-m-toast {
+  pointer-events: auto;
+  min-width: 220px;
+  max-width: 480px;
+  padding: 12px 16px;
+  border-radius: var(--radius-card);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  box-shadow: var(--shadow-float);
+  border: 1px solid var(--sh-border);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.92rem;
+  animation: sh-slide-down var(--dur-base) var(--ease-spring) both;
+}
+.sh-m-toast--success {
+  border-color: var(--sh-success-border);
+}
+.sh-m-toast--warn {
+  border-color: var(--sh-warning-border);
+}
+.sh-m-toast--error {
+  border-color: var(--sh-danger-border);
+}
+.sh-m-toast--leaving {
+  animation: sh-slide-up var(--dur-base) var(--ease-in-quart) both reverse;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Auth sheet layout
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0 12px;
+}
+
+body.sh-mobile .sh-m-auth-google {
+  padding: 4px 0;
+}
+
+body.sh-mobile .sh-m-auth-or {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 8px 0 4px;
+}
+body.sh-mobile .sh-m-auth-or::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1px;
+  background: var(--sh-border);
+}
+body.sh-mobile .sh-m-auth-or-text {
+  position: relative;
+  padding: 0 10px;
+  background: var(--sh-surface);
+  color: var(--sh-muted);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+body.sh-mobile .sh-m-auth-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 16px;
+  border-radius: var(--radius-card);
+  background: var(--sh-danger-bg);
+  color: var(--sh-danger-text);
+  border: 1px solid var(--sh-danger-border);
+  margin-bottom: 14px;
+  font-size: 0.9rem;
+  line-height: 1.4;
+  animation: sh-slide-down var(--dur-base) var(--ease-out-quart) both;
+}
+body.sh-mobile .sh-m-auth-alert--lockout {
+  background: var(--sh-warning-bg);
+  color: var(--sh-warning-text);
+  border-color: var(--sh-warning-border);
+}
+
+body.sh-mobile .sh-m-auth-switch {
+  margin: 4px 0 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: var(--sh-subtext);
+}
+
+body.sh-mobile .sh-m-auth-switch-link {
+  border: none;
+  background: transparent;
+  color: var(--sh-brand);
+  font-weight: 600;
+  font-size: 0.9rem;
+  cursor: pointer;
+  padding: 4px 2px;
+  border-radius: 4px;
+}
+body.sh-mobile .sh-m-auth-switch-link:hover {
+  text-decoration: underline;
+}
+
+body.sh-mobile .sh-m-auth-help {
+  font-size: 0.92rem;
+  line-height: 1.5;
+  color: var(--sh-subtext);
+  margin: 4px 0 8px;
+}
+
+body.sh-mobile .sh-m-auth-progress {
+  display: flex;
+  gap: 6px;
+  justify-content: center;
+  margin: 0 0 16px;
+}
+body.sh-mobile .sh-m-auth-progress__dot {
+  width: 28px;
+  height: 4px;
+  border-radius: var(--radius-pill);
+  background: var(--sh-border);
+  transition: background var(--dur-quick) var(--ease-smooth);
+}
+body.sh-mobile .sh-m-auth-progress__dot--active {
+  background: var(--sh-brand);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Welcome splash confetti host
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-welcome-confetti-host {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+  z-index: 1;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * AiOrb
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-ai-orb {
+  position: relative;
+  display: inline-block;
+}
+
+body.sh-mobile .sh-m-ai-orb__core {
+  position: absolute;
+  inset: 12%;
+  border-radius: 50%;
+  background: var(--sh-ai-gradient);
+  box-shadow:
+    0 8px 32px rgba(37, 99, 235, 0.35),
+    inset 0 2px 12px rgba(255, 255, 255, 0.35);
+  z-index: 2;
+}
+
+body.sh-mobile .sh-m-ai-orb__halo {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--sh-mobile-mesh);
+  filter: blur(18px);
+  opacity: 0.6;
+  z-index: 1;
+}
+
+body.sh-mobile .sh-m-ai-orb__ring {
+  position: absolute;
+  inset: 8%;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  z-index: 3;
+  pointer-events: none;
+}
+
+body.sh-mobile .sh-m-ai-orb--thinking {
+  animation: sh-orb-pulse 2.4s var(--ease-smooth) infinite;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * StatCounter
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 64px;
+}
+body.sh-mobile .sh-m-stat__num {
+  font-family: var(--font);
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--sh-heading);
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+body.sh-mobile .sh-m-stat__label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-muted);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Home greeting — aurora mesh hero card
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-home-greet {
+  position: relative;
+  margin: 8px 16px 16px;
+  padding: 0;
+  border-radius: 20px;
+  overflow: hidden;
+  background: var(--sh-surface);
+  box-shadow: var(--shadow-card-rest);
+  animation: sh-fade-in-up var(--dur-base) var(--ease-out-quart) both;
+}
+
+body.sh-mobile .sh-m-home-greet__mesh {
+  position: absolute;
+  inset: -30%;
+  background: var(--sh-mobile-mesh);
+  filter: blur(40px);
+  opacity: 0.7;
+  pointer-events: none;
+  z-index: 0;
+}
+
+body.sh-mobile .sh-m-home-greet__body {
+  position: relative;
+  z-index: 1;
+  padding: 20px;
+}
+
+body.sh-mobile .sh-m-home-greet__title {
+  margin: 0 0 6px;
+  font-family: var(--font);
+  font-size: clamp(1.4rem, 5.2vw, 1.7rem);
+  font-weight: 800;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+  color: var(--sh-heading);
+}
+
+body.sh-mobile .sh-m-home-greet__sub {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.45;
+  color: var(--sh-subtext);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Messages search input + toolbar (segmented filter + unread pill)
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-msg-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+  margin: 10px 16px 4px;
+  height: 40px;
+  border-radius: var(--radius-pill);
+  background: var(--sh-soft);
+  border: 1px solid transparent;
+  transition:
+    border-color var(--dur-quick) var(--ease-smooth),
+    background var(--dur-quick) var(--ease-smooth);
+}
+
+body.sh-mobile .sh-m-msg-search:focus-within {
+  background: var(--sh-surface);
+  border-color: var(--sh-brand);
+  box-shadow: 0 0 0 3px var(--sh-brand-soft-bg);
+}
+
+body.sh-mobile .sh-m-msg-search__icon {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--sh-muted);
+  pointer-events: none;
+}
+
+body.sh-mobile .sh-m-msg-search__input {
+  flex: 1;
+  height: 100%;
+  padding: 0 40px 0 40px;
+  border: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--sh-text);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+body.sh-mobile .sh-m-msg-search__input::placeholder {
+  color: var(--sh-muted);
+}
+
+/* Hide the default search-input clear glyph WebKit renders — we ship our own. */
+body.sh-mobile .sh-m-msg-search__input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+body.sh-mobile .sh-m-msg-search__clear {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sh-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+body.sh-mobile .sh-m-msg-search__clear:hover {
+  background: var(--sh-border);
+  color: var(--sh-text);
+}
+
+body.sh-mobile .sh-m-msg-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px 4px;
+}
+
+body.sh-mobile .sh-m-msg-unread-pill {
+  flex-shrink: 0;
+  padding: 6px 10px;
+  border-radius: var(--radius-pill);
+  background: var(--sh-brand-soft-bg);
+  color: var(--sh-brand-hover);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * AI page landing — orb + copy + suggestions
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-ai-landing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  text-align: center;
+  padding: 48px 24px 24px;
+  gap: 16px;
+  animation: sh-fade-in var(--dur-slow) var(--ease-out-quart) both;
+}
+
+body.sh-mobile .sh-m-ai-landing__title {
+  margin: 8px 0 0;
+  font-family: var(--font);
+  font-size: clamp(1.4rem, 6vw, 1.75rem);
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--sh-heading);
+  line-height: 1.15;
+}
+
+body.sh-mobile .sh-m-ai-landing__sub {
+  margin: 0;
+  max-width: 420px;
+  font-size: 0.95rem;
+  line-height: 1.5;
+  color: var(--sh-subtext);
+}
+
+body.sh-mobile .sh-m-ai-landing__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 520px;
+  margin: 16px 0 8px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Profile hero banner (aurora mesh + avatar overlap)
+ * ───────────────────────────────────────────────────────────────── */
+
+body.sh-mobile .sh-m-profile-hero {
+  position: relative;
+  height: 160px;
+  margin: 0 0 56px;
+  border-radius: 0 0 24px 24px;
+  overflow: hidden;
+  background: var(--sh-mobile-mesh);
+}
+body.sh-mobile .sh-m-profile-hero__avatar {
+  position: absolute;
+  left: 50%;
+  bottom: -44px;
+  transform: translateX(-50%);
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  background: var(--sh-surface);
+  box-shadow: var(--shadow-float);
+  border: 3px solid var(--sh-surface);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font);
+  font-weight: 800;
+  font-size: 2rem;
+  color: var(--sh-subtext);
+}
+body.sh-mobile .sh-m-profile-hero__avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+body.sh-mobile .sh-m-profile-stats {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  padding: 12px 4px 4px;
+  margin-top: 8px;
+  border-top: 1px solid var(--sh-border);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+ * Shared spinner keyframes (reuse mob-spin from mobile.css)
+ * ───────────────────────────────────────────────────────────────── */
+@keyframes mob-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

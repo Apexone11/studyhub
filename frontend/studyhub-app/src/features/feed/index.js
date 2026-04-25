@@ -10,13 +10,21 @@ export { useFeedData } from '../../pages/feed/useFeedData'
 
 // Constants
 export {
-  FONT, FILTERS, COMPOSER_PROMPTS,
-  authHeaders, timeAgo, courseColor,
-  actionButton, linkButton, pillStyle,
+  FONT,
+  FILTERS,
+  COMPOSER_PROMPTS,
+  authHeaders,
+  timeAgo,
+  courseColor,
+  actionButton,
+  linkButton,
+  pillStyle,
   commentButtonStyle,
 } from '../../pages/feed/feedConstants'
 
 // Helpers
 export {
-  attachmentPreviewKind, attachmentEndpoints, canUserDeletePost,
+  attachmentPreviewKind,
+  attachmentEndpoints,
+  canUserDeletePost,
 } from '../../pages/feed/feedHelpers'

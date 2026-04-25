@@ -1,10 +1,10 @@
-import { useGroupList } from './useGroupList';
-import { useGroupDetail } from './useGroupDetail';
-import { useGroupMembers } from './useGroupMembers';
-import { useGroupResources } from './useGroupResources';
-import { useGroupSessions } from './useGroupSessions';
-import { useGroupDiscussions } from './useGroupDiscussions';
-import { useGroupActivity } from './useGroupActivity';
+import { useGroupList } from './useGroupList'
+import { useGroupDetail } from './useGroupDetail'
+import { useGroupMembers } from './useGroupMembers'
+import { useGroupResources } from './useGroupResources'
+import { useGroupSessions } from './useGroupSessions'
+import { useGroupDiscussions } from './useGroupDiscussions'
+import { useGroupActivity } from './useGroupActivity'
 
 /**
  * Comprehensive hook for managing Study Groups data
@@ -21,13 +21,13 @@ import { useGroupActivity } from './useGroupActivity';
  */
 export function useStudyGroupsData() {
   // Compose all sub-hooks
-  const list = useGroupList();
-  const detail = useGroupDetail();
-  const members = useGroupMembers();
-  const resources = useGroupResources();
-  const sessions = useGroupSessions();
-  const discussions = useGroupDiscussions(detail.activeGroup?.id);
-  const activity = useGroupActivity();
+  const list = useGroupList()
+  const detail = useGroupDetail()
+  const members = useGroupMembers()
+  const resources = useGroupResources()
+  const sessions = useGroupSessions()
+  const discussions = useGroupDiscussions(detail.activeGroup?.id)
+  const activity = useGroupActivity()
 
   // Return the complete interface for backward compatibility
   return {
@@ -115,5 +115,5 @@ export function useStudyGroupsData() {
     // Filter and pagination utilities
     setFilters: list.setFilters,
     setPagination: list.setPagination,
-  };
+  }
 }

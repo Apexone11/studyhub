@@ -143,6 +143,7 @@ export default function LoginPage() {
     try {
       const response = await fetch(`${API}/api/auth/login`, {
         method: 'POST',
+        credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           username: username.trim(),
@@ -154,6 +155,12 @@ export default function LoginPage() {
       if (!response.ok) {
         setError(data.error || 'Could not sign you in.')
         setShowForgot(Boolean(data.showForgot))
+        return
+      }
+
+      // High-risk login: the server asked us to verify via an emailed code.
+      if (data.status === 'challenge' && data.challengeId) {
+        navigate(`/login/challenge/${encodeURIComponent(data.challengeId)}`, { replace: true })
         return
       }
 

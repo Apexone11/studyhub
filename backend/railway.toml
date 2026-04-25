@@ -6,7 +6,10 @@ builder = "nixpacks"
 buildCommand = "npm install && npx prisma generate"
 
 [deploy]
-preDeployCommand = "npx prisma migrate deploy"
+# Run migrations first, then refresh the MaxMind GeoLite2 DB (best-effort —
+# if MAXMIND_LICENSE_KEY isn't set or the download fails, we swallow the
+# error and keep deploying; geoip.service.js already falls back to no-op).
+preDeployCommand = "npx prisma migrate deploy && (npm run update-geoip-db || echo '[pre-deploy] skipping geoip refresh')"
 startCommand = "npm start"
 healthcheckPath = "/health"
 healthcheckTimeout = 60

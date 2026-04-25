@@ -91,20 +91,23 @@ router.post('/waitlist/invite', async (req, res) => {
       const { deliverMail } = require('../../lib/email/emailTransport')
       const { getFromAddress } = require('../../lib/email/emailValidation')
 
-      void deliverMail({
-        from: `"StudyHub" <${getFromAddress()}>`,
-        to: entry.email,
-        subject: 'Your StudyHub invitation is ready',
-        text: [
-          'Great news! Your spot on StudyHub is ready.',
-          '',
-          `You were on the ${entry.tier === 'institution' ? 'Institution' : 'Pro'} waitlist, and we are excited to invite you.`,
-          '',
-          'Visit https://getstudyhub.org to get started.',
-          '',
-          '— The StudyHub Team',
-        ].join('\n'),
-      }, 'waitlist-invitation').catch(() => {})
+      void deliverMail(
+        {
+          from: `"StudyHub" <${getFromAddress()}>`,
+          to: entry.email,
+          subject: 'Your StudyHub invitation is ready',
+          text: [
+            'Great news! Your spot on StudyHub is ready.',
+            '',
+            `You were on the ${entry.tier === 'institution' ? 'Institution' : 'Pro'} waitlist, and we are excited to invite you.`,
+            '',
+            'Visit https://getstudyhub.org to get started.',
+            '',
+            '— The StudyHub Team',
+          ].join('\n'),
+        },
+        'waitlist-invitation',
+      ).catch(() => {})
     } catch {
       // Email infra missing — log and continue
     }

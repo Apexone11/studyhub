@@ -43,7 +43,11 @@
         var isNative =
           window.location.protocol === 'capacitor:' ||
           document.URL.indexOf('capacitor://') === 0 ||
-          (window.location.protocol === 'https:' && window.location.hostname === 'localhost') ||
+          // Capacitor WebView serves at http(s)://localhost/ with NO port.
+          // The web dev server is http://localhost:5173, so gate on port === ''.
+          ((window.location.protocol === 'https:' || window.location.protocol === 'http:') &&
+            window.location.hostname === 'localhost' &&
+            window.location.port === '') ||
           navigator.userAgent.indexOf('StudyHub') > -1
         if (isNative) {
           window.__SH_NATIVE__ = true

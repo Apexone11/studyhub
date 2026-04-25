@@ -36,7 +36,9 @@ function authHeaders() {
 function attachmentExtension(name = '') {
   const dotIndex = String(name).lastIndexOf('.')
   if (dotIndex < 0) return ''
-  return String(name).slice(dotIndex + 1).toLowerCase()
+  return String(name)
+    .slice(dotIndex + 1)
+    .toLowerCase()
 }
 
 function attachmentPreviewKind(attachmentType, attachmentName) {
@@ -44,8 +46,14 @@ function attachmentPreviewKind(attachmentType, attachmentName) {
   const extension = attachmentExtension(attachmentName)
 
   if (rawType === 'pdf' || extension === 'pdf') return 'pdf'
-  if (rawType === 'image' || rawType.startsWith('image/') || IMAGE_EXTENSIONS.has(extension)) return 'image'
-  if (TEXT_EXTENSIONS.has(extension) || rawType.startsWith('text/') || rawType.includes('json') || rawType.includes('xml')) {
+  if (rawType === 'image' || rawType.startsWith('image/') || IMAGE_EXTENSIONS.has(extension))
+    return 'image'
+  if (
+    TEXT_EXTENSIONS.has(extension) ||
+    rawType.startsWith('text/') ||
+    rawType.includes('json') ||
+    rawType.includes('xml')
+  ) {
     return 'text'
   }
   return 'document'
@@ -129,7 +137,10 @@ export default function AttachmentPreviewPage() {
     if (!config) return
 
     try {
-      const response = await fetch(config.detailUrl, { headers: authHeaders(), credentials: 'include' })
+      const response = await fetch(config.detailUrl, {
+        headers: authHeaders(),
+        credentials: 'include',
+      })
       const data = await readJsonSafely(response, {})
 
       if (response.status === 403) {
@@ -151,7 +162,11 @@ export default function AttachmentPreviewPage() {
 
       setState({ loading: false, error: '', detail: data })
     } catch (error) {
-      setState({ loading: false, error: error.message || 'Could not load this attachment preview.', detail: null })
+      setState({
+        loading: false,
+        error: error.message || 'Could not load this attachment preview.',
+        detail: null,
+      })
     }
   }, [config])
 
@@ -163,7 +178,10 @@ export default function AttachmentPreviewPage() {
 
   if (!config) return <Navigate to="/feed" replace />
 
-  const previewKind = attachmentPreviewKind(state.detail?.attachmentType, state.detail?.attachmentName)
+  const previewKind = attachmentPreviewKind(
+    state.detail?.attachmentType,
+    state.detail?.attachmentName,
+  )
 
   return (
     <>
@@ -172,9 +190,25 @@ export default function AttachmentPreviewPage() {
         <div style={pageShell('reading', 26, 48)}>
           <main id="main-content" style={{ display: 'grid', gap: 16 }}>
             <section style={panelStyle()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div
+                style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  gap: 12,
+                  flexWrap: 'wrap',
+                }}
+              >
                 <div>
-                  <h1 style={{ margin: 0, fontSize: 24, color: 'var(--sh-heading)', display: 'flex', gap: 10, alignItems: 'center' }}>
+                  <h1
+                    style={{
+                      margin: 0,
+                      fontSize: 24,
+                      color: 'var(--sh-heading)',
+                      display: 'flex',
+                      gap: 10,
+                      alignItems: 'center',
+                    }}
+                  >
                     <IconEye size={20} />
                     Attachment Preview
                   </h1>
@@ -198,7 +232,15 @@ export default function AttachmentPreviewPage() {
             </section>
 
             {state.error ? (
-              <section style={{ ...panelStyle(), background: 'var(--sh-danger-bg)', borderColor: 'var(--sh-danger-border)', color: 'var(--sh-danger)', fontSize: 14 }}>
+              <section
+                style={{
+                  ...panelStyle(),
+                  background: 'var(--sh-danger-bg)',
+                  borderColor: 'var(--sh-danger-border)',
+                  color: 'var(--sh-danger)',
+                  fontSize: 14,
+                }}
+              >
                 {state.error}
               </section>
             ) : null}
@@ -226,7 +268,12 @@ export default function AttachmentPreviewPage() {
                       src={config.previewUrl}
                       alt={state.detail.attachmentName || 'Attachment preview'}
                       loading="lazy"
-                      style={{ width: '100%', maxHeight: '80vh', objectFit: 'contain', display: 'block' }}
+                      style={{
+                        width: '100%',
+                        maxHeight: '80vh',
+                        objectFit: 'contain',
+                        display: 'block',
+                      }}
                     />
                   ) : (
                     <iframe

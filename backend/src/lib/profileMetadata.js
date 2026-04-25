@@ -138,7 +138,8 @@ function sanitizeProfileFieldVisibility(rawVisibility) {
 
   PROFILE_FIELD_VISIBILITY_KEYS.forEach((key) => {
     if (!Object.hasOwn(rawVisibility, key)) return
-    const value = typeof rawVisibility[key] === 'string' ? rawVisibility[key].trim().toLowerCase() : ''
+    const value =
+      typeof rawVisibility[key] === 'string' ? rawVisibility[key].trim().toLowerCase() : ''
     if (!PROFILE_FIELD_VISIBILITY_VALUES.includes(value)) {
       throw new Error(`${key} visibility must be public or private.`)
     }
@@ -160,7 +161,13 @@ function canViewProfileField(field, visibility, isOwner) {
   return Boolean(isOwner) || visibility[field] === 'public'
 }
 
-function buildProfilePresentation({ user, pii, profileFieldVisibility, isOwner = false, privatePreview = false }) {
+function buildProfilePresentation({
+  user,
+  pii,
+  profileFieldVisibility,
+  isOwner = false,
+  privatePreview = false,
+}) {
   const visibility = getProfileFieldVisibility(profileFieldVisibility)
   const bio = typeof user?.bio === 'string' && user.bio.trim() ? user.bio.trim() : null
 
@@ -173,7 +180,9 @@ function buildProfilePresentation({ user, pii, profileFieldVisibility, isOwner =
         : null,
     bio,
     age:
-      !privatePreview && canViewProfileField('age', visibility, isOwner) && Number.isInteger(pii?.age)
+      !privatePreview &&
+      canViewProfileField('age', visibility, isOwner) &&
+      Number.isInteger(pii?.age)
         ? pii.age
         : null,
     location:

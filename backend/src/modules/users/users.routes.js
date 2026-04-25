@@ -88,6 +88,12 @@ router.get('/me/learning-goal', requireAuth, usersController.getLearningGoal)
 // ── PUT /api/users/me/learning-goal ────────────────────────────
 router.put('/me/learning-goal', requireAuth, usersController.setLearningGoal)
 
+// ── GET /api/users/me/onboarding-state ─────────────────────────
+// Per-role Getting Started checklist state (Design Refresh v2 Week 2).
+// Each counter is derived from existing tables with graceful-degradation
+// fallbacks. Consumed by frontend/.../onboarding/checklistConfig.js.
+router.get('/me/onboarding-state', requireAuth, usersController.getOnboardingState)
+
 // ── GET /api/users/:username ───────────────────────────────────
 router.get('/:username', optionalAuth, usersController.getUserByUsername)
 

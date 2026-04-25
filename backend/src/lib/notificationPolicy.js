@@ -10,24 +10,19 @@
  */
 
 /* ── Severity categories that always escalate ────────────────── */
-const HIGH_SEVERITY_CATEGORIES = new Set([
-  'sexual',
-  'self_harm',
-  'violence',
-  'hate_speech',
-])
+const HIGH_SEVERITY_CATEGORIES = new Set(['sexual', 'self_harm', 'violence', 'hate_speech'])
 
 /* ── High-impact content surfaces ─────────────────────────────── */
 const HIGH_IMPACT_SURFACES = new Set([
-  'post',          // feed post (public reach)
-  'post_comment',  // feed comment
-  'feed_post',     // alias
-  'feed_comment',  // alias
+  'post', // feed post (public reach)
+  'post_comment', // feed comment
+  'feed_post', // alias
+  'feed_comment', // alias
 ])
 
 /* ── Repeat-offender thresholds ───────────────────────────────── */
-const REPEAT_OFFENDER_STRIKE_THRESHOLD = 2   // ≥ 2 active strikes
-const REPEAT_OFFENDER_CASE_THRESHOLD = 3     // ≥ 3 cases in 24 h
+const REPEAT_OFFENDER_STRIKE_THRESHOLD = 2 // ≥ 2 active strikes
+const REPEAT_OFFENDER_CASE_THRESHOLD = 3 // ≥ 3 cases in 24 h
 const REPEAT_OFFENDER_CASE_WINDOW_MS = 24 * 60 * 60 * 1000
 
 /* ── Plagiarism email threshold ───────────────────────────────── */

@@ -60,24 +60,30 @@ export default function BadgeDisplay({ badges }) {
                 position: 'relative',
                 transition: 'transform 0.15s',
               }}
-              onMouseEnter={(e) => { e.currentTarget.style.transform = 'scale(1.12) translateY(-2px)' }}
-              onMouseLeave={(e) => { e.currentTarget.style.transform = 'scale(1)' }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.transform = 'scale(1.12) translateY(-2px)'
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.transform = 'scale(1)'
+              }}
             >
               <i className={icon} style={{ fontSize: 18, color: tier.text, marginBottom: 2 }} />
-              <span style={{
-                fontSize: 7,
-                fontWeight: 800,
-                color: tier.text,
-                textAlign: 'center',
-                lineHeight: 1.1,
-                padding: '0 4px',
-                maxWidth: 56,
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-                textTransform: 'uppercase',
-                letterSpacing: '0.03em',
-              }}>
+              <span
+                style={{
+                  fontSize: 7,
+                  fontWeight: 800,
+                  color: tier.text,
+                  textAlign: 'center',
+                  lineHeight: 1.1,
+                  padding: '0 4px',
+                  maxWidth: 56,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.03em',
+                }}
+              >
                 {badge.name}
               </span>
             </div>

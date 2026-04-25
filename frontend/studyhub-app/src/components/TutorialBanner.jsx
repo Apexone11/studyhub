@@ -29,16 +29,30 @@ export default function TutorialBanner({ featureKey, title, steps }) {
 
   return (
     <div style={bannerStyle}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'flex-start',
+          gap: 12,
+        }}
+      >
         <div style={{ flex: 1 }}>
           <h4 style={titleStyle}>{title}</h4>
           <ol style={listStyle}>
             {steps.map((step, i) => (
-              <li key={i} style={stepStyle}>{step}</li>
+              <li key={i} style={stepStyle}>
+                {step}
+              </li>
             ))}
           </ol>
         </div>
-        <button type="button" onClick={handleDismiss} style={dismissStyle} aria-label="Dismiss tutorial">
+        <button
+          type="button"
+          onClick={handleDismiss}
+          style={dismissStyle}
+          aria-label="Dismiss tutorial"
+        >
           Got it
         </button>
       </div>

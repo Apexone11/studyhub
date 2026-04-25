@@ -30,7 +30,11 @@ function renderHomePage() {
 }
 
 describe('HomePage', () => {
-  it('navigates to the sheets page using the search query parameter', async () => {
+  // The landing hero no longer renders an inline search input; the Hero now
+  // routes visitors to /register or /sheets via CTA buttons. Keeping the test
+  // skipped (not deleted) so it is trivial to re-enable if the search bar
+  // returns as part of a later hero redesign.
+  it.skip('navigates to the sheets page using the search query parameter', async () => {
     const user = userEvent.setup()
 
     renderHomePage()
@@ -38,6 +42,14 @@ describe('HomePage', () => {
     await user.type(screen.getByPlaceholderText('Search sheets, courses, topics...'), 'biology')
     await user.click(screen.getByRole('button', { name: 'Search' }))
 
-    expect(await screen.findByTestId('sheets-location-probe')).toHaveTextContent('/sheets?search=biology')
+    expect(await screen.findByTestId('sheets-location-probe')).toHaveTextContent(
+      '/sheets?search=biology',
+    )
+  })
+
+  it('renders the hero CTA that links to the sheets page', () => {
+    renderHomePage()
+    const cta = screen.getByRole('link', { name: /Browse Study Sheets/i })
+    expect(cta).toHaveAttribute('href', '/sheets')
   })
 })

@@ -43,7 +43,18 @@ function extractIp(req) {
  * Record an audit event. Non-blocking — errors are captured to Sentry
  * but never propagated to the caller.
  */
-async function recordAudit({ event, actorId = null, actorRole = null, targetUserId = null, route = null, method = null, resource = null, resourceId = null, details = null, ipAddress = null }) {
+async function recordAudit({
+  event,
+  actorId = null,
+  actorRole = null,
+  targetUserId = null,
+  route = null,
+  method = null,
+  resource = null,
+  resourceId = null,
+  details = null,
+  ipAddress = null,
+}) {
   try {
     return await prisma.auditLog.create({
       data: {
@@ -70,7 +81,11 @@ async function recordAudit({ event, actorId = null, actorRole = null, targetUser
  * Convenience helper: create an audit record from an Express request.
  * Extracts actor info from req.user and route info from req.
  */
-function auditFromRequest(req, event, { targetUserId = null, resource = null, resourceId = null, details = null } = {}) {
+function auditFromRequest(
+  req,
+  event,
+  { targetUserId = null, resource = null, resourceId = null, details = null } = {},
+) {
   return recordAudit({
     event,
     actorId: req.user?.userId || null,
@@ -89,7 +104,14 @@ function auditFromRequest(req, event, { targetUserId = null, resource = null, re
  * Standalone audit logger for use outside of Express request context.
  * Compatible with the spec: logAudit({ userId, action, resource, resourceId, details, ipAddress })
  */
-async function logAudit({ userId = null, action, resource = null, resourceId = null, details = null, ipAddress = null }) {
+async function logAudit({
+  userId = null,
+  action,
+  resource = null,
+  resourceId = null,
+  details = null,
+  ipAddress = null,
+}) {
   try {
     await prisma.auditLog.create({
       data: {

@@ -1,3 +1,21 @@
+/**
+ * E2E tests for /library (BookHub).
+ *
+ * Covers the Google-Books-powered discovery surface:
+ *   - popular books render on initial load
+ *   - typed search hits /api/library/search with the query
+ *   - clicking a BookCard navigates to /library/:volumeId
+ *   - empty state appears when the API returns zero results
+ *
+ * Full rewrite 2026-04-23 per the tech-debt handoff. The previous file was
+ * authored against a /api/library/books endpoint that no longer exists and
+ * used data-testid selectors that the real BookCard / LibraryPage don't
+ * emit. This spec targets the actual current markup:
+ *   - search input: placeholder "Search books by title, author..."
+ *   - book cards: <a class="book-card" href="/library/<volumeId>">
+ *   - empty copy: "No books found"
+ */
+
 import { test, expect } from '@playwright/test'
 import { mockAuthenticatedApp, createSessionUser } from './helpers/mockStudyHubApi'
 
@@ -11,273 +29,128 @@ async function disableTutorials(page) {
   })
 }
 
-// SKIP: These tests use incorrect mockAuthenticatedApp signature (3-arg callback),
-// route.respond() instead of route.fulfill(), and wrong API routes/selectors.
-// Needs full rewrite to match the house mock pattern. See sheets.fork-contribute.spec.js
-// for the correct pattern.
-test.describe.skip('Library Page — NEEDS REWRITE', () => {
+function makeVolume(overrides = {}) {
+  return {
+    volumeId: 'vol-1',
+    title: 'Introduction to Algorithms',
+    authors: ['Thomas Cormen'],
+    publishedDate: '2022',
+    description: 'A classic CS textbook on algorithm design and analysis.',
+    pageCount: 1312,
+    categories: ['Computers'],
+    thumbnail: null,
+    previewLink: null,
+    infoLink: null,
+    downloadable: false,
+    ...overrides,
+  }
+}
+
+test.describe('Library Page @e2e', () => {
   test.beforeEach(async ({ page }) => {
     await disableTutorials(page)
   })
 
-  test('library page loads and displays book grid', async ({ page }) => {
-    const mockUser = createSessionUser({
-      id: 'user-1',
-      email: 'test@university.edu',
-      username: 'testuser',
+  test('popular books render on initial load', async ({ page }) => {
+    await mockAuthenticatedApp(page, {
+      user: createSessionUser({ username: 'library_reader_1' }),
     })
-
-    await mockAuthenticatedApp(page, mockUser, async () => {
-      // Mock library books endpoint
-      await page.route('**/api/library/books*', (route) => {
-        route.abort('blockedbyclient')
-        route.continue()
-      })
-
-      await page.route('**/api/library/books', (route) => {
-        route.respond({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            books: [
-              {
-                id: 'book-1',
-                title: 'Introduction to Computer Science',
-                author: 'John Smith',
-                description: 'A comprehensive guide to CS fundamentals',
-                coverUrl: 'https://example.com/cover1.jpg',
-                category: 'Computer Science',
-                language: 'English',
-                downloadUrl: 'https://example.com/download/book-1',
-                pageCount: 450,
-                publishedYear: 2022,
-              },
-              {
-                id: 'book-2',
-                title: 'Modern Mathematics',
-                author: 'Jane Doe',
-                description: 'Advanced math concepts explained',
-                coverUrl: 'https://example.com/cover2.jpg',
-                category: 'Mathematics',
-                language: 'English',
-                downloadUrl: 'https://example.com/download/book-2',
-                pageCount: 380,
-                publishedYear: 2023,
-              },
-            ],
-            total: 2,
-            page: 1,
-            pageSize: 20,
-          }),
-        })
-      })
-
-      await page.goto('/library')
-
-      // Verify page heading is visible
-      const heading = page.locator('text=Library')
-      await expect(heading).toBeVisible()
-
-      // Verify book cards render
-      const bookCards = page.locator('[data-testid="book-card"]')
-      await expect(bookCards).toHaveCount(2)
-
-      // Verify first book title is visible
-      const firstBookTitle = page.locator('text=Introduction to Computer Science')
-      await expect(firstBookTitle).toBeVisible()
-
-      // Verify second book title is visible
-      const secondBookTitle = page.locator('text=Modern Mathematics')
-      await expect(secondBookTitle).toBeVisible()
-    })
-  })
-
-  test('search filters books', async ({ page }) => {
-    const mockUser = createSessionUser({
-      id: 'user-2',
-      email: 'searcher@university.edu',
-      username: 'searcher',
-    })
-
-    await mockAuthenticatedApp(page, mockUser, async () => {
-      let searchCalled = false
-
-      await page.route('**/api/library/books*', (route) => {
-        const url = new URL(route.request().url())
-        const searchParam = url.searchParams.get('search')
-
-        if (searchParam === 'mathematics') {
-          searchCalled = true
-          route.respond({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              books: [
-                {
-                  id: 'book-2',
-                  title: 'Modern Mathematics',
-                  author: 'Jane Doe',
-                  description: 'Advanced math concepts explained',
-                  coverUrl: 'https://example.com/cover2.jpg',
-                  category: 'Mathematics',
-                  language: 'English',
-                  downloadUrl: 'https://example.com/download/book-2',
-                  pageCount: 380,
-                  publishedYear: 2023,
-                },
-              ],
-              total: 1,
-              page: 1,
-              pageSize: 20,
+    await page.route('**/api/library/search**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          books: [
+            makeVolume({ volumeId: 'vol-1', title: 'Introduction to Algorithms' }),
+            makeVolume({
+              volumeId: 'vol-2',
+              title: 'Structure and Interpretation of Computer Programs',
             }),
-          })
-        } else {
-          route.respond({
-            status: 200,
-            contentType: 'application/json',
-            body: JSON.stringify({
-              books: [],
-              total: 0,
-              page: 1,
-              pageSize: 20,
-            }),
-          })
-        }
-      })
+          ],
+          total: 2,
+        }),
+      }),
+    )
 
-      await page.goto('/library')
+    await page.goto('/library')
 
-      // Find and fill search input
-      const searchInput = page.locator('[data-testid="library-search"]')
-      await searchInput.fill('mathematics')
-
-      // Wait for API call with search parameter
-      await page.waitForLoadState('networkidle')
-
-      // Verify search was called with correct parameter
-      expect(searchCalled).toBe(true)
-
-      // Verify filtered result is visible
-      const bookTitle = page.locator('text=Modern Mathematics')
-      await expect(bookTitle).toBeVisible()
-    })
+    await expect(page.getByText('Introduction to Algorithms')).toBeVisible({ timeout: 10000 })
+    await expect(page.getByText('Structure and Interpretation of Computer Programs')).toBeVisible()
   })
 
-  test('empty state shown when no books', async ({ page }) => {
-    const mockUser = createSessionUser({
-      id: 'user-3',
-      email: 'emptystate@university.edu',
-      username: 'emptyuser',
+  test('typed search hits /api/library/search with the query', async ({ page }) => {
+    await mockAuthenticatedApp(page, {
+      user: createSessionUser({ username: 'library_searcher' }),
     })
 
-    await mockAuthenticatedApp(page, mockUser, async () => {
-      await page.route('**/api/library/books*', (route) => {
-        route.respond({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            books: [],
-            total: 0,
-            page: 1,
-            pageSize: 20,
-          }),
-        })
+    let searchedFor = ''
+    await page.route('**/api/library/search**', (route) => {
+      const url = new URL(route.request().url())
+      const q = url.searchParams.get('q') || ''
+      if (q) searchedFor = q
+      return route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          books: q
+            ? [makeVolume({ volumeId: 'vol-bio', title: 'Campbell Biology' })]
+            : [makeVolume({ volumeId: 'vol-default', title: 'Default Popular Book' })],
+          total: q ? 1 : 1,
+        }),
       })
-
-      await page.goto('/library')
-
-      // Verify empty state message is visible
-      const emptyState = page.locator('[data-testid="library-empty-state"]')
-      await expect(emptyState).toBeVisible()
-
-      // Verify no book cards are present
-      const bookCards = page.locator('[data-testid="book-card"]')
-      await expect(bookCards).toHaveCount(0)
     })
+
+    await page.goto('/library')
+
+    const searchInput = page.getByPlaceholder(/search books by title, author/i)
+    await searchInput.fill('biology')
+    await searchInput.press('Enter')
+
+    await expect(page.getByText('Campbell Biology')).toBeVisible({ timeout: 10000 })
+    expect(searchedFor.toLowerCase()).toContain('biology')
   })
 
-  test('book card links to detail page', async ({ page }) => {
-    const mockUser = createSessionUser({
-      id: 'user-4',
-      email: 'detail@university.edu',
-      username: 'detailuser',
+  test('clicking a book card navigates to /library/:volumeId', async ({ page }) => {
+    await mockAuthenticatedApp(page, {
+      user: createSessionUser({ username: 'library_navigator' }),
     })
+    await page.route('**/api/library/search**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          books: [makeVolume({ volumeId: 'nav-target', title: 'Crime and Punishment' })],
+          total: 1,
+        }),
+      }),
+    )
+    // Detail page also fetches; give it something sensible.
+    await page.route('**/api/library/books/nav-target', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(makeVolume({ volumeId: 'nav-target', title: 'Crime and Punishment' })),
+      }),
+    )
 
-    await mockAuthenticatedApp(page, mockUser, async () => {
-      await page.route('**/api/library/books', (route) => {
-        route.respond({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            books: [
-              {
-                id: 'book-1',
-                title: 'Introduction to Computer Science',
-                author: 'John Smith',
-                description: 'A comprehensive guide to CS fundamentals',
-                coverUrl: 'https://example.com/cover1.jpg',
-                category: 'Computer Science',
-                language: 'English',
-                downloadUrl: 'https://example.com/download/book-1',
-                pageCount: 450,
-                publishedYear: 2022,
-              },
-            ],
-            total: 1,
-            page: 1,
-            pageSize: 20,
-          }),
-        })
-      })
-
-      await page.goto('/library')
-
-      // Click on book card
-      const bookCard = page.locator('[data-testid="book-card"]').first()
-      await bookCard.click()
-
-      // Verify navigation to detail page
-      await expect(page).toHaveURL(/\/library\/book-1/)
-    })
+    await page.goto('/library')
+    await page.getByText('Crime and Punishment').first().click()
+    await expect(page).toHaveURL(/\/library\/nav-target$/)
   })
 
-  test('book detail page loads', async ({ page }) => {
-    const mockUser = createSessionUser({
-      id: 'user-5',
-      email: 'detailpage@university.edu',
-      username: 'detailpageuser',
+  test('empty state appears when the API returns zero results', async ({ page }) => {
+    await mockAuthenticatedApp(page, {
+      user: createSessionUser({ username: 'library_empty' }),
     })
+    await page.route('**/api/library/search**', (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ books: [], total: 0 }),
+      }),
+    )
 
-    await mockAuthenticatedApp(page, mockUser, async () => {
-      await page.route('**/api/library/books/book-1', (route) => {
-        route.respond({
-          status: 200,
-          contentType: 'application/json',
-          body: JSON.stringify({
-            id: 'book-1',
-            title: 'Introduction to Computer Science',
-            author: 'John Smith',
-            description:
-              'A comprehensive guide to CS fundamentals covering algorithms, data structures, and software engineering principles.',
-            coverUrl: 'https://example.com/cover1.jpg',
-            category: 'Computer Science',
-            language: 'English',
-            downloadUrl: 'https://example.com/download/book-1',
-            pageCount: 450,
-            publishedYear: 2022,
-          }),
-        })
-      })
-
-      await page.goto('/library/book-1')
-
-      // Verify book title is visible
-      const title = page.locator('text=Introduction to Computer Science')
-      await expect(title).toBeVisible()
-
-      // Verify author is visible
-      const author = page.locator('text=John Smith')
-      await expect(author).toBeVisible()
-    })
+    await page.goto('/library')
+    await expect(page.getByText(/No books found/i)).toBeVisible({ timeout: 10000 })
   })
 })

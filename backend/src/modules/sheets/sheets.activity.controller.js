@@ -105,9 +105,10 @@ router.get('/:id/activity', sheetActivityLimiter, optionalAuth, async (req, res)
           id: `contrib-review-${c.id}`,
           date: c.reviewedAt,
           actor: c.reviewer,
-          message: c.status === 'accepted'
-            ? `Merged contribution from ${c.proposer?.username || 'unknown'}`
-            : `Rejected contribution from ${c.proposer?.username || 'unknown'}`,
+          message:
+            c.status === 'accepted'
+              ? `Merged contribution from ${c.proposer?.username || 'unknown'}`
+              : `Rejected contribution from ${c.proposer?.username || 'unknown'}`,
           meta: { contributionId: c.id },
         })
       }
@@ -119,7 +120,11 @@ router.get('/:id/activity', sheetActivityLimiter, optionalAuth, async (req, res)
         id: `comment-${c.id}`,
         date: c.createdAt,
         actor: c.author,
-        message: c.content ? (c.content.length > 120 ? c.content.slice(0, 120) + '...' : c.content) : '',
+        message: c.content
+          ? c.content.length > 120
+            ? c.content.slice(0, 120) + '...'
+            : c.content
+          : '',
         meta: { commentId: c.id },
       })
     }

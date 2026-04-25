@@ -13,6 +13,9 @@ const ERROR_CODES = Object.freeze({
   AUTH_REQUIRED: 'AUTH_REQUIRED',
   AUTH_EXPIRED: 'AUTH_EXPIRED',
   ADMIN_MFA_REQUIRED: 'ADMIN_MFA_REQUIRED',
+  // Surfaced by requireTrustedDevice; the frontend catches this code and
+  // opens the step-up challenge modal before retrying the original request.
+  REAUTH_REQUIRED: 'REAUTH_REQUIRED',
 
   // ── CSRF / guarded mode ────────────────────────────────────────────────
   CSRF_INVALID: 'CSRF_INVALID',

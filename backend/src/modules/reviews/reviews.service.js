@@ -66,10 +66,12 @@ async function generateReviewReport({ days = 7, adminUserId } = {}) {
     })
     .join('\n\n')
 
-  const starDistribution = [1, 2, 3, 4, 5].map((s) => {
-    const count = reviews.filter((r) => r.stars === s).length
-    return `${s} star: ${count}`
-  }).join(', ')
+  const starDistribution = [1, 2, 3, 4, 5]
+    .map((s) => {
+      const count = reviews.filter((r) => r.stars === s).length
+      return `${s} star: ${count}`
+    })
+    .join(', ')
 
   const prompt = `You are an analytics assistant for StudyHub, a collaborative study platform for college students. Analyze the following ${reviews.length} user reviews from the past ${days} days and provide actionable insights for the platform administrators.
 
@@ -110,7 +112,10 @@ Guidelines:
   let parsed
   try {
     // Strip any markdown code fences if present
-    const cleaned = rawAnalysis.replace(/^```(?:json)?\n?/gm, '').replace(/\n?```$/gm, '').trim()
+    const cleaned = rawAnalysis
+      .replace(/^```(?:json)?\n?/gm, '')
+      .replace(/\n?```$/gm, '')
+      .trim()
     parsed = JSON.parse(cleaned)
   } catch {
     // If parsing fails, store raw text with fallback structure

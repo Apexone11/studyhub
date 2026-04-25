@@ -26,9 +26,7 @@ export default function SheetLabLineage({ lab }) {
           <IconFork size={24} />
         </div>
         <p className="sheet-lab__empty-title">No lineage data</p>
-        <p className="sheet-lab__empty-text">
-          This sheet has no fork history to display.
-        </p>
+        <p className="sheet-lab__empty-text">This sheet has no fork history to display.</p>
       </div>
     )
   }

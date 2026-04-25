@@ -28,9 +28,9 @@ export function renderMath(latex, displayMode = false) {
       displayMode,
       throwOnError: false,
       strict: false,
-      trust: false,       // Disallow \url, \href — security
-      maxSize: 100,       // Prevent excessively large output
-      maxExpand: 500,     // Limit macro expansion depth
+      trust: false, // Disallow \url, \href — security
+      maxSize: 100, // Prevent excessively large output
+      maxExpand: 500, // Limit macro expansion depth
       output: 'htmlAndMathml',
     })
   } catch {
@@ -69,10 +69,14 @@ export const MathInline = Node.create({
   renderHTML({ HTMLAttributes }) {
     const latex = HTMLAttributes['data-math'] || ''
     const html = renderMath(latex, false)
-    return ['span', mergeAttributes(
-      { 'data-math': latex, class: 'sh-math-inline', contenteditable: 'false' },
-      HTMLAttributes,
-    ), ['span', { innerHTML: html }]]
+    return [
+      'span',
+      mergeAttributes(
+        { 'data-math': latex, class: 'sh-math-inline', contenteditable: 'false' },
+        HTMLAttributes,
+      ),
+      ['span', { innerHTML: html }],
+    ]
   },
 
   addProseMirrorPlugins() {
@@ -90,19 +94,24 @@ export const MathInline = Node.create({
       const render = () => {
         dom.innerHTML = renderMath(node.attrs.latex, false)
         if (!node.attrs.latex.trim()) {
-          dom.innerHTML = '<span style="color:#6366f1;font-style:italic;font-size:12px">$math$</span>'
+          dom.innerHTML =
+            '<span style="color:#6366f1;font-style:italic;font-size:12px">$math$</span>'
         }
       }
       render()
 
       // Double-click to edit
       dom.addEventListener('dblclick', () => {
-        const newLatex = prompt('Edit LaTeX (inline math):', node.attrs.latex)  
+        const newLatex = prompt('Edit LaTeX (inline math):', node.attrs.latex)
         if (newLatex !== null && typeof getPos === 'function') {
-          editor.chain().focus().command(({ tr }) => {
-            tr.setNodeMarkup(getPos(), undefined, { latex: newLatex })
-            return true
-          }).run()
+          editor
+            .chain()
+            .focus()
+            .command(({ tr }) => {
+              tr.setNodeMarkup(getPos(), undefined, { latex: newLatex })
+              return true
+            })
+            .run()
         }
       })
 
@@ -113,7 +122,8 @@ export const MathInline = Node.create({
           dom.setAttribute('data-math', updatedNode.attrs.latex)
           dom.innerHTML = renderMath(updatedNode.attrs.latex, false)
           if (!updatedNode.attrs.latex.trim()) {
-            dom.innerHTML = '<span style="color:#6366f1;font-style:italic;font-size:12px">$math$</span>'
+            dom.innerHTML =
+              '<span style="color:#6366f1;font-style:italic;font-size:12px">$math$</span>'
           }
           return true
         },
@@ -151,10 +161,14 @@ export const MathBlock = Node.create({
   renderHTML({ HTMLAttributes }) {
     const latex = HTMLAttributes['data-math-display'] || ''
     const html = renderMath(latex, true)
-    return ['div', mergeAttributes(
-      { 'data-math-display': latex, class: 'sh-math-block', contenteditable: 'false' },
-      HTMLAttributes,
-    ), ['div', { innerHTML: html }]]
+    return [
+      'div',
+      mergeAttributes(
+        { 'data-math-display': latex, class: 'sh-math-block', contenteditable: 'false' },
+        HTMLAttributes,
+      ),
+      ['div', { innerHTML: html }],
+    ]
   },
 
   addNodeView() {
@@ -174,19 +188,24 @@ export const MathBlock = Node.create({
       const render = () => {
         dom.innerHTML = renderMath(node.attrs.latex, true)
         if (!node.attrs.latex.trim()) {
-          dom.innerHTML = '<div style="color:#6366f1;font-style:italic;font-size:13px">$$block math$$</div>'
+          dom.innerHTML =
+            '<div style="color:#6366f1;font-style:italic;font-size:13px">$$block math$$</div>'
         }
       }
       render()
 
       // Double-click to edit
       dom.addEventListener('dblclick', () => {
-        const newLatex = prompt('Edit LaTeX (block math):', node.attrs.latex)  
+        const newLatex = prompt('Edit LaTeX (block math):', node.attrs.latex)
         if (newLatex !== null && typeof getPos === 'function') {
-          editor.chain().focus().command(({ tr }) => {
-            tr.setNodeMarkup(getPos(), undefined, { latex: newLatex })
-            return true
-          }).run()
+          editor
+            .chain()
+            .focus()
+            .command(({ tr }) => {
+              tr.setNodeMarkup(getPos(), undefined, { latex: newLatex })
+              return true
+            })
+            .run()
         }
       })
 
@@ -197,7 +216,8 @@ export const MathBlock = Node.create({
           dom.setAttribute('data-math-display', updatedNode.attrs.latex)
           dom.innerHTML = renderMath(updatedNode.attrs.latex, true)
           if (!updatedNode.attrs.latex.trim()) {
-            dom.innerHTML = '<div style="color:#6366f1;font-style:italic;font-size:13px">$$block math$$</div>'
+            dom.innerHTML =
+              '<div style="color:#6366f1;font-style:italic;font-size:13px">$$block math$$</div>'
           }
           return true
         },
@@ -207,7 +227,7 @@ export const MathBlock = Node.create({
 
   // Input rule: typing $$...$$ on its own line creates a math block
   addInputRules() {
-    return []  // Handled via plugin below for better UX
+    return [] // Handled via plugin below for better UX
   },
 })
 
@@ -241,9 +261,7 @@ export function mathInputPlugin() {
           const start = from - inlineMatch[0].length
           const mathInlineType = state.schema.nodes.mathInline
           if (mathInlineType) {
-            const tr = state.tr
-              .delete(start, from)
-              .insert(start, mathInlineType.create({ latex }))
+            const tr = state.tr.delete(start, from).insert(start, mathInlineType.create({ latex }))
             view.dispatch(tr)
             return true
           }

@@ -1,10 +1,6 @@
 const { classifyHtmlRisk, RISK_TIER } = require('./htmlSecurity')
 const { scanBufferWithClamAv } = require('../clamav')
-const {
-  SCAN_STATUS,
-  HTML_VERSION_KIND,
-  findVersionByKind,
-} = require('./htmlDraftStorage')
+const { SCAN_STATUS, HTML_VERSION_KIND, findVersionByKind } = require('./htmlDraftStorage')
 
 const scanTimers = new Map()
 
@@ -13,11 +9,16 @@ const scanTimers = new Map()
  */
 function tierToScanStatus(tier) {
   switch (tier) {
-    case RISK_TIER.CLEAN: return SCAN_STATUS.PASSED
-    case RISK_TIER.FLAGGED: return SCAN_STATUS.FLAGGED
-    case RISK_TIER.HIGH_RISK: return SCAN_STATUS.PENDING_REVIEW
-    case RISK_TIER.QUARANTINED: return SCAN_STATUS.QUARANTINED
-    default: return SCAN_STATUS.PASSED
+    case RISK_TIER.CLEAN:
+      return SCAN_STATUS.PASSED
+    case RISK_TIER.FLAGGED:
+      return SCAN_STATUS.FLAGGED
+    case RISK_TIER.HIGH_RISK:
+      return SCAN_STATUS.PENDING_REVIEW
+    case RISK_TIER.QUARANTINED:
+      return SCAN_STATUS.QUARANTINED
+    default:
+      return SCAN_STATUS.PASSED
   }
 }
 
@@ -106,9 +107,12 @@ async function runHtmlScanNow(prisma, { sheetId }) {
       htmlScanUpdatedAt: new Date(),
       content: htmlToScan,
       // If sheet was pending_review but scan now shows clean + not acknowledged, revert to draft
-      status: sheet.status === 'pending_review' && tier === RISK_TIER.CLEAN && !sheet.htmlScanAcknowledgedAt
-        ? 'draft'
-        : sheet.status,
+      status:
+        sheet.status === 'pending_review' &&
+        tier === RISK_TIER.CLEAN &&
+        !sheet.htmlScanAcknowledgedAt
+          ? 'draft'
+          : sheet.status,
     },
   })
 
@@ -128,38 +132,51 @@ function scheduleHtmlScan(prisma, { sheetId, delayMs = 450 }) {
     scanTimers.delete(sheetId)
   }
 
-  return prisma.studySheet.update({
-    where: { id: sheetId },
-    data: {
-      htmlScanStatus: SCAN_STATUS.QUEUED,
-      htmlScanUpdatedAt: new Date(),
-      htmlScanFindings: null,
-      htmlRiskTier: 0,
-    },
-  }).finally(() => {
-    const timer = setTimeout(async () => {
-      scanTimers.delete(sheetId)
-      try {
-        await runHtmlScanNow(prisma, { sheetId })
-      } catch (scanErr) {
-        console.error(`[htmlDraftWorkflow] Background scan failed for sheet ${sheetId}:`, scanErr)
-        await prisma.studySheet.update({
-          where: { id: sheetId },
-          data: {
-            htmlScanStatus: SCAN_STATUS.FLAGGED,
-            htmlRiskTier: RISK_TIER.FLAGGED,
-            htmlScanFindings: [{ source: 'system', severity: 'high', message: 'Background scan failed to complete.' }],
-            htmlScanUpdatedAt: new Date(),
-          },
-        }).catch((updateErr) => {
-          console.error(`[htmlDraftWorkflow] Failed to update scan status for sheet ${sheetId}:`, updateErr)
-        })
-      }
-    }, safeDelay)
+  return prisma.studySheet
+    .update({
+      where: { id: sheetId },
+      data: {
+        htmlScanStatus: SCAN_STATUS.QUEUED,
+        htmlScanUpdatedAt: new Date(),
+        htmlScanFindings: null,
+        htmlRiskTier: 0,
+      },
+    })
+    .finally(() => {
+      const timer = setTimeout(async () => {
+        scanTimers.delete(sheetId)
+        try {
+          await runHtmlScanNow(prisma, { sheetId })
+        } catch (scanErr) {
+          console.error(`[htmlDraftWorkflow] Background scan failed for sheet ${sheetId}:`, scanErr)
+          await prisma.studySheet
+            .update({
+              where: { id: sheetId },
+              data: {
+                htmlScanStatus: SCAN_STATUS.FLAGGED,
+                htmlRiskTier: RISK_TIER.FLAGGED,
+                htmlScanFindings: [
+                  {
+                    source: 'system',
+                    severity: 'high',
+                    message: 'Background scan failed to complete.',
+                  },
+                ],
+                htmlScanUpdatedAt: new Date(),
+              },
+            })
+            .catch((updateErr) => {
+              console.error(
+                `[htmlDraftWorkflow] Failed to update scan status for sheet ${sheetId}:`,
+                updateErr,
+              )
+            })
+        }
+      }, safeDelay)
 
-    if (typeof timer.unref === 'function') timer.unref()
-    scanTimers.set(sheetId, timer)
-  })
+      if (typeof timer.unref === 'function') timer.unref()
+      scanTimers.set(sheetId, timer)
+    })
 }
 
 module.exports = {

@@ -1,0 +1,62 @@
+/*
+ * AiSuggestionCard.module.css — Phase 3 of v2 design refresh.
+ *
+ * The 2px AI gradient bar on the left edge is the only piece of
+ * brand-accent visual treatment on this card. The rest of the
+ * surface stays on the same neutral card tokens as Upcoming Exams
+ * so the two cards sit side-by-side without competing.
+ *
+ * Tokens: every color comes from --sh-* custom properties so dark
+ * mode + future theme work pick this up automatically.
+ */
+
+.card {
+  position: relative;
+  /* The card primitive already paints surface bg + border + radius.
+     We add the AI gradient as a left rail using a pseudo-element so
+     it doesn't fight the card's own border-radius. */
+  overflow: hidden;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--sh-brand), var(--sh-brand-accent, var(--sh-brand)));
+  pointer-events: none;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.text {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--sh-heading);
+  /* Suggestions are 1-2 short sentences. Keep them readable but
+     tight; this card lives next to other dashboard widgets. */
+}
+
+.subtext {
+  margin: 4px 0 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--sh-muted);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}

@@ -33,7 +33,8 @@ router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
       select: { id: true, userId: true, status: true, title: true },
     })
     if (!visibility) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!canReadSheet(visibility, req.user)) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(visibility, req.user))
+      return res.status(404).json({ error: 'Sheet not found.' })
     if (visibility.status !== SHEET_STATUS.PUBLISHED) {
       return sendForbidden(res, 'You can only star published sheets.')
     }
@@ -101,11 +102,15 @@ router.get('/:id/comments', async (req, res) => {
 
   try {
     const sheetSection = await timedSection('sheet-lookup', () =>
-      prisma.studySheet.findUnique({ where: { id: sheetId }, select: { id: true, status: true, userId: true } })
+      prisma.studySheet.findUnique({
+        where: { id: sheetId },
+        select: { id: true, status: true, userId: true },
+      }),
     )
     const sheet = sheetSection.data
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null))
+      return res.status(404).json({ error: 'Sheet not found.' })
 
     let orderBy = { createdAt: 'desc' }
     if (sort === 'oldest') {
@@ -143,7 +148,7 @@ router.get('/:id/comments', async (req, res) => {
           orderBy,
           take: limit,
           skip: offset,
-        })
+        }),
       ),
       timedSection('count', () => prisma.comment.count({ where: { sheetId, parentId: null } })),
     ])
@@ -192,109 +197,122 @@ router.get('/:id/comments', async (req, res) => {
   }
 })
 
-router.post('/:id/comments', requireAuth, requireVerifiedEmail, commentLimiter, async (req, res) => {
-  const sheetId = Number.parseInt(req.params.id, 10)
-  if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
-  const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
-  const parentId = req.body.parentId ? Number.parseInt(req.body.parentId, 10) : null
-  const attachmentValidation = normalizeCommentGifAttachments(req.body.attachments)
+router.post(
+  '/:id/comments',
+  requireAuth,
+  requireVerifiedEmail,
+  commentLimiter,
+  async (req, res) => {
+    const sheetId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
+    const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
+    const parentId = req.body.parentId ? Number.parseInt(req.body.parentId, 10) : null
+    const attachmentValidation = normalizeCommentGifAttachments(req.body.attachments)
 
-  if (attachmentValidation.error) {
-    return sendError(res, 400, attachmentValidation.error, ERROR_CODES.BAD_REQUEST)
-  }
-
-  const { attachments } = attachmentValidation
-
-  if (!content && attachments.length === 0) return res.status(400).json({ error: 'Comment cannot be empty.' })
-  if (content.length > 500) {
-    return res.status(400).json({ error: 'Comment must be 500 characters or fewer.' })
-  }
-
-  try {
-    const sheet = await prisma.studySheet.findUnique({
-      where: { id: sheetId },
-      select: { id: true, userId: true, title: true, status: true },
-    })
-    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
-
-    // Validate parentId if provided (max 1 level deep)
-    if (parentId) {
-      const parentComment = await prisma.comment.findUnique({
-        where: { id: parentId },
-        select: { id: true, sheetId: true, parentId: true },
-      })
-      if (!parentComment) return res.status(400).json({ error: 'Parent comment not found.' })
-      if (parentComment.sheetId !== sheetId) return res.status(400).json({ error: 'Parent comment belongs to different sheet.' })
-      if (parentComment.parentId !== null) return res.status(400).json({ error: 'Cannot reply to replies (max 1 level deep).' })
+    if (attachmentValidation.error) {
+      return sendError(res, 400, attachmentValidation.error, ERROR_CODES.BAD_REQUEST)
     }
 
-    const moderationStatus = getInitialModerationStatus(req.user)
-    const comment = await prisma.comment.create({
-      data: {
-        content,
-        sheetId,
-        userId: req.user.userId,
-        parentId: parentId || null,
-        moderationStatus,
-        attachments: attachments.length > 0 ? {
-          create: attachments.map((att) => ({
-            url: att.url,
-            type: att.type,
-            name: att.name || '',
-          })),
-        } : undefined,
-      },
-      include: {
-        author: { select: AUTHOR_SELECT },
-        attachments: { select: { id: true, url: true, type: true, name: true } },
-      },
-    })
+    const { attachments } = attachmentValidation
 
-    trackActivity(prisma, req.user.userId, 'comments')
+    if (!content && attachments.length === 0)
+      return res.status(400).json({ error: 'Comment cannot be empty.' })
+    if (content.length > 500) {
+      return res.status(400).json({ error: 'Comment must be 500 characters or fewer.' })
+    }
 
-    // Only notify sheet author if it's a top-level comment
-    if (!parentId) {
-      await createNotification(prisma, {
-        userId: sheet.userId,
-        type: 'comment',
-        message: `${req.user.username} commented on your sheet "${sheet.title}".`,
-        actorId: req.user.userId,
-        sheetId,
-        linkPath: `/sheets/${sheetId}`,
+    try {
+      const sheet = await prisma.studySheet.findUnique({
+        where: { id: sheetId },
+        select: { id: true, userId: true, title: true, status: true },
+      })
+      if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+      if (!canReadSheet(sheet, req.user || null))
+        return res.status(404).json({ error: 'Sheet not found.' })
+
+      // Validate parentId if provided (max 1 level deep)
+      if (parentId) {
+        const parentComment = await prisma.comment.findUnique({
+          where: { id: parentId },
+          select: { id: true, sheetId: true, parentId: true },
+        })
+        if (!parentComment) return res.status(400).json({ error: 'Parent comment not found.' })
+        if (parentComment.sheetId !== sheetId)
+          return res.status(400).json({ error: 'Parent comment belongs to different sheet.' })
+        if (parentComment.parentId !== null)
+          return res.status(400).json({ error: 'Cannot reply to replies (max 1 level deep).' })
+      }
+
+      const moderationStatus = getInitialModerationStatus(req.user)
+      const comment = await prisma.comment.create({
+        data: {
+          content,
+          sheetId,
+          userId: req.user.userId,
+          parentId: parentId || null,
+          moderationStatus,
+          attachments:
+            attachments.length > 0
+              ? {
+                  create: attachments.map((att) => ({
+                    url: att.url,
+                    type: att.type,
+                    name: att.name || '',
+                  })),
+                }
+              : undefined,
+        },
+        include: {
+          author: { select: AUTHOR_SELECT },
+          attachments: { select: { id: true, url: true, type: true, name: true } },
+        },
       })
 
-      await notifyMentionedUsers(prisma, {
-        text: content,
-        actorId: req.user.userId,
-        actorUsername: req.user.username,
-        excludeUserIds: [sheet.userId],
-        message: `${req.user.username} mentioned you in a comment on "${sheet.title}".`,
-        linkPath: `/sheets/${sheetId}`,
-      })
-    } else {
-      // Notify parent comment author if it's a reply
-      const parentCommentData = await prisma.comment.findUnique({
-        where: { id: parentId },
-        select: { userId: true },
-      })
-      if (parentCommentData && parentCommentData.userId !== req.user.userId) {
+      trackActivity(prisma, req.user.userId, 'comments')
+
+      // Only notify sheet author if it's a top-level comment
+      if (!parentId) {
         await createNotification(prisma, {
-          userId: parentCommentData.userId,
-          type: 'reply',
-          message: `${req.user.username} replied to your comment.`,
+          userId: sheet.userId,
+          type: 'comment',
+          message: `${req.user.username} commented on your sheet "${sheet.title}".`,
           actorId: req.user.userId,
+          sheetId,
           linkPath: `/sheets/${sheetId}`,
         })
-      }
-    }
 
-    res.status(201).json(comment)
-  } catch (error) {
-    captureError(error, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-})
+        await notifyMentionedUsers(prisma, {
+          text: content,
+          actorId: req.user.userId,
+          actorUsername: req.user.username,
+          excludeUserIds: [sheet.userId],
+          message: `${req.user.username} mentioned you in a comment on "${sheet.title}".`,
+          linkPath: `/sheets/${sheetId}`,
+        })
+      } else {
+        // Notify parent comment author if it's a reply
+        const parentCommentData = await prisma.comment.findUnique({
+          where: { id: parentId },
+          select: { userId: true },
+        })
+        if (parentCommentData && parentCommentData.userId !== req.user.userId) {
+          await createNotification(prisma, {
+            userId: parentCommentData.userId,
+            type: 'reply',
+            message: `${req.user.username} replied to your comment.`,
+            actorId: req.user.userId,
+            linkPath: `/sheets/${sheetId}`,
+          })
+        }
+      }
+
+      res.status(201).json(comment)
+    } catch (error) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+      res.status(500).json({ error: 'Server error.' })
+    }
+  },
+)
 
 router.post('/:id/react', requireAuth, reactLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
@@ -312,7 +330,8 @@ router.post('/:id/react', requireAuth, reactLimiter, async (req, res) => {
       select: { id: true, userId: true, status: true },
     })
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    if (!canReadSheet(sheet, req.user || null)) return res.status(404).json({ error: 'Sheet not found.' })
+    if (!canReadSheet(sheet, req.user || null))
+      return res.status(404).json({ error: 'Sheet not found.' })
     if (sheet.status !== SHEET_STATUS.PUBLISHED) {
       return sendForbidden(res, 'Reactions are disabled until the sheet is published.')
     }
@@ -354,69 +373,74 @@ router.post('/:id/react', requireAuth, reactLimiter, async (req, res) => {
   }
 })
 
-router.post('/:id/comments/:commentId/react', requireAuth, commentReactLimiter, async (req, res) => {
-  const commentId = Number.parseInt(req.params.commentId, 10)
-  const { userId } = req.user
-  const { type } = req.body || {}
+router.post(
+  '/:id/comments/:commentId/react',
+  requireAuth,
+  commentReactLimiter,
+  async (req, res) => {
+    const commentId = Number.parseInt(req.params.commentId, 10)
+    const { userId } = req.user
+    const { type } = req.body || {}
 
-  if (!type || (type !== 'like' && type !== 'dislike')) {
-    return res.status(400).json({ error: 'Reaction type must be "like" or "dislike".' })
-  }
-
-  try {
-    const comment = await prisma.comment.findUnique({
-      where: { id: commentId },
-      select: { id: true, sheetId: true },
-    })
-    if (!comment) return res.status(404).json({ error: 'Comment not found.' })
-
-    // Verify sheet is readable
-    const sheet = await prisma.studySheet.findUnique({
-      where: { id: comment.sheetId },
-      select: { id: true, status: true, userId: true },
-    })
-    if (!sheet || !canReadSheet(sheet, req.user)) {
-      return res.status(404).json({ error: 'Comment not found.' })
+    if (!type || (type !== 'like' && type !== 'dislike')) {
+      return res.status(400).json({ error: 'Reaction type must be "like" or "dislike".' })
     }
 
-    const existing = await prisma.commentReaction.findUnique({
-      where: { userId_commentId: { userId, commentId } },
-    })
+    try {
+      const comment = await prisma.comment.findUnique({
+        where: { id: commentId },
+        select: { id: true, sheetId: true },
+      })
+      if (!comment) return res.status(404).json({ error: 'Comment not found.' })
 
-    // Toggle logic: if same type, remove; if different, update; if none, create
-    if (existing && existing.type === type) {
-      await prisma.commentReaction.delete({
+      // Verify sheet is readable
+      const sheet = await prisma.studySheet.findUnique({
+        where: { id: comment.sheetId },
+        select: { id: true, status: true, userId: true },
+      })
+      if (!sheet || !canReadSheet(sheet, req.user)) {
+        return res.status(404).json({ error: 'Comment not found.' })
+      }
+
+      const existing = await prisma.commentReaction.findUnique({
         where: { userId_commentId: { userId, commentId } },
       })
-    } else if (existing) {
-      await prisma.commentReaction.update({
-        where: { userId_commentId: { userId, commentId } },
-        data: { type },
+
+      // Toggle logic: if same type, remove; if different, update; if none, create
+      if (existing && existing.type === type) {
+        await prisma.commentReaction.delete({
+          where: { userId_commentId: { userId, commentId } },
+        })
+      } else if (existing) {
+        await prisma.commentReaction.update({
+          where: { userId_commentId: { userId, commentId } },
+          data: { type },
+        })
+      } else {
+        await prisma.commentReaction.create({
+          data: { userId, commentId, type },
+        })
+      }
+
+      // Get updated counts
+      const [likes, dislikes, userReaction] = await Promise.all([
+        prisma.commentReaction.count({ where: { commentId, type: 'like' } }),
+        prisma.commentReaction.count({ where: { commentId, type: 'dislike' } }),
+        prisma.commentReaction.findUnique({
+          where: { userId_commentId: { userId, commentId } },
+        }),
+      ])
+
+      res.json({
+        reactionCounts: { like: likes, dislike: dislikes },
+        userReaction: userReaction ? userReaction.type : null,
       })
-    } else {
-      await prisma.commentReaction.create({
-        data: { userId, commentId, type },
-      })
+    } catch (error) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+      res.status(500).json({ error: 'Server error.' })
     }
-
-    // Get updated counts
-    const [likes, dislikes, userReaction] = await Promise.all([
-      prisma.commentReaction.count({ where: { commentId, type: 'like' } }),
-      prisma.commentReaction.count({ where: { commentId, type: 'dislike' } }),
-      prisma.commentReaction.findUnique({
-        where: { userId_commentId: { userId, commentId } },
-      }),
-    ])
-
-    res.json({
-      reactionCounts: { like: likes, dislike: dislikes },
-      userReaction: userReaction ? userReaction.type : null,
-    })
-  } catch (error) {
-    captureError(error, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
-  }
-})
+  },
+)
 
 router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (req, res) => {
   const commentId = Number.parseInt(req.params.commentId, 10)
@@ -424,14 +448,17 @@ router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (re
   try {
     const comment = await prisma.comment.findUnique({ where: { id: commentId } })
     if (!comment) return res.status(404).json({ error: 'Comment not found.' })
-    if (!assertOwnerOrAdmin({
-      res,
-      user: req.user,
-      ownerId: comment.userId,
-      message: 'Not your comment.',
-      targetType: 'sheet-comment',
-      targetId: commentId,
-    })) return
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: comment.userId,
+        message: 'Not your comment.',
+        targetType: 'sheet-comment',
+        targetId: commentId,
+      })
+    )
+      return
 
     await prisma.comment.delete({ where: { id: comment.id } })
     res.json({ message: 'Comment deleted.' })

@@ -10,8 +10,14 @@ export { default as useRegisterFlow } from '../../pages/auth/useRegisterFlow'
 
 // Constants & API helpers
 export {
-  RULES, validateAccountFields, getSteps,
-  apiStartRegistration, apiVerifyCode, apiResendCode,
-  apiGoogleAuth, apiGoogleComplete,
-  apiCompleteRegistration, apiLoadSchools,
+  RULES,
+  validateAccountFields,
+  getSteps,
+  apiStartRegistration,
+  apiVerifyCode,
+  apiResendCode,
+  apiGoogleAuth,
+  apiGoogleComplete,
+  apiCompleteRegistration,
+  apiLoadSchools,
 } from '../../pages/auth/registerConstants'

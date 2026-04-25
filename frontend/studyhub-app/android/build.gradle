@@ -7,7 +7,7 @@ buildscript {
         mavenCentral()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.13.0'
+        classpath 'com.android.tools.build:gradle:9.2.0'
         classpath 'com.google.gms:google-services:4.4.4'
 
         // NOTE: Do not place your application dependencies here; they belong
@@ -17,11 +17,22 @@ buildscript {
 
 apply from: "variables.gradle"
 
+// Redirect every subproject's build output OUT of OneDrive. The project
+// tree lives under C:\Users\<name>\OneDrive\Desktop\studyhub, and OneDrive's
+// file-sync daemon keeps open handles on files the Android Gradle plugin
+// needs to rename/delete thousands of times per build, which surfaces as
+// java.nio.file.AccessDeniedException on mergeDebugResources /
+// packageDebugResources / mergeDebugAssets. The generated build/ dir is
+// pure machine output — there is nothing to back up to the cloud.
+def externalBuildRoot = new File(System.getenv("STUDYHUB_ANDROID_BUILD_DIR")
+        ?: "${System.getProperty('user.home')}/studyhub-android-build")
+
 allprojects {
     repositories {
         google()
         mavenCentral()
     }
+    buildDir = new File(externalBuildRoot, "${rootProject.name}/${project.name}")
 }
 
 task clean(type: Delete) {

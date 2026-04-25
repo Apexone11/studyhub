@@ -80,7 +80,9 @@ function AiBubbleInner() {
   // Close bubble on Escape key (global).
   useEffect(() => {
     if (!isOpen) return
-    const handleEsc = (e) => { if (e.key === 'Escape') setIsOpen(false) }
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') setIsOpen(false)
+    }
     window.addEventListener('keydown', handleEsc)
     return () => window.removeEventListener('keydown', handleEsc)
   }, [isOpen])
@@ -93,7 +95,14 @@ function AiBubbleInner() {
   }, [chat.messages, chat.streamingText, isOpen])
 
   // Don't show bubble on the /ai page itself or on auth pages.
-  const hiddenPaths = ['/ai', '/login', '/register', '/forgot-password', '/reset-password', '/messages']
+  const hiddenPaths = [
+    '/ai',
+    '/login',
+    '/register',
+    '/forgot-password',
+    '/reset-password',
+    '/messages',
+  ]
   if (hiddenPaths.some((p) => location.pathname.startsWith(p))) return null
   // Hide on reader page (full-screen, has its own AI button)
   if (location.pathname.match(/^\/library\/\d+\/read/)) return null
@@ -164,41 +173,53 @@ function AiBubbleInner() {
 
       {/* Chat Window */}
       {isOpen && (
-        <div style={{
-          position: 'fixed',
-          bottom: 88,
-          right: 24,
-          width: 'min(380px, calc(100vw - 48px))',
-          height: 520,
-          maxHeight: 'calc(100vh - 120px)',
-          background: 'var(--sh-surface)',
-          borderRadius: 16,
-          border: '1px solid var(--sh-border)',
-          boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
-          display: 'flex',
-          flexDirection: 'column',
-          zIndex: 9997,
-          fontFamily: PAGE_FONT,
-          overflow: 'hidden',
-        }}>
-          {/* Header */}
-          <div style={{
-            padding: '12px 16px',
-            borderBottom: '1px solid var(--sh-border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+        <div
+          style={{
+            position: 'fixed',
+            bottom: 88,
+            right: 24,
+            width: 'min(380px, calc(100vw - 48px))',
+            height: 520,
+            maxHeight: 'calc(100vh - 120px)',
             background: 'var(--sh-surface)',
-          }}>
+            borderRadius: 16,
+            border: '1px solid var(--sh-border)',
+            boxShadow: '0 8px 40px rgba(0,0,0,0.15)',
+            display: 'flex',
+            flexDirection: 'column',
+            zIndex: 9997,
+            fontFamily: PAGE_FONT,
+            overflow: 'hidden',
+          }}
+        >
+          {/* Header */}
+          <div
+            style={{
+              padding: '12px 16px',
+              borderBottom: '1px solid var(--sh-border)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              background: 'var(--sh-surface)',
+            }}
+          >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <div style={{
-                width: 26, height: 26, borderRadius: '50%',
-                background: 'var(--sh-ai-gradient)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center',
-              }}>
+              <div
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: '50%',
+                  background: 'var(--sh-ai-gradient)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
                 <IconSpark size={14} style={{ color: '#fff' }} />
               </div>
-              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>Hub AI</span>
+              <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--sh-heading)' }}>
+                Hub AI
+              </span>
               {chat.streaming && (
                 <span style={{ fontSize: 11, color: 'var(--sh-brand)', fontWeight: 500 }}>
                   Thinking...
@@ -207,9 +228,17 @@ function AiBubbleInner() {
             </div>
             <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
               <button
-                onClick={() => { chat.startNewConversation() }}
+                onClick={() => {
+                  chat.startNewConversation()
+                }}
                 title="New conversation"
-                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--sh-muted)' }}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: 4,
+                  color: 'var(--sh-muted)',
+                }}
               >
                 <IconPlus size={16} />
               </button>
@@ -217,8 +246,12 @@ function AiBubbleInner() {
                 onClick={openFullPage}
                 title="Open full page"
                 style={{
-                  background: 'none', border: 'none', cursor: 'pointer',
-                  padding: '3px 8px', fontSize: 11, color: 'var(--sh-brand)',
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  padding: '3px 8px',
+                  fontSize: 11,
+                  color: 'var(--sh-brand)',
                   fontWeight: 600,
                 }}
               >
@@ -232,14 +265,31 @@ function AiBubbleInner() {
             {!chat.activeConversationId && chat.messages.length === 0 && (
               <div style={{ textAlign: 'center', padding: '30px 10px' }}>
                 <IconSpark size={32} style={{ color: 'var(--sh-brand)', marginBottom: 12 }} />
-                <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sh-heading)', marginBottom: 6 }}>
+                <div
+                  style={{
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: 'var(--sh-heading)',
+                    marginBottom: 6,
+                  }}
+                >
                   How can I help?
                 </div>
-                <div style={{ fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5, marginBottom: 14 }}>
-                  Ask me anything about your studies. I can create sheets, explain concepts, and quiz you.
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: 'var(--sh-muted)',
+                    lineHeight: 1.5,
+                    marginBottom: 14,
+                  }}
+                >
+                  Ask me anything about your studies. I can create sheets, explain concepts, and
+                  quiz you.
                 </div>
                 {contextChips.length > 0 && (
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}>
+                  <div
+                    style={{ display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' }}
+                  >
                     {contextChips.map((chip) => (
                       <button
                         key={chip.label}
@@ -250,12 +300,24 @@ function AiBubbleInner() {
                           }
                         }}
                         style={{
-                          background: 'var(--sh-soft)', border: '1px solid var(--sh-border)',
-                          borderRadius: 8, padding: '6px 10px', fontSize: 11, fontWeight: 500,
-                          color: 'var(--sh-text)', cursor: 'pointer', transition: 'all 0.15s',
+                          background: 'var(--sh-soft)',
+                          border: '1px solid var(--sh-border)',
+                          borderRadius: 8,
+                          padding: '6px 10px',
+                          fontSize: 11,
+                          fontWeight: 500,
+                          color: 'var(--sh-text)',
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
                         }}
-                        onMouseEnter={(e) => { e.currentTarget.style.borderColor = 'var(--sh-brand)'; e.currentTarget.style.color = 'var(--sh-brand)' }}
-                        onMouseLeave={(e) => { e.currentTarget.style.borderColor = 'var(--sh-border)'; e.currentTarget.style.color = 'var(--sh-text)' }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--sh-brand)'
+                          e.currentTarget.style.color = 'var(--sh-brand)'
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.borderColor = 'var(--sh-border)'
+                          e.currentTarget.style.color = 'var(--sh-text)'
+                        }}
                       >
                         {chip.label}
                       </button>
@@ -272,17 +334,29 @@ function AiBubbleInner() {
             {/* Streaming */}
             {chat.streaming && chat.streamingText && (
               <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'flex-start' }}>
-                <div style={{
-                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                  background: 'var(--sh-ai-gradient)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
+                <div
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    background: 'var(--sh-ai-gradient)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   <IconSpark size={11} style={{ color: '#fff' }} />
                 </div>
-                <div style={{
-                  background: 'var(--sh-soft)', borderRadius: '4px 12px 12px 12px',
-                  padding: '8px 12px', maxWidth: '82%', fontSize: 13,
-                }}>
+                <div
+                  style={{
+                    background: 'var(--sh-soft)',
+                    borderRadius: '4px 12px 12px 12px',
+                    padding: '8px 12px',
+                    maxWidth: '82%',
+                    fontSize: 13,
+                  }}
+                >
                   <AiMarkdown content={chat.streamingText} />
                 </div>
               </div>
@@ -290,26 +364,42 @@ function AiBubbleInner() {
 
             {chat.streaming && !chat.streamingText && (
               <div style={{ display: 'flex', gap: 8, marginBottom: 10, alignItems: 'center' }}>
-                <div style={{
-                  width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-                  background: 'var(--sh-ai-gradient)',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                }}>
+                <div
+                  style={{
+                    width: 22,
+                    height: 22,
+                    borderRadius: '50%',
+                    flexShrink: 0,
+                    background: 'var(--sh-ai-gradient)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
                   <IconSpark size={11} style={{ color: '#fff' }} />
                 </div>
-                <div style={{
-                  background: 'var(--sh-soft)', borderRadius: '4px 12px 12px 12px',
-                }}>
+                <div
+                  style={{
+                    background: 'var(--sh-soft)',
+                    borderRadius: '4px 12px 12px 12px',
+                  }}
+                >
                   <AiThinkingDots compact />
                 </div>
               </div>
             )}
 
             {chat.error && (
-              <div style={{
-                background: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)',
-                borderRadius: 8, padding: '8px 12px', marginBottom: 8, fontSize: 12,
-              }}>
+              <div
+                style={{
+                  background: 'var(--sh-danger-bg)',
+                  color: 'var(--sh-danger-text)',
+                  borderRadius: 8,
+                  padding: '8px 12px',
+                  marginBottom: 8,
+                  fontSize: 12,
+                }}
+              >
                 {chat.error}
               </div>
             )}
@@ -336,13 +426,15 @@ function AiBubbleInner() {
           )}
 
           {/* Input */}
-          <div style={{
-            padding: '10px 14px',
-            borderTop: '1px solid var(--sh-border)',
-            display: 'flex',
-            gap: 8,
-            alignItems: 'flex-end',
-          }}>
+          <div
+            style={{
+              padding: '10px 14px',
+              borderTop: '1px solid var(--sh-border)',
+              display: 'flex',
+              gap: 8,
+              alignItems: 'flex-end',
+            }}
+          >
             <textarea
               ref={inputRef}
               aria-label="Ask Hub AI"
@@ -352,11 +444,19 @@ function AiBubbleInner() {
               placeholder="Ask Hub AI..."
               rows={1}
               style={{
-                flex: 1, resize: 'none', border: '1px solid var(--sh-border)',
-                borderRadius: 10, padding: '8px 12px', fontSize: 13,
-                fontFamily: PAGE_FONT, color: 'var(--sh-text)',
-                background: 'var(--sh-bg)', outline: 'none',
-                minHeight: 36, maxHeight: 80, lineHeight: 1.4,
+                flex: 1,
+                resize: 'none',
+                border: '1px solid var(--sh-border)',
+                borderRadius: 10,
+                padding: '8px 12px',
+                fontSize: 13,
+                fontFamily: PAGE_FONT,
+                color: 'var(--sh-text)',
+                background: 'var(--sh-bg)',
+                outline: 'none',
+                minHeight: 36,
+                maxHeight: 80,
+                lineHeight: 1.4,
               }}
               onInput={(e) => {
                 e.target.style.height = 'auto'
@@ -367,10 +467,18 @@ function AiBubbleInner() {
               onClick={chat.streaming ? chat.stopStreaming : handleSend}
               disabled={!chat.streaming && !input.trim()}
               style={{
-                background: chat.streaming ? 'var(--sh-danger)' : (input.trim() ? 'var(--sh-brand)' : 'var(--sh-soft)'),
-                color: (chat.streaming || input.trim()) ? '#fff' : 'var(--sh-muted)',
-                border: 'none', borderRadius: 8, padding: '8px 14px',
-                fontSize: 12, fontWeight: 600, cursor: (chat.streaming || input.trim()) ? 'pointer' : 'not-allowed',
+                background: chat.streaming
+                  ? 'var(--sh-danger)'
+                  : input.trim()
+                    ? 'var(--sh-brand)'
+                    : 'var(--sh-soft)',
+                color: chat.streaming || input.trim() ? '#fff' : 'var(--sh-muted)',
+                border: 'none',
+                borderRadius: 8,
+                padding: '8px 14px',
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: chat.streaming || input.trim() ? 'pointer' : 'not-allowed',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -392,29 +500,42 @@ function BubbleMessage({ message }) {
   const isUser = message.role === 'user'
 
   return (
-    <div style={{
-      display: 'flex', gap: 8, marginBottom: 10,
-      flexDirection: isUser ? 'row-reverse' : 'row',
-      alignItems: 'flex-start',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        gap: 8,
+        marginBottom: 10,
+        flexDirection: isUser ? 'row-reverse' : 'row',
+        alignItems: 'flex-start',
+      }}
+    >
       {!isUser && (
-        <div style={{
-          width: 22, height: 22, borderRadius: '50%', flexShrink: 0,
-          background: 'var(--sh-ai-gradient)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-        }}>
+        <div
+          style={{
+            width: 22,
+            height: 22,
+            borderRadius: '50%',
+            flexShrink: 0,
+            background: 'var(--sh-ai-gradient)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+        >
           <IconSpark size={11} style={{ color: '#fff' }} />
         </div>
       )}
-      <div style={{
-        background: isUser ? 'var(--sh-brand)' : 'var(--sh-soft)',
-        color: isUser ? '#fff' : 'var(--sh-text)',
-        borderRadius: isUser ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
-        padding: '8px 12px',
-        maxWidth: '82%',
-        fontSize: 13,
-        wordBreak: 'break-word',
-      }}>
+      <div
+        style={{
+          background: isUser ? 'var(--sh-brand)' : 'var(--sh-soft)',
+          color: isUser ? '#fff' : 'var(--sh-text)',
+          borderRadius: isUser ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
+          padding: '8px 12px',
+          maxWidth: '82%',
+          fontSize: 13,
+          wordBreak: 'break-word',
+        }}
+      >
         {isUser ? (
           <div style={{ lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>{message.content}</div>
         ) : (
@@ -449,12 +570,19 @@ function AiQuotaBar({ label, used, limit }) {
 
   return (
     <div style={{ marginBottom: 4 }}>
-      <div style={{
-        display: 'flex', justifyContent: 'space-between',
-        color: isExhausted ? 'var(--sh-danger)' : 'var(--sh-muted)',
-        fontSize: 10, fontWeight: 600, marginBottom: 2,
-      }}>
-        <span>{used}/{limit} {label}</span>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          color: isExhausted ? 'var(--sh-danger)' : 'var(--sh-muted)',
+          fontSize: 10,
+          fontWeight: 600,
+          marginBottom: 2,
+        }}
+      >
+        <span>
+          {used}/{limit} {label}
+        </span>
         {isExhausted ? (
           <span style={{ color: 'var(--sh-danger)', fontWeight: 700 }}>Limit reached</span>
         ) : isWarning ? (
@@ -463,17 +591,23 @@ function AiQuotaBar({ label, used, limit }) {
           <span>{limit - used} left</span>
         )}
       </div>
-      <div style={{
-        height: 3, borderRadius: 2,
-        background: 'var(--sh-soft, #e2e8f0)',
-        overflow: 'hidden',
-      }}>
-        <div style={{
-          width: `${pct}%`, height: '100%',
-          background: barColor,
+      <div
+        style={{
+          height: 3,
           borderRadius: 2,
-          transition: 'width 0.3s ease',
-        }} />
+          background: 'var(--sh-soft, #e2e8f0)',
+          overflow: 'hidden',
+        }}
+      >
+        <div
+          style={{
+            width: `${pct}%`,
+            height: '100%',
+            background: barColor,
+            borderRadius: 2,
+            transition: 'width 0.3s ease',
+          }}
+        />
       </div>
     </div>
   )

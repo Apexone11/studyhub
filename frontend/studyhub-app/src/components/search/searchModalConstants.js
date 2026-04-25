@@ -43,7 +43,7 @@ export const styles = {
     outline: 'none',
     fontSize: 15,
     fontFamily: 'inherit',
-    color: '#0f172a',
+    color: 'var(--sh-text)',
     background: 'transparent',
   },
   clearBtn: {
@@ -102,19 +102,6 @@ export const styles = {
     fontSize: 12,
     color: 'var(--sh-slate-500, #64748b)',
     marginTop: 2,
-  },
-  userAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: '50%',
-    background: 'var(--sh-avatar-bg)',
-    border: '1.5px solid var(--sh-brand)',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    fontSize: 10,
-    fontWeight: 700,
-    color: 'var(--sh-avatar-text)',
   },
 }
 

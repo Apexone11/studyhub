@@ -65,10 +65,7 @@ router.get('/:id/lab/lineage', optionalAuth, async (req, res) => {
     // We query all sheets whose rootSheetId matches, plus direct forks of root.
     const allForks = await prisma.studySheet.findMany({
       where: {
-        OR: [
-          { rootSheetId: rootId },
-          { forkOf: rootId },
-        ],
+        OR: [{ rootSheetId: rootId }, { forkOf: rootId }],
       },
       select: FORK_SELECT,
       orderBy: { createdAt: 'asc' },
@@ -118,7 +115,11 @@ function formatNode(sheet, currentSheetId) {
     updatedAt: sheet.updatedAt,
     createdAt: sheet.createdAt,
     author: sheet.author
-      ? { id: sheet.author.id, username: sheet.author.username, avatarUrl: sheet.author.avatarUrl || null }
+      ? {
+          id: sheet.author.id,
+          username: sheet.author.username,
+          avatarUrl: sheet.author.avatarUrl || null,
+        }
       : null,
     isCurrent: sheet.id === currentSheetId,
   }

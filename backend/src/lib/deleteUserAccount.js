@@ -11,7 +11,14 @@ const r2 = require('./r2Storage')
 const { getStripe } = require('../modules/payments/payments.service')
 const { deleteVideoAssetRefs } = require('../modules/video/video.service')
 
-const CANCEL_ON_DELETE_STATUSES = new Set(['active', 'trialing', 'past_due', 'unpaid', 'paused', 'incomplete'])
+const CANCEL_ON_DELETE_STATUSES = new Set([
+  'active',
+  'trialing',
+  'past_due',
+  'unpaid',
+  'paused',
+  'incomplete',
+])
 
 function uniq(values) {
   return [...new Set((values || []).filter(Boolean))]
@@ -77,20 +84,27 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
       select: { avatarUrl: true, coverImageUrl: true, email: true },
     })
 
-    const announcementIds = (await tx.announcement.findMany({
-      where: { authorId: userId },
-      select: { id: true },
-    })).map((announcement) => announcement.id)
+    const announcementIds = (
+      await tx.announcement.findMany({
+        where: { authorId: userId },
+        select: { id: true },
+      })
+    ).map((announcement) => announcement.id)
 
-    const announcementImageUrls = announcementIds.length > 0
-      ? (await tx.announcementMedia.findMany({
-        where: {
-          announcementId: { in: announcementIds },
-          type: 'image',
-        },
-        select: { url: true },
-      })).map((media) => media.url).filter(Boolean)
-      : []
+    const announcementImageUrls =
+      announcementIds.length > 0
+        ? (
+            await tx.announcementMedia.findMany({
+              where: {
+                announcementId: { in: announcementIds },
+                type: 'image',
+              },
+              select: { url: true },
+            })
+          )
+            .map((media) => media.url)
+            .filter(Boolean)
+        : []
 
     if (reason) {
       await tx.deletionReason.create({
@@ -133,27 +147,31 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
       { userId },
     ])
 
-    const sheetCommentIds = (await tx.comment.findMany({
-      where: { OR: sheetCommentFilters },
-      select: { id: true },
-    })).map((comment) => comment.id)
+    const sheetCommentIds = (
+      await tx.comment.findMany({
+        where: { OR: sheetCommentFilters },
+        select: { id: true },
+      })
+    ).map((comment) => comment.id)
 
-    const sheetCommentAttachmentUrls = sheetCommentIds.length > 0
-      ? (await tx.commentAttachment.findMany({
-        where: { commentId: { in: sheetCommentIds } },
-        select: { url: true },
-      })).map((attachment) => attachment.url).filter(Boolean)
-      : []
+    const sheetCommentAttachmentUrls =
+      sheetCommentIds.length > 0
+        ? (
+            await tx.commentAttachment.findMany({
+              where: { commentId: { in: sheetCommentIds } },
+              select: { url: true },
+            })
+          )
+            .map((attachment) => attachment.url)
+            .filter(Boolean)
+        : []
 
     if (sheetIds.length > 0) {
       await tx.starredSheet.deleteMany({ where: { sheetId: { in: sheetIds } } })
       await tx.reaction.deleteMany({ where: { sheetId: { in: sheetIds } } })
       await tx.sheetContribution.deleteMany({
         where: {
-          OR: [
-            { targetSheetId: { in: sheetIds } },
-            { forkSheetId: { in: sheetIds } },
-          ],
+          OR: [{ targetSheetId: { in: sheetIds } }, { forkSheetId: { in: sheetIds } }],
         },
       })
     }
@@ -171,17 +189,24 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
       { userId },
     ])
 
-    const feedCommentIds = (await tx.feedPostComment.findMany({
-      where: { OR: feedCommentFilters },
-      select: { id: true },
-    })).map((comment) => comment.id)
+    const feedCommentIds = (
+      await tx.feedPostComment.findMany({
+        where: { OR: feedCommentFilters },
+        select: { id: true },
+      })
+    ).map((comment) => comment.id)
 
-    const feedCommentAttachmentUrls = feedCommentIds.length > 0
-      ? (await tx.feedPostCommentAttachment.findMany({
-        where: { commentId: { in: feedCommentIds } },
-        select: { url: true },
-      })).map((attachment) => attachment.url).filter(Boolean)
-      : []
+    const feedCommentAttachmentUrls =
+      feedCommentIds.length > 0
+        ? (
+            await tx.feedPostCommentAttachment.findMany({
+              where: { commentId: { in: feedCommentIds } },
+              select: { url: true },
+            })
+          )
+            .map((attachment) => attachment.url)
+            .filter(Boolean)
+        : []
 
     if (postIds.length > 0) {
       await tx.feedPostReaction.deleteMany({ where: { postId: { in: postIds } } })
@@ -216,27 +241,31 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
       { userId },
     ])
 
-    const noteCommentIds = (await tx.noteComment.findMany({
-      where: { OR: noteCommentFilters },
-      select: { id: true },
-    })).map((comment) => comment.id)
+    const noteCommentIds = (
+      await tx.noteComment.findMany({
+        where: { OR: noteCommentFilters },
+        select: { id: true },
+      })
+    ).map((comment) => comment.id)
 
-    const noteCommentAttachmentUrls = noteCommentIds.length > 0
-      ? (await tx.noteCommentAttachment.findMany({
-        where: { commentId: { in: noteCommentIds } },
-        select: { url: true },
-      })).map((attachment) => attachment.url).filter(Boolean)
-      : []
+    const noteCommentAttachmentUrls =
+      noteCommentIds.length > 0
+        ? (
+            await tx.noteCommentAttachment.findMany({
+              where: { commentId: { in: noteCommentIds } },
+              select: { url: true },
+            })
+          )
+            .map((attachment) => attachment.url)
+            .filter(Boolean)
+        : []
 
     await tx.noteComment.deleteMany({ where: { OR: noteCommentFilters } })
 
     await tx.feedPostReaction.deleteMany({ where: { userId } })
     await tx.sheetContribution.deleteMany({
       where: {
-        OR: [
-          { proposerId: userId },
-          { reviewerId: userId },
-        ],
+        OR: [{ proposerId: userId }, { reviewerId: userId }],
       },
     })
     await tx.feedPost.deleteMany({ where: { userId } })
@@ -344,41 +373,45 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
       cleanupAttachmentIfUnused(prisma, attachmentUrl, {
         source: 'deleteUserAccount',
         userId,
-      })
+      }),
     ),
     ...deletedAssetRefs.contentImageUrls.map((imageUrl) =>
       cleanupContentImageIfUnused(prisma, imageUrl, {
         source: 'deleteUserAccount',
         userId,
-      })
+      }),
     ),
     ...deletedAssetRefs.noteImageUrls.map((imageUrl) =>
       cleanupNoteImageIfUnused(prisma, imageUrl, {
         source: 'deleteUserAccount',
         userId,
-      })
+      }),
     ),
     ...deletedAssetRefs.announcementImageUrls.map((imageUrl) =>
       cleanupAnnouncementImage(imageUrl, {
         source: 'deleteUserAccount',
         userId,
-      })
+      }),
     ),
     ...deletedAssetRefs.videos.map((video) => deleteVideoAssetRefs(video)),
   ]
 
   if (deletedAssetRefs.avatarUrl) {
-    cleanupTasks.push(cleanupAvatarIfUnused(prisma, deletedAssetRefs.avatarUrl, {
-      source: 'deleteUserAccount',
-      userId,
-    }))
+    cleanupTasks.push(
+      cleanupAvatarIfUnused(prisma, deletedAssetRefs.avatarUrl, {
+        source: 'deleteUserAccount',
+        userId,
+      }),
+    )
   }
 
   if (deletedAssetRefs.coverImageUrl) {
-    cleanupTasks.push(cleanupCoverIfUnused(prisma, deletedAssetRefs.coverImageUrl, {
-      source: 'deleteUserAccount',
-      userId,
-    }))
+    cleanupTasks.push(
+      cleanupCoverIfUnused(prisma, deletedAssetRefs.coverImageUrl, {
+        source: 'deleteUserAccount',
+        userId,
+      }),
+    )
   }
 
   const cleanupResults = await Promise.allSettled(cleanupTasks)

@@ -43,19 +43,21 @@ export function canSubmitHtmlReview({
 export function reduceScanState(previousState, patch = {}) {
   const next = {
     status: patch.status || previousState.status || 'queued',
-    tier: typeof patch.tier === 'number' ? patch.tier : (previousState.tier || 0),
-    findings: Array.isArray(patch.findings) ? patch.findings : (previousState.findings || []),
+    tier: typeof patch.tier === 'number' ? patch.tier : previousState.tier || 0,
+    findings: Array.isArray(patch.findings) ? patch.findings : previousState.findings || [],
     riskSummary: patch.riskSummary || previousState.riskSummary || '',
     tierExplanation: patch.tierExplanation || previousState.tierExplanation || '',
     findingsByCategory: patch.findingsByCategory || previousState.findingsByCategory || {},
     updatedAt: patch.updatedAt || previousState.updatedAt || null,
     acknowledgedAt: patch.acknowledgedAt || previousState.acknowledgedAt || null,
-    hasOriginalVersion: typeof patch.hasOriginalVersion === 'boolean'
-      ? patch.hasOriginalVersion
-      : Boolean(previousState.hasOriginalVersion),
-    hasWorkingVersion: typeof patch.hasWorkingVersion === 'boolean'
-      ? patch.hasWorkingVersion
-      : Boolean(previousState.hasWorkingVersion),
+    hasOriginalVersion:
+      typeof patch.hasOriginalVersion === 'boolean'
+        ? patch.hasOriginalVersion
+        : Boolean(previousState.hasOriginalVersion),
+    hasWorkingVersion:
+      typeof patch.hasWorkingVersion === 'boolean'
+        ? patch.hasWorkingVersion
+        : Boolean(previousState.hasWorkingVersion),
     originalSourceName: patch.originalSourceName || previousState.originalSourceName || null,
   }
 

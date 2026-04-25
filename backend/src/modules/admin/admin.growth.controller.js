@@ -8,6 +8,7 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 
 const router = express.Router()
 
@@ -137,7 +138,7 @@ router.get('/activation-funnel', async (req, res) => {
       })
     }
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -276,7 +277,7 @@ router.get('/referral-stats', async (req, res) => {
       })
     }
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
@@ -336,7 +337,7 @@ router.get('/observability/summary', async (req, res) => {
       })
     }
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

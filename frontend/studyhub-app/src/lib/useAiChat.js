@@ -87,25 +87,28 @@ export function useAiChat() {
   }, [loadConversations, loadUsage])
 
   // ── Select a conversation and load its messages ──────────────────
-  const selectConversation = useCallback(async (id) => {
-    if (id === activeConversationId) return
-    setActiveConversationId(id)
-    setMessages([])
-    setStreamingText('')
-    setError(null)
+  const selectConversation = useCallback(
+    async (id) => {
+      if (id === activeConversationId) return
+      setActiveConversationId(id)
+      setMessages([])
+      setStreamingText('')
+      setError(null)
 
-    if (!id) return
+      if (!id) return
 
-    setLoading(true)
-    try {
-      const data = await aiService.getConversation(id)
-      setMessages(data.messages || [])
-    } catch {
-      setError('Failed to load conversation.')
-    } finally {
-      setLoading(false)
-    }
-  }, [activeConversationId])
+      setLoading(true)
+      try {
+        const data = await aiService.getConversation(id)
+        setMessages(data.messages || [])
+      } catch {
+        setError('Failed to load conversation.')
+      } finally {
+        setLoading(false)
+      }
+    },
+    [activeConversationId],
+  )
 
   // ── Create a new conversation ────────────────────────────────────
   const startNewConversation = useCallback(async () => {
@@ -124,152 +127,157 @@ export function useAiChat() {
   }, [])
 
   // ── Send a message (with SSE streaming) ──────────────────────────
-  const sendMessage = useCallback(async (content, { images, hideFromChat } = {}) => {
-    if (!content.trim() || streaming) return
+  const sendMessage = useCallback(
+    async (content, { images, hideFromChat } = {}) => {
+      if (!content.trim() || streaming) return
 
-    let convId = activeConversationId
+      let convId = activeConversationId
 
-    // Auto-create conversation if none is active.
-    if (!convId) {
-      const conv = await startNewConversation()
-      if (!conv) return
-      convId = conv.id
-    }
-
-    // Optimistically add the user message to the local list (unless hidden).
-    if (!hideFromChat) {
-      const userMsg = {
-        id: `temp-${Date.now()}`,
-        role: 'user',
-        content: content.trim(),
-        hasImage: images && images.length > 0,
-        imageDescription: images ? `${images.length} image(s)` : null,
-        createdAt: new Date().toISOString(),
+      // Auto-create conversation if none is active.
+      if (!convId) {
+        const conv = await startNewConversation()
+        if (!conv) return
+        convId = conv.id
       }
-      setMessages((prev) => [...prev, userMsg])
-    }
-    setStreaming(true)
-    setStreamingText('')
-    setError(null)
-    setTruncated(false)
 
-    try {
-      const reader = await aiService.sendMessage({
-        conversationId: convId,
-        content: content.trim(),
-        currentPage: location.pathname,
-        images: images || undefined,
-      })
+      // Optimistically add the user message to the local list (unless hidden).
+      if (!hideFromChat) {
+        const userMsg = {
+          id: `temp-${Date.now()}`,
+          role: 'user',
+          content: content.trim(),
+          hasImage: images && images.length > 0,
+          imageDescription: images ? `${images.length} image(s)` : null,
+          createdAt: new Date().toISOString(),
+        }
+        setMessages((prev) => [...prev, userMsg])
+      }
+      setStreaming(true)
+      setStreamingText('')
+      setError(null)
+      setTruncated(false)
 
-      abortRef.current = reader
-      const decoder = new TextDecoder()
-      const feedSSE = createSSEParser()
-      let fullText = ''
+      try {
+        const reader = await aiService.sendMessage({
+          conversationId: convId,
+          content: content.trim(),
+          currentPage: location.pathname,
+          images: images || undefined,
+        })
 
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
+        abortRef.current = reader
+        const decoder = new TextDecoder()
+        const feedSSE = createSSEParser()
+        let fullText = ''
 
-        const chunk = decoder.decode(value, { stream: true })
-        const events = feedSSE(chunk)
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
 
-        for (const event of events) {
-          switch (event.type) {
-            case 'delta':
-              fullText += event.text
-              setStreamingText(fullText)
-              break
+          const chunk = decoder.decode(value, { stream: true })
+          const events = feedSSE(chunk)
 
-            case 'title':
-              // Update the conversation title in our list.
-              setConversations((prev) =>
-                prev.map((c) =>
-                  c.id === convId ? { ...c, title: event.title } : c
+          for (const event of events) {
+            switch (event.type) {
+              case 'delta':
+                fullText += event.text
+                setStreamingText(fullText)
+                break
+
+              case 'title':
+                // Update the conversation title in our list.
+                setConversations((prev) =>
+                  prev.map((c) => (c.id === convId ? { ...c, title: event.title } : c)),
                 )
-              )
-              break
+                break
 
-            case 'done':
-              // Replace streaming text with the final saved message.
-              setMessages((prev) => [
-                ...prev,
-                {
-                  id: event.messageId,
-                  role: 'assistant',
-                  content: fullText,
-                  tokenCount: event.tokenCount,
-                  createdAt: new Date().toISOString(),
-                },
-              ])
-              setStreamingText('')
-              // Update usage from the event.
-              if (event.usage) {
-                setUsage((prev) => ({
+              case 'done':
+                // Replace streaming text with the final saved message.
+                setMessages((prev) => [
                   ...prev,
-                  messagesUsed: event.usage.used,
-                  messagesRemaining: event.usage.limit - event.usage.used,
-                }))
-              }
-              break
+                  {
+                    id: event.messageId,
+                    role: 'assistant',
+                    content: fullText,
+                    tokenCount: event.tokenCount,
+                    createdAt: new Date().toISOString(),
+                  },
+                ])
+                setStreamingText('')
+                // Update usage from the event.
+                if (event.usage) {
+                  setUsage((prev) => ({
+                    ...prev,
+                    messagesUsed: event.usage.used,
+                    messagesRemaining: event.usage.limit - event.usage.used,
+                  }))
+                }
+                break
 
-            case 'truncated':
-              setTruncated(true)
-              break
+              case 'truncated':
+                setTruncated(true)
+                break
 
-            case 'error':
-              setError(event.message)
-              break
+              case 'error':
+                setError(event.message)
+                break
+            }
           }
         }
+      } catch (err) {
+        if (err.name !== 'AbortError') {
+          setError(err.message || 'Failed to get AI response.')
+        }
+        setStreamingText('')
+      } finally {
+        setStreaming(false)
+        abortRef.current = null
+        // Bump the conversation to the top of the list.
+        setConversations((prev) => {
+          const idx = prev.findIndex((c) => c.id === convId)
+          if (idx <= 0) return prev
+          const updated = [...prev]
+          const [moved] = updated.splice(idx, 1)
+          moved.updatedAt = new Date().toISOString()
+          return [moved, ...updated]
+        })
       }
-    } catch (err) {
-      if (err.name !== 'AbortError') {
-        setError(err.message || 'Failed to get AI response.')
-      }
-      setStreamingText('')
-    } finally {
-      setStreaming(false)
-      abortRef.current = null
-      // Bump the conversation to the top of the list.
-      setConversations((prev) => {
-        const idx = prev.findIndex((c) => c.id === convId)
-        if (idx <= 0) return prev
-        const updated = [...prev]
-        const [moved] = updated.splice(idx, 1)
-        moved.updatedAt = new Date().toISOString()
-        return [moved, ...updated]
-      })
-    }
-  }, [activeConversationId, streaming, location.pathname, startNewConversation])
+    },
+    [activeConversationId, streaming, location.pathname, startNewConversation],
+  )
 
   // ── Continue a truncated generation ──────────────────────────────
   const continueGeneration = useCallback(async () => {
     if (streaming || !truncated || !activeConversationId) return
     setTruncated(false)
-    await sendMessage('Continue generating from where you left off. Do not repeat what was already written -- pick up exactly where the previous response ended.', { hideFromChat: true })
+    await sendMessage(
+      'Continue generating from where you left off. Do not repeat what was already written -- pick up exactly where the previous response ended.',
+      { hideFromChat: true },
+    )
   }, [streaming, truncated, activeConversationId, sendMessage])
 
   // ── Delete a conversation ────────────────────────────────────────
-  const removeConversation = useCallback(async (id) => {
-    try {
-      await aiService.deleteConversation(id)
-      setConversations((prev) => prev.filter((c) => c.id !== id))
-      if (id === activeConversationId) {
-        setActiveConversationId(null)
-        setMessages([])
+  const removeConversation = useCallback(
+    async (id) => {
+      try {
+        await aiService.deleteConversation(id)
+        setConversations((prev) => prev.filter((c) => c.id !== id))
+        if (id === activeConversationId) {
+          setActiveConversationId(null)
+          setMessages([])
+        }
+      } catch {
+        setError('Failed to delete conversation.')
       }
-    } catch {
-      setError('Failed to delete conversation.')
-    }
-  }, [activeConversationId])
+    },
+    [activeConversationId],
+  )
 
   // ── Rename a conversation ────────────────────────────────────────
   const editConversationTitle = useCallback(async (id, title) => {
     try {
       await aiService.renameConversation(id, title)
-      setConversations((prev) =>
-        prev.map((c) => (c.id === id ? { ...c, title } : c))
-      )
+      setConversations((prev) => prev.map((c) => (c.id === id ? { ...c, title } : c)))
     } catch {
       setError('Failed to rename conversation.')
     }

@@ -75,7 +75,9 @@ export function ImageUploadButton({ images, onImagesChange, disabled }) {
         onClick={() => inputRef.current?.click()}
         disabled={disabled || images.length >= MAX_IMAGES}
         title={images.length >= MAX_IMAGES ? `Max ${MAX_IMAGES} images` : 'Attach image'}
-        aria-label={images.length >= MAX_IMAGES ? `Maximum ${MAX_IMAGES} images reached` : 'Attach image'}
+        aria-label={
+          images.length >= MAX_IMAGES ? `Maximum ${MAX_IMAGES} images reached` : 'Attach image'
+        }
         style={{
           background: 'none',
           border: 'none',
@@ -88,7 +90,17 @@ export function ImageUploadButton({ images, onImagesChange, disabled }) {
           alignItems: 'center',
         }}
       >
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
           <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
         </svg>
       </button>
@@ -103,7 +115,9 @@ export function ImageUploadButton({ images, onImagesChange, disabled }) {
 export function ImagePreviewStrip({ images, onRemove }) {
   // Revoke all remaining blob URLs when the strip unmounts (e.g. message sent).
   const imagesRef = useRef(images)
-  useEffect(() => { imagesRef.current = images }, [images])
+  useEffect(() => {
+    imagesRef.current = images
+  }, [images])
 
   useEffect(() => {
     return () => {
@@ -113,40 +127,55 @@ export function ImagePreviewStrip({ images, onRemove }) {
     }
   }, [])
 
-  const handleRemove = useCallback((idx) => {
-    const removed = images[idx]
-    if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
-    onRemove(idx)
-  }, [images, onRemove])
+  const handleRemove = useCallback(
+    (idx) => {
+      const removed = images[idx]
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
+      onRemove(idx)
+    },
+    [images, onRemove],
+  )
 
   if (images.length === 0) return null
 
   return (
-    <div style={{
-      display: 'flex',
-      gap: 6,
-      padding: '6px 0',
-      flexWrap: 'wrap',
-    }}>
+    <div
+      style={{
+        display: 'flex',
+        gap: 6,
+        padding: '6px 0',
+        flexWrap: 'wrap',
+      }}
+    >
       {images.map((img, idx) => (
         <div key={idx} style={{ position: 'relative', display: 'inline-block' }}>
           <img
             src={img.previewUrl}
             alt={img.name || `Image ${idx + 1}`}
             style={{
-              width: 48, height: 48, borderRadius: 8,
-              objectFit: 'cover', border: '1px solid var(--sh-border)',
+              width: 48,
+              height: 48,
+              borderRadius: 8,
+              objectFit: 'cover',
+              border: '1px solid var(--sh-border)',
             }}
           />
           <button
             onClick={() => handleRemove(idx)}
             aria-label={`Remove image ${img.name || idx + 1}`}
             style={{
-              position: 'absolute', top: -4, right: -4,
-              width: 16, height: 16, borderRadius: '50%',
-              background: 'var(--sh-danger)', border: 'none',
-              cursor: 'pointer', display: 'flex',
-              alignItems: 'center', justifyContent: 'center',
+              position: 'absolute',
+              top: -4,
+              right: -4,
+              width: 16,
+              height: 16,
+              borderRadius: '50%',
+              background: 'var(--sh-danger)',
+              border: 'none',
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
               padding: 0,
             }}
           >

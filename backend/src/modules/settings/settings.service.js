@@ -8,10 +8,7 @@ const {
   mapChallengeForClient,
 } = require('../../lib/verification/verificationChallenges')
 const { getUserPII } = require('../../lib/piiVault')
-const {
-  getProfileFieldVisibility,
-  normalizeProfileLinks,
-} = require('../../lib/profileMetadata')
+const { getProfileFieldVisibility, normalizeProfileLinks } = require('../../lib/profileMetadata')
 const prisma = require('../../lib/prisma')
 
 const { COURSE_CODE_REGEX } = require('./settings.constants')
@@ -53,7 +50,8 @@ function parseCustomCourses(customCourses) {
     const code = typeof course.code === 'string' ? course.code.trim().toUpperCase() : ''
     const name = typeof course.name === 'string' ? course.name.trim() : ''
 
-    if (!code || !name) throw new AppError(400, 'Each custom course must include both code and name.')
+    if (!code || !name)
+      throw new AppError(400, 'Each custom course must include both code and name.')
     if (!COURSE_CODE_REGEX.test(code)) {
       throw new AppError(400, 'Custom course code must be 2-20 characters (A-Z, 0-9, or -).')
     }
@@ -147,7 +145,10 @@ async function sendSettingsVerificationEmail(email, username, code, metadata = {
       source: 'sendEmailVerification',
       ...metadata,
     })
-    throw new AppError(503, 'We could not send a verification code to that email address. Please try again later.')
+    throw new AppError(
+      503,
+      'We could not send a verification code to that email address. Please try again later.',
+    )
   }
 }
 

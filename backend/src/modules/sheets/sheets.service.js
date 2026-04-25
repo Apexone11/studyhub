@@ -5,7 +5,9 @@ const { normalizeContentFormat } = require('../../lib/html/htmlSecurity')
 const { shouldAutoPublish } = require('../../lib/trustGate')
 
 function normalizeSheetStatus(value, fallback = SHEET_STATUS.PUBLISHED) {
-  const normalized = String(value || '').trim().toLowerCase()
+  const normalized = String(value || '')
+    .trim()
+    .toLowerCase()
   if (normalized === SHEET_STATUS.DRAFT) return SHEET_STATUS.DRAFT
   if (normalized === SHEET_STATUS.PENDING_REVIEW) return SHEET_STATUS.PENDING_REVIEW
   if (normalized === SHEET_STATUS.PUBLISHED) return SHEET_STATUS.PUBLISHED
@@ -27,7 +29,13 @@ function canReadSheet(sheet, user) {
   return canModerateOrOwnSheet(sheet, user)
 }
 
-function resolveNextSheetStatus({ requestedStatus, contentFormat, isDraftAutosave = false, user = null, currentStatus = null }) {
+function resolveNextSheetStatus({
+  requestedStatus,
+  contentFormat,
+  isDraftAutosave = false,
+  user = null,
+  currentStatus = null,
+}) {
   const normalizedRequested = normalizeSheetStatus(requestedStatus, '')
   if (normalizedRequested === SHEET_STATUS.DRAFT || isDraftAutosave) {
     return SHEET_STATUS.DRAFT
@@ -47,12 +55,13 @@ function resolveNextSheetStatus({ requestedStatus, contentFormat, isDraftAutosav
 
 function safeDownloadName(name, fallbackExt = '') {
   const ext = fallbackExt || path.extname(name || '')
-  const base = String(name || 'studyhub-sheet')
-    .replace(path.extname(String(name || '')), '')
-    .replace(/[^a-zA-Z0-9_-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 80) || 'studyhub-sheet'
+  const base =
+    String(name || 'studyhub-sheet')
+      .replace(path.extname(String(name || '')), '')
+      .replace(/[^a-zA-Z0-9_-]/g, '_')
+      .replace(/_+/g, '_')
+      .replace(/^_+|_+$/g, '')
+      .slice(0, 80) || 'studyhub-sheet'
 
   return `${base}${ext}`.toLowerCase()
 }

@@ -1,4 +1,12 @@
-const defaults = { width: 20, height: 20, fill: 'none', stroke: 'currentColor', strokeWidth: 1.5, strokeLinecap: 'round', strokeLinejoin: 'round' }
+const defaults = {
+  width: 20,
+  height: 20,
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeWidth: 1.5,
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+}
 
 export function SearchIcon({ size = 20, ...props }) {
   return (

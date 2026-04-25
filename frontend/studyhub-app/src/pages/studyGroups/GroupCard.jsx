@@ -18,7 +18,10 @@ export default function GroupCard({ group, onJoin, onNavigateDetail }) {
       style={{
         ...styles.card,
         ...(isMember
-          ? { borderColor: 'var(--sh-brand-border)', boxShadow: '0 14px 28px rgba(37, 99, 235, 0.12)' }
+          ? {
+              borderColor: 'var(--sh-brand-border)',
+              boxShadow: '0 14px 28px rgba(37, 99, 235, 0.12)',
+            }
           : {}),
       }}
       onClick={onNavigateDetail}
@@ -69,7 +72,16 @@ export default function GroupCard({ group, onJoin, onNavigateDetail }) {
           }}
         >
           <div style={{ minWidth: 0 }}>
-            <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.72)', letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8 }}>
+            <div
+              style={{
+                fontSize: 11,
+                fontWeight: 800,
+                color: 'rgba(255,255,255,0.72)',
+                letterSpacing: '0.08em',
+                textTransform: 'uppercase',
+                marginBottom: 8,
+              }}
+            >
               Study Group
             </div>
             <h3 style={{ ...styles.cardTitle, margin: 0, color: '#fff', fontSize: '1.08rem' }}>
@@ -128,14 +140,17 @@ export default function GroupCard({ group, onJoin, onNavigateDetail }) {
 
         <p style={{ ...styles.cardDesc, margin: 0, minHeight: 66 }}>
           {truncateText(
-            group.description || 'Collaborate on sessions, resources, and discussion threads with your classmates.',
+            group.description ||
+              'Collaborate on sessions, resources, and discussion threads with your classmates.',
             135,
           )}
         </p>
 
         <div style={styles.cardMeta}>
           {group.courseCode ? <span style={styles.courseTagSmall}>{group.courseCode}</span> : null}
-          {group.schoolShort ? <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>{group.schoolShort}</span> : null}
+          {group.schoolShort ? (
+            <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>{group.schoolShort}</span>
+          ) : null}
           {group.resourceCount > 0 ? (
             <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
               {group.resourceCount} resource{group.resourceCount === 1 ? '' : 's'}
@@ -143,7 +158,8 @@ export default function GroupCard({ group, onJoin, onNavigateDetail }) {
           ) : null}
           {group.upcomingSessionCount > 0 ? (
             <span style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
-              {group.upcomingSessionCount} upcoming session{group.upcomingSessionCount === 1 ? '' : 's'}
+              {group.upcomingSessionCount} upcoming session
+              {group.upcomingSessionCount === 1 ? '' : 's'}
             </span>
           ) : null}
         </div>
@@ -151,7 +167,9 @@ export default function GroupCard({ group, onJoin, onNavigateDetail }) {
 
       <div style={styles.cardFooter}>
         <span style={{ fontSize: 12, color: 'var(--sh-muted)', fontWeight: 600 }}>
-          {isMember ? 'You are already in this group' : 'Open the group to see sessions, resources, and discussions'}
+          {isMember
+            ? 'You are already in this group'
+            : 'Open the group to see sessions, resources, and discussions'}
         </span>
         {isMember ? (
           <span style={styles.joinedLabel}>Joined</span>

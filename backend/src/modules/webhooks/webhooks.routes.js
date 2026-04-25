@@ -38,11 +38,7 @@ function getEventRecipients(eventData) {
   if (!eventData || typeof eventData !== 'object') return []
 
   if (Array.isArray(eventData.to)) {
-    return [...new Set(
-      eventData.to
-        .map((entry) => normalizeEmailAddress(entry))
-        .filter(Boolean),
-    )]
+    return [...new Set(eventData.to.map((entry) => normalizeEmailAddress(entry)).filter(Boolean))]
   }
 
   const singleRecipient = normalizeEmailAddress(eventData.to)
@@ -154,9 +150,10 @@ function getPrimaryRecipient(data) {
 }
 
 async function persistDeliveryEvent(payload, req) {
-  const eventData = payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
-    ? payload.data
-    : {}
+  const eventData =
+    payload.data && typeof payload.data === 'object' && !Array.isArray(payload.data)
+      ? payload.data
+      : {}
 
   const svixId = normalizeString(req.get('svix-id'))
   const providerWebhookId = svixId ? `svix:${svixId}` : null
@@ -184,47 +181,49 @@ async function persistDeliveryEvent(payload, req) {
       await tx.emailDeliveryEvent.create({ data: record })
 
       if (suppressionReason && suppressionRecipients.length > 0) {
-        await Promise.all(suppressionRecipients.map(async (email) => {
-          const suppression = await tx.emailSuppression.upsert({
-            where: { email },
-            update: {
-              active: true,
-              reason: suppressionReason,
-              provider: WEBHOOK_PROVIDER,
-              sourceEventType: eventType,
-              sourceEventId: providerWebhookId,
-              sourceMessageId,
-              details: suppressionDetails,
-              lastSuppressedAt,
-            },
-            create: {
-              email,
-              active: true,
-              reason: suppressionReason,
-              provider: WEBHOOK_PROVIDER,
-              sourceEventType: eventType,
-              sourceEventId: providerWebhookId,
-              sourceMessageId,
-              details: suppressionDetails,
-              firstSuppressedAt: lastSuppressedAt,
-              lastSuppressedAt,
-            },
-          })
-
-          await tx.emailSuppressionAudit.create({
-            data: {
-              suppressionId: suppression.id,
-              action: 'auto-suppress',
-              reason: `Automatic suppression from ${eventType}.`,
-              context: {
+        await Promise.all(
+          suppressionRecipients.map(async (email) => {
+            const suppression = await tx.emailSuppression.upsert({
+              where: { email },
+              update: {
+                active: true,
+                reason: suppressionReason,
                 provider: WEBHOOK_PROVIDER,
                 sourceEventType: eventType,
                 sourceEventId: providerWebhookId,
                 sourceMessageId,
+                details: suppressionDetails,
+                lastSuppressedAt,
               },
-            },
-          })
-        }))
+              create: {
+                email,
+                active: true,
+                reason: suppressionReason,
+                provider: WEBHOOK_PROVIDER,
+                sourceEventType: eventType,
+                sourceEventId: providerWebhookId,
+                sourceMessageId,
+                details: suppressionDetails,
+                firstSuppressedAt: lastSuppressedAt,
+                lastSuppressedAt,
+              },
+            })
+
+            await tx.emailSuppressionAudit.create({
+              data: {
+                suppressionId: suppression.id,
+                action: 'auto-suppress',
+                reason: `Automatic suppression from ${eventType}.`,
+                context: {
+                  provider: WEBHOOK_PROVIDER,
+                  sourceEventType: eventType,
+                  sourceEventId: providerWebhookId,
+                  sourceMessageId,
+                },
+              },
+            })
+          }),
+        )
       }
     })
 
@@ -238,36 +237,40 @@ async function persistDeliveryEvent(payload, req) {
   }
 }
 
-router.post('/resend', express.raw({ type: 'application/json', limit: WEBHOOK_BODY_LIMIT }), async (req, res) => {
-  const payloadText = getRawPayloadText(req)
-  if (!payloadText) {
-    return res.status(400).json({ error: 'Webhook payload is required.' })
-  }
-
-  try {
-    const payload = verifyResendPayload(payloadText, req)
-    const result = await persistDeliveryEvent(payload, req)
-
-    return res.status(200).json({
-      ok: true,
-      eventType: result.eventType,
-      duplicate: result.duplicate,
-    })
-  } catch (error) {
-    if (error?.statusCode === 400) {
-      captureError(error, { source: 'resendWebhookSignatureVerification' })
-      return res.status(400).json({ error: 'Invalid webhook request.' })
+router.post(
+  '/resend',
+  express.raw({ type: 'application/json', limit: WEBHOOK_BODY_LIMIT }),
+  async (req, res) => {
+    const payloadText = getRawPayloadText(req)
+    if (!payloadText) {
+      return res.status(400).json({ error: 'Webhook payload is required.' })
     }
 
-    if (error?.statusCode === 503) {
-      captureError(error, { source: 'resendWebhookConfig' })
-      return res.status(503).json({ error: 'Webhook endpoint is not configured.' })
-    }
+    try {
+      const payload = verifyResendPayload(payloadText, req)
+      const result = await persistDeliveryEvent(payload, req)
 
-    captureError(error, { source: 'resendWebhookPersistence' })
-    console.error(error)
-    return res.status(500).json({ error: 'Failed to process webhook event.' })
-  }
-})
+      return res.status(200).json({
+        ok: true,
+        eventType: result.eventType,
+        duplicate: result.duplicate,
+      })
+    } catch (error) {
+      if (error?.statusCode === 400) {
+        captureError(error, { source: 'resendWebhookSignatureVerification' })
+        return res.status(400).json({ error: 'Invalid webhook request.' })
+      }
+
+      if (error?.statusCode === 503) {
+        captureError(error, { source: 'resendWebhookConfig' })
+        return res.status(503).json({ error: 'Webhook endpoint is not configured.' })
+      }
+
+      captureError(error, { source: 'resendWebhookPersistence' })
+      console.error(error)
+      return res.status(500).json({ error: 'Failed to process webhook event.' })
+    }
+  },
+)
 
 module.exports = router

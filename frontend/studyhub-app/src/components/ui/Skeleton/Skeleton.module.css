@@ -1,0 +1,65 @@
+.base {
+  display: block;
+  background: linear-gradient(90deg, var(--sh-soft) 0%, var(--sh-border) 50%, var(--sh-soft) 100%);
+  background-size: 200% 100%;
+  animation: skeletonShimmer 1.6s linear infinite;
+  border-radius: var(--radius-sm);
+}
+
+.text {
+  height: 1em;
+}
+
+.avatar {
+  border-radius: var(--radius-full);
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.card {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: var(--radius-card);
+  padding: var(--space-6);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.card__header {
+  height: 20px;
+  width: 40%;
+}
+
+.card__divider {
+  height: 1px;
+  background: var(--sh-border);
+  border: none;
+  animation: none;
+  border-radius: 0;
+  margin: var(--space-2) 0;
+}
+
+.card__footer {
+  height: 16px;
+  width: 30%;
+}
+
+@keyframes skeletonShimmer {
+  from {
+    background-position: 200% 0;
+  }
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .base {
+    animation-duration: 8s;
+  }
+}

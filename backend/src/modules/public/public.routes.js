@@ -11,6 +11,7 @@ const { captureError } = require('../../monitoring/sentry')
 const { cacheControl } = require('../../lib/cacheControl')
 const prisma = require('../../lib/prisma')
 
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 
 router.use(publicLimiter)
@@ -29,7 +30,7 @@ router.get(
       res.json({ sheetCount, courseCount, schoolCount, userCount })
     } catch (err) {
       captureError(err, { route: req.originalUrl, method: req.method })
-      res.status(500).json({ error: 'Could not load platform stats.' })
+      sendError(res, 500, 'Could not load platform stats.', ERROR_CODES.INTERNAL)
     }
   },
 )

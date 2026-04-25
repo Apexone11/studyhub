@@ -1,7 +1,6 @@
 const express = require('express')
 const compression = require('compression')
 const cors = require('cors')
-const rateLimit = require('express-rate-limit')
 const helmet = require('helmet')
 const http = require('http')
 const path = require('node:path')
@@ -12,6 +11,7 @@ const { bootstrapRuntime } = require('./lib/bootstrap/bootstrap')
 const { validateEmailTransport } = require('./lib/email/email')
 const { startHtmlArchiveScheduler } = require('./lib/html/htmlArchiveScheduler')
 const { startModerationCleanupScheduler } = require('./lib/moderation/moderationCleanupScheduler')
+const { startInactiveSessionScheduler } = require('./lib/inactiveSessionScheduler')
 const {
   AVATARS_DIR,
   CONTENT_IMAGES_DIR,
@@ -42,6 +42,7 @@ const courseRoutes = require('./modules/courses')
 const sheetRoutes = require('./modules/sheets')
 const feedRoutes = require('./modules/feed')
 const dashboardRoutes = require('./modules/dashboard')
+const examRoutes = require('./modules/exams')
 const settingsRoutes = require('./modules/settings')
 const announcementRoutes = require('./modules/announcements')
 const adminRoutes = require('./modules/admin')
@@ -76,6 +77,8 @@ const studyStatusRoutes = require('./modules/studyStatus')
 const onboardingRoutes = require('./modules/onboarding')
 const referralRoutes = require('./modules/referrals')
 const hashtagsRoutes = require('./modules/hashtags')
+const sectionsRoutes = require('./modules/sections')
+const materialsRoutes = require('./modules/materials')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -265,14 +268,7 @@ app.use((req, res, next) => {
   return sendError(res, 403, 'Origin not allowed.', ERROR_CODES.FORBIDDEN)
 })
 
-const globalLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 1000,
-  standardHeaders: true,
-  legacyHeaders: false,
-  skip: (req) =>
-    req.path === '/' || req.path === '/health' || req.path.startsWith('/uploads/avatars/'),
-})
+const { globalLimiter } = require('./lib/rateLimiters')
 
 app.use(globalLimiter)
 
@@ -419,6 +415,11 @@ app.use('/api/feed', feedRoutes)
 // Mount dashboard summary endpoints under /api/dashboard.
 app.use('/api/dashboard', dashboardRoutes)
 
+// Mount upcoming-exams endpoints under /api/exams (Phase 2 of v2 design refresh).
+// Frontend is flag-gated by `design_v2_upcoming_exams`; server keeps endpoints
+// available to authenticated users so the flag flip is one-sided.
+app.use('/api/exams', examRoutes)
+
 // Mount settings endpoints under /api/settings.
 app.use('/api/settings', settingsRoutes)
 
@@ -498,6 +499,12 @@ app.use('/api/onboarding', onboardingRoutes)
 app.use('/api/referrals', referralRoutes)
 app.use('/api/hashtags', hashtagsRoutes)
 
+// Sections + Materials (Week 3 of v2 design refresh — teacher section-aware publishing).
+// Frontend is gated by `design_v2_teach_sections`; server-side endpoints stay available
+// to teacher accounts so the flag flip is one-sided and safe to roll back.
+app.use('/api/sections', sectionsRoutes)
+app.use('/api/materials', materialsRoutes)
+
 // Waitlist module (Phase 0 — confirmation email + in-app notification + admin endpoints)
 app.use('/api/waitlist', require('./modules/waitlist'))
 
@@ -560,6 +567,7 @@ async function startServer() {
   const instance = server.listen(PORT, () => {
     startHtmlArchiveScheduler()
     startModerationCleanupScheduler()
+    startInactiveSessionScheduler()
     // Pre-warm library cache with popular books (non-blocking).
     // Also syncs to CachedBook DB table so fallback works when Google Books is unavailable.
     const {

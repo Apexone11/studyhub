@@ -63,7 +63,10 @@ function sanitizePreviewHtml(value) {
 }
 
 function buildPreviewDocument({ title, html }) {
-  const safeTitle = sanitizeHtml(String(title || 'StudyHub Preview'), { allowedTags: [], allowedAttributes: {} })
+  const safeTitle = sanitizeHtml(String(title || 'StudyHub Preview'), {
+    allowedTags: [],
+    allowedAttributes: {},
+  })
   const safeBody = sanitizePreviewHtml(html)
 
   return `<!doctype html>
@@ -123,7 +126,10 @@ function stripDangerousTags(value) {
 }
 
 function buildInteractiveDocument({ title, html }) {
-  const safeTitle = sanitizeHtml(String(title || 'StudyHub Sheet'), { allowedTags: [], allowedAttributes: {} })
+  const safeTitle = sanitizeHtml(String(title || 'StudyHub Sheet'), {
+    allowedTags: [],
+    allowedAttributes: {},
+  })
   const cleanedHtml = stripDangerousTags(html)
 
   return `<!doctype html>

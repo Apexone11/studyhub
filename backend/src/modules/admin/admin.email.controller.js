@@ -55,7 +55,9 @@ router.patch('/email-suppressions/:id/unsuppress', async (req, res) => {
 
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : ''
   if (reason.length < 8) {
-    return res.status(400).json({ error: 'Provide an unsuppress reason with at least 8 characters.' })
+    return res
+      .status(400)
+      .json({ error: 'Provide an unsuppress reason with at least 8 characters.' })
   }
 
   try {

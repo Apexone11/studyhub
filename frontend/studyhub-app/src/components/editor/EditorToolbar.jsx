@@ -20,11 +20,18 @@ function ToolbarButton({ onClick, active, disabled, title, children, style: extr
       aria-label={title}
       aria-pressed={active || undefined}
       style={{
-        display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
-        width: 30, height: 28, borderRadius: 6, border: 'none',
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 30,
+        height: 28,
+        borderRadius: 6,
+        border: 'none',
         background: active ? 'var(--sh-brand)' : 'transparent',
         color: active ? 'var(--sh-nav-text)' : 'var(--sh-muted)',
-        fontSize: 13, fontWeight: 700, cursor: disabled ? 'default' : 'pointer',
+        fontSize: 13,
+        fontWeight: 700,
+        cursor: disabled ? 'default' : 'pointer',
         opacity: disabled ? 0.4 : 1,
         transition: 'background 0.12s, color 0.12s',
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
@@ -71,11 +78,18 @@ function LinkPopover({ onSubmit, onCancel, initialUrl }) {
     <form
       onSubmit={handleSubmit}
       style={{
-        position: 'absolute', top: '100%', left: 0, zIndex: 20,
-        padding: '8px 10px', borderRadius: 10,
-        background: '#1e293b', border: '1px solid #334155',
+        position: 'absolute',
+        top: '100%',
+        left: 0,
+        zIndex: 20,
+        padding: '8px 10px',
+        borderRadius: 10,
+        background: '#1e293b',
+        border: '1px solid #334155',
         boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-        display: 'flex', gap: 6, alignItems: 'center',
+        display: 'flex',
+        gap: 6,
+        alignItems: 'center',
         marginTop: 4,
       }}
       onClick={(e) => e.stopPropagation()}
@@ -87,18 +101,29 @@ function LinkPopover({ onSubmit, onCancel, initialUrl }) {
         placeholder="https://example.com"
         autoFocus
         style={{
-          width: 220, padding: '5px 8px', borderRadius: 6,
-          border: '1px solid #475569', background: '#0f172a',
-          color: '#e2e8f0', fontSize: 12, fontFamily: 'inherit',
+          width: 220,
+          padding: '5px 8px',
+          borderRadius: 6,
+          border: '1px solid #475569',
+          background: '#0f172a',
+          color: '#e2e8f0',
+          fontSize: 12,
+          fontFamily: 'inherit',
           outline: 'none',
         }}
       />
       <button
         type="submit"
         style={{
-          padding: '5px 10px', borderRadius: 6, border: 'none',
-          background: 'var(--sh-brand)', color: 'var(--sh-nav-text)', fontSize: 11,
-          fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          padding: '5px 10px',
+          borderRadius: 6,
+          border: 'none',
+          background: 'var(--sh-brand)',
+          color: 'var(--sh-nav-text)',
+          fontSize: 11,
+          fontWeight: 700,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
         }}
       >
         Set
@@ -107,9 +132,15 @@ function LinkPopover({ onSubmit, onCancel, initialUrl }) {
         type="button"
         onClick={onCancel}
         style={{
-          padding: '5px 8px', borderRadius: 6, border: '1px solid #475569',
-          background: 'transparent', color: '#94a3b8', fontSize: 11,
-          fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+          padding: '5px 8px',
+          borderRadius: 6,
+          border: '1px solid #475569',
+          background: 'transparent',
+          color: '#94a3b8',
+          fontSize: 11,
+          fontWeight: 700,
+          cursor: 'pointer',
+          fontFamily: 'inherit',
         }}
       >
         Cancel
@@ -123,11 +154,14 @@ function LinkPopover({ onSubmit, onCancel, initialUrl }) {
 export default function EditorToolbar({ editor, themeAware = false }) {
   const [showLinkInput, setShowLinkInput] = useState(false)
 
-  const setLink = useCallback((url) => {
-    if (!editor) return
-    editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
-    setShowLinkInput(false)
-  }, [editor])
+  const setLink = useCallback(
+    (url) => {
+      if (!editor) return
+      editor.chain().focus().extendMarkRange('link').setLink({ href: url }).run()
+      setShowLinkInput(false)
+    },
+    [editor],
+  )
 
   const removeLink = useCallback(() => {
     if (!editor) return
@@ -137,23 +171,31 @@ export default function EditorToolbar({ editor, themeAware = false }) {
 
   const insertInlineMath = useCallback(() => {
     if (!editor) return
-    const latex = prompt('Enter LaTeX (inline math):')  
+    const latex = prompt('Enter LaTeX (inline math):')
     if (latex !== null && latex.trim()) {
-      editor.chain().focus().insertContent({
-        type: 'mathInline',
-        attrs: { latex: latex.trim() },
-      }).run()
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: 'mathInline',
+          attrs: { latex: latex.trim() },
+        })
+        .run()
     }
   }, [editor])
 
   const insertBlockMath = useCallback(() => {
     if (!editor) return
-    const latex = prompt('Enter LaTeX (block/display math):')  
+    const latex = prompt('Enter LaTeX (block/display math):')
     if (latex !== null && latex.trim()) {
-      editor.chain().focus().insertContent({
-        type: 'mathBlock',
-        attrs: { latex: latex.trim() },
-      }).run()
+      editor
+        .chain()
+        .focus()
+        .insertContent({
+          type: 'mathBlock',
+          attrs: { latex: latex.trim() },
+        })
+        .run()
     }
   }, [editor])
 
@@ -161,50 +203,57 @@ export default function EditorToolbar({ editor, themeAware = false }) {
   const imageInputRef = useRef(null)
   const [uploading, setUploading] = useState(false)
 
-  const handleImageSelect = useCallback(async (e) => {
-    const file = e.target.files?.[0]
-    if (!file || !editor) return
-    // Reset input so re-selecting the same file works
-    e.target.value = ''
+  const handleImageSelect = useCallback(
+    async (e) => {
+      const file = e.target.files?.[0]
+      if (!file || !editor) return
+      // Reset input so re-selecting the same file works
+      e.target.value = ''
 
-    // Client-side validation
-    if (!file.type.startsWith('image/')) {
-      showToast('Please select an image file.', 'error')
-      return
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      showToast('Image must be 5 MB or smaller.', 'error')
-      return
-    }
+      // Client-side validation
+      if (!file.type.startsWith('image/')) {
+        showToast('Please select an image file.', 'error')
+        return
+      }
+      if (file.size > 5 * 1024 * 1024) {
+        showToast('Image must be 5 MB or smaller.', 'error')
+        return
+      }
 
-    setUploading(true)
-    try {
-      const formData = new FormData()
-      formData.append('image', file)
-      const headers = authHeaders()
-      // Remove Content-Type — fetch will set multipart boundary automatically
-      delete headers['Content-Type']
-      const response = await fetch(`${API}/api/upload/content-image`, {
-        method: 'POST',
-        headers,
-        credentials: 'include',
-        body: formData,
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error || 'Upload failed.')
+      setUploading(true)
+      try {
+        const formData = new FormData()
+        formData.append('image', file)
+        const headers = authHeaders()
+        // Remove Content-Type — fetch will set multipart boundary automatically
+        delete headers['Content-Type']
+        const response = await fetch(`${API}/api/upload/content-image`, {
+          method: 'POST',
+          headers,
+          credentials: 'include',
+          body: formData,
+        })
+        const data = await response.json()
+        if (!response.ok) throw new Error(data.error || 'Upload failed.')
 
-      // Insert image into editor at current cursor position
-      const imageUrl = data.url.startsWith('http') ? data.url : `${API}${data.url}`
-      editor.chain().focus().setImage({
-        src: imageUrl,
-        alt: file.name.replace(/\.[^.]+$/, ''),
-      }).run()
-    } catch (err) {
-      showToast(err.message || 'Image upload failed.', 'error')
-    } finally {
-      setUploading(false)
-    }
-  }, [editor])
+        // Insert image into editor at current cursor position
+        const imageUrl = data.url.startsWith('http') ? data.url : `${API}${data.url}`
+        editor
+          .chain()
+          .focus()
+          .setImage({
+            src: imageUrl,
+            alt: file.name.replace(/\.[^.]+$/, ''),
+          })
+          .run()
+      } catch (err) {
+        showToast(err.message || 'Image upload failed.', 'error')
+      } finally {
+        setUploading(false)
+      }
+    },
+    [editor],
+  )
 
   if (!editor) return null
 
@@ -215,7 +264,10 @@ export default function EditorToolbar({ editor, themeAware = false }) {
       role="toolbar"
       aria-label="Text formatting"
       style={{
-        display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 2,
+        display: 'flex',
+        flexWrap: 'wrap',
+        alignItems: 'center',
+        gap: 2,
         padding: '6px 10px',
         background: themeAware ? 'var(--sh-soft)' : '#1e293b',
         borderBottom: themeAware ? '1px solid var(--sh-border)' : '1px solid #334155',
@@ -297,7 +349,15 @@ export default function EditorToolbar({ editor, themeAware = false }) {
         active={editor.isActive('bulletList')}
         title="Bullet list"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        >
           <line x1="8" y1="6" x2="21" y2="6" />
           <line x1="8" y1="12" x2="21" y2="12" />
           <line x1="8" y1="18" x2="21" y2="18" />
@@ -311,13 +371,51 @@ export default function EditorToolbar({ editor, themeAware = false }) {
         active={editor.isActive('orderedList')}
         title="Numbered list"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        >
           <line x1="10" y1="6" x2="21" y2="6" />
           <line x1="10" y1="12" x2="21" y2="12" />
           <line x1="10" y1="18" x2="21" y2="18" />
-          <text x="2" y="8" fill="currentColor" stroke="none" fontSize="8" fontWeight="700" fontFamily="system-ui">1</text>
-          <text x="2" y="14" fill="currentColor" stroke="none" fontSize="8" fontWeight="700" fontFamily="system-ui">2</text>
-          <text x="2" y="20" fill="currentColor" stroke="none" fontSize="8" fontWeight="700" fontFamily="system-ui">3</text>
+          <text
+            x="2"
+            y="8"
+            fill="currentColor"
+            stroke="none"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="system-ui"
+          >
+            1
+          </text>
+          <text
+            x="2"
+            y="14"
+            fill="currentColor"
+            stroke="none"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="system-ui"
+          >
+            2
+          </text>
+          <text
+            x="2"
+            y="20"
+            fill="currentColor"
+            stroke="none"
+            fontSize="8"
+            fontWeight="700"
+            fontFamily="system-ui"
+          >
+            3
+          </text>
         </svg>
       </ToolbarButton>
 
@@ -338,7 +436,16 @@ export default function EditorToolbar({ editor, themeAware = false }) {
         active={editor.isActive('codeBlock')}
         title="Code block"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polyline points="16 18 22 12 16 6" />
           <polyline points="8 6 2 12 8 18" />
         </svg>
@@ -347,7 +454,15 @@ export default function EditorToolbar({ editor, themeAware = false }) {
         onClick={() => editor.chain().focus().setHorizontalRule().run()}
         title="Horizontal rule"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+        >
           <line x1="3" y1="12" x2="21" y2="12" />
         </svg>
       </ToolbarButton>
@@ -366,7 +481,16 @@ export default function EditorToolbar({ editor, themeAware = false }) {
         active={isLink}
         title={isLink ? 'Remove link' : 'Insert link'}
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
           <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
         </svg>
@@ -386,8 +510,26 @@ export default function EditorToolbar({ editor, themeAware = false }) {
         title="Insert block math ($$...$$)"
         style={{ fontFamily: 'serif', fontSize: 11 }}
       >
-        <svg width="16" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-          <text x="4" y="16" fill="currentColor" stroke="none" fontSize="14" fontFamily="serif" fontStyle="italic">&#x03A3;</text>
+        <svg
+          width="16"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+        >
+          <text
+            x="4"
+            y="16"
+            fill="currentColor"
+            stroke="none"
+            fontSize="14"
+            fontFamily="serif"
+            fontStyle="italic"
+          >
+            &#x03A3;
+          </text>
         </svg>
       </ToolbarButton>
 
@@ -401,7 +543,16 @@ export default function EditorToolbar({ editor, themeAware = false }) {
         {uploading ? (
           <span style={{ fontSize: 10 }}>...</span>
         ) : (
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
             <circle cx="8.5" cy="8.5" r="1.5" />
             <polyline points="21 15 16 10 5 21" />
@@ -424,7 +575,16 @@ export default function EditorToolbar({ editor, themeAware = false }) {
         disabled={!editor.can().undo()}
         title="Undo (Ctrl+Z)"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polyline points="1 4 1 10 7 10" />
           <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
         </svg>
@@ -434,7 +594,16 @@ export default function EditorToolbar({ editor, themeAware = false }) {
         disabled={!editor.can().redo()}
         title="Redo (Ctrl+Shift+Z)"
       >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+        <svg
+          width="14"
+          height="14"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <polyline points="23 4 23 10 17 10" />
           <path d="M20.49 15a9 9 0 1 1-2.13-9.36L23 10" />
         </svg>

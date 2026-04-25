@@ -14,9 +14,9 @@ const AppMobile = lazy(() => import('./mobile/App.mobile'))
 
 const HomePage = lazy(() => import('./pages/home/HomePage'))
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'))
+const LoginChallengePage = lazy(() => import('./pages/auth/LoginChallengePage'))
 const RegisterScreen = lazy(() => import('./pages/auth/RegisterScreen'))
 const RolePickerPage = lazy(() => import('./pages/auth/RolePickerPage'))
-/* DashboardPage removed — /dashboard now redirects to /users/:me via DashboardRedirect */
 const TermsPage = lazy(() => import('./pages/legal/TermsPage'))
 const PrivacyPage = lazy(() => import('./pages/legal/PrivacyPage'))
 const GuidelinesPage = lazy(() => import('./pages/legal/GuidelinesPage'))
@@ -25,6 +25,12 @@ const DisclaimerPage = lazy(() => import('./pages/legal/DisclaimerPage'))
 const DataRequestPage = lazy(() => import('./pages/legal/DataRequestPage'))
 const FeedPage = lazy(() => import('./pages/feed/FeedPage'))
 const SheetsPage = lazy(() => import('./pages/sheets/SheetsPage'))
+// Design Refresh v2 — Week 2 new pages
+const TeachMaterialsPage = lazy(() => import('./pages/teach/TeachMaterialsPage'))
+const DocsPage = lazy(() => import('./pages/docs/DocsPage').then((m) => ({ default: m.default })))
+const DocsFeaturePage = lazy(() =>
+  import('./pages/docs/DocsPage').then((m) => ({ default: m.DocsFeaturePage })),
+)
 const SheetViewerPage = lazy(() => import('./pages/sheets/viewer/SheetViewerPage'))
 const AttachmentPreviewPage = lazy(() => import('./pages/preview/AttachmentPreviewPage'))
 const SheetHtmlPreviewPage = lazy(() => import('./pages/preview/SheetHtmlPreviewPage'))
@@ -63,6 +69,7 @@ import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
 import OfflineIndicator from './components/OfflineIndicator'
 import LegalAcceptanceEnforcementModal from './components/LegalAcceptanceEnforcementModal'
+import SwUpdateAutoReloader from './components/SwUpdateAutoReloader'
 import DarkModeFx from './components/DarkModeFx'
 import { ChatPanelProvider } from './lib/chatPanelContext.jsx'
 
@@ -342,6 +349,7 @@ function AppRoutes() {
           </a>
           <RouteAnnouncer />
           <RouteTelemetry />
+          <SwUpdateAutoReloader />
           <PreferencesBootstrap />
           <LegalAcceptanceEnforcementModal />
           <AuthenticatedAiProvider>
@@ -362,6 +370,14 @@ function AppRoutes() {
                     element={
                       <PublicRoute>
                         <LoginPage />
+                      </PublicRoute>
+                    }
+                  />
+                  <Route
+                    path="/login/challenge/:id"
+                    element={
+                      <PublicRoute>
+                        <LoginChallengePage />
                       </PublicRoute>
                     }
                   />
@@ -388,6 +404,9 @@ function AppRoutes() {
                   <Route path="/disclaimer" element={<DisclaimerPage />} />
                   <Route path="/data-request" element={<DataRequestPage />} />
                   <Route path="/about" element={<AboutPage />} />
+                  {/* Public feature catalog — v2 design refresh Week 2 */}
+                  <Route path="/docs" element={<DocsPage />} />
+                  <Route path="/docs/:slug" element={<DocsFeaturePage />} />
                   <Route path="/pricing" element={<PricingPage />} />
                   <Route path="/supporters" element={<SupportersPage />} />
                   <Route path="/forgot-password" element={<ForgotPasswordPage />} />
@@ -407,6 +426,16 @@ function AppRoutes() {
                     element={
                       <PrivateRoute>
                         <SheetsPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  {/* Teacher workspace — v2 design refresh Week 2. Non-
+                     teachers are redirected inside the component to /sheets. */}
+                  <Route
+                    path="/teach/materials"
+                    element={
+                      <PrivateRoute>
+                        <TeachMaterialsPage />
                       </PrivateRoute>
                     }
                   />

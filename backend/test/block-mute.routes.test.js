@@ -76,7 +76,9 @@ const mocks = vi.hoisted(() => {
       PROFILE_VISIBILITY: { PUBLIC: 'public', ENROLLED: 'enrolled', PRIVATE: 'private' },
     },
     userBadges: {
-      enrichUserWithBadges: vi.fn((user) => Promise.resolve({ ...user, plan: 'free', isDonor: false, donorLevel: null })),
+      enrichUserWithBadges: vi.fn((user) =>
+        Promise.resolve({ ...user, plan: 'free', isDonor: false, donorLevel: null }),
+      ),
       enrichUsersWithBadges: vi.fn((users) => Promise.resolve(users)),
     },
     badges: {
@@ -89,6 +91,7 @@ const mocks = vi.hoisted(() => {
     rateLimiters: {
       readLimiter: (_req, _res, next) => next(),
       usersFollowLimiter: (_req, _res, next) => next(),
+      roleChangeLimiter: (_req, _res, next) => next(),
     },
   }
 })

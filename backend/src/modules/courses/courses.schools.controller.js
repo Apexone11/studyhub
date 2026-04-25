@@ -5,6 +5,7 @@ const { cacheControl } = require('../../lib/cacheControl')
 const prisma = require('../../lib/prisma')
 const { schoolsLimiter, POPULAR_COURSES_LIMIT } = require('./courses.constants')
 
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 
 // Public endpoint for school + course dropdowns.
@@ -44,7 +45,7 @@ router.get(
       })
 
       console.error(error)
-      return res.status(500).json({ error: 'Server error.' })
+      return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
     }
   },
 )
@@ -103,7 +104,7 @@ router.get(
     } catch (error) {
       captureError(error, { route: req.originalUrl, method: req.method })
       console.error(error)
-      return res.status(500).json({ error: 'Server error.' })
+      return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
     }
   },
 )
@@ -135,7 +136,7 @@ router.get('/schools/suggest', requireAuth, async (req, res) => {
     return res.json({ school: school || null })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    return res.status(500).json({ error: 'Server error.' })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

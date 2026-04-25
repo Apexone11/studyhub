@@ -19,7 +19,9 @@ function getKey(envVar = 'FIELD_ENCRYPTION_KEY') {
   const hex = process.env[envVar]
   if (!hex) return null
   if (hex.length !== 64) {
-    throw new Error(`${envVar} must be a 64-character hex string (32 bytes). Got ${hex.length} chars.`)
+    throw new Error(
+      `${envVar} must be a 64-character hex string (32 bytes). Got ${hex.length} chars.`,
+    )
   }
   return Buffer.from(hex, 'hex')
 }
@@ -59,10 +61,7 @@ function encrypt(plaintext) {
   const iv = crypto.randomBytes(IV_LENGTH)
   const cipher = crypto.createCipheriv(ALGORITHM, key, iv)
 
-  const encrypted = Buffer.concat([
-    cipher.update(plaintext, 'utf8'),
-    cipher.final(),
-  ])
+  const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()])
 
   const authTag = cipher.getAuthTag()
 
@@ -115,10 +114,7 @@ function decryptWithKey(ciphertext, key) {
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv)
     decipher.setAuthTag(authTag)
 
-    const decrypted = Buffer.concat([
-      decipher.update(encrypted),
-      decipher.final(),
-    ])
+    const decrypted = Buffer.concat([decipher.update(encrypted), decipher.final()])
 
     return decrypted.toString('utf8')
   } catch {

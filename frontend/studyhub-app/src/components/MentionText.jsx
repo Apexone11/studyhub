@@ -34,7 +34,7 @@ export default function MentionText({ text, style }) {
         onClick={(e) => e.stopPropagation()}
       >
         @{username}
-      </Link>
+      </Link>,
     )
 
     lastIndex = matchStart + fullMatch.length

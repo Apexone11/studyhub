@@ -4,6 +4,7 @@ import Navbar from '../../components/navbar/Navbar'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { fadeInUp, staggerEntrance, fadeInOnScroll } from '../../lib/animations'
+import { LogoMark } from '../../components/Icons'
 
 const FONT = "'Plus Jakarta Sans', sans-serif"
 
@@ -311,6 +312,22 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
   if (tier === 'free') {
     return (
       <div style={{ ...c.card, ...(isFreeUser ? {} : { opacity: 0.65 }) }}>
+        <div
+          aria-label="StudyHub Free plan"
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 12,
+            background: 'var(--sh-soft)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 12,
+            overflow: 'hidden',
+          }}
+        >
+          <LogoMark size={32} />
+        </div>
         <span style={c.tierLabel}>Free</span>
         <div style={c.priceRow}>
           <span style={c.priceValue}>$0</span>

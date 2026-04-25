@@ -1,0 +1,28 @@
+/**
+ * UI component kit barrel.
+ *
+ * Consumers: `import { Button, Input, Card } from '../../components/ui'`.
+ * Each component is re-exported as a named export. Keep this file as
+ * the single import surface so refactors inside `ui/` don't ripple.
+ *
+ * Components get added here as they land in their own commits so the
+ * tree stays importable at every point in the history.
+ */
+export { default as Button } from './Button/Button'
+export { default as Input } from './Input/Input'
+export { default as Card, CardHeader, CardBody, CardFooter } from './Card/Card'
+export { default as Modal, ModalFooter } from './Modal/Modal'
+export { default as Chip, Badge } from './Chip/Chip'
+export { default as Avatar } from './Avatar/Avatar'
+export {
+  default as Skeleton,
+  SkeletonText,
+  SkeletonAvatar,
+  SkeletonCard,
+} from './Skeleton/Skeleton'
+
+// Figma-aligned icon namespace. Re-exports the existing `Icons.jsx`
+// set under the names Figma uses. Consumers can either pull individual
+// icons from the root ui barrel or bulk-import via `import * as Icons
+// from '../../components/ui/Icons'`.
+export * from './Icons'

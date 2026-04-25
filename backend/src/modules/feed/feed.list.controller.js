@@ -13,6 +13,7 @@ const {
 const { enrichUsersWithBadges } = require('../../lib/userBadges')
 const log = require('../../lib/logger')
 
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 
 /**
@@ -274,7 +275,7 @@ router.get('/', async (req, res) => {
         },
         '[feed] all primary sections failed',
       )
-      return res.status(500).json({ error: 'Could not load the feed right now.' })
+      return sendError(res, 500, 'Could not load the feed right now.', ERROR_CODES.INTERNAL)
     }
 
     const sheetIds = sheets.map((sheet) => sheet.id)
@@ -515,7 +516,7 @@ router.get('/', async (req, res) => {
     res.json(payload)
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
