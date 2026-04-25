@@ -277,11 +277,13 @@ Comments answer **why**, not **what**. The code is the source of truth for what 
 - "Changed in v1.7.0 to fix X" → either delete (if the rationale is obvious now) or keep just the rationale ("Order matters: must precede Y").
 - Date-stamped notes only when the date itself is the load-bearing fact (e.g., "Mobile work paused 2026-04-23, files preserved for resume").
 
-**Load-bearing exceptions** (do NOT sweep these even if they look like metadata):
+### Load-bearing exceptions (do NOT sweep these even if they look like metadata)
 
 - Test-file names like `cycle36-decomposed-pages.smoke.spec.js` and Playwright grep tags like `@cycle36-smoke` — these are CI selectors.
 - `describe()` block names that contain a cycle/phase tag and surface as test IDs in CI output.
 - `Phase N` tags in `scripts/seedFeatureFlags.js` and on shipped `design_v2_*` flag definitions — these are the canonical pointer back to the master plan and required by CLAUDE.md §12.
+- `decision #N` references — explicit anchors to founder-locked decisions in roadmap + security addendum.
+- Date stamps where the date itself is the load-bearing fact (e.g., "Mobile work paused 2026-04-23, files preserved for resume").
 - Any constant whose name happens to match the metadata regex (e.g., `CYCLE_LENGTH_MS`, `PHASE_2_TIMEOUT`).
 
 When in doubt, leave the comment and flag it for the founder.
