@@ -3,7 +3,6 @@
  * version browsing, compare mode, snapshot creation, and restore previews.
  * Extracted from SheetLabPage.jsx (Track 5.1).
  */
-import { Link } from 'react-router-dom'
 import UserAvatar from '../../../components/UserAvatar'
 import { useFocusTrap } from '../../../lib/useFocusTrap'
 import { timeAgo, truncateChecksum } from './sheetLabConstants'
@@ -21,7 +20,6 @@ const KIND_META = {
 
 export default function SheetLabHistory({ lab }) {
   const {
-    sheetId,
     commits,
     page,
     totalPages,
@@ -261,14 +259,25 @@ export default function SheetLabHistory({ lab }) {
                           {loadingRestorePreview === commit.id ? 'Loading preview...' : 'Restore'}
                         </button>
                       ) : null}
-                      <Link
-                        to={`/sheets/${sheetId}/lab?tab=history&version=${commit.id}`}
+                      <button
+                        type="button"
                         className="sheet-lab__browse-btn"
-                        onClick={(e) => e.stopPropagation()}
-                        aria-label={`Browse this version: ${commit.message || 'Snapshot'} by ${commit.author?.username || 'Unknown'}`}
+                        onClick={(e) => {
+                          // Stop bubbling so the wrapping commit-card
+                          // role="button" doesn't double-fire and toggle
+                          // the drawer back closed on the same gesture.
+                          e.stopPropagation()
+                          toggleCommitContent(commit.id)
+                        }}
+                        aria-expanded={isExpanded}
+                        aria-label={
+                          isExpanded
+                            ? `Hide preview for ${commit.message || 'Snapshot'} by ${commit.author?.username || 'Unknown'}`
+                            : `Browse this version: ${commit.message || 'Snapshot'} by ${commit.author?.username || 'Unknown'}`
+                        }
                       >
-                        Browse at this version
-                      </Link>
+                        {isExpanded ? 'Hide preview' : 'Browse at this version'}
+                      </button>
                     </div>
                   ) : (
                     <div className="sheet-lab__commit-actions">
