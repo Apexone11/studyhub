@@ -14,3 +14,9 @@
 # 2026-04-23 — Prettier big-bang reformat (no logic changes).
 # First run after adding .prettierrc.json in Day 4 of the tech-debt week.
 11af34ffcd514fb4eaf0b07c28ed4fb6193debd6
+
+# 2026-04-25 — Comment cleanup sweep (task #43).
+# Stripped sprint/cycle/PR-review parentheticals from 9 docblocks across
+# feature barrels and the inactive-session scheduler. Surrounding rationale
+# preserved verbatim; no logic touched.
+d3f1c011d8b5e51995c93296ff00112a3394b296
