@@ -13,7 +13,7 @@ import { authHeaders } from './sheetLabConstants'
 export default function useSheetLab() {
   const navigate = useNavigate()
   const { id } = useParams()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const sheetId = Number.parseInt(id, 10)
   const { user, clearSession } = useSession()
 
@@ -182,29 +182,66 @@ export default function useSheetLab() {
   }, [loading, commits.length])
 
   // Expand / collapse commit content
+  const updateCommitSearchParam = useCallback(
+    (commitId) => {
+      const currentCommit = searchParams.get('commit')
+      const nextCommit = commitId === null ? null : String(commitId)
+      if (currentCommit === nextCommit) return
+      const nextParams = new URLSearchParams(searchParams)
+      if (commitId === null) {
+        nextParams.delete('commit')
+      } else {
+        nextParams.set('commit', String(commitId))
+        if (!nextParams.get('tab')) nextParams.set('tab', 'history')
+      }
+      setSearchParams(nextParams, { replace: true })
+    },
+    [searchParams, setSearchParams],
+  )
+
+  const loadCommitContent = useCallback(
+    async (commitId) => {
+      setExpandedCommitId(commitId)
+      setLoadingContent(true)
+      try {
+        const response = await fetch(`${API}/api/sheets/${sheetId}/lab/commits/${commitId}`, {
+          headers: authHeaders(),
+          credentials: 'include',
+        })
+        const data = await readJsonSafely(response, {})
+        if (!response.ok)
+          throw new Error(getApiErrorMessage(data, 'Could not load commit content.'))
+        setExpandedContent(data.commit?.content || '')
+      } catch (err) {
+        showToast(err.message, 'error')
+        setExpandedContent(null)
+      } finally {
+        setLoadingContent(false)
+      }
+    },
+    [sheetId],
+  )
+
   const toggleCommitContent = async (commitId) => {
     if (expandedCommitId === commitId) {
       setExpandedCommitId(null)
       setExpandedContent(null)
+      updateCommitSearchParam(null)
       return
     }
-    setExpandedCommitId(commitId)
-    setLoadingContent(true)
-    try {
-      const response = await fetch(`${API}/api/sheets/${sheetId}/lab/commits/${commitId}`, {
-        headers: authHeaders(),
-        credentials: 'include',
-      })
-      const data = await readJsonSafely(response, {})
-      if (!response.ok) throw new Error(getApiErrorMessage(data, 'Could not load commit content.'))
-      setExpandedContent(data.commit?.content || '')
-    } catch (err) {
-      showToast(err.message, 'error')
-      setExpandedContent(null)
-    } finally {
-      setLoadingContent(false)
-    }
+    updateCommitSearchParam(commitId)
+    await loadCommitContent(commitId)
   }
+
+  useEffect(() => {
+    const commitParam = searchParams.get('commit')
+    const commitId = Number.parseInt(commitParam || '', 10)
+    if (!Number.isInteger(commitId)) return
+    const commitExistsOnPage = commits.some((commit) => commit.id === commitId)
+    if (!commitExistsOnPage) return
+    if (expandedCommitId === commitId) return
+    loadCommitContent(commitId)
+  }, [searchParams, commits, expandedCommitId, loadCommitContent])
 
   // Fetch auto-summary when create modal opens
   const fetchAutoSummary = useCallback(async () => {

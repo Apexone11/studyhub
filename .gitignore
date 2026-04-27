@@ -78,6 +78,7 @@ pnpm-debug.log*
 .claude/settings.local.json
 .claude/worktrees/
 .claude/scheduled_tasks.lock
+.cursor/
 .~lock.*#
 
 # Local brainstorming/runtime state

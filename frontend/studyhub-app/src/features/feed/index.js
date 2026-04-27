@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * features/feed — barrel re-exports for the Feed feature
  *
- * Convention (Cycle 35+): new hooks, helpers, and constants go here.
+ * Convention: new hooks, helpers, and constants go here.
  * Pages stay in pages/feed/ and import from this barrel.
  * ═══════════════════════════════════════════════════════════════════════════ */
 

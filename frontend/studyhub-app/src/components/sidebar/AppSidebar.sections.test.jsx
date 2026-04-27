@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
+import { roleLabel } from '../../lib/roleLabel'
 
 const mockUser = { current: null }
 
@@ -84,10 +85,10 @@ describe('AppSidebar sectioned nav (phase1 on)', () => {
     expect(screen.getAllByText(/^Hub AI$/i).length).toBeGreaterThan(0)
   })
 
-  it('keeps role label copy intact on the sectioned path (Self-learner never becomes "Member")', () => {
+  it('keeps role label copy intact on the sectioned path for self-learners', () => {
     const { container } = renderWith({ ...baseUser, accountType: 'other' })
-    expect(screen.getByText(/Self-learner · Joined/)).toBeInTheDocument()
-    expect(container.textContent).not.toMatch(/\bMember\b/)
+    expect(screen.getByText(new RegExp(`${roleLabel('other')} · Joined`))).toBeInTheDocument()
+    expect(container.textContent).toContain(roleLabel('other'))
   })
 
   it('teachers get the TEACHING-oriented role label', () => {

@@ -11,6 +11,7 @@ const { runPlagiarismScan } = require('../plagiarism/plagiarism.service')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
 const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
+const { extractPreviewText } = require('../../lib/sheets/extractPreviewText')
 const {
   normalizeSheetStatus,
   resolveNextSheetStatus,
@@ -83,6 +84,9 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     if (typeof content === 'string') {
       if (!content.trim()) return res.status(400).json({ error: 'Content is required.' })
       data.content = content.trim()
+      // Re-extract preview alongside any content update so the Grid card
+      // doesn't show stale text after the author edits the body.
+      data.previewText = extractPreviewText(data.content)
     }
     if (requestedContentFormat) {
       data.contentFormat = requestedContentFormat

@@ -86,8 +86,9 @@ router.post('/login', loginLimiter, async (req, res) => {
       data: { failedAttempts: 0, lockedUntil: null, lastFailedLoginAt: null },
     })
 
-    /* Login verification flow removed in v1.5.0. Email verification is no longer
-     * required to log in. See docs/internal/beta-v1.7.0-release-log.md for details. */
+    /* Email verification is no longer required at login time — moved to
+     * the trusted-device flow. See trustedDevice.service.js for the
+     * current verification path. */
 
     // Evaluate device + geo + risk BEFORE issuing a session. Lets us route
     // high-risk attempts (band=challenge, score >= 60) through an email

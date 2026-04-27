@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * features/admin — barrel re-exports for the Admin feature
  *
- * Convention (Cycle 35+): new hooks, helpers, and constants go here.
+ * Convention: new hooks, helpers, and constants go here.
  * Pages stay in pages/admin/ and import from this barrel.
  * ═══════════════════════════════════════════════════════════════════════════ */
 

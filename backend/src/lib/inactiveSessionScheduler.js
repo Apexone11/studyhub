@@ -16,7 +16,7 @@
  * test, and local dev. Opt in explicitly per-instance with
  * `ENABLE_INACTIVE_SESSION_SWEEP=true`.
  *
- * Rationale for default-off-everywhere (Copilot review round 4):
+ * Rationale for default-off-everywhere:
  *   - Production: any scaled deployment must pick exactly one worker.
  *   - Staging: the moment staging is scaled to two replicas, an
  *     implicit "on in non-prod" default silently doubles DB load.
