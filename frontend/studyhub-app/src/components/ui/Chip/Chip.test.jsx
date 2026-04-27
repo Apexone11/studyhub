@@ -78,6 +78,44 @@ describe('Chip', () => {
     expect(el.className).toMatch(/chip--pill/)
     expect(el.className).toMatch(/mine/)
   })
+
+  it('omits aria-pressed when selected is undefined', () => {
+    render(<Chip data-testid="c">x</Chip>)
+    const el = screen.getByTestId('c')
+    expect(el).not.toHaveAttribute('aria-pressed')
+    expect(el.className).not.toMatch(/chip--selected/)
+  })
+
+  it('sets aria-pressed="false" without the selected modifier when selected={false}', () => {
+    render(
+      <Chip data-testid="c" selected={false}>
+        x
+      </Chip>,
+    )
+    const el = screen.getByTestId('c')
+    expect(el).toHaveAttribute('aria-pressed', 'false')
+    expect(el.className).not.toMatch(/chip--selected/)
+  })
+
+  it('sets aria-pressed="true" and applies chip--selected when selected={true}', () => {
+    render(
+      <Chip data-testid="c" selected>
+        x
+      </Chip>,
+    )
+    const el = screen.getByTestId('c')
+    expect(el).toHaveAttribute('aria-pressed', 'true')
+    expect(el.className).toMatch(/chip--selected/)
+  })
+
+  it('lets a caller-supplied aria-pressed override the derived value', () => {
+    render(
+      <Chip data-testid="c" selected={false} aria-pressed="mixed">
+        x
+      </Chip>,
+    )
+    expect(screen.getByTestId('c')).toHaveAttribute('aria-pressed', 'mixed')
+  })
 })
 
 describe('Badge', () => {

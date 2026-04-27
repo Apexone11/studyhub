@@ -1,0 +1,143 @@
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 14px;
+  background: var(--sh-soft);
+  border-bottom: 1px solid var(--sh-border);
+  flex-wrap: wrap;
+  font-size: 12px;
+  color: var(--sh-subtext);
+}
+
+.results {
+  font-weight: 700;
+  margin-right: auto;
+}
+
+/* "Search across StudyHub" switch */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  background: transparent;
+  border: 1px solid var(--sh-border);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  color: var(--sh-subtext);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 12px;
+  font-weight: 600;
+  transition:
+    border-color 0.15s ease,
+    color 0.15s ease,
+    background 0.15s ease;
+}
+
+.switch:hover {
+  border-color: var(--sh-border-strong);
+  color: var(--sh-text);
+}
+
+.switch:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sh-brand) 30%, transparent);
+}
+
+.switchTrack {
+  position: relative;
+  display: inline-block;
+  width: 28px;
+  height: 16px;
+  border-radius: var(--radius-full);
+  background: var(--sh-border);
+  transition: background 0.15s ease;
+}
+
+.switchKnob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--sh-surface);
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform 0.15s ease,
+    background 0.15s ease;
+}
+
+.switchOn {
+  border-color: var(--sh-brand);
+  color: var(--sh-brand);
+  background: var(--sh-brand-soft);
+}
+
+.switchOn .switchTrack {
+  background: var(--sh-brand);
+}
+
+.switchOn .switchKnob {
+  transform: translateX(12px);
+  background: var(--sh-btn-primary-text);
+}
+
+.switchLabel {
+  white-space: nowrap;
+}
+
+/* Grid/List view toggle */
+.viewToggle {
+  display: inline-flex;
+  padding: 3px;
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  border-radius: var(--radius-full);
+  gap: 2px;
+}
+
+.viewBtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--radius-full);
+  color: var(--sh-subtext);
+  cursor: pointer;
+  transition:
+    background 0.15s ease,
+    color 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.viewBtn:hover {
+  color: var(--sh-text);
+}
+
+.viewBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--sh-brand) 30%, transparent);
+}
+
+.viewBtnActive {
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  box-shadow: var(--shadow-sm);
+  border-color: var(--sh-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .switchKnob,
+  .switchTrack,
+  .switch,
+  .viewBtn {
+    transition: none;
+  }
+}

@@ -6,10 +6,13 @@ builder = "nixpacks"
 buildCommand = "npm install && npx prisma generate"
 
 [deploy]
-# Run migrations first, then refresh the MaxMind GeoLite2 DB (best-effort —
-# if MAXMIND_LICENSE_KEY isn't set or the download fails, we swallow the
-# error and keep deploying; geoip.service.js already falls back to no-op).
-preDeployCommand = "npx prisma migrate deploy && (npm run update-geoip-db || echo '[pre-deploy] skipping geoip refresh')"
+# Run migrations first, then provision SHIPPED design_v2_* FeatureFlag rows
+# (fail-closed contract: missing rows render shipped features invisible —
+# we want the deploy to ABORT if seeding fails, hence no `||` fallback).
+# Finally refresh the MaxMind GeoLite2 DB best-effort — if MAXMIND_LICENSE_KEY
+# isn't set or the download fails we swallow the error; geoip.service.js
+# already falls back to no-op.
+preDeployCommand = "npx prisma migrate deploy && npm run seed:flags && (npm run update-geoip-db || echo '[pre-deploy] skipping geoip refresh')"
 startCommand = "npm start"
 healthcheckPath = "/health"
 healthcheckTimeout = 60

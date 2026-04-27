@@ -10,7 +10,15 @@ import {
   isEditableSheetStatus,
 } from './sheetsPageConstants'
 
-export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork, studyStatus }) {
+export default function SheetListRow({
+  sheet,
+  forking,
+  onOpen,
+  onStar,
+  onFork,
+  studyStatus,
+  v2 = false,
+}) {
   const format = resolveSheetFormat(sheet)
   const detailPath = isEditableSheetStatus(sheet.status)
     ? `/sheets/upload?draft=${sheet.id}`
@@ -67,7 +75,14 @@ export default function SheetListRow({ sheet, forking, onOpen, onStar, onFork, s
         <p className="sheets-repo-row__description">{preview}</p>
         <div className="sheets-repo-row__meta">
           <span>
-            {sheet.course?.code || 'General'} · {schoolLabel}
+            {sheet.course?.code ? (
+              <span className={v2 ? 'sheets-repo-row__course-code--v2' : undefined}>
+                {sheet.course.code}
+              </span>
+            ) : (
+              'General'
+            )}{' '}
+            · {schoolLabel}
           </span>
           <span aria-hidden="true">•</span>
           {sheet.author?.username ? (

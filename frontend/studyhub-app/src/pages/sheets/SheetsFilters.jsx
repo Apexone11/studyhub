@@ -1,4 +1,5 @@
 import { IconSearch } from '../../components/Icons'
+import Chip from '../../components/ui/Chip/Chip'
 import { SORT_OPTIONS, FORMAT_OPTIONS, STATUS_OPTIONS } from './sheetsPageConstants'
 
 export default function SheetsFilters({
@@ -19,8 +20,18 @@ export default function SheetsFilters({
   handleSchoolChange,
   toggleMine,
   accountType,
+  v2Chips = false,
 }) {
   const hideSchoolCourse = accountType === 'other'
+  // Chip is a `<span>` primitive; when used as a toggle in v2 mode it
+  // needs role="button" + tabIndex + a manual Enter/Space handler so
+  // keyboard users get parity with the legacy `<button class="sh-chip">`.
+  const chipKeyHandler = (action) => (event) => {
+    if (event.key === 'Enter' || event.key === ' ') {
+      event.preventDefault()
+      action()
+    }
+  }
   return (
     <section className="sh-card sheets-page__filters-card">
       <div className="sheets-page__mobile-search-row">
@@ -124,37 +135,86 @@ export default function SheetsFilters({
         </select>
 
         <div className="sheets-page__toggle-row" data-tutorial="sheets-toggles">
-          <button
-            type="button"
-            className={`sh-chip ${mine ? 'sh-chip--active' : ''}`}
-            onClick={toggleMine}
-          >
-            Mine
-          </button>
-          <button
-            type="button"
-            className={`sh-chip ${starred ? 'sh-chip--active' : ''}`}
-            onClick={() => setQueryParam('starred', starred ? '' : '1')}
-          >
-            Starred
-          </button>
+          {v2Chips ? (
+            <>
+              <Chip
+                tone="brand"
+                selected={mine}
+                onClick={toggleMine}
+                role="button"
+                tabIndex={0}
+                onKeyDown={chipKeyHandler(toggleMine)}
+                style={{ cursor: 'pointer' }}
+              >
+                Mine
+              </Chip>
+              <Chip
+                tone="brand"
+                selected={starred}
+                onClick={() => setQueryParam('starred', starred ? '' : '1')}
+                role="button"
+                tabIndex={0}
+                onKeyDown={chipKeyHandler(() => setQueryParam('starred', starred ? '' : '1'))}
+                style={{ cursor: 'pointer' }}
+              >
+                Starred
+              </Chip>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className={`sh-chip ${mine ? 'sh-chip--active' : ''}`}
+                onClick={toggleMine}
+              >
+                Mine
+              </button>
+              <button
+                type="button"
+                className={`sh-chip ${starred ? 'sh-chip--active' : ''}`}
+                onClick={() => setQueryParam('starred', starred ? '' : '1')}
+              >
+                Starred
+              </button>
+            </>
+          )}
         </div>
 
         {mine ? (
           <div className="sheets-page__status-row">
-            {STATUS_OPTIONS.map((option) => (
-              <button
-                key={option.value}
-                type="button"
-                className={`sh-chip sh-chip--status ${statusFilter === option.value ? 'sh-chip--active' : ''}`}
-                onClick={() =>
-                  setQueryParam('status', statusFilter === option.value ? '' : option.value)
-                }
-              >
-                {option.icon ? <span className="sh-chip__icon">{option.icon}</span> : null}
-                {option.label}
-              </button>
-            ))}
+            {STATUS_OPTIONS.map((option) => {
+              const isActive = statusFilter === option.value
+              const setStatus = () => setQueryParam('status', isActive ? '' : option.value)
+              if (v2Chips) {
+                return (
+                  <Chip
+                    key={option.value}
+                    tone="neutral"
+                    size="sm"
+                    selected={isActive}
+                    onClick={setStatus}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={chipKeyHandler(setStatus)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    {option.icon ? <span className="sh-chip__icon">{option.icon}</span> : null}
+                    {option.label}
+                  </Chip>
+                )
+              }
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`sh-chip sh-chip--status ${isActive ? 'sh-chip--active' : ''}`}
+                  onClick={setStatus}
+                >
+                  {option.icon ? <span className="sh-chip__icon">{option.icon}</span> : null}
+                  {option.label}
+                </button>
+              )
+            })}
           </div>
         ) : null}
       </div>

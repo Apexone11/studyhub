@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * SheetsPage.jsx — Study sheets listing (thin orchestrator)
  *
- * Components: SheetsFilters, SheetsEmptyState, SheetsAside, SheetListItem
- * Data: useSheetsData
+ * Components: SheetsFilters, SheetsEmptyState, SheetsAside, SheetListItem,
+ *             SheetGridCard, SheetsViewBar
+ * Data: useSheetsData, useSheetsViewMode, useDesignV2Flags
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useMemo } from 'react'
 import { Link } from 'react-router-dom'
@@ -12,18 +13,24 @@ import { IconUpload } from '../../components/Icons'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { useStudyStatusBatch } from '../../lib/useStudyStatus'
+import { useDesignV2Flags } from '../../lib/designV2Flags'
 import { SkeletonSheetGrid } from '../../components/Skeleton'
 import SheetListRow from './SheetListItem'
+import SheetGridCard from './SheetGridCard'
 import SheetsFilters from './SheetsFilters'
 import SheetsEmptyState from './SheetsEmptyState'
 import SheetsAside from './SheetsAside'
+import SheetsViewBar from './SheetsViewBar'
 import useSheetsData from './useSheetsData'
+import useSheetsViewMode from './useSheetsViewMode'
 import { isEditableSheetStatus } from './sheetsPageConstants'
 import './SheetsPage.css'
 
 export default function SheetsPage() {
   usePageTitle('Study Sheets')
   const layout = useResponsiveAppLayout()
+  const flags = useDesignV2Flags()
+  const { viewMode, setViewMode } = useSheetsViewMode()
 
   const {
     user,
@@ -36,6 +43,7 @@ export default function SheetsPage() {
     statusFilter,
     sortValue,
     formatValue,
+    searchAll,
     catalog,
     catalogError,
     sheetsState,
@@ -55,6 +63,7 @@ export default function SheetsPage() {
     handleSchoolChange,
     handleCourseFilter,
     toggleMine,
+    toggleSearchAll,
     clearAllFilters,
     toggleStar,
     handleFork,
@@ -63,6 +72,20 @@ export default function SheetsPage() {
 
   const sheetIds = useMemo(() => (sheetsState.sheets || []).map((s) => s.id), [sheetsState.sheets])
   const studyStatusMap = useStudyStatusBatch(sheetIds)
+
+  // Phase 4 Day 3 — Grid/List + cross-school toggles ride the
+  // `design_v2_sheets_grid` flag. When the flag is off the page renders
+  // exactly as before (list-only, no view bar, no cross-school switch).
+  const v2Enabled = flags.sheetsGrid === true && !flags.loading
+  const renderGrid = v2Enabled && viewMode === 'grid'
+  const handleSheetOpen = (sheetId) => {
+    const s = sheetsState.sheets.find((x) => x.id === sheetId)
+    if (s && isEditableSheetStatus(s.status)) {
+      navigate(`/sheets/upload?draft=${sheetId}`)
+    } else {
+      navigate(`/sheets/${sheetId}`)
+    }
+  }
 
   return (
     <>
@@ -108,6 +131,7 @@ export default function SheetsPage() {
                 handleSchoolChange={handleSchoolChange}
                 toggleMine={toggleMine}
                 accountType={user?.accountType}
+                v2Chips={v2Enabled}
               />
 
               {catalogError ? (
@@ -115,6 +139,39 @@ export default function SheetsPage() {
               ) : null}
               {sheetsState.error ? (
                 <div className="sh-alert sh-alert--danger">{sheetsState.error}</div>
+              ) : null}
+
+              {/* SheetsViewBar must render OUTSIDE the loading/empty/results
+                  split: when a school-scoped query returns zero results, the
+                  user needs the cross-school switch to widen the search.
+                  Hiding the bar inside the results branch traps them in an
+                  empty state with no recovery path. */}
+              {v2Enabled ? (
+                <section className="sh-card sh-card--flat sh-card--flush sheets-page__viewbar-shell">
+                  <SheetsViewBar
+                    viewMode={viewMode}
+                    onViewModeChange={setViewMode}
+                    searchAll={searchAll}
+                    onToggleSearchAll={toggleSearchAll}
+                    resultsLabel={
+                      sheetsState.loading
+                        ? 'Loading sheets...'
+                        : `${sheetsState.total} sheet${sheetsState.total === 1 ? '' : 's'}`
+                    }
+                  />
+                  {hasActiveFilters ? (
+                    <div className="sheets-page__list-head sheets-page__list-head--secondary">
+                      <span aria-hidden="true" />
+                      <button
+                        type="button"
+                        className="sh-btn sh-btn--ghost sh-btn--sm"
+                        onClick={clearAllFilters}
+                      >
+                        Clear filters
+                      </button>
+                    </div>
+                  ) : null}
+                </section>
               ) : null}
 
               {sheetsState.loading ? (
@@ -130,41 +187,53 @@ export default function SheetsPage() {
                 />
               ) : (
                 <section className="sh-card sh-card--flat sh-card--flush sheets-page__list-shell">
-                  <div className="sheets-page__list-head">
-                    <span>
-                      {sheetsState.total} sheet{sheetsState.total === 1 ? '' : 's'}
-                    </span>
-                    {hasActiveFilters ? (
-                      <button
-                        type="button"
-                        className="sh-btn sh-btn--ghost sh-btn--sm"
-                        onClick={clearAllFilters}
-                      >
-                        Clear filters
-                      </button>
-                    ) : null}
-                  </div>
+                  {v2Enabled ? null : (
+                    <div className="sheets-page__list-head">
+                      <span>
+                        {sheetsState.total} sheet{sheetsState.total === 1 ? '' : 's'}
+                      </span>
+                      {hasActiveFilters ? (
+                        <button
+                          type="button"
+                          className="sh-btn sh-btn--ghost sh-btn--sm"
+                          onClick={clearAllFilters}
+                        >
+                          Clear filters
+                        </button>
+                      ) : null}
+                    </div>
+                  )}
 
-                  <div ref={cardsRef} className="sheets-page__rows" role="list">
-                    {sheetsState.sheets.map((sheet) => (
-                      <SheetListRow
-                        key={sheet.id}
-                        sheet={sheet}
-                        studyStatus={studyStatusMap[sheet.id] || null}
-                        forking={forkingSheetId === sheet.id}
-                        onOpen={(sheetId) => {
-                          const s = sheetsState.sheets.find((x) => x.id === sheetId)
-                          if (s && isEditableSheetStatus(s.status)) {
-                            navigate(`/sheets/upload?draft=${sheetId}`)
-                          } else {
-                            navigate(`/sheets/${sheetId}`)
-                          }
-                        }}
-                        onStar={toggleStar}
-                        onFork={handleFork}
-                      />
-                    ))}
-                  </div>
+                  {renderGrid ? (
+                    <div ref={cardsRef} className="sheets-page__grid" role="list">
+                      {sheetsState.sheets.map((sheet) => (
+                        <SheetGridCard
+                          key={sheet.id}
+                          sheet={sheet}
+                          studyStatus={studyStatusMap[sheet.id] || null}
+                          forking={forkingSheetId === sheet.id}
+                          onOpen={handleSheetOpen}
+                          onStar={toggleStar}
+                          onFork={handleFork}
+                        />
+                      ))}
+                    </div>
+                  ) : (
+                    <div ref={cardsRef} className="sheets-page__rows" role="list">
+                      {sheetsState.sheets.map((sheet) => (
+                        <SheetListRow
+                          key={sheet.id}
+                          sheet={sheet}
+                          studyStatus={studyStatusMap[sheet.id] || null}
+                          forking={forkingSheetId === sheet.id}
+                          onOpen={handleSheetOpen}
+                          onStar={toggleStar}
+                          onFork={handleFork}
+                          v2={v2Enabled}
+                        />
+                      ))}
+                    </div>
+                  )}
 
                   {sheetsState.sheets.length < sheetsState.total ? (
                     <div className="sheets-page__load-more-wrap">

@@ -225,6 +225,21 @@ app.use((req, res, next) => {
   next()
 })
 
+// Belt-and-suspenders Vary: Origin on EVERY response. The cors() middleware
+// adds it for routes it touches and cacheControl() adds it for cached routes,
+// but a response that errors out before either runs (rate-limit 429, validation
+// 400 from earlier middleware, the global error handler at the bottom of this
+// file) would otherwise reach a shared cache without Vary: Origin. A shared
+// cache that keys only by URL would then serve one origin's cached body to
+// requests from a different origin, surfacing in the browser as a "CORS error"
+// even though the backend is healthy. This was the failure mode the
+// cacheControl.js header note describes — re-asserted globally so no response
+// path can skip it.
+app.use((req, res, next) => {
+  res.setHeader('Vary', 'Origin')
+  next()
+})
+
 app.use(
   cors({
     origin: (origin, callback) => {
@@ -245,7 +260,15 @@ app.use(
           /* fall through to reject */
         }
       }
-      callback(new Error(`CORS: origin ${origin} not allowed`))
+      // Reject by returning false instead of throwing. callback(new Error())
+      // routes the request to the global error handler at the bottom of this
+      // file, which sends a 500 with NO Access-Control-Allow-Origin header.
+      // If a shared cache (Cloudflare edge) catches that 500, it can be
+      // re-served to requests from legitimate origins → browser reports
+      // "CORS error" on a healthy endpoint. callback(null, false) lets cors
+      // respond cleanly without Allow-Origin (browser blocks naturally) and
+      // does not produce a cacheable error body.
+      callback(null, false)
     },
     credentials: true,
   }),
@@ -534,6 +557,25 @@ app.get('/health', async (req, res) => {
 app.use((err, req, res, _next) => {
   captureError(err, { url: req.originalUrl, method: req.method })
   const statusCode = err.statusCode || err.status || 500
+  // CORS preservation: if the request came from a trusted origin, re-emit
+  // Access-Control-Allow-Origin + Allow-Credentials on the error response.
+  // Without this, an error thrown by any route handler short-circuits the
+  // cors middleware's response decoration and the browser sees a response
+  // with no CORS headers → reports "CORS error" instead of the actual
+  // status code. This matters for rate-limit 429s, validation 400s, and
+  // anything that hits this handler. Vary: Origin is already set globally
+  // upstream so caches won't mix origins.
+  const requestOrigin = req.headers.origin
+  if (requestOrigin) {
+    const normalized = normalizeOrigin(requestOrigin)
+    if (normalized && trustedOrigins.has(normalized)) {
+      res.setHeader('Access-Control-Allow-Origin', requestOrigin)
+      res.setHeader('Access-Control-Allow-Credentials', 'true')
+    }
+  }
+  // Error responses must never be cached. Without this, Cloudflare can
+  // cache a transient 500 and serve it to other origins for the cache TTL.
+  res.setHeader('Cache-Control', 'no-store')
   res.status(statusCode).json({
     error: statusCode >= 500 ? 'Internal server error' : err.message || 'Something went wrong',
     ...(err.code ? { code: err.code } : {}),
