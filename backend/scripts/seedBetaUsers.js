@@ -17,6 +17,7 @@ const bcrypt = require('bcryptjs')
 const { createPrismaClient } = require('../src/lib/prisma')
 const { assertLocalDatabase } = require('./assertLocalDatabase')
 const { seedFeatureFlags } = require('./seedFeatureFlags')
+const { extractPreviewText } = require('../src/lib/sheets/extractPreviewText')
 
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
 
@@ -299,6 +300,201 @@ async function seedAiSuggestions(studentUsers) {
 }
 
 /**
+ * Seed published study sheets for the Sheets Grid view (Phase 4 Day 3).
+ *
+ * /sheets must show beta_student1 a meaningful state out of the box —
+ * 6+ sheets across 3 courses, all with non-null previewText so the Grid
+ * card has real preview content to render, plus at least one sheet from
+ * a school OTHER than UMD so the cross-school "Search across StudyHub"
+ * toggle has visible state to flip into.
+ *
+ * Idempotent: dedupes on (userId, title). Reruns won't pile up
+ * duplicates. Uses the same `extractPreviewText` helper as the
+ * create/update controllers so the seeded preview matches what a real
+ * publish would produce.
+ *
+ * Required by CLAUDE.md §11 (Working Agreement #11): "every feature
+ * that adds a new UI surface MUST include a seed update so
+ * `npm run seed:beta` produces a localhost state where the feature is
+ * visible end-to-end for beta_student1 without manual data setup."
+ */
+async function seedSheetsGridFixture(studentUsers) {
+  const primary =
+    studentUsers.find(
+      (u) => u.username === (process.env.BETA_STUDENT1_USERNAME || 'beta_student1'),
+    ) || null
+  if (!primary) return
+
+  // Pull a UMD course trio + one UMBC course. UMD is beta_student1's
+  // primary school via `seedEnrollments`, so a UMBC sheet is the
+  // cross-school case.
+  const umd = await prisma.school.findFirst({ where: { short: 'UMD' }, select: { id: true } })
+  const umbc = await prisma.school.findFirst({ where: { short: 'UMBC' }, select: { id: true } })
+
+  if (!umd) {
+    console.warn('Sheets Grid seed: UMD school missing. Run `npm --prefix backend run seed`.')
+    return
+  }
+
+  const umdCourses = await prisma.course.findMany({
+    where: { schoolId: umd.id },
+    select: { id: true, code: true, name: true },
+    orderBy: { id: 'asc' },
+    take: 3,
+  })
+  const umbcCourse = umbc
+    ? await prisma.course.findFirst({
+        where: { schoolId: umbc.id },
+        select: { id: true, code: true, name: true },
+        orderBy: { id: 'asc' },
+      })
+    : null
+
+  if (umdCourses.length < 3) {
+    console.warn('Sheets Grid seed: <3 UMD courses available; skipping.')
+    return
+  }
+
+  const author2 =
+    studentUsers.find(
+      (u) => u.username === (process.env.BETA_STUDENT2_USERNAME || 'beta_student2'),
+    ) || primary
+  const author3 =
+    studentUsers.find(
+      (u) => u.username === (process.env.BETA_STUDENT3_USERNAME || 'beta_student3'),
+    ) || primary
+
+  const fixtures = [
+    {
+      title: `${umdCourses[0].code} — Master Study Guide`,
+      content:
+        `# ${umdCourses[0].code} Study Guide\n\n## Core Concepts\nA quick-reference summary covering every chapter through midterm. ` +
+        'Includes worked examples for the trickiest practice problems and a glossary of vocabulary the professor reuses on quizzes. ' +
+        'Pair this with the recurrence-relations cheat sheet for week 8 prep.',
+      courseId: umdCourses[0].id,
+      authorId: primary.id,
+      stars: 14,
+      forks: 3,
+      downloads: 42,
+    },
+    {
+      title: `${umdCourses[0].code} — Quick Recursion Cheatsheet`,
+      content:
+        '# Recursion in One Page\n\n## Base case first\nIdentify the smallest sub-problem and write a return for it before anything else. ' +
+        '## Recursive case\nReduce toward the base case on every call; never re-enter with the same args. ' +
+        'Common patterns: tree traversal, divide-and-conquer, accumulator passing.',
+      courseId: umdCourses[0].id,
+      authorId: author2.id,
+      stars: 7,
+      forks: 1,
+      downloads: 21,
+    },
+    {
+      title: `${umdCourses[1].code} — Limits, Derivatives, Integrals`,
+      content:
+        '# Calculus Refresher\n\n## Limits\n`lim(x→a) f(x) = L` reads "as x approaches a, f(x) approaches L". ' +
+        "## Power rule\n`d/dx[x^n] = n·x^(n-1)`. ## Chain rule\n`d/dx[f(g(x))] = f'(g(x)) · g'(x)`. " +
+        'Last page: a one-shot reference for the most-tested integration techniques.',
+      courseId: umdCourses[1].id,
+      authorId: primary.id,
+      stars: 22,
+      forks: 5,
+      downloads: 71,
+    },
+    {
+      title: `${umdCourses[1].code} — Practice Exam Walkthrough`,
+      content:
+        '# Practice Exam, fully worked\n\nEvery problem from the spring practice exam, with the reasoning written out — not just the final number. ' +
+        'Highlights three problems where the official answer key is misleading and explains why the cleaner setup gets the same answer faster.',
+      courseId: umdCourses[1].id,
+      authorId: author3.id,
+      stars: 9,
+      forks: 2,
+      downloads: 18,
+    },
+    {
+      title: `${umdCourses[2].code} — Lecture Notes Index`,
+      content:
+        '# Lecture-by-lecture index\n\nClickable bookmarks to every major concept, ordered the way the professor introduces them. ' +
+        'Helps when reviewing for the cumulative final and you need to jump straight to "where did we cover dynamic programming?"',
+      courseId: umdCourses[2].id,
+      authorId: primary.id,
+      stars: 5,
+      forks: 0,
+      downloads: 12,
+    },
+    {
+      title: `${umdCourses[2].code} — Common Mistakes Recap`,
+      content:
+        '# 12 mistakes I made on Quiz 1\n\nIf you see yourself in any of these, fix it before the next quiz. ' +
+        'Each mistake is paired with the correct approach and a one-line "what to do differently next time".',
+      courseId: umdCourses[2].id,
+      authorId: author2.id,
+      stars: 11,
+      forks: 4,
+      downloads: 27,
+    },
+  ]
+
+  if (umbcCourse) {
+    fixtures.push({
+      title: `${umbcCourse.code} — Cross-school Crossover`,
+      content:
+        '# A view from UMBC\n\nNotes from a parallel course at UMBC that covers similar ground. ' +
+        'Useful for comparing how the same material is taught at a different school — the worked examples are different and ' +
+        'often clearer. Drop this in the cross-school search to confirm the toggle works.',
+      courseId: umbcCourse.id,
+      authorId: author3.id,
+      stars: 4,
+      forks: 1,
+      downloads: 9,
+    })
+  } else {
+    console.warn(
+      'Sheets Grid seed: UMBC unavailable; cross-school sheet will not be present. ' +
+        'Cross-school toggle test requires a non-UMD school in the catalog.',
+    )
+  }
+
+  for (const fixture of fixtures) {
+    const existing = await prisma.studySheet.findFirst({
+      where: { userId: fixture.authorId, title: fixture.title },
+      select: { id: true },
+    })
+    const previewText = extractPreviewText(fixture.content)
+    if (existing) {
+      await prisma.studySheet.update({
+        where: { id: existing.id },
+        data: {
+          courseId: fixture.courseId,
+          content: fixture.content,
+          previewText,
+          stars: fixture.stars,
+          forks: fixture.forks,
+          downloads: fixture.downloads,
+          status: 'published',
+        },
+      })
+    } else {
+      await prisma.studySheet.create({
+        data: {
+          title: fixture.title,
+          content: fixture.content,
+          previewText,
+          courseId: fixture.courseId,
+          userId: fixture.authorId,
+          status: 'published',
+          contentFormat: 'markdown',
+          stars: fixture.stars,
+          forks: fixture.forks,
+          downloads: fixture.downloads,
+        },
+      })
+    }
+  }
+}
+
+/**
  * IN_FLIGHT_DESIGN_V2_FLAGS — DOCUMENTATION ONLY as of decision #20
  * (2026-04-24, CLAUDE.md §12).
  *
@@ -355,6 +551,7 @@ async function main() {
   }
   await seedUpcomingExams(studentUsers)
   await seedAiSuggestions(studentUsers)
+  await seedSheetsGridFixture(studentUsers)
   await seedFeatureFlags(prisma)
 
   console.log('Local beta users are ready:')

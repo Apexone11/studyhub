@@ -87,3 +87,33 @@
   background: transparent;
   color: var(--sh-muted);
 }
+
+/* Selected state — for chips used as filter-pill toggles. The brand
+   tone flips to a solid brand fill; the neutral tone flips to a slate
+   fill. Other tones inherit a soft "hold the tone but bump contrast"
+   treatment so the selected state is always visible. Eyebrow chips
+   keep their flat presentation; they only carry the aria-pressed
+   attribute, not a visual change. */
+.chip--selected.chip--tone-brand {
+  background: var(--sh-brand);
+  color: var(--sh-btn-primary-text);
+}
+.chip--selected.chip--tone-neutral {
+  background: var(--sh-slate-900);
+  color: var(--sh-btn-primary-text);
+}
+.chip--selected.chip--tone-success {
+  background: var(--sh-success-text);
+  color: var(--sh-btn-primary-text);
+}
+.chip--selected.chip--tone-warning {
+  background: var(--sh-warning-text);
+  color: var(--sh-btn-primary-text);
+}
+.chip--selected.chip--tone-danger {
+  background: var(--sh-danger-text);
+  color: var(--sh-btn-primary-text);
+}
+.chip--eyebrow.chip--selected {
+  background: transparent;
+}

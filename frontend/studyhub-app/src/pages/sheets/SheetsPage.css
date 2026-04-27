@@ -116,6 +116,14 @@
   overflow: hidden;
 }
 
+/* v2 view-bar shell — sits between the filters card and the
+   results/empty-state below so the cross-school switch and view toggle
+   stay reachable even when the current query returns zero results. */
+.sheets-page__viewbar-shell {
+  overflow: hidden;
+  padding: 0;
+}
+
 .sheets-page__list-head {
   display: flex;
   justify-content: space-between;
@@ -133,6 +141,48 @@
   display: grid;
 }
 
+/* Phase 4 Day 3 — Grid view layout. Renders only when the
+   `design_v2_sheets_grid` flag is on AND the user picked the Grid view.
+   The rest of the page (header, filters card, aside) stays unchanged
+   regardless of view mode. */
+.sheets-page__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  padding: 12px;
+  background: var(--sh-surface);
+}
+
+@media (max-width: 767px) {
+  .sheets-page__grid {
+    grid-template-columns: 1fr;
+    padding: 10px;
+  }
+}
+
+/* Secondary "Clear filters" row used in v2 mode. The primary header
+   slot is now occupied by the SheetsViewBar (results count + view +
+   cross-school toggles), so the clear-filters affordance moves to a
+   thin secondary row that only appears when filters are active. */
+.sheets-page__list-head--secondary {
+  background: var(--sh-surface);
+  border-bottom: 1px solid var(--sh-border);
+  padding: 6px 14px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+}
+
+/* Phase 4 Day 3 — List view course code under v2. Plain styled span,
+   no background, no border. The existing meta-line span passes through
+   `sheets-repo-row__course-code--v2` only when `v2` is true on
+   SheetListRow. The non-v2 path keeps the unstyled meta line. */
+.sheets-repo-row__course-code--v2 {
+  color: var(--sh-brand);
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-weight: 600;
+  font-size: 13px;
+}
+
 .sheets-repo-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
@@ -140,7 +190,9 @@
   padding: 13px 14px;
   border-bottom: 1px solid var(--sh-border);
   cursor: pointer;
-  transition: background 0.14s ease, box-shadow 0.14s ease;
+  transition:
+    background 0.14s ease,
+    box-shadow 0.14s ease;
 }
 
 .sheets-repo-row:last-child {
@@ -478,7 +530,7 @@
   bottom: 24px;
   width: 44px;
   height: 44px;
-  border-radius: 999px;
+  border-radius: var(--radius-full);
   border: 1px solid transparent;
   display: grid;
   place-items: center;

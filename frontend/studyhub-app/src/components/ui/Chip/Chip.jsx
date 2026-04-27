@@ -9,9 +9,17 @@ import styles from './Chip.module.css'
  *
  * API:
  *
- *   variant  "eyebrow" | "pill" | "badge"   default "pill"
- *   tone     "brand" | "success" | "warning" | "danger" | "neutral"   default "brand"
- *   size     "sm" | "md"   default "md" (ignored by eyebrow variant)
+ *   variant   "eyebrow" | "pill" | "badge"   default "pill"
+ *   tone      "brand" | "success" | "warning" | "danger" | "neutral"   default "brand"
+ *   size      "sm" | "md"   default "md" (ignored by eyebrow variant)
+ *   selected  boolean | undefined   default undefined.
+ *             Optional. When defined, the chip is treated as a toggle:
+ *             `aria-pressed` reflects the value. When `true`, the chip
+ *             also picks up the `chip--selected` modifier (solid tone
+ *             background + anti-text). Eyebrow variants ignore the
+ *             selected modifier visually but still set aria-pressed so
+ *             the call-site can wrap the chip in a button without
+ *             losing the state.
  *
  * Variants:
  *   eyebrow — uppercase, letter-spaced, transparent bg, tone-colored text.
@@ -22,7 +30,7 @@ import styles from './Chip.module.css'
  *             call-site.
  */
 const Chip = forwardRef(function Chip(
-  { variant = 'pill', tone = 'brand', size = 'md', className, children, ...rest },
+  { variant = 'pill', tone = 'brand', size = 'md', selected, className, children, ...rest },
   ref,
 ) {
   const classes = [
@@ -31,13 +39,16 @@ const Chip = forwardRef(function Chip(
     styles[`chip--tone-${tone}`],
     // eyebrow ignores size classes
     variant !== 'eyebrow' && styles[`chip--${size}`],
+    selected === true && styles['chip--selected'],
     className,
   ]
     .filter(Boolean)
     .join(' ')
 
+  const ariaPressed = selected === undefined ? undefined : selected ? 'true' : 'false'
+
   return (
-    <span ref={ref} className={classes} {...rest}>
+    <span ref={ref} className={classes} aria-pressed={ariaPressed} {...rest}>
       {children}
     </span>
   )

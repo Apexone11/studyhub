@@ -877,6 +877,56 @@ export function IconFilter({ size, ...p }) {
   )
 }
 
+// Grid — 2x2 grid of rounded squares (Sheets grid view toggle)
+export function IconGrid({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <rect x="4" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="13" y="4" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="4" y="13" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+      <rect x="13" y="13" width="7" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.8" />
+    </Svg>
+  )
+}
+
+// List — three full-width rows with leading dots (Sheets list view toggle)
+export function IconList({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <circle cx="5" cy="6" r="1.4" fill="currentColor" />
+      <line
+        x1="9"
+        y1="6"
+        x2="20"
+        y2="6"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <circle cx="5" cy="12" r="1.4" fill="currentColor" />
+      <line
+        x1="9"
+        y1="12"
+        x2="20"
+        y2="12"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+      <circle cx="5" cy="18" r="1.4" fill="currentColor" />
+      <line
+        x1="9"
+        y1="18"
+        x2="20"
+        y2="18"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </Svg>
+  )
+}
+
 // Eye — preview
 export function IconEye({ size, ...p }) {
   return (

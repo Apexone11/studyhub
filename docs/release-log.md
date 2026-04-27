@@ -36,6 +36,12 @@ internal log into this file when they describe user-visible behavior.
   `@v3` to restore CodeQL Advanced runs, and switch the release-log gate
   to track this public file at `docs/release-log.md` instead of the
   gitignored internal log so PRs can satisfy it.
+- **Railway preDeploy now provisions SHIPPED design_v2 flags.** Chained
+  `npm run seed:flags` between `prisma migrate deploy` and the geoip
+  refresh in `backend/railway.toml`. Closes the activation gap where
+  fail-closed flag evaluation rendered Phase 1/2/3 features invisible
+  in production whenever a deploy preceded the manual seed step. Seed
+  failure aborts the deploy by design (no `||` fallback).
 
 ### Sheets
 
