@@ -241,7 +241,9 @@ Tables with migrations (safe to query):
 - Scan existing implementation patterns before editing. Follow the established style unless correctness requires a change.
 - Keep changes incremental and pattern-aligned.
 - Prefer fixing root causes over local patches.
-- After each beta implementation cycle, document changes and validation results in `docs/internal/beta-v2.0.0-release-log.md`.
+- Two release logs run in parallel:
+  - **Public, tracked log:** `docs/release-log.md`. CI (`Enforce release log update` in `.github/workflows/ci.yml`) requires every PR that touches `backend/`, `frontend/`, `scripts/`, `.github/workflows/`, `docker-compose.yml`, or `package.json` to add a one-line entry under the most recent cycle heading. Keep entries factual and user-visible.
+  - **Private, gitignored log:** `docs/internal/beta-v2.0.0-release-log.md`. After each beta implementation cycle, document the full deliverables, decisions, security checklists, validation results, and agent hand-offs here. This file is the canonical internal record but is never tracked in git, so it cannot satisfy the CI gate on its own.
 - For frontend validation in this repo, `npm --prefix frontend/studyhub-app run lint` is the reliable full-lint command.
 - Use quoted paths in PowerShell because the workspace path contains spaces.
 - `.git-blame-ignore-revs` at the repo root lists commits skipped by `git blame`. Enable locally with `git config blame.ignoreRevsFile .git-blame-ignore-revs`. GitHub honors it automatically. Add new revs when landing mechanical commits (reformats, mass renames, codemods) that would otherwise pollute blame.
@@ -251,6 +253,42 @@ Tables with migrations (safe to query):
 - Design baseline: Plus Jakarta Sans, token-based styles in `frontend/studyhub-app/src/index.css`, modern clean cards/gradients, and consistent icon treatment.
 - Preserve the current HomePage visual language unless a task explicitly calls for a redesign.
 - UserAvatar component (`frontend/studyhub-app/src/components/UserAvatar.jsx`) must be used everywhere a user's profile picture is displayed. It handles fallback avatars automatically.
+
+## Comment Policy
+
+Comments answer **why**, not **what**. The code is the source of truth for what it does; comments earn their keep by capturing context that the code can't.
+
+**KEEP** — comments that explain WHY:
+
+- A business rule or invariant that isn't obvious from the code itself.
+- A non-obvious decision rationale or trade-off (with the reasoning).
+- A security or correctness constraint (e.g., "must run before X because Y").
+- A reference to an external spec, RFC, issue, or doc by URL.
+- A reference to a founder-locked decision (e.g., "decision #17", "decision #20") — these are anchors that future agents check against the master plan, not metadata.
+
+**DELETE** — comments that add noise:
+
+- Sprint number, cycle number, PR number, reviewer attribution ("Cycle 4", "Sprint X", "Copilot review #4", "fixed for round 3").
+- Version/date stamps on individual lines ("Added in v1.7.0", "Changed 2026-04-12") — git already has this.
+- Comments that restate what the code literally does (`// increment counter` above `counter++`).
+- Stale TODOs that no longer apply, or `TODO(name)` with departed-author handles.
+- Process meta-commentary ("done in this PR", "see chat", "as discussed").
+
+**CONVERT** — historical comments that contain a load-bearing fact:
+
+- "Changed in v1.7.0 to fix X" → either delete (if the rationale is obvious now) or keep just the rationale ("Order matters: must precede Y").
+- Date-stamped notes only when the date itself is the load-bearing fact (e.g., "Mobile work paused 2026-04-23, files preserved for resume").
+
+### Load-bearing exceptions (do NOT sweep these even if they look like metadata)
+
+- Test-file names like `cycle36-decomposed-pages.smoke.spec.js` and Playwright grep tags like `@cycle36-smoke` — these are CI selectors.
+- `describe()` block names that contain a cycle/phase tag and surface as test IDs in CI output.
+- `Phase N` tags in `scripts/seedFeatureFlags.js` and on shipped `design_v2_*` flag definitions — these are the canonical pointer back to the master plan and required by CLAUDE.md §12.
+- `decision #N` references — explicit anchors to founder-locked decisions in roadmap + security addendum.
+- Date stamps where the date itself is the load-bearing fact (e.g., "Mobile work paused 2026-04-23, files preserved for resume").
+- Any constant whose name happens to match the metadata regex (e.g., `CYCLE_LENGTH_MS`, `PHASE_2_TIMEOUT`).
+
+When in doubt, leave the comment and flag it for the founder.
 
 ## Validation Commands
 
@@ -328,7 +366,7 @@ When handling a new task:
 4. Before writing any new backend feature, verify that all required database tables have corresponding migrations in `backend/prisma/migrations/`. If a migration is missing, create it before proceeding with the feature code.
 5. All frontend API calls must use `${API}/api/...` (never omit the `/api` prefix).
 6. Validate changes with the smallest relevant lint/test/build commands, then broader checks if the surface area is wider.
-7. Update the beta release log when a beta-cycle code change is completed.
+7. Update both release logs when a beta-cycle code change is completed: a one-line entry in the tracked public log (`docs/release-log.md`, required by CI) and the full cycle write-up in the private log (`docs/internal/beta-v2.0.0-release-log.md`).
 8. Do not put emoji in UI chrome (component copy, buttons, headings, labels, nav, empty states, toasts). Emoji are allowed only inside user-generated content surfaces (feed posts, messages, notes, comments, group discussions, profile bios). See "CSS and Styling" for the full policy.
 9. All inline style colors must use CSS custom property tokens (`var(--sh-*)`).
 10. Wrap any call to `getBlockedUserIds` or `getMutedUserIds` in try-catch for graceful degradation.
@@ -364,7 +402,7 @@ Founder-approved design refresh in progress. Context for any agent picking up th
     2. Pin to a specific `~` or `^` range that matches the repo's existing styling.
     3. Update both `package.json` and `package-lock.json` in the same commit.
     4. Do not add transitive helpers ("while I'm in here…"). One problem → one dep.
-    5. Log the add in `docs/internal/beta-v2.0.0-release-log.md` under a `### Dependency changes` subsection with: date, package name + version, why no existing dep solved the need, and a one-line rollback plan.
+    5. Log the add in `docs/internal/beta-v2.0.0-release-log.md` under a `### Dependency changes` subsection with: date, package name + version, why no existing dep solved the need, and a one-line rollback plan. Add a one-line bullet to `docs/release-log.md` as well so the public log mentions the new dep.
   - **Still forbidden without an explicit founder "yes" in chat:**
     - Major version bumps of React, React Router, Vite, Prisma, Express, Socket.io, Tailwind, or any auth/crypto library.
     - Replacing a library the repo already uses with a competitor.

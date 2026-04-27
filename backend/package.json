@@ -20,6 +20,7 @@
     "seed:roles-v2-flags": "node scripts/seedRolesV2Flags.js",
     "seed:notes-hardening-flag": "node scripts/seedNotesHardeningFlag.js",
     "backfill:note-version-bytes": "node scripts/backfillNoteVersionBytes.js",
+    "backfill:previewText": "node scripts/backfillPreviewText.js",
     "smoke:routes": "node scripts/smokeRoutes.js",
     "migrate:readiness": "node scripts/checkMigrationReadiness.js",
     "migrate:readiness:deploy": "node scripts/checkMigrationReadiness.js --deploy",

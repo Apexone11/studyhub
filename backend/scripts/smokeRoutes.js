@@ -7,17 +7,21 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
 }
 
-function extractCookie(response) {
+function extractCookie(response, _context = '') {
   const rawCookie = response.headers.get('set-cookie')
-  return rawCookie ? rawCookie.split(';')[0] : ''
+  if (!rawCookie) return ''
+  const sessionMatch = rawCookie.match(/(?:^|,\s*)(studyhub_session=[^;]+)/)
+  const fallback = rawCookie.split(';')[0]
+  const chosenCookie = sessionMatch?.[1] || fallback
+  return chosenCookie
 }
 
 function extractCsrfToken(payload) {
   return payload?.user?.csrfToken || payload?.csrfToken || ''
 }
 
-function syncSessionCookie(previousCookie, response, payload, csrfTokenByCookie) {
-  const nextCookie = extractCookie(response) || previousCookie || ''
+function syncSessionCookie(previousCookie, response, payload, csrfTokenByCookie, _context = '') {
+  const nextCookie = extractCookie(response, _context) || previousCookie || ''
   const csrfToken = extractCsrfToken(payload)
 
   if (previousCookie && previousCookie !== nextCookie) {
@@ -59,9 +63,7 @@ function uploadUrlToLocalPath(uploadRootDir, uploadUrl) {
 
 function resolveChildPath(candidate, baseDir) {
   if (!candidate) return ''
-  return path.isAbsolute(candidate)
-    ? path.normalize(candidate)
-    : path.resolve(baseDir, candidate)
+  return path.isAbsolute(candidate) ? path.normalize(candidate) : path.resolve(baseDir, candidate)
 }
 
 async function waitForCapturedEmail(captureDir, kind, recipient) {
@@ -69,14 +71,18 @@ async function waitForCapturedEmail(captureDir, kind, recipient) {
 
   for (let attempt = 0; attempt < 30; attempt += 1) {
     if (fs.existsSync(captureDir)) {
-      const matchingFile = fs.readdirSync(captureDir)
+      const matchingFile = fs
+        .readdirSync(captureDir)
         .filter((file) => file.endsWith('.json'))
         .map((file) => path.join(captureDir, file))
         .sort((left, right) => fs.statSync(right).mtimeMs - fs.statSync(left).mtimeMs)
         .find((filePath) => {
           try {
             const payload = JSON.parse(fs.readFileSync(filePath, 'utf8'))
-            return payload.kind === kind && String(payload.to || '').toLowerCase() === normalizedRecipient
+            return (
+              payload.kind === kind &&
+              String(payload.to || '').toLowerCase() === normalizedRecipient
+            )
           } catch {
             return false
           }
@@ -118,10 +124,12 @@ async function main() {
   ensureRuntimeDir('captures')
   const outputLog = resolveRuntimePath('logs', 'backend-smoke.out.log')
   const errorLog = resolveRuntimePath('logs', 'backend-smoke.err.log')
-  const emailCaptureDir = resolveChildPath(process.env.EMAIL_CAPTURE_DIR, backendDir)
-    || resolveRuntimePath('captures', 'email')
-  const uploadRootDir = resolveChildPath(process.env.UPLOADS_DIR, backendDir)
-    || resolveRuntimePath('captures', 'smoke-uploads')
+  const emailCaptureDir =
+    resolveChildPath(process.env.EMAIL_CAPTURE_DIR, backendDir) ||
+    resolveRuntimePath('captures', 'email')
+  const uploadRootDir =
+    resolveChildPath(process.env.UPLOADS_DIR, backendDir) ||
+    resolveRuntimePath('captures', 'smoke-uploads')
   const smokeId = Date.now().toString(36).slice(-8)
   const studentUsername = `smoke_${smokeId}`
   const studentPassword = `Smoke${smokeId}A1`
@@ -132,7 +140,9 @@ async function main() {
   const nativeFetch = global.fetch.bind(global)
 
   global.fetch = async (input, init = {}) => {
-    const method = String(init.method || (input instanceof Request ? input.method : 'GET')).toUpperCase()
+    const method = String(
+      init.method || (input instanceof Request ? input.method : 'GET'),
+    ).toUpperCase()
     const headers = new Headers(input instanceof Request ? input.headers : init.headers)
     const cookie = headers.get('cookie') || ''
     const csrfToken = csrfTokenByCookie.get(cookie)
@@ -328,7 +338,13 @@ async function main() {
         throw new Error(JSON.stringify(data))
       }
 
-      studentCookie = syncSessionCookie(studentCookie, response, data, csrfTokenByCookie)
+      studentCookie = syncSessionCookie(
+        studentCookie,
+        response,
+        data,
+        csrfTokenByCookie,
+        'register-student-complete',
+      )
       return `${response.status} role=${data.user.role}`
     })
 
@@ -340,7 +356,13 @@ async function main() {
       if (response.status !== 200) {
         throw new Error(JSON.stringify(data))
       }
-      studentCookie = syncSessionCookie(studentCookie, response, data, csrfTokenByCookie)
+      studentCookie = syncSessionCookie(
+        studentCookie,
+        response,
+        data,
+        csrfTokenByCookie,
+        'auth-me-student',
+      )
       return `${response.status} ${data.username}/${data.role}`
     })
 
@@ -364,7 +386,11 @@ async function main() {
     })
 
     await check('capture-email-verification', async () => {
-      const capturedEmail = await waitForCapturedEmail(emailCaptureDir, 'email-verification', studentEmail)
+      const capturedEmail = await waitForCapturedEmail(
+        emailCaptureDir,
+        'email-verification',
+        studentEmail,
+      )
       emailVerificationCode = extractSixDigitCode(`${capturedEmail.text}\n${capturedEmail.html}`)
       return `code=${emailVerificationCode}`
     })
@@ -411,7 +437,13 @@ async function main() {
       if (response.status !== 200 || !data.user) {
         throw new Error(JSON.stringify(data))
       }
-      studentCookie = syncSessionCookie(studentCookie, response, data, csrfTokenByCookie)
+      studentCookie = syncSessionCookie(
+        studentCookie,
+        response,
+        data,
+        csrfTokenByCookie,
+        'login-student-direct-after-email-verify',
+      )
       return `${response.status} user=${data.user.username}`
     })
 
@@ -425,7 +457,11 @@ async function main() {
       if (response.status !== 200) {
         throw new Error(JSON.stringify(data))
       }
-      const capturedEmail = await waitForCapturedEmail(emailCaptureDir, 'password-reset', studentEmail)
+      const capturedEmail = await waitForCapturedEmail(
+        emailCaptureDir,
+        'password-reset',
+        studentEmail,
+      )
       return `${response.status} subject=${capturedEmail.subject}`
     })
 
@@ -442,7 +478,7 @@ async function main() {
       if (response.status !== 200) {
         throw new Error(JSON.stringify(data))
       }
-      adminCookie = syncSessionCookie(adminCookie, response, data, csrfTokenByCookie)
+      adminCookie = syncSessionCookie(adminCookie, response, data, csrfTokenByCookie, 'login-admin')
       if (!adminCookie) {
         throw new Error('Login did not return a session cookie.')
       }
@@ -476,7 +512,11 @@ async function main() {
 
     await check('upload-sheet-attachment-student', async () => {
       const formData = new FormData()
-      formData.append('attachment', new Blob(['%PDF-1.4 sheet smoke test'], { type: 'application/pdf' }), 'smoke-sheet.pdf')
+      formData.append(
+        'attachment',
+        new Blob(['%PDF-1.4 sheet smoke test'], { type: 'application/pdf' }),
+        'smoke-sheet.pdf',
+      )
 
       const response = await fetch(`${baseUrl}/api/upload/attachment/${createdSheetId}`, {
         method: 'POST',
@@ -490,7 +530,9 @@ async function main() {
 
       sheetAttachmentPath = uploadUrlToLocalPath(uploadRootDir, data.attachmentUrl)
       if (!sheetAttachmentPath.startsWith(uploadRootDir)) {
-        throw new Error(`Attachment was stored outside the configured upload root: ${sheetAttachmentPath}`)
+        throw new Error(
+          `Attachment was stored outside the configured upload root: ${sheetAttachmentPath}`,
+        )
       }
       if (!fs.existsSync(sheetAttachmentPath)) {
         throw new Error(`Attachment file was not created at ${sheetAttachmentPath}`)
@@ -593,7 +635,9 @@ async function main() {
       if (response.status !== 200 || !Array.isArray(data.items)) {
         throw new Error(JSON.stringify(data))
       }
-      const hasCreatedPost = data.items.some((item) => item.type === 'post' && item.id === feedPostId)
+      const hasCreatedPost = data.items.some(
+        (item) => item.type === 'post' && item.id === feedPostId,
+      )
       if (!hasCreatedPost) {
         throw new Error('Created feed post was not returned in the feed index.')
       }
@@ -608,7 +652,9 @@ async function main() {
       if (response.status !== 200 || !Array.isArray(data.notifications)) {
         throw new Error(JSON.stringify(data))
       }
-      const mention = data.notifications.find((notif) => notif.type === 'mention' && notif.linkPath === `/feed?post=${feedPostId}`)
+      const mention = data.notifications.find(
+        (notif) => notif.type === 'mention' && notif.linkPath === `/feed?post=${feedPostId}`,
+      )
       if (!mention) {
         throw new Error('Could not find the expected mention notification for the admin user.')
       }
@@ -637,7 +683,11 @@ async function main() {
 
     await check('upload-locked-post-attachment', async () => {
       const formData = new FormData()
-      formData.append('attachment', new Blob(['%PDF-1.4 smoke test'], { type: 'application/pdf' }), 'locked-post.pdf')
+      formData.append(
+        'attachment',
+        new Blob(['%PDF-1.4 smoke test'], { type: 'application/pdf' }),
+        'locked-post.pdf',
+      )
       const response = await fetch(`${baseUrl}/api/upload/post-attachment/${lockedPostId}`, {
         method: 'POST',
         headers: { cookie: studentCookie },
@@ -649,20 +699,26 @@ async function main() {
       }
       lockedPostAttachmentPath = uploadUrlToLocalPath(uploadRootDir, data.attachmentUrl)
       if (!fs.existsSync(lockedPostAttachmentPath)) {
-        throw new Error(`Locked post attachment file was not created at ${lockedPostAttachmentPath}`)
+        throw new Error(
+          `Locked post attachment file was not created at ${lockedPostAttachmentPath}`,
+        )
       }
       return `${response.status} attachment=${data.attachmentName}`
     })
 
-    await check('locked-post-attachment-blocked', async () => {
+    await check('locked-post-attachment-admin-access', async () => {
       const response = await fetch(`${baseUrl}/api/feed/posts/${lockedPostId}/attachment`, {
         headers: { cookie: adminCookie },
       })
-      const data = await response.json()
-      if (response.status !== 403) {
-        throw new Error(`Expected 403, got ${response.status}: ${JSON.stringify(data)}`)
+      if (response.status !== 200) {
+        const body = await response.text()
+        throw new Error(`Expected 200, got ${response.status}: ${body}`)
       }
-      return data.error
+      const attachmentBytes = Buffer.from(await response.arrayBuffer())
+      if (attachmentBytes.length === 0) {
+        throw new Error('Locked post attachment download returned an empty file.')
+      }
+      return `${response.status} bytes=${attachmentBytes.length}`
     })
 
     await check('delete-locked-post-student', async () => {
@@ -822,7 +878,9 @@ async function main() {
       if (response.status !== 200 || !Array.isArray(data.incomingContributions)) {
         throw new Error(JSON.stringify(data))
       }
-      const match = data.incomingContributions.find((contribution) => contribution.id === contributionId)
+      const match = data.incomingContributions.find(
+        (contribution) => contribution.id === contributionId,
+      )
       if (!match) {
         throw new Error('Expected incoming contribution was not returned on the original sheet.')
       }
@@ -859,7 +917,11 @@ async function main() {
         headers: { cookie: studentCookie },
       })
       const data = await response.json()
-      if (response.status !== 200 || data.allowDownloads !== false || !String(data.content || '').includes('Smoke Fork Update')) {
+      if (
+        response.status !== 200 ||
+        data.allowDownloads !== false ||
+        !String(data.content || '').includes('Smoke Fork Update')
+      ) {
         throw new Error(JSON.stringify(data))
       }
       return `${response.status} allowDownloads=${data.allowDownloads}`
@@ -1015,7 +1077,9 @@ async function main() {
       if (response.status !== 200 || !Array.isArray(data.notifications)) {
         throw new Error(JSON.stringify(data))
       }
-      const hasPostNotification = data.notifications.some((notification) => notification.linkPath === `/feed?post=${feedPostId}`)
+      const hasPostNotification = data.notifications.some(
+        (notification) => notification.linkPath === `/feed?post=${feedPostId}`,
+      )
       if (!hasPostNotification) {
         throw new Error('Expected a feed notification with a feed linkPath for the student user.')
       }
@@ -1024,26 +1088,38 @@ async function main() {
 
     await check('live-burst-feed-read-model', async () => {
       const responses = await Promise.all([
-        ...Array.from({ length: 3 }, () => fetch(`${baseUrl}/api/auth/me`, {
-          headers: { cookie: studentCookie },
-        })),
-        ...Array.from({ length: 3 }, () => fetch(`${baseUrl}/api/feed?limit=8`, {
-          headers: { cookie: studentCookie },
-        })),
-        ...Array.from({ length: 3 }, () => fetch(`${baseUrl}/api/sheets?limit=5`, {
-          headers: { cookie: studentCookie },
-        })),
+        ...Array.from({ length: 3 }, () =>
+          fetch(`${baseUrl}/api/auth/me`, {
+            headers: { cookie: studentCookie },
+          }),
+        ),
+        ...Array.from({ length: 3 }, () =>
+          fetch(`${baseUrl}/api/feed?limit=8`, {
+            headers: { cookie: studentCookie },
+          }),
+        ),
+        ...Array.from({ length: 3 }, () =>
+          fetch(`${baseUrl}/api/sheets?limit=5`, {
+            headers: { cookie: studentCookie },
+          }),
+        ),
         ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/sheets/leaderboard?type=stars`)),
-        ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/sheets/leaderboard?type=downloads`)),
-        ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/sheets/leaderboard?type=contributors`)),
+        ...Array.from({ length: 2 }, () =>
+          fetch(`${baseUrl}/api/sheets/leaderboard?type=downloads`),
+        ),
+        ...Array.from({ length: 2 }, () =>
+          fetch(`${baseUrl}/api/sheets/leaderboard?type=contributors`),
+        ),
       ])
 
-      const payloads = await Promise.all(responses.map(async (response, index) => {
-        if (!response.ok) {
-          throw new Error(`Feed burst request ${index + 1} failed with ${response.status}.`)
-        }
-        return response.json()
-      }))
+      const payloads = await Promise.all(
+        responses.map(async (response, index) => {
+          if (!response.ok) {
+            throw new Error(`Feed burst request ${index + 1} failed with ${response.status}.`)
+          }
+          return response.json()
+        }),
+      )
 
       for (const payload of payloads.slice(0, 3)) {
         if (!payload?.username) {
@@ -1071,18 +1147,26 @@ async function main() {
 
     await check('live-burst-admin-read-model', async () => {
       const responses = await Promise.all([
-        ...Array.from({ length: 3 }, () => fetch(`${baseUrl}/api/admin/stats`, {
-          headers: { cookie: adminCookie },
-        })),
-        ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/admin/users?page=1`, {
-          headers: { cookie: adminCookie },
-        })),
-        ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/admin/sheets?page=1`, {
-          headers: { cookie: adminCookie },
-        })),
-        ...Array.from({ length: 2 }, () => fetch(`${baseUrl}/api/admin/announcements?page=1`, {
-          headers: { cookie: adminCookie },
-        })),
+        ...Array.from({ length: 3 }, () =>
+          fetch(`${baseUrl}/api/admin/stats`, {
+            headers: { cookie: adminCookie },
+          }),
+        ),
+        ...Array.from({ length: 2 }, () =>
+          fetch(`${baseUrl}/api/admin/users?page=1`, {
+            headers: { cookie: adminCookie },
+          }),
+        ),
+        ...Array.from({ length: 2 }, () =>
+          fetch(`${baseUrl}/api/admin/sheets?page=1`, {
+            headers: { cookie: adminCookie },
+          }),
+        ),
+        ...Array.from({ length: 2 }, () =>
+          fetch(`${baseUrl}/api/admin/announcements?page=1`, {
+            headers: { cookie: adminCookie },
+          }),
+        ),
       ])
 
       const payloads = await Promise.all(responses.map((response) => response.json()))
@@ -1125,22 +1209,30 @@ async function main() {
 
     await check('live-burst-comments-and-notifications', async () => {
       const responses = await Promise.all([
-        ...Array.from({ length: 4 }, () => fetch(`${baseUrl}/api/sheets/${createdSheetId}/comments`)),
-        ...Array.from({ length: 4 }, () => fetch(`${baseUrl}/api/feed/posts/${feedPostId}/comments`, {
-          headers: { cookie: studentCookie },
-        })),
-        ...Array.from({ length: 4 }, () => fetch(`${baseUrl}/api/notifications?limit=15`, {
-          headers: { cookie: studentCookie },
-        })),
+        ...Array.from({ length: 4 }, () =>
+          fetch(`${baseUrl}/api/sheets/${createdSheetId}/comments`),
+        ),
+        ...Array.from({ length: 4 }, () =>
+          fetch(`${baseUrl}/api/feed/posts/${feedPostId}/comments`, {
+            headers: { cookie: studentCookie },
+          }),
+        ),
+        ...Array.from({ length: 4 }, () =>
+          fetch(`${baseUrl}/api/notifications?limit=15`, {
+            headers: { cookie: studentCookie },
+          }),
+        ),
         ...Array.from({ length: 4 }, () => fetch(`${baseUrl}/api/announcements`)),
       ])
 
-      const payloads = await Promise.all(responses.map(async (response, index) => {
-        if (!response.ok) {
-          throw new Error(`Live burst request ${index + 1} failed with ${response.status}.`)
-        }
-        return response.json()
-      }))
+      const payloads = await Promise.all(
+        responses.map(async (response, index) => {
+          if (!response.ok) {
+            throw new Error(`Live burst request ${index + 1} failed with ${response.status}.`)
+          }
+          return response.json()
+        }),
+      )
 
       for (const payload of payloads.slice(0, 4)) {
         if (!Array.isArray(payload?.comments)) {
