@@ -281,4 +281,55 @@ describe('redactPII (decision #17, locked Phase 3)', () => {
     const text = 'Review chapters 1-6 before the midterm on May 5.'
     expect(redactPII(text)).toBe(text)
   })
+
+  /**
+   * Boundary regression suite for the tightened phone regex.
+   *
+   * The Round-of-fixes commit (3ed90abb) reshaped PHONE_RE specifically
+   * to stop snagging hyphenated numeric ranges like "chapters 1-6" and
+   * to start catching arbitrarily-grouped international numbers like
+   * "+44 20 7946 0958". These cases pin the new behavior so a future
+   * "simplify the regex" refactor can't quietly regress either side.
+   */
+  describe('phone regex — boundary cases', () => {
+    it('does not match short hyphenated ranges like "1-6" or "10-12"', () => {
+      expect(redactPII('Read chapters 1-6 tonight.')).not.toContain('[redacted-phone]')
+      expect(redactPII('Sections 10-12 are due Friday.')).not.toContain('[redacted-phone]')
+    })
+
+    it('does not match digit runs that are part of identifiers (no word-boundary leakage)', () => {
+      // The (?<![\w-]) / (?![\w-]) anchors are what protect IDs. If
+      // they ever get dropped, an order_id or sheet slug containing a
+      // 10-digit run would get partially redacted.
+      expect(redactPII('order_1234567890_extra')).not.toContain('[redacted-phone]')
+      expect(redactPII('sheet-slug-1234567890-v2')).not.toContain('[redacted-phone]')
+    })
+
+    it('matches international numbers with multiple short groups', () => {
+      // E.164-style with 4 groups of varying lengths. The regex's
+      // first alternation is what makes this work.
+      expect(redactPII('Reach me at +1 415 555 0199 mornings.')).toContain('[redacted-phone]')
+      expect(redactPII('UK office: +44 20 7946 0958.')).toContain('[redacted-phone]')
+    })
+
+    it('matches NANP numbers without separators', () => {
+      // Bare 10-digit run, surrounded by whitespace, is the worst-case
+      // for the boundary check — must still match.
+      expect(redactPII('Phone 4155550199 today.')).toContain('[redacted-phone]')
+    })
+
+    it('matches a phone number sitting at the end of a sentence', () => {
+      // The trailing punctuation is a non-word character, so the
+      // (?![\w-]) lookahead must still allow the match.
+      expect(redactPII('Call 123-456-7890.')).toContain('[redacted-phone]')
+    })
+
+    it('redacts both an email and a phone in the same string', () => {
+      const out = redactPII('Email a@b.com or call 123-456-7890.')
+      expect(out).toContain('[redacted-email]')
+      expect(out).toContain('[redacted-phone]')
+      expect(out).not.toContain('a@b.com')
+      expect(out).not.toContain('123-456-7890')
+    })
+  })
 })
