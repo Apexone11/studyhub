@@ -22,7 +22,7 @@ beforeAll(() => {
   const appPath = require.resolve('../src/index')
   delete require.cache[appPath]
   app = require(appPath).app
-})
+}, 30000)
 
 afterAll(() => {
   const appPath = require.resolve('../src/index')

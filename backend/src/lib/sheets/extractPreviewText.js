@@ -38,12 +38,34 @@ function stripHtml(html) {
     .replace(/&nbsp;/g, ' ')
 }
 
+function stripMarkdown(text) {
+  return String(text)
+    .replace(/!\[[^\]]*]\([^)]+\)/g, ' ')
+    .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')
+    .replace(/(^|\s)#{1,6}\s+/g, '$1')
+    .replace(/(^|\s)[-*+]\s+/g, '$1')
+    .replace(/(^|\s)>\s+/g, '$1')
+    .replace(/`{1,3}([^`]+)`{1,3}/g, '$1')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/[*_~]/g, '')
+}
+
 function extractPreviewText(content) {
   if (typeof content !== 'string' || content.length === 0) return null
   const plain = stripHtml(content).replace(/\s+/g, ' ').trim()
+  const normalized = stripMarkdown(plain).replace(/\s+/g, ' ').trim()
   if (plain.length === 0) return null
-  if (plain.length <= PREVIEW_MAX_CHARS) return plain
-  return plain.slice(0, PREVIEW_MAX_CHARS - ELLIPSIS.length) + ELLIPSIS
+  if (normalized.length === 0) return null
+  if (normalized.length <= PREVIEW_MAX_CHARS) return normalized
+  const cutoff = PREVIEW_MAX_CHARS - ELLIPSIS.length
+  const sliced = normalized.slice(0, cutoff)
+  const endsWithHighSurrogate = /[\uD800-\uDBFF]$/.test(sliced)
+  let safeSliced = sliced
+  if (endsWithHighSurrogate) {
+    safeSliced = safeSliced.slice(0, -1)
+  }
+  return safeSliced + ELLIPSIS
 }
 
 module.exports = {
