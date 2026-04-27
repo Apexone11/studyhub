@@ -21,6 +21,10 @@ const suggestions = require('./ai.suggestions.service')
 
 const router = express.Router()
 const requireTrustedOrigin = originAllowlist()
+const requireTrustedSuggestionRead = originAllowlist({
+  checkSafeMethods: true,
+  allowMissingOrigin: true,
+})
 
 // Strip the persisted row down to the fields the client needs.
 // Internal columns we deliberately drop:
@@ -45,25 +49,31 @@ function shapeForClient(row) {
 // GET /api/ai/suggestions
 // Returns the user's current suggestion, regenerating when stale or
 // missing (subject to the shared daily quota).
-router.get('/', requireAuth, aiSuggestionsReadLimiter, async (req, res) => {
-  try {
-    const prisma = require('../../lib/prisma')
-    const user = await prisma.user.findUnique({
-      where: { id: req.user.userId },
-      select: { id: true, role: true, emailVerified: true, isStaffVerified: true },
-    })
-    if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
+router.get(
+  '/',
+  requireAuth,
+  requireTrustedSuggestionRead,
+  aiSuggestionsReadLimiter,
+  async (req, res) => {
+    try {
+      const prisma = require('../../lib/prisma')
+      const user = await prisma.user.findUnique({
+        where: { id: req.user.userId },
+        select: { id: true, role: true, emailVerified: true, isStaffVerified: true },
+      })
+      if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
-    const result = await suggestions.fetchOrGenerate(user)
-    return res.json({
-      suggestion: shapeForClient(result.suggestion),
-      quotaExhausted: Boolean(result.quotaExhausted),
-    })
-  } catch (err) {
-    captureError(err, { tags: { module: 'ai', action: 'getSuggestion' } })
-    return sendError(res, 500, 'Failed to load suggestion.', ERROR_CODES.INTERNAL)
-  }
-})
+      const result = await suggestions.fetchOrGenerate(user)
+      return res.json({
+        suggestion: shapeForClient(result.suggestion),
+        quotaExhausted: Boolean(result.quotaExhausted),
+      })
+    } catch (err) {
+      captureError(err, { tags: { module: 'ai', action: 'getSuggestion' } })
+      return sendError(res, 500, 'Failed to load suggestion.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 // POST /api/ai/suggestions/refresh
 // Force-regenerate. Counts against daily quota AND a 5/hour refresh

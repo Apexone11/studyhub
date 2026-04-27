@@ -185,6 +185,15 @@ describe('GET /suggestions', () => {
     expect(mocks.suggestionsService.fetchOrGenerate).not.toHaveBeenCalled()
   })
 
+  it('returns 403 from an untrusted origin because GET can generate a paid suggestion', async () => {
+    originAllowed = false
+
+    const res = await request(app).get('/suggestions')
+
+    expect(res.status).toBe(403)
+    expect(mocks.suggestionsService.fetchOrGenerate).not.toHaveBeenCalled()
+  })
+
   it('returns 500 + structured error on service failure', async () => {
     mocks.suggestionsService.fetchOrGenerate.mockRejectedValueOnce(new Error('anthropic 500'))
     const res = await request(app).get('/suggestions')

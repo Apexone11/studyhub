@@ -2,7 +2,7 @@
  * originAllowlist.test.js — Unit tests for the payments-facing Origin guard.
  *
  * Covers:
- *   - GET/HEAD/OPTIONS pass through unchanged
+ *   - GET/HEAD/OPTIONS pass through unchanged by default
  *   - Missing Origin + Referer is rejected with 403 (stricter than the global
  *     CSRF guard, which bails out in that case)
  *   - Whitelisted Origin / Referer passes
@@ -57,6 +57,51 @@ describe('originAllowlist()', () => {
   it('passes GET requests through without checking the Origin header', () => {
     const mw = originAllowlist()
     const req = makeReq({ method: 'GET', headers: {} })
+    const res = makeRes()
+    const next = vi.fn()
+
+    mw(req, res, next)
+
+    expect(next).toHaveBeenCalledOnce()
+    expect(res.statusCode).toBe(200)
+  })
+
+  it('can enforce trusted origins for side-effecting GET routes', () => {
+    const mw = originAllowlist({ checkSafeMethods: true })
+    const req = makeReq({
+      method: 'GET',
+      headers: { origin: 'https://evil.example.com' },
+    })
+    const res = makeRes()
+    const next = vi.fn()
+
+    mw(req, res, next)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('can reject cross-site Fetch Metadata while allowing missing Origin', () => {
+    const mw = originAllowlist({ checkSafeMethods: true, allowMissingOrigin: true })
+    const req = makeReq({
+      method: 'GET',
+      headers: { 'sec-fetch-site': 'cross-site' },
+    })
+    const res = makeRes()
+    const next = vi.fn()
+
+    mw(req, res, next)
+
+    expect(next).not.toHaveBeenCalled()
+    expect(res.statusCode).toBe(403)
+  })
+
+  it('can allow same-origin safe requests that omit Origin and Referer', () => {
+    const mw = originAllowlist({ checkSafeMethods: true, allowMissingOrigin: true })
+    const req = makeReq({
+      method: 'GET',
+      headers: { 'sec-fetch-site': 'same-origin' },
+    })
     const res = makeRes()
     const next = vi.fn()
 

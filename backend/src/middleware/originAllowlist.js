@@ -95,20 +95,37 @@ function buildTrustedOrigins() {
  *   - rebuildPerRequest: if true, reconstructs the trusted-origin set on each
  *     request. Useful for tests that mutate process.env between cases. Defaults
  *     to false for production (set is built once at factory time).
+ *   - checkSafeMethods: if true, enforce the same origin rules on GET/HEAD too.
+ *     Use only for endpoints whose "read" path can write, spend quota, or call
+ *     paid upstream services.
+ *   - allowMissingOrigin: if true, same-origin/native callers that omit both
+ *     Origin and Referer are allowed. Cross-site Fetch Metadata is still denied.
  */
-function originAllowlist({ rebuildPerRequest = false } = {}) {
+function originAllowlist({
+  rebuildPerRequest = false,
+  checkSafeMethods = false,
+  allowMissingOrigin = false,
+} = {}) {
   const cachedTrustedOrigins = rebuildPerRequest ? null : buildTrustedOrigins()
 
   return function originAllowlistMiddleware(req, res, next) {
     // Safe methods skip the check — payment POST routes are what we care about.
-    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') {
+    if (
+      !checkSafeMethods &&
+      (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS')
+    ) {
       return next()
+    }
+
+    if (checkSafeMethods && req.headers['sec-fetch-site'] === 'cross-site') {
+      return sendError(res, 403, 'Origin not allowed.', ERROR_CODES.FORBIDDEN)
     }
 
     const rawOrigin = req.headers.origin || req.headers.referer
     const requestOrigin = normalizeOrigin(rawOrigin)
 
     if (!requestOrigin) {
+      if (allowMissingOrigin) return next()
       return sendError(res, 403, 'Origin header required.', ERROR_CODES.FORBIDDEN)
     }
 
