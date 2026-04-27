@@ -19,10 +19,15 @@
  * indexed UPDATE per row.
  */
 
-const prisma = require('../src/core/db/prisma')
-const { extractPreviewText } = require('../src/lib/sheets/extractPreviewText')
 const path = require('node:path')
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
+if (!process.env.DATABASE_URL) {
+  throw new Error(
+    'DATABASE_URL is missing after loading backend/.env. Set it in backend/.env or environment before running backfill:previewText.',
+  )
+}
+const prisma = require('../src/core/db/prisma')
+const { extractPreviewText } = require('../src/lib/sheets/extractPreviewText')
 
 const BATCH_SIZE = 100
 
