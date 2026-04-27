@@ -5,9 +5,9 @@ permissions:
 
 on:
   pull_request:
-    branches: ['main']
+    branches: ['main', 'approved-branch']
   push:
-    branches: ['main']
+    branches: ['main', 'approved-branch']
 
 jobs:
   backend:
