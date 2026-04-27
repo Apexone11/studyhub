@@ -29,6 +29,11 @@ export default function useSheetsData() {
   const mine = searchParams.get('mine') === '1'
   const starred = searchParams.get('starred') === '1'
   const statusFilter = searchParams.get('status') || ''
+  // Phase 4 Day 3 — "Search across StudyHub" cross-school toggle. When
+  // ?searchAll=1 is set, the request omits schoolId so backend returns
+  // results across the whole platform regardless of the user's selected
+  // school. Default false (off) keeps the page school-scoped.
+  const searchAll = searchParams.get('searchAll') === '1'
   const sortValue = SORT_OPTIONS.some((option) => option.value === searchParams.get('sort'))
     ? searchParams.get('sort')
     : 'recommended'
@@ -146,6 +151,7 @@ export default function useSheetsData() {
     mine ||
     starred ||
     statusFilter ||
+    searchAll ||
     formatValue !== 'all' ||
     sortValue !== 'recommended',
   )
@@ -207,7 +213,9 @@ export default function useSheetsData() {
       const params = new URLSearchParams({ limit: '24', sort: sortValue })
 
       if (search) params.set('search', search)
-      if (schoolId) params.set('schoolId', schoolId)
+      // Cross-school toggle wins over schoolId — user explicitly asked
+      // for a platform-wide search.
+      if (schoolId && !searchAll) params.set('schoolId', schoolId)
       if (courseId) params.set('courseId', courseId)
       if (mine) params.set('mine', '1')
       if (mine && statusFilter) params.set('status', statusFilter)
@@ -262,7 +270,18 @@ export default function useSheetsData() {
         })
       }
     },
-    [clearSession, courseId, formatValue, mine, schoolId, search, sortValue, starred, statusFilter],
+    [
+      clearSession,
+      courseId,
+      formatValue,
+      mine,
+      schoolId,
+      search,
+      searchAll,
+      sortValue,
+      starred,
+      statusFilter,
+    ],
   )
 
   const loadMoreSheets = useCallback(async () => {
@@ -273,7 +292,7 @@ export default function useSheetsData() {
       sort: sortValue,
     })
     if (search) params.set('search', search)
-    if (schoolId) params.set('schoolId', schoolId)
+    if (schoolId && !searchAll) params.set('schoolId', schoolId)
     if (courseId) params.set('courseId', courseId)
     if (mine) params.set('mine', '1')
     if (mine && statusFilter) params.set('status', statusFilter)
@@ -308,6 +327,7 @@ export default function useSheetsData() {
     mine,
     schoolId,
     search,
+    searchAll,
     sheetsState.sheets.length,
     sortValue,
     starred,
@@ -343,7 +363,7 @@ export default function useSheetsData() {
   useLivePolling(loadSheets, {
     enabled: Boolean(user),
     intervalMs: 45000,
-    refreshKey: `${search}|${schoolId}|${courseId}|${mine}|${starred}|${sortValue}|${formatValue}|${statusFilter}`,
+    refreshKey: `${search}|${schoolId}|${courseId}|${mine}|${starred}|${sortValue}|${formatValue}|${statusFilter}|${searchAll ? '1' : '0'}`,
   })
 
   const handleCourseFilter = useCallback(
@@ -368,6 +388,13 @@ export default function useSheetsData() {
     }
     setSearchParams(next, { replace: true })
   }, [mine, searchParams, setSearchParams])
+
+  const toggleSearchAll = useCallback(() => {
+    const next = new URLSearchParams(searchParams)
+    if (searchAll) next.delete('searchAll')
+    else next.set('searchAll', '1')
+    setSearchParams(next, { replace: true })
+  }, [searchAll, searchParams, setSearchParams])
 
   const clearAllFilters = useCallback(() => {
     setSearchParams(new URLSearchParams(), { replace: true })
@@ -433,6 +460,7 @@ export default function useSheetsData() {
     statusFilter,
     sortValue,
     formatValue,
+    searchAll,
     catalog,
     catalogError,
     sheetsState,
@@ -452,6 +480,7 @@ export default function useSheetsData() {
     handleSchoolChange,
     handleCourseFilter,
     toggleMine,
+    toggleSearchAll,
     clearAllFilters,
     toggleStar,
     handleFork,
