@@ -1,5 +1,5 @@
 /**
- * extractPreviewText.test.js — Phase 4 Sheets Grid groundwork.
+ * extractPreviewText.test.js
  *
  * Pins the contract the StudySheet.previewText column relies on:
  * extract a clean, capped, NULL-safe summary from a raw HTML/markdown
@@ -31,6 +31,11 @@ describe('extractPreviewText', () => {
   it('decodes the common HTML entities', () => {
     const out = extractPreviewText('Tom &amp; Jerry &lt;3 &quot;hi&quot;')
     expect(out).toBe(`Tom & Jerry <3 "hi"`)
+  })
+
+  it('strips common markdown markers so previews stay readable', () => {
+    const out = extractPreviewText('**bold** # Heading [docs](https://example.com)\n- item one')
+    expect(out).toBe('bold Heading docs item one')
   })
 
   it('collapses runs of whitespace including newlines and tabs', () => {
@@ -67,11 +72,11 @@ describe('extractPreviewText', () => {
     expect(extractPreviewText('<div></div>')).toBeNull()
   })
 
-  it('respects the cap when truncation point lands mid-multi-byte', () => {
-    // The cap is char-count, not byte-count. Plain ASCII string
-    // long enough to truncate — confirm the cap holds.
-    const long = 'abcdef '.repeat(80)
+  it('avoids leaving a dangling high surrogate when truncating emoji text', () => {
+    const long = `${'x'.repeat(236)}😀tail`
     const out = extractPreviewText(long)
     expect(out.length).toBeLessThanOrEqual(PREVIEW_MAX_CHARS)
+    expect(out.endsWith('...')).toBe(true)
+    expect(/[\uD800-\uDBFF]$/.test(out.slice(0, -3))).toBe(false)
   })
 })
