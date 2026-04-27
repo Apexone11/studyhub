@@ -17,7 +17,7 @@ jobs:
         working-directory: backend
     steps:
       - uses: actions/checkout@v4
-      - name: Enforce beta release log update
+      - name: Enforce release log update
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
@@ -28,11 +28,15 @@ jobs:
           echo "Changed files:"
           echo "$CHANGED_FILES"
 
+          # The internal log at docs/internal/beta-v*-release-log.md is gitignored
+          # by design (private team notes). The public-facing, tracked log at
+          # docs/release-log.md is the only file in the diff that can satisfy
+          # this gate. See docs/release-log.md for the contributor checklist.
           CODE_CHANGED="$(printf '%s\n' "$CHANGED_FILES" | grep -E '^(backend/|frontend/|scripts/|\.github/workflows/|docker-compose\.yml|package\.json)' || true)"
-          BETA_LOG_CHANGED="$(printf '%s\n' "$CHANGED_FILES" | grep -E '^docs/beta-v[0-9]+\.[0-9]+\.[0-9]+-release-log\.md$' || true)"
+          RELEASE_LOG_CHANGED="$(printf '%s\n' "$CHANGED_FILES" | grep -E '^docs/release-log\.md$' || true)"
 
-          if [[ -n "$CODE_CHANGED" && -z "$BETA_LOG_CHANGED" ]]; then
-            echo "::error::Code changes detected without updating docs/beta-v<MAJOR.MINOR.PATCH>-release-log.md"
+          if [[ -n "$CODE_CHANGED" && -z "$RELEASE_LOG_CHANGED" ]]; then
+            echo "::error::Code changes detected without updating docs/release-log.md. Add a one-line entry under the current cycle heading."
             exit 1
           fi
       - uses: actions/setup-node@v4
