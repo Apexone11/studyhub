@@ -30,6 +30,8 @@ internal log into this file when they describe user-visible behavior.
 
 ### CI / infrastructure
 
+- **CI branch coverage hotfix.** StudyHub CI and CodeQL now run for
+  `approved-branch` pull requests and pushes in addition to `main`.
 - **CI hotfix (Day 2.5).** Pin `github/codeql-action` init + analyze to
   `@v3` to restore CodeQL Advanced runs, and switch the release-log gate
   to track this public file at `docs/release-log.md` instead of the
