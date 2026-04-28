@@ -237,16 +237,96 @@ export function useNotesData() {
   function handleContentChange(value) {
     setEditorContent(value)
   }
+
+  /**
+   * Persist a metadata change (private / allowDownloads / courseId) for the
+   * active note via PATCH /api/notes/:id/metadata. Updates the local React
+   * state optimistically, also patches the sidebar list row so the new
+   * value is visible immediately, and reverts on failure with a toast.
+   *
+   * Why: the hardened content-save path only persists `title`/`content`,
+   * so these three controls were updating client state but never reaching
+   * the backend. After a reload the selectors snapped back to whatever
+   * was persisted, which made them feel broken.
+   */
+  async function persistMetadataChange(field, value, optimisticApply, revert) {
+    if (!activeNote?.id) return
+    optimisticApply()
+    setNotes((prev) => prev.map((n) => (n.id === activeNote.id ? { ...n, [field]: value } : n)))
+    setActiveNote((prev) => (prev?.id === activeNote.id ? { ...prev, [field]: value } : prev))
+    try {
+      const response = await fetch(`${API}/api/notes/${activeNote.id}/metadata`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ [field]: value }),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json().catch(() => ({}))
+      // Trust the server's normalized row (e.g. it auto-cleared
+      // allowDownloads when private went true).
+      const serverNote = data?.note
+      if (serverNote) {
+        const normalized = normalizeNote(serverNote)
+        setNotes((prev) => prev.map((n) => (n.id === normalized.id ? { ...n, ...normalized } : n)))
+        setActiveNote((prev) => (prev?.id === normalized.id ? { ...prev, ...normalized } : prev))
+        if (Object.prototype.hasOwnProperty.call(normalized, 'allowDownloads')) {
+          setEditorAllowDownloads(Boolean(normalized.allowDownloads))
+        }
+      }
+    } catch {
+      revert()
+      setNotes((prev) =>
+        prev.map((n) =>
+          n.id === activeNote.id ? { ...n, [field]: !value === false ? !value : !value } : n,
+        ),
+      )
+      setActiveNote((prev) =>
+        prev?.id === activeNote.id ? { ...prev, [field]: activeNote[field] } : prev,
+      )
+      showToast('Failed to update note settings', 'error')
+    }
+  }
+
   function handlePrivateChange(value) {
-    setEditorPrivate(value)
-    // When going private, downloads are auto-reset by backend — reflect locally
-    if (value) setEditorAllowDownloads(false)
+    const previous = editorPrivate
+    const previousDownloads = editorAllowDownloads
+    persistMetadataChange(
+      'private',
+      value,
+      () => {
+        setEditorPrivate(value)
+        // Mirror the backend behavior locally so the Downloads checkbox
+        // doesn't blink — going private clears downloads.
+        if (value) setEditorAllowDownloads(false)
+      },
+      () => {
+        setEditorPrivate(previous)
+        setEditorAllowDownloads(previousDownloads)
+      },
+    )
   }
   function handleAllowDownloadsChange(value) {
-    setEditorAllowDownloads(value)
+    const previous = editorAllowDownloads
+    persistMetadataChange(
+      'allowDownloads',
+      value,
+      () => setEditorAllowDownloads(value),
+      () => setEditorAllowDownloads(previous),
+    )
   }
   function handleCourseChange(value) {
-    setEditorCourseId(value)
+    const previous = editorCourseId
+    // The dropdown emits string values ("" for "No course"). Convert to
+    // null/number for the backend so the metadata controller's parseInt
+    // succeeds and the courseId column is set correctly.
+    const courseIdForServer = value === '' || value == null ? null : Number.parseInt(value, 10)
+    persistMetadataChange(
+      'courseId',
+      courseIdForServer,
+      () => setEditorCourseId(value),
+      () => setEditorCourseId(previous),
+    )
   }
 
   /* ── Create / Delete ─────────────────────────────────────────────────── */
