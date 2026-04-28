@@ -22,7 +22,9 @@ const ROUTE_TO_API = {
   '/study-groups': '/api/study-groups',
   '/announcements': '/api/announcements',
   '/my-courses': '/api/courses/enrolled',
-  '/tests': '/api/tests',
+  // '/tests' is intentionally NOT prefetched: the page is currently a v2
+  // teaser with no backend route. Mapping it to '/api/tests' here would
+  // hit a 404 every time a user hovers Practice Tests in the sidebar.
   '/ai': '/api/ai/conversations',
   '/library': '/api/library/search?language=en',
   '/users/:username': null, // Profile routes are dynamic; not prefetched
