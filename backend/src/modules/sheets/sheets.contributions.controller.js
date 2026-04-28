@@ -20,6 +20,7 @@ const { serializeContribution } = require('./sheets.serializer')
 const { computeChecksum } = require('../sheetLab/sheetLab.constants')
 const { trackActivity } = require('../../lib/activityTracker')
 const { checkAndAwardBadges } = require('../../lib/badges')
+const { withPreviewText } = require('../../lib/sheets/applyContentUpdate')
 
 const router = express.Router()
 
@@ -103,7 +104,9 @@ router.patch(
           where: { id: contribution.targetSheetId },
           data: {
             description: contribution.forkSheet.description,
-            content: contribution.forkSheet.content,
+            // withPreviewText keeps the Sheets Grid card preview in sync
+            // with the merged-in body — see applyContentUpdate.js docstring.
+            ...withPreviewText(contribution.forkSheet.content),
             contentFormat: contribution.forkSheet.contentFormat || 'markdown',
             status: SHEET_STATUS.PUBLISHED,
             attachmentUrl: contribution.forkSheet.attachmentUrl,

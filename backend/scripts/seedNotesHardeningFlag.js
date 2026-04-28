@@ -22,9 +22,7 @@ const FLAG = {
     'Notes hardening v2: local-first state machine, IDB draft, revision concurrency, diff/restore',
 }
 
-const prisma = createPrismaClient()
-
-async function main() {
+async function seedNotesHardeningFlag(prisma) {
   const existing = await prisma.featureFlag.findUnique({ where: { name: FLAG.name } })
   const flag = await prisma.featureFlag.upsert({
     where: { name: FLAG.name },
@@ -38,18 +36,35 @@ async function main() {
       rolloutPercentage: 100,
     },
   })
-  if (existing) {
-    console.log(
-      `[seed] kept ${flag.name} (enabled=${existing.enabled}, rollout=${existing.rolloutPercentage}%)`,
-    )
-  } else {
-    console.log(`[seed] ${flag.name} = ${flag.enabled} ${flag.rolloutPercentage}%`)
+  return {
+    name: flag.name,
+    existed: Boolean(existing),
+    enabled: existing ? existing.enabled : flag.enabled,
+    rolloutPercentage: existing ? existing.rolloutPercentage : flag.rolloutPercentage,
   }
 }
 
-main()
-  .catch((err) => {
+async function main() {
+  const prisma = createPrismaClient()
+  try {
+    const result = await seedNotesHardeningFlag(prisma)
+    if (result.existed) {
+      console.log(
+        `[seed] kept ${result.name} (enabled=${result.enabled}, rollout=${result.rolloutPercentage}%)`,
+      )
+    } else {
+      console.log(`[seed] ${result.name} = ${result.enabled} ${result.rolloutPercentage}%`)
+    }
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
+if (require.main === module) {
+  main().catch((err) => {
     console.error('[seed] notes-hardening flag seed failed:', err)
     process.exit(1)
   })
-  .finally(() => prisma.$disconnect())
+}
+
+module.exports = { seedNotesHardeningFlag, FLAG }

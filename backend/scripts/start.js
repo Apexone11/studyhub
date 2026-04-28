@@ -11,14 +11,24 @@ function envFlag(name, fallback = false) {
   return /^(1|true|yes|on)$/i.test(value)
 }
 
-function shouldRunMigrationsOnStart() {
-  const isRailway = [
-    'RAILWAY_ENVIRONMENT_ID',
-    'RAILWAY_PROJECT_ID',
-    'RAILWAY_SERVICE_ID',
-  ].some((name) => Boolean(process.env[name]))
+function isRailwayBoot() {
+  return ['RAILWAY_ENVIRONMENT_ID', 'RAILWAY_PROJECT_ID', 'RAILWAY_SERVICE_ID'].some((name) =>
+    Boolean(process.env[name]),
+  )
+}
 
-  return envFlag('RUN_PRISMA_MIGRATIONS_ON_START', isRailway)
+function shouldRunMigrationsOnStart() {
+  return envFlag('RUN_PRISMA_MIGRATIONS_ON_START', isRailwayBoot())
+}
+
+function shouldSeedFeatureFlagsOnStart() {
+  // Seeding is idempotent (upsert-only, no user data, no destructive writes).
+  // Default ON when Railway env vars are present so deploys self-provision
+  // shipped FeatureFlag rows without an operator running `seed:flags` by
+  // hand. The fail-CLOSED contract (CLAUDE.md §12, decision #20) means a
+  // missing row makes a shipped feature invisible — that is exactly what
+  // this guard prevents.
+  return envFlag('SEED_FEATURE_FLAGS_ON_START', isRailwayBoot())
 }
 
 function runPrismaMigrations() {
@@ -42,10 +52,60 @@ function runPrismaMigrations() {
   })
 }
 
+async function runFeatureFlagSeeds() {
+  const { createPrismaClient } = require(path.join(BACKEND_ROOT, 'src', 'lib', 'prisma'))
+  const { seedFeatureFlags } = require('./seedFeatureFlags')
+  const { seedRolesV2Flags } = require('./seedRolesV2Flags')
+  const { seedNotesHardeningFlag } = require('./seedNotesHardeningFlag')
+
+  const prisma = createPrismaClient()
+  try {
+    const designV2 = await seedFeatureFlags(prisma)
+    for (const r of designV2) {
+      console.log(
+        r.existed
+          ? `[boot-seed] kept ${r.name} (enabled=${r.enabled})`
+          : `[boot-seed] seeded ${r.name} (enabled=true, rollout=100%)`,
+      )
+    }
+
+    const rolesV2 = await seedRolesV2Flags(prisma)
+    for (const r of rolesV2) {
+      console.log(
+        r.existed
+          ? `[boot-seed] kept ${r.name} (enabled=${r.enabled}, rollout=${r.rolloutPercentage}%)`
+          : `[boot-seed] seeded ${r.name} (enabled=true, rollout=100%)`,
+      )
+    }
+
+    const notesHardening = await seedNotesHardeningFlag(prisma)
+    console.log(
+      notesHardening.existed
+        ? `[boot-seed] kept ${notesHardening.name} (enabled=${notesHardening.enabled}, rollout=${notesHardening.rolloutPercentage}%)`
+        : `[boot-seed] seeded ${notesHardening.name} (enabled=${notesHardening.enabled}, rollout=${notesHardening.rolloutPercentage}%)`,
+    )
+  } finally {
+    await prisma.$disconnect()
+  }
+}
+
 async function main() {
   if (shouldRunMigrationsOnStart()) {
     console.log('Running Prisma migrations before starting the API.')
     await runPrismaMigrations()
+  }
+
+  if (shouldSeedFeatureFlagsOnStart()) {
+    console.log('Provisioning shipped FeatureFlag rows before starting the API.')
+    try {
+      await runFeatureFlagSeeds()
+    } catch (err) {
+      // Don't block API startup on a flag-seed failure — the API serving
+      // is more important than features being lit. The fail-CLOSED client
+      // already renders unseeded flags as off, so the user-visible cost
+      // is "feature appears dark" until an operator re-runs the seed.
+      console.error('[boot-seed] feature-flag seed failed; continuing startup.', err)
+    }
   }
 
   const backendEntry = require(path.join(BACKEND_ROOT, 'src', 'index.js'))

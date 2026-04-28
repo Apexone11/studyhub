@@ -8,10 +8,19 @@
  * 5. Static uploads route headers (nosniff, cache-control)
  */
 import { createRequire } from 'node:module'
+import express from 'express'
+import path from 'node:path'
+import fs from 'node:fs'
+import os from 'node:os'
 import request from 'supertest'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 const require = createRequire(import.meta.url)
+// Hoisted imports (Task #56 test-isolation fix, 2026-04-27).
+// Express is heavy; calling `await import('express')` inside 5+ test
+// bodies caused sporadic worker timeouts under the full suite on Windows.
+// Pulled into top-of-file static imports — node:* are zero-cost, express
+// is paid once per test file. Do NOT reintroduce per-test dynamic imports.
 
 let app
 
@@ -168,8 +177,6 @@ describe('Security headers on API routes', () => {
  * ═══════════════════════════════════════════════════════════════════════════ */
 describe('Preview exceptions preserved', () => {
   it('preview path: CSP allows fonts/styles, blocks scripts, scoped frame-ancestors, no X-Frame-Options', async () => {
-    const express = (await import('express')).default
-
     // Replicate the exact middleware from index.js
     const appSurfaceCsp = [
       "default-src 'none'",
@@ -250,11 +257,6 @@ describe('Static uploads route headers', () => {
   // the exact static middleware from index.js.
 
   it('avatar static route sets nosniff and cache-control', async () => {
-    const express = (await import('express')).default
-    const path = (await import('node:path')).default
-    const fs = (await import('node:fs')).default
-    const os = (await import('node:os')).default
-
     // Create a temp dir with a test file
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'avatar-test-'))
     fs.writeFileSync(path.join(tmpDir, 'test.png'), 'fake-png')
@@ -282,11 +284,6 @@ describe('Static uploads route headers', () => {
   })
 
   it('cover static route sets nosniff and cache-control', async () => {
-    const express = (await import('express')).default
-    const path = (await import('node:path')).default
-    const fs = (await import('node:fs')).default
-    const os = (await import('node:os')).default
-
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cover-test-'))
     fs.writeFileSync(path.join(tmpDir, 'test.jpg'), 'fake-jpg')
 
@@ -312,11 +309,6 @@ describe('Static uploads route headers', () => {
   })
 
   it('school-logos static route sets nosniff and longer cache', async () => {
-    const express = (await import('express')).default
-    const path = (await import('node:path')).default
-    const fs = (await import('node:fs')).default
-    const os = (await import('node:os')).default
-
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'logo-test-'))
     fs.writeFileSync(path.join(tmpDir, 'test.png'), 'fake-logo')
 

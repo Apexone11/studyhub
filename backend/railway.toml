@@ -6,13 +6,13 @@ builder = "nixpacks"
 buildCommand = "npm install && npx prisma generate"
 
 [deploy]
-# Run migrations first, then provision SHIPPED design_v2_* FeatureFlag rows
-# (fail-closed contract: missing rows render shipped features invisible —
-# we want the deploy to ABORT if seeding fails, hence no `||` fallback).
-# Finally refresh the MaxMind GeoLite2 DB best-effort — if MAXMIND_LICENSE_KEY
-# isn't set or the download fails we swallow the error; geoip.service.js
-# already falls back to no-op.
-preDeployCommand = "npx prisma migrate deploy && npm run seed:flags && (npm run update-geoip-db || echo '[pre-deploy] skipping geoip refresh')"
+# Migrations + FeatureFlag seeding are handled by `scripts/start.js` on
+# every boot (idempotent upserts; see CLAUDE.md §12 and decision #20).
+# Doing it in start.js — rather than relying on preDeployCommand —
+# means restarts, crash-recoveries, and Dockerfile-built deploys all
+# self-provision shipped flags without an operator running anything by
+# hand. preDeployCommand here only handles best-effort GeoIP refresh.
+preDeployCommand = "npm run update-geoip-db || echo '[pre-deploy] skipping geoip refresh'"
 startCommand = "npm start"
 healthcheckPath = "/health"
 healthcheckTimeout = 60

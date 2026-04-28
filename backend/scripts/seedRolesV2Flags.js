@@ -30,9 +30,8 @@ const FLAGS = [
   },
 ]
 
-const prisma = createPrismaClient()
-
-async function main() {
+async function seedRolesV2Flags(prisma) {
+  const results = []
   for (const flag of FLAGS) {
     const existing = await prisma.featureFlag.findUnique({ where: { name: flag.name } })
     await prisma.featureFlag.upsert({
@@ -47,17 +46,37 @@ async function main() {
         rolloutPercentage: 100,
       },
     })
-    console.log(
-      existing
-        ? `[roles-v2] kept ${flag.name} (enabled=${existing.enabled}, rollout=${existing.rolloutPercentage}%)`
-        : `[roles-v2] seeded ${flag.name} (enabled=true, rollout=100%)`,
-    )
+    results.push({
+      name: flag.name,
+      existed: Boolean(existing),
+      enabled: existing ? existing.enabled : true,
+      rolloutPercentage: existing ? existing.rolloutPercentage : 100,
+    })
+  }
+  return results
+}
+
+async function main() {
+  const prisma = createPrismaClient()
+  try {
+    const results = await seedRolesV2Flags(prisma)
+    for (const r of results) {
+      console.log(
+        r.existed
+          ? `[roles-v2] kept ${r.name} (enabled=${r.enabled}, rollout=${r.rolloutPercentage}%)`
+          : `[roles-v2] seeded ${r.name} (enabled=true, rollout=100%)`,
+      )
+    }
+  } finally {
+    await prisma.$disconnect()
   }
 }
 
-main()
-  .catch((err) => {
+if (require.main === module) {
+  main().catch((err) => {
     console.error('[roles-v2] seed failed:', err)
     process.exit(1)
   })
-  .finally(() => prisma.$disconnect())
+}
+
+module.exports = { seedRolesV2Flags, FLAGS }

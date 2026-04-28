@@ -11,6 +11,7 @@ const {
   computeChecksum,
 } = require('./sheetLab.constants')
 const { diffLimiter } = require('../sheets/sheets.constants')
+const { withPreviewText } = require('../../lib/sheets/applyContentUpdate')
 
 const router = express.Router()
 
@@ -80,7 +81,9 @@ router.post('/:id/lab/sync-upstream', requireAuth, async (req, res) => {
       prisma.studySheet.update({
         where: { id: sheetId },
         data: {
-          content: original.content,
+          // Re-extract previewText so the Grid card reflects the upstream
+          // body the fork just absorbed.
+          ...withPreviewText(original.content),
           contentFormat: original.contentFormat || 'markdown',
         },
       }),
@@ -276,7 +279,9 @@ router.post('/:id/lab/restore/:commitId', requireAuth, async (req, res) => {
       prisma.studySheet.update({
         where: { id: sheetId },
         data: {
-          content: targetCommit.content,
+          // Restore rewinds content to a prior commit; re-extract previewText
+          // so the Grid card matches what was restored.
+          ...withPreviewText(targetCommit.content),
           contentFormat: targetCommit.contentFormat,
         },
         select: { id: true, title: true, content: true, contentFormat: true },
