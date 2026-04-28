@@ -381,6 +381,18 @@ export function useNotesData() {
     setActiveNote((prev) => (prev?.id === noteId ? { ...prev, tags: nextTags } : prev))
   }, [])
 
+  // Used by NoteEditor to push a local optimistic update into the
+  // sidebar list after each successful autosave. Without this, the
+  // sidebar's title and preview stay stale until the next 60s poll —
+  // making autosave feel broken even though the persistence layer is
+  // working. Pinned/starred booleans are preserved from the prior
+  // local row so they aren't clobbered by a partial patch.
+  const patchNoteLocally = useCallback((noteId, partial) => {
+    if (!noteId || !partial || typeof partial !== 'object') return
+    setNotes((prev) => prev.map((note) => (note.id === noteId ? { ...note, ...partial } : note)))
+    setActiveNote((prev) => (prev?.id === noteId ? { ...prev, ...partial } : prev))
+  }, [])
+
   const notesByTab = notes.filter((note) => {
     if (filterTab === 'private') return note.private !== false
     if (filterTab === 'shared') return note.private === false
@@ -458,5 +470,6 @@ export function useNotesData() {
     togglePin,
     handleRestore,
     handleTagsChange,
+    patchNoteLocally,
   }
 }

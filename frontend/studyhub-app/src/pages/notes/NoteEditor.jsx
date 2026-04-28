@@ -47,6 +47,51 @@ function getNoteTags(tagsValue) {
 /* ── Configure marked for backward-compat conversion ────────── */
 marked.setOptions({ breaks: true, gfm: true })
 
+// Default title used by NotesPage on create. The auto-derive title
+// path (M2) only overwrites a title that is empty / "Untitled" /
+// "Untitled Note" — anything else is treated as a manual override
+// even if the user typed it before the auto-derive heuristic ran.
+const UNTITLED_PLACEHOLDERS = new Set(['', 'untitled', 'untitled note'])
+
+// Pull a clean title candidate out of the editor's HTML output. We
+// prefer the first `<h1>` (or `<h2>` as a fallback if no H1 exists)
+// because that mirrors how documents are usually titled. If neither
+// is present we fall back to the first non-empty line of plain text
+// — same behavior as Google Docs / Notion. Returns null if nothing
+// usable is found so the caller can leave the title untouched.
+function deriveTitleFromHtml(html) {
+  if (typeof html !== 'string' || !html.trim()) return null
+
+  const headingMatch =
+    html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)
+  let candidate = headingMatch ? headingMatch[1] : ''
+
+  if (!candidate) {
+    const plain = html
+      .replace(/<style[\s\S]*?<\/style>/gi, '')
+      .replace(/<script[\s\S]*?<\/script>/gi, '')
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+    candidate = plain.split(/(?<=[.!?])\s+|\n+/)[0] || plain
+  }
+
+  const cleaned = candidate
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+
+  if (!cleaned) return null
+  return cleaned.length > 80 ? `${cleaned.slice(0, 77).trim()}…` : cleaned
+}
+
 /* ── Detect whether content is markdown vs HTML ─────────────── */
 function isMarkdown(content) {
   if (!content || !content.trim()) return false
@@ -262,6 +307,7 @@ export default function NoteEditor({
   togglePin,
   handleRestore,
   handleTagsChange,
+  patchNoteLocally,
   layout,
 }) {
   const [showVersions, setShowVersions] = useState(false)
@@ -280,7 +326,17 @@ export default function NoteEditor({
     latestContentRef.current = editorContent ?? ''
   }, [editorContent])
 
+  // M2 — auto-derive title once the user starts writing content into a
+  // freshly-created note. We track manual edits via a ref so toggling
+  // notes doesn't reset the flag mid-session, and we re-evaluate per
+  // active note id.
+  const titleManuallyEditedRef = useRef(false)
+  useEffect(() => {
+    titleManuallyEditedRef.current = false
+  }, [activeNote?.id])
+
   const wrappedTitleChange = (value) => {
+    titleManuallyEditedRef.current = true
     handleTitleChange?.(value)
     if (hardeningEnabled && activeNote?.id) {
       latestTitleRef.current = value ?? ''
@@ -290,11 +346,49 @@ export default function NoteEditor({
 
   const wrappedContentChange = (html) => {
     handleContentChange?.(html)
+    let nextTitle = latestTitleRef.current ?? ''
+
+    // Only auto-derive when the user hasn't claimed the title yet.
+    // The placeholder set check intentionally compares against the
+    // exact strings NotesPage seeds new notes with — anything else
+    // is a deliberate manual title and we leave it alone.
+    if (!titleManuallyEditedRef.current) {
+      const currentNormalized = (nextTitle || '').trim().toLowerCase()
+      if (UNTITLED_PLACEHOLDERS.has(currentNormalized)) {
+        const derived = deriveTitleFromHtml(html)
+        if (derived && derived !== nextTitle) {
+          nextTitle = derived
+          handleTitleChange?.(derived)
+          latestTitleRef.current = derived
+        }
+      }
+    }
+
     if (hardeningEnabled && activeNote?.id) {
       latestContentRef.current = html ?? ''
-      persistence.onEditorChange(latestTitleRef.current ?? '', html ?? '')
+      persistence.onEditorChange(nextTitle, html ?? '')
     }
   }
+
+  // M6 — push every fresh "saved" transition into the sidebar list so
+  // titles, previews, and timestamps update without waiting for the
+  // 60s background poll. We key on lastSavedAt rather than status
+  // alone so back-to-back saves all propagate.
+  const lastPushedSavedAtRef = useRef(null)
+  useEffect(() => {
+    if (!hardeningEnabled || !activeNote?.id || typeof patchNoteLocally !== 'function') return
+    if (persistence.state?.status !== 'saved') return
+    const savedAt = persistence.state?.lastSavedAt
+    if (!savedAt) return
+    const stamp = savedAt instanceof Date ? savedAt.toISOString() : String(savedAt)
+    if (lastPushedSavedAtRef.current === stamp) return
+    lastPushedSavedAtRef.current = stamp
+    patchNoteLocally(activeNote.id, {
+      title: latestTitleRef.current ?? '',
+      content: latestContentRef.current ?? '',
+      updatedAt: typeof savedAt === 'string' ? savedAt : new Date(savedAt).toISOString(),
+    })
+  }, [hardeningEnabled, activeNote?.id, patchNoteLocally, persistence.state])
 
   // Ctrl/Cmd+S -> manual save (or open conflict diff if conflicted)
   useEffect(() => {
@@ -405,17 +499,33 @@ export default function NoteEditor({
         <input
           value={editorTitle}
           onChange={(e) => wrappedTitleChange(e.target.value)}
-          placeholder="Note title..."
+          // Autofocus when a fresh note is opened so the user can start
+          // typing the title immediately. Skipped on phone to avoid an
+          // unwanted keyboard pop on entering the editor view.
+          autoFocus={
+            !layout.isPhone && UNTITLED_PLACEHOLDERS.has((editorTitle || '').trim().toLowerCase())
+          }
+          placeholder="Add a title — or just start writing"
+          aria-label="Note title"
           style={{
             flex: '1 1 200px',
             border: 'none',
+            borderBottom: '1px solid transparent',
             outline: 'none',
-            fontSize: 18,
+            fontSize: 20,
             fontWeight: 800,
             color: 'var(--sh-heading)',
             fontFamily: PAGE_FONT,
             minWidth: 120,
             background: 'transparent',
+            padding: '4px 2px 6px',
+            transition: 'border-color .15s',
+          }}
+          onFocus={(e) => {
+            e.currentTarget.style.borderBottomColor = 'var(--sh-brand-border, #93c5fd)'
+          }}
+          onBlur={(e) => {
+            e.currentTarget.style.borderBottomColor = 'transparent'
           }}
         />
         <select

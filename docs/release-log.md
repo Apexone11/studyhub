@@ -97,6 +97,72 @@ internal log into this file when they describe user-visible behavior.
   incognito, Brave, Safari, and Firefox strict mode — blocking sign-in
   entirely for any user with strict privacy settings. Cookies now flow
   as first-party. Single-line change in `frontend/studyhub-app/src/config.js`.
+- **Upload + chunked-notes "Invalid request payload" hotfix.** The
+  global `inputSanitizer` middleware was rejecting any single string
+  field longer than 10 KB with a generic "Invalid request payload"
+  error before the route ever ran — silently blocking imported HTML
+  sheets, AI-generated sheets, 32 KB note save chunks, and large Hub AI
+  prompts. Bumped `MAX_FIELD_LENGTH` to 5 MB to match the body parser
+  limit and raised `express.json()` to `{ limit: '5mb' }` (was the
+  Express 100 KB default, which would have surfaced as a 413 once the
+  field cap was lifted). Null-byte and control-char rejection still
+  runs on every string regardless of length.
+- **Notes M6 — sidebar refreshes on every autosave.** `useNotesData`
+  exposes a new `patchNoteLocally(noteId, partial)` that `NoteEditor`
+  calls on each fresh `saved` transition with the latest title,
+  content, and `updatedAt`. Previously the sidebar list stayed stale
+  until the 60-second background poll, which made autosave look broken
+  even though `useNotePersistence` was working. Pinned/starred state
+  is preserved through partial patches.
+- **Notes M2 — auto-derive title from first heading / first line.**
+  When a freshly created "Untitled Note" gets content, the editor now
+  pulls a title candidate from the first `<h1>` (then `<h2>`, then the
+  first sentence of plain text), capped at 80 chars. A
+  `titleManuallyEditedRef` flag stops auto-derive the moment the user
+  edits the title input. Behavior matches Google Docs / Notion's "use
+  the first line" convention.
+- **Notes M4 — title input polish.** Larger 20px font, friendlier
+  "Add a title — or just start writing" placeholder, focus-only
+  bottom border, and autofocus on freshly opened untitled notes (not
+  on phone, to avoid an unwanted keyboard pop).
+- **Video pipeline V1 — feed gating, R2 cleanup, orphan sweep,
+  thumbnail editor.** Five fixes in one cycle:
+  1. Backend `POST /api/feed-posts` with `videoId` now returns 409 if
+     the video is still `processing`/`failed`/`blocked`, with a
+     specific message for each — composer surfaces the right copy
+     instead of dropping a broken card into followers' feeds.
+  2. `video.service.processVideo` now calls `deleteVideoAssetRefs`
+     whenever a video transitions to FAILED (duration cap or
+     pipeline error). Previously the raw upload + any partial
+     variants stayed in R2 forever, bleeding storage cost on every
+     failed upload.
+  3. `video.routes.js` chunk-buffer sweep was destructively wiping
+     ALL in-flight uploads when 100+ buffers existed. Replaced with
+     per-buffer `lastTouched` TTL eviction every 5 min — only idle
+     > 30 min buffers are evicted, active uploads are never
+     > interrupted.
+  4. New `scripts/sweepOrphanVideos.js` — reclaims R2 bytes from
+     stalled processing (>6h in `processing`/`failed`/`blocked`,
+     skipping rows with a pending `VideoAppeal`) and ready-but-never-
+     attached uploads (>24h with no FeedPost or AnnouncementMedia).
+     Logs MB freed per run. Wired into `scripts/start.js` behind
+     `SWEEP_ORPHAN_VIDEOS_ON_START` (off by default — flip on
+     exactly one Railway worker), runs on boot then every 6h. Also
+     exposed as `npm --prefix backend run sweep:orphan-videos` for
+     manual one-off runs.
+  5. New `PATCH /api/video/:id/thumbnail` — owner can pick a frame
+     timestamp (re-runs ffmpeg server-side) or upload a custom JPG/
+     PNG (≤2 MB, magic-byte validated, rate-limited 15/min). Same
+     R2 key is overwritten so existing public URLs stay valid; client
+     gets a `?v=<timestamp>` cache-buster so the new image renders
+     immediately. New `VideoThumbnailEditor.jsx` modal + entry-point
+     button in `VideoUploader.jsx` post-processing state. Also
+     surfaces three quick-pick frames (start / middle / end) and a
+     full scrubber via the existing stream URL.
+  6. FeedComposer Post button is now state-aware: gray "Waiting for
+     video…" while processing, red "Remove video to post" on failure,
+     green "Post video ✓" when ready. Backend 409 still enforces; the
+     button is the fast-feedback layer.
 - **Phase R1 — `UserSchoolEnrollment` additive schema (Task #11/#64).**
   New table + Prisma model + relations on `User.schoolEnrollments` and
   `School.enrollments` to give school membership its own first-class

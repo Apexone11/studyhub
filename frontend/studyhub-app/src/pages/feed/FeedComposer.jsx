@@ -112,6 +112,24 @@ export default function FeedComposer({ user, onSubmitPost }) {
       return
     }
 
+    // Backend enforces this with a 409, but blocking the click here
+    // gives instant feedback rather than a round-trip to learn the
+    // post was rejected.
+    if (pendingVideoId && videoProcessing) {
+      setComposeState({
+        saving: false,
+        error: 'Video is still processing. Wait until it turns ready, then post.',
+      })
+      return
+    }
+    if (pendingVideoId && videoFailed) {
+      setComposeState({
+        saving: false,
+        error: 'Video processing failed. Remove it before posting.',
+      })
+      return
+    }
+
     setComposeState({ saving: true, error: '' })
     try {
       await onSubmitPost({
@@ -399,17 +417,42 @@ export default function FeedComposer({ user, onSubmitPost }) {
             </svg>{' '}
             Video
           </button>
-          <button
-            type="submit"
-            disabled={composeState.saving}
-            style={{
-              ...linkButton(),
-              cursor: composeState.saving ? 'wait' : 'pointer',
-              opacity: composeState.saving ? 0.6 : 1,
-            }}
-          >
-            {composeState.saving ? 'Posting...' : 'Post'}
-          </button>
+          {(() => {
+            // Post button reflects the video state so the user always
+            // knows whether a click will succeed: gray + disabled while
+            // processing, green when ready, red+disabled if failed.
+            const blockedByVideo = !!pendingVideoId && (videoProcessing || videoFailed)
+            const disabled = composeState.saving || blockedByVideo
+            const baseStyle = linkButton()
+            const readyStyle =
+              pendingVideoId && videoReady && !composeState.saving
+                ? {
+                    background: 'var(--sh-success)',
+                    color: 'var(--sh-success-fg, var(--sh-surface))',
+                    borderColor: 'var(--sh-success)',
+                  }
+                : {}
+            const cursor = composeState.saving ? 'wait' : blockedByVideo ? 'not-allowed' : 'pointer'
+            const opacity = composeState.saving ? 0.6 : blockedByVideo ? 0.5 : 1
+            const label = composeState.saving
+              ? 'Posting...'
+              : pendingVideoId && videoProcessing
+                ? 'Waiting for video...'
+                : pendingVideoId && videoFailed
+                  ? 'Remove video to post'
+                  : pendingVideoId && videoReady
+                    ? 'Post video ✓'
+                    : 'Post'
+            return (
+              <button
+                type="submit"
+                disabled={disabled}
+                style={{ ...baseStyle, ...readyStyle, cursor, opacity }}
+              >
+                {label}
+              </button>
+            )
+          })()}
         </div>
       </div>
       {attachedFile && (

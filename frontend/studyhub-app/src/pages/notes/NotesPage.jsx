@@ -142,6 +142,7 @@ export default function NotesPage() {
               togglePin={data.togglePin}
               handleRestore={data.handleRestore}
               handleTagsChange={data.handleTagsChange}
+              patchNoteLocally={data.patchNoteLocally}
               layout={layout}
             />
           </div>

@@ -16,10 +16,12 @@
  *   maxSize                  — Optional max file size in bytes (default 500 MB)
  *   compact                  — Boolean, show a smaller inline variant
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useRef, useState, useCallback, useEffect } from 'react'
+import { lazy, Suspense, useRef, useState, useCallback, useEffect } from 'react'
 import useVideoUpload, { UPLOAD_STATUS } from '../../lib/useVideoUpload'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
+
+const VideoThumbnailEditor = lazy(() => import('./VideoThumbnailEditor'))
 
 const ACCEPT = '.mp4,.webm,.mov,video/mp4,video/webm,video/quicktime'
 
@@ -542,6 +544,8 @@ function VideoProcessingProgress({ videoId }) {
   const [previewUrl, setPreviewUrl] = useState(null)
   const [downloadable, setDownloadable] = useState(true)
   const [toggling, setToggling] = useState(false)
+  const [videoMeta, setVideoMeta] = useState(null)
+  const [showThumbnailEditor, setShowThumbnailEditor] = useState(false)
 
   useEffect(() => {
     if (!videoId) return
@@ -557,6 +561,10 @@ function VideoProcessingProgress({ videoId }) {
           setStep('finalizing')
           setDone(true)
           setDownloadable(data.downloadable !== false)
+          // Cache the full video record for the thumbnail editor — it
+          // needs `id`, `duration`, and `thumbnailUrl` to compute the
+          // 10/50/90% candidate timestamps and seed its preview.
+          if (active) setVideoMeta(data)
           clearInterval(poll)
           // Fetch stream URL for preview
           try {
@@ -709,6 +717,62 @@ function VideoProcessingProgress({ videoId }) {
           />
         </div>
       )}
+
+      {/* Thumbnail editor entry point — only meaningful once processing
+          finished and we have the full video record (id + duration). */}
+      {done && videoMeta?.id ? (
+        <div style={{ marginTop: 10 }}>
+          <button
+            type="button"
+            onClick={() => setShowThumbnailEditor(true)}
+            style={{
+              width: '100%',
+              padding: '8px 12px',
+              background: 'var(--sh-soft)',
+              border: '1px solid var(--sh-border)',
+              borderRadius: 8,
+              color: 'var(--sh-text)',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 6,
+            }}
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+              <circle cx="8.5" cy="8.5" r="1.5" />
+              <polyline points="21 15 16 10 5 21" />
+            </svg>
+            Edit thumbnail
+          </button>
+        </div>
+      ) : null}
+
+      {showThumbnailEditor && videoMeta?.id ? (
+        <Suspense fallback={null}>
+          <VideoThumbnailEditor
+            video={videoMeta}
+            streamUrl={previewUrl}
+            onClose={() => setShowThumbnailEditor(false)}
+            onSaved={(updated) => {
+              setVideoMeta((prev) => ({ ...(prev || {}), ...updated }))
+            }}
+          />
+        </Suspense>
+      ) : null}
 
       {/* Download toggle for the creator */}
       {done && (

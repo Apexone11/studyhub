@@ -820,6 +820,19 @@ const videoUploadChunkLimiter = rateLimit({
   keyGenerator: (req) => `vid-chunk-${req.user?.userId || 'anon'}`,
 })
 
+// PATCH /api/video/:id/thumbnail. The handler does ffmpeg work on a
+// frame-timestamp request, so 15/min per user gives users room to
+// preview a few candidates without letting a misbehaving client pin
+// a worker on transcoding.
+const videoThumbnailLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 15,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many thumbnail edits. Please slow down.' },
+  keyGenerator: (req) => `vid-thumb-${req.user?.userId || 'anon'}`,
+})
+
 // ── Payments module ───────────────────────────────────────────────────────
 
 const paymentCheckoutLimiter = rateLimit({
@@ -1164,6 +1177,7 @@ module.exports = {
   // Video module
   videoUploadInitLimiter,
   videoUploadChunkLimiter,
+  videoThumbnailLimiter,
 
   // Payments module
   paymentCheckoutLimiter,

@@ -31,6 +31,14 @@ function shouldSeedFeatureFlagsOnStart() {
   return envFlag('SEED_FEATURE_FLAGS_ON_START', isRailwayBoot())
 }
 
+function shouldSweepOrphanVideosOnStart() {
+  // Off by default — only one worker should run the sweep so two
+  // replicas don't race to delete the same R2 objects. Operators flip
+  // SWEEP_ORPHAN_VIDEOS_ON_START=true on the chosen worker (same
+  // pattern as ENABLE_INACTIVE_SESSION_SWEEP).
+  return envFlag('SWEEP_ORPHAN_VIDEOS_ON_START', false)
+}
+
 function runPrismaMigrations() {
   return new Promise((resolve, reject) => {
     const command = process.platform === 'win32' ? 'npx.cmd' : 'npx'
@@ -116,6 +124,28 @@ async function main() {
   }
 
   await startServer()
+
+  if (shouldSweepOrphanVideosOnStart()) {
+    // Run once on boot, then every 6 hours. Wrapped in try/catch so a
+    // sweep failure doesn't kill the worker — orphan cleanup is a
+    // background hygiene job, not a critical path. Each sweep is
+    // idempotent + scoped to age-thresholded rows so re-runs after a
+    // failed sweep never double-charge or double-delete.
+    const { sweepOrphanVideos } = require('./sweepOrphanVideos')
+    const SIX_HOURS_MS = 6 * 60 * 60 * 1000
+
+    const runSweep = async () => {
+      try {
+        await sweepOrphanVideos()
+      } catch (err) {
+        console.error('[orphan-video-sweep] failed:', err.message)
+      }
+    }
+
+    console.log('[orphan-video-sweep] enabled — first run now, then every 6h.')
+    void runSweep()
+    setInterval(runSweep, SIX_HOURS_MS).unref?.()
+  }
 }
 
 main().catch((error) => {

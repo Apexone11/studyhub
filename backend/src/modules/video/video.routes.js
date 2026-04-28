@@ -20,7 +20,12 @@ const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const r2 = require('../../lib/r2Storage')
-const { processVideo, deleteVideoAssets } = require('./video.service')
+const {
+  processVideo,
+  deleteVideoAssets,
+  regenerateThumbnailFromFrame,
+  replaceThumbnailFromUpload,
+} = require('./video.service')
 const { scanBufferWithClamAv } = require('../../lib/clamav')
 const {
   VIDEO_DURATION_LIMITS,
@@ -48,9 +53,16 @@ const uploadBuffers = new Map() // key: uploadId -> { buffer, r2Parts, r2PartNum
 
 function getOrCreateBuffer(uploadId) {
   if (!uploadBuffers.has(uploadId)) {
-    uploadBuffers.set(uploadId, { buffer: Buffer.alloc(0), r2Parts: [], r2PartNumber: 1 })
+    uploadBuffers.set(uploadId, {
+      buffer: Buffer.alloc(0),
+      r2Parts: [],
+      r2PartNumber: 1,
+      lastTouched: Date.now(),
+    })
   }
-  return uploadBuffers.get(uploadId)
+  const state = uploadBuffers.get(uploadId)
+  state.lastTouched = Date.now()
+  return state
 }
 
 function clearBuffer(uploadId) {
@@ -66,16 +78,23 @@ async function flushBufferIfReady(r2Key, uploadId, state, force = false) {
   state.r2Parts.push(part)
   state.r2PartNumber++
   state.buffer = Buffer.alloc(0)
+  state.lastTouched = Date.now()
 }
 
-// Auto-cleanup stale buffers after 30 minutes (prevents memory leaks from abandoned uploads)
+// Per-buffer TTL sweep. Previously this `clear()`'d the entire Map when
+// >100 buffers existed, which silently killed any in-flight upload
+// during a busy hour. The sweep now only evicts entries idle for longer
+// than BUFFER_TTL_MS so active uploads are never disturbed.
 const BUFFER_TTL_MS = 30 * 60 * 1000
+const BUFFER_SWEEP_INTERVAL_MS = 5 * 60 * 1000
 setInterval(() => {
-  // Simple sweep — in practice, uploads complete within minutes
-  if (uploadBuffers.size > 100) {
-    uploadBuffers.clear()
+  const now = Date.now()
+  for (const [uploadId, state] of uploadBuffers.entries()) {
+    if (now - (state.lastTouched || 0) > BUFFER_TTL_MS) {
+      uploadBuffers.delete(uploadId)
+    }
   }
-}, BUFFER_TTL_MS)
+}, BUFFER_SWEEP_INTERVAL_MS).unref?.()
 
 // Multer for caption uploads only (small files, memory storage)
 const captionUpload = multer({
@@ -95,8 +114,45 @@ const captionUpload = multer({
 const {
   videoUploadInitLimiter,
   videoUploadChunkLimiter,
+  videoThumbnailLimiter,
   readLimiter,
 } = require('../../lib/rateLimiters')
+
+// Thumbnail uploads accept jpg/png images up to 2 MB. Memory storage
+// is fine because the helper hands the buffer straight to R2 — we
+// never write to disk.
+const MAX_THUMBNAIL_UPLOAD_BYTES = 2 * 1024 * 1024
+const ALLOWED_THUMBNAIL_MIMES = new Set(['image/jpeg', 'image/png'])
+const thumbnailUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_THUMBNAIL_UPLOAD_BYTES },
+  fileFilter: (_req, file, cb) => {
+    if (!ALLOWED_THUMBNAIL_MIMES.has(file.mimetype)) {
+      return cb(new Error('Only JPG and PNG images are allowed for thumbnails.'))
+    }
+    cb(null, true)
+  },
+})
+
+// Magic-byte check — never trust client-provided MIME alone.
+// JPEG files start with FF D8 FF; PNG with the 8-byte PNG signature.
+function detectImageContentType(buffer) {
+  if (!Buffer.isBuffer(buffer) || buffer.length < 8) return null
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg'
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return 'image/png'
+  }
+  return null
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Upload Flow: init -> chunk(s) -> complete
@@ -651,6 +707,92 @@ router.post('/:id/appeal', requireAuth, async (req, res) => {
     res.status(500).json({ error: 'Failed to submit appeal.' })
   }
 })
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Thumbnail editor
+// ═══════════════════════════════════════════════════════════════════════════
+
+/**
+ * PATCH /api/video/:id/thumbnail
+ *
+ * Two modes:
+ *   - JSON body { frameTimestamp: <number> } — re-extract a frame
+ *     from the source video at that second (capped to duration). Runs
+ *     ffmpeg server-side; idempotent because we always overwrite the
+ *     existing thumbnailR2Key.
+ *   - multipart/form-data with `file` (≤ 2 MB jpg/png) — upload a
+ *     custom image. Magic-byte validated server-side; multer's MIME
+ *     check is a soft gate that doesn't replace real signature checks.
+ *
+ * Owner-only. Rate-limited to 15/min/user. Both flows leave the public
+ * thumbnail URL stable (we overwrite the same R2 key) so any feed card
+ * already showing the old thumbnail just refreshes with the new image.
+ */
+router.patch(
+  '/:id/thumbnail',
+  requireAuth,
+  videoThumbnailLimiter,
+  thumbnailUpload.single('file'),
+  async (req, res) => {
+    try {
+      const videoId = parseInt(req.params.id, 10)
+      if (isNaN(videoId)) return res.status(400).json({ error: 'Invalid video ID.' })
+
+      const video = await prisma.video.findUnique({
+        where: { id: videoId },
+        select: { id: true, userId: true, status: true },
+      })
+      if (!video) return res.status(404).json({ error: 'Video not found.' })
+      if (video.userId !== req.user.userId) {
+        return res.status(403).json({ error: 'You can only edit your own video thumbnails.' })
+      }
+
+      let thumbKey
+      if (req.file && req.file.buffer) {
+        const detected = detectImageContentType(req.file.buffer)
+        if (!detected) {
+          return res.status(400).json({ error: 'Uploaded file is not a valid JPG or PNG image.' })
+        }
+        thumbKey = await replaceThumbnailFromUpload(videoId, req.file.buffer, detected)
+      } else {
+        const ts = Number(req.body?.frameTimestamp)
+        if (!Number.isFinite(ts) || ts < 0) {
+          return res
+            .status(400)
+            .json({
+              error: 'frameTimestamp must be a non-negative number, or upload an image file.',
+            })
+        }
+        thumbKey = await regenerateThumbnailFromFrame(videoId, ts)
+      }
+
+      const updated = await prisma.video.findUnique({
+        where: { id: videoId },
+        include: {
+          captions: { select: { id: true, language: true, label: true } },
+          user: { select: { id: true, username: true, avatarUrl: true } },
+        },
+      })
+
+      res.json({
+        ...formatVideoResponse(updated),
+        // Public URL is identical to the existing one (we overwrote the
+        // same key); include a cache-busting query param so the client
+        // re-fetches the new image without a hard reload.
+        thumbnailUrl: updated.thumbnailR2Key
+          ? `${r2.getPublicUrl(updated.thumbnailR2Key)}?v=${Date.now()}`
+          : null,
+        thumbnailR2Key: thumbKey,
+      })
+    } catch (err) {
+      const status = Number.isInteger(err.statusCode) ? err.statusCode : 500
+      if (status >= 500) {
+        captureError(err, { route: req.originalUrl, method: req.method })
+      }
+      res.status(status).json({ error: err.message || 'Failed to update thumbnail.' })
+    }
+  },
+)
 
 // ═══════════════════════════════════════════════════════════════════════════
 // Captions

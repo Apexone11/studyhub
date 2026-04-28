@@ -324,7 +324,12 @@ app.post(
 )
 
 // Parse JSON request bodies for auth and future API routes.
-app.use(express.json())
+// 5mb limit matches the inputSanitizer per-field cap and accommodates
+// imported HTML sheets, AI-generated sheets, and chunked-note bodies.
+// Without this, the express default 100KB cap rejected any legitimate
+// HTML import or AI sheet save with PayloadTooLargeError before the
+// route ever ran.
+app.use(express.json({ limit: '5mb' }))
 
 // Phase 5: reject payloads with null bytes, control chars, excessive
 // nesting/length, or duplicate query params before they reach routes.
