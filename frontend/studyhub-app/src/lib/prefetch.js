@@ -21,7 +21,12 @@ const ROUTE_TO_API = {
   '/messages': '/api/messages/conversations',
   '/study-groups': '/api/study-groups',
   '/announcements': '/api/announcements',
-  '/my-courses': '/api/courses/enrolled',
+  // /my-courses uses /api/courses/schools (catalog) on mount. Prefetching
+  // that warms the dropdown for every page that needs school data
+  // (Sheets, Notes, Study Groups, My Courses), so it's a high-value
+  // prefetch. The earlier /api/courses/enrolled mapping was wrong — no
+  // such backend route exists, every hover fired a 404.
+  '/my-courses': '/api/courses/schools',
   // '/tests' is intentionally NOT prefetched: the page is currently a v2
   // teaser with no backend route. Mapping it to '/api/tests' here would
   // hit a 404 every time a user hovers Practice Tests in the sidebar.

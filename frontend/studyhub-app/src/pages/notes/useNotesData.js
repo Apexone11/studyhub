@@ -148,8 +148,26 @@ export function useNotesData() {
 
     // The rest of this effect fetches the course-school list; that one
     // doesn't need polling (course enrollments change rarely).
-    fetch(`${API}/api/courses/schools`, { headers: authHeaders(), credentials: 'include' })
-      .then((response) => response.json())
+    // cache: 'no-cache' bypasses any stale 5xx the browser disk cache may
+    // be holding from before recent backend CORS / Cache-Control fixes
+    // shipped — without this, a poisoned cached response keeps firing
+    // the "Failed to load courses" toast on every page load.
+    fetch(`${API}/api/courses/schools`, {
+      headers: authHeaders(),
+      credentials: 'include',
+      cache: 'no-cache',
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('schools fetch failed')
+        // Defensive parse: a cached empty body, CORS-blocked opaque
+        // response, or transient truncation makes .json() throw
+        // "Unexpected end of JSON input" which we'd silently treat as
+        // a load failure. Read text first, parse second, treat empty
+        // as failure.
+        const text = await response.text()
+        if (!text) throw new Error('schools fetch returned empty body')
+        return JSON.parse(text)
+      })
       .then((data) => {
         if (active)
           setCourses(

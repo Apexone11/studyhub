@@ -13,10 +13,20 @@ const runtimeConfig =
 // re-uses the same flag for routing decisions.
 const _isNative = typeof window !== 'undefined' && Boolean(window.__SH_NATIVE__)
 
-// Production Railway backend. Used as the default for native builds because
-// the Capacitor APK has no web server to proxy against. Also serves as a
-// last-resort fallback if someone forgets to set VITE_MOBILE_API_URL.
-const RAILWAY_BACKEND_URL = 'https://studyhub-production-c655.up.railway.app'
+// Production backend, served via the same-site api.getstudyhub.org subdomain.
+// Until 2026-04-27 this pointed at the raw Railway hostname
+// (studyhub-production-c655.up.railway.app) which was a different
+// registrable domain from getstudyhub.org — so the session cookie was
+// treated as third-party and dropped by Chrome incognito, Brave, Safari,
+// and Firefox strict mode. That blocked sign-in entirely for any user
+// with strict privacy settings. api.getstudyhub.org is a same-site
+// subdomain (CNAME → fl8bi234.up.railway.app, DNS only / not proxied)
+// so cookies flow as first-party and incognito sign-in works.
+//
+// Used as the default for native builds (Capacitor APK has no web server
+// to proxy against) and as a last-resort fallback if someone forgets to
+// set VITE_MOBILE_API_URL.
+const RAILWAY_BACKEND_URL = 'https://api.getstudyhub.org'
 
 // On native, prefer the mobile-specific API URL, then the standard API URL,
 // then fall back to the Railway production backend (NEVER to localhost, which

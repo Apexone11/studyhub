@@ -188,10 +188,15 @@ export default function useSheetsData() {
   const loadCatalog = useCallback(async ({ signal, startTransition } = {}) => {
     const apply = startTransition || ((fn) => fn())
     try {
+      // cache: 'no-cache' bypasses any stale browser disk cache holding
+      // a poisoned response from before recent backend CORS fixes — the
+      // "0 schools available" surfaced in prod was the dropdown reading
+      // from a cached empty/error response that pre-dated the fix.
       const response = await fetch(`${API}/api/courses/schools`, {
         headers: authHeaders(),
         credentials: 'include',
         signal,
+        cache: 'no-cache',
       })
       const data = await response.json().catch(() => [])
       if (!response.ok) {
@@ -203,7 +208,13 @@ export default function useSheetsData() {
       })
     } catch (error) {
       if (error?.name === 'AbortError') return
-      apply(() => setCatalogError(error.message || 'Could not load schools.'))
+      // Friendly message — never surface raw browser internals like
+      // "Failed to fetch" or "Failed to execute 'json' on 'Response'..."
+      const friendly =
+        error && typeof error.message === 'string' && error.message.startsWith('Failed to')
+          ? 'Could not load schools.'
+          : error?.message || 'Could not load schools.'
+      apply(() => setCatalogError(friendly))
     }
   }, [])
 
