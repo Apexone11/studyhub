@@ -25,10 +25,13 @@ import {
 } from './UploadSheetFormFields'
 import { TutorialModal, HtmlReviewNoticeModal, HtmlScanModal } from '../lab/HtmlScanModal'
 import UploadNavActions from './UploadNavActions'
+import DraftsPickerModal from './DraftsPickerModal'
 import useUploadSheet from './useUploadSheet'
+import { useState } from 'react'
 
 export default function UploadSheetPage() {
   const hook = useUploadSheet()
+  const [showDraftsPicker, setShowDraftsPicker] = useState(false)
 
   const navActions = (
     <UploadNavActions
@@ -43,6 +46,7 @@ export default function UploadSheetPage() {
       onSaveDraft={hook.saveDraftNow}
       onOpenPreview={hook.openHtmlPreview}
       onSubmit={hook.handleSubmit}
+      onOpenDrafts={() => setShowDraftsPicker(true)}
     />
   )
 
@@ -182,6 +186,12 @@ export default function UploadSheetPage() {
         variant="danger"
         onConfirm={hook.discardDraft}
         onCancel={() => hook.setShowDiscardDialog(false)}
+      />
+
+      <DraftsPickerModal
+        open={showDraftsPicker}
+        onClose={() => setShowDraftsPicker(false)}
+        currentDraftId={hook.draftId}
       />
     </div>
   )

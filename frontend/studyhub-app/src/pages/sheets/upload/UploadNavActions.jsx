@@ -17,6 +17,7 @@ export default function UploadNavActions({
   onSaveDraft,
   onOpenPreview,
   onSubmit,
+  onOpenDrafts,
 }) {
   const submitDisabled = loading || attachUploading || (isHtmlMode && !canSubmitHtml)
 
@@ -53,6 +54,29 @@ export default function UploadNavActions({
           {legacyMarkdownMode ? 'Draft autosave…' : 'Working draft sync…'}
         </span>
       )}
+      {!isEditing && typeof onOpenDrafts === 'function' ? (
+        <button
+          type="button"
+          onClick={onOpenDrafts}
+          aria-label="Open my drafts"
+          style={{
+            fontSize: 12,
+            fontWeight: 700,
+            color: 'var(--sh-slate-500)',
+            padding: '6px 12px',
+            background: 'var(--sh-surface)',
+            border: '1px solid var(--sh-slate-300)',
+            borderRadius: 8,
+            cursor: 'pointer',
+            fontFamily: FONT,
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+          }}
+        >
+          My drafts
+        </button>
+      ) : null}
       <button
         type="button"
         onClick={onSaveDraft}

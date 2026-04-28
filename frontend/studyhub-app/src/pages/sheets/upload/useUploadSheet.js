@@ -38,6 +38,11 @@ export default function useUploadSheet() {
   const draftQuery = searchParams.get('draft') || ''
   const requestedDraftId = Number.parseInt(draftQuery, 10)
   const hasRequestedDraft = Number.isInteger(requestedDraftId)
+  // `?fresh=1` is the "Start a new draft" entry point. The page normally
+  // auto-loads the user's most recent in-progress draft; with this flag
+  // we skip that lookup so the editor opens blank and the user can work
+  // on a brand new draft alongside any drafts they already have.
+  const startFresh = searchParams.get('fresh') === '1'
 
   /* ── Form state ────────────────────────────────────────────────────── */
   const [title, setTitle] = useState('')
@@ -223,12 +228,21 @@ export default function useUploadSheet() {
           return
         }
 
-        const response = await fetch(`${API}/api/sheets/drafts/latest`, {
-          headers: authHeaders(),
-          credentials: 'include',
-        })
-        const data = await response.json().catch(() => ({}))
-        if (!response.ok) throw new Error(data.error || 'Could not load latest draft.')
+        // `?fresh=1` skips the latest-draft auto-load so the user can
+        // start a clean draft without losing any drafts they already have
+        // in flight. The first /drafts/autosave call from this empty
+        // editor will create a brand-new StudySheet row.
+        const data = startFresh
+          ? { draft: null }
+          : await (async () => {
+              const response = await fetch(`${API}/api/sheets/drafts/latest`, {
+                headers: authHeaders(),
+                credentials: 'include',
+              })
+              const body = await response.json().catch(() => ({}))
+              if (!response.ok) throw new Error(body.error || 'Could not load latest draft.')
+              return body
+            })()
         if (cancelled) return
 
         if (data?.draft) {
@@ -261,7 +275,15 @@ export default function useUploadSheet() {
     return () => {
       cancelled = true
     }
-  }, [draftReloadKey, hasRequestedDraft, hydrateFromSheet, isEditing, requestedDraftId, sheetId])
+  }, [
+    draftReloadKey,
+    hasRequestedDraft,
+    hydrateFromSheet,
+    isEditing,
+    requestedDraftId,
+    sheetId,
+    startFresh,
+  ])
 
   /* ── Tutorial check ────────────────────────────────────────────────── */
   useEffect(() => {

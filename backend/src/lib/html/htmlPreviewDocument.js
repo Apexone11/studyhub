@@ -52,10 +52,17 @@ const DEFAULT_ALLOWED_ATTRIBUTES = {
 }
 
 function sanitizePreviewHtml(value) {
+  // The CSP for safe preview already restricts what can actually load
+  // (script-src 'none', img-src data: blob: https:, font-src
+  // https://fonts.gstatic.com, connect-src 'none'). Stripping every
+  // https: URL out of href/src/srcset on top of CSP made flagged sheets
+  // render as blank pages — every <img src="https://..."> got rewritten
+  // to nothing. CSP is the right defense here, so we let https/http/mailto
+  // through and trust the CSP to keep the runtime locked down.
   return sanitizeHtml(String(value || ''), {
     allowedTags: DEFAULT_ALLOWED_TAGS,
     allowedAttributes: DEFAULT_ALLOWED_ATTRIBUTES,
-    allowedSchemes: ['data', 'blob'],
+    allowedSchemes: ['data', 'blob', 'https', 'http', 'mailto'],
     allowedSchemesAppliedToAttributes: ['href', 'src', 'srcset'],
     allowProtocolRelative: false,
     parseStyleAttributes: true,

@@ -40,10 +40,23 @@ const SWEEP_BATCH_SIZE = 100
 
 async function sweepStalledProcessing(prisma) {
   const cutoff = new Date(Date.now() - STALE_THRESHOLD_MS)
+
+  // Pull the candidate set in one query: stale-status + old + UNATTACHED.
+  // The unattached guard mirrors sweepUnattachedReadyVideos and is the
+  // safety net against deleting bytes that are still referenced by a
+  // FeedPost or AnnouncementMedia. Stale 'failed'/'blocked' rows that
+  // still have post references get left alone — the post itself will
+  // eventually free the row when it's deleted (FK is onDelete:SetNull,
+  // so the row stops being referenced and the next sweep picks it up).
+  // Pending VideoAppeals are also folded into this query as a relation
+  // filter, eliminating the per-video N+1 lookup the old loop did.
   const candidates = await prisma.video.findMany({
     where: {
       status: { in: STALE_STATUSES },
       createdAt: { lt: cutoff },
+      feedPosts: { none: {} },
+      announcementMedia: { none: {} },
+      OR: [{ status: { not: 'blocked' } }, { appeals: { none: { status: 'pending' } } }],
     },
     take: SWEEP_BATCH_SIZE,
     include: { captions: true },
@@ -52,16 +65,6 @@ async function sweepStalledProcessing(prisma) {
   let bytesFreed = 0
   let deleted = 0
   for (const video of candidates) {
-    // Skip blocked videos that still have a pending appeal — admins
-    // need the asset around to review.
-    if (video.status === 'blocked') {
-      const pendingAppeal = await prisma.videoAppeal.findFirst({
-        where: { videoId: video.id, status: 'pending' },
-        select: { id: true },
-      })
-      if (pendingAppeal) continue
-    }
-
     try {
       await deleteVideoAssetRefs(video)
       await prisma.video.delete({ where: { id: video.id } })

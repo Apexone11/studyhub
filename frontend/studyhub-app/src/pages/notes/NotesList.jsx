@@ -5,28 +5,7 @@ import { useEffect, useRef } from 'react'
 import { PAGE_FONT, timeAgo } from '../shared/pageUtils'
 import { staggerEntrance } from '../../lib/animations'
 import { SkeletonList } from '../../components/Skeleton'
-
-// Sidebar previews show plain text only. Notes are stored as HTML
-// (TipTap output), so a naive `content.slice(0, N)` exposes raw markup
-// like `<p><strong>...` to the user. Mirrors the sanitize pattern in
-// NoteEditor.jsx:htmlWordCount and the sheet extractor — kept inline
-// here so the sidebar never has to re-parse the editor's HTML tree.
-function stripHtmlForPreview(html) {
-  if (typeof html !== 'string' || !html.trim()) return ''
-  return html
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/&#\d+;/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
+import { stripHtmlForPreview } from './noteHtml.js'
 
 export default function NotesList({
   visibleNotes,

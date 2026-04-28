@@ -190,7 +190,24 @@ app.use((req, res, next) => {
 app.use(httpLogger)
 
 // Gzip/Brotli compression for all text-based responses.
-app.use(compression())
+// SSE streams (text/event-stream) MUST bypass compression — buffering would
+// hold every Hub AI delta in a 16 KB chunk before flushing, which makes the
+// chat feel frozen for the first 5–20 seconds of a response. The
+// `x-no-compression` request header is the standard escape hatch the
+// `compression` middleware honors via its default filter; SSE routes set
+// the header explicitly before writing.
+app.use(
+  compression({
+    filter: (req, res) => {
+      if (req.headers['x-no-compression']) return false
+      const contentType = res.getHeader('Content-Type')
+      if (typeof contentType === 'string' && contentType.includes('text/event-stream')) {
+        return false
+      }
+      return compression.filter(req, res)
+    },
+  }),
+)
 
 if (isProd) {
   app.set('trust proxy', 1)
