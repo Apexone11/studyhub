@@ -8,6 +8,7 @@ import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { stripHtmlForPreview } from './noteHtml.js'
+import { flattenSchoolsToCourses } from '../../lib/courses.js'
 
 const NOTE_FILTER_TABS = new Set(['all', 'private', 'shared', 'starred'])
 
@@ -175,12 +176,7 @@ export function useNotesData() {
         return JSON.parse(text)
       })
       .then((data) => {
-        if (active)
-          setCourses(
-            (data || []).flatMap((school) =>
-              (school.courses || []).map((course) => ({ ...course, schoolName: school.name })),
-            ),
-          )
+        if (active) setCourses(flattenSchoolsToCourses(data))
       })
       .catch(() => {
         if (active) {

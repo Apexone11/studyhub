@@ -23,6 +23,7 @@ import { usePageTitle } from '../../../lib/usePageTitle'
 import { pageShell } from '../../../lib/ui'
 import { API } from '../../../config'
 import { PAGE_FONT, authHeaders } from '../../shared/pageUtils'
+import { flattenSchoolsToCourses } from '../../../lib/courses'
 
 export default function AiSheetSetupPage() {
   usePageTitle('Publish AI Sheet')
@@ -60,11 +61,7 @@ export default function AiSheetSetupPage() {
         credentials: 'include',
       })
       const data = await res.json().catch(() => [])
-      setCourses(
-        (data || []).flatMap((school) =>
-          (school.courses || []).map((c) => ({ ...c, schoolName: school.name })),
-        ),
-      )
+      setCourses(flattenSchoolsToCourses(data))
     } catch {
       setCourses([])
     } finally {
