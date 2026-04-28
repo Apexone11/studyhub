@@ -18,7 +18,11 @@ router.use(publicLimiter)
 
 router.get(
   '/platform-stats',
-  cacheControl(300, { public: true, staleWhileRevalidate: 600 }),
+  // Browser cache only — Cloudflare ignores Vary: Origin on non-Enterprise
+  // plans, so `public: true` here would let the CDN replay one origin's
+  // CORS headers to other origins. See courses.schools.controller.js for
+  // the full rationale.
+  cacheControl(300, { staleWhileRevalidate: 600 }),
   async (req, res) => {
     try {
       const [sheetCount, courseCount, schoolCount, userCount] = await Promise.all([

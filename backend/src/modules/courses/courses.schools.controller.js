@@ -9,9 +9,18 @@ const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 
 // Public endpoint for school + course dropdowns.
+//
+// IMPORTANT: must NOT use { public: true }. Cloudflare's CDN ignores
+// Vary: Origin on non-Enterprise plans (only Vary: Accept-Encoding is
+// honored), so a `public` Cache-Control here would let Cloudflare cache
+// one origin's response and replay it to every other origin. The
+// browser sees Access-Control-Allow-Origin from the WRONG origin and
+// reports "CORS error" even though the backend is healthy. Browser
+// cache (which DOES honor Vary: Origin and is not shared across users)
+// gives us the same user-perceived speedup without the CORS poisoning.
 router.get(
   '/schools',
-  cacheControl(600, { public: true, staleWhileRevalidate: 1800 }),
+  cacheControl(600, { staleWhileRevalidate: 1800 }),
   schoolsLimiter,
   async (req, res) => {
     try {
@@ -51,9 +60,10 @@ router.get(
 )
 
 // Public endpoint for popular courses ranked by published sheet count.
+// Same Cloudflare/Vary caveat as /schools above — must NOT be `public`.
 router.get(
   '/popular',
-  cacheControl(300, { public: true, staleWhileRevalidate: 600 }),
+  cacheControl(300, { staleWhileRevalidate: 600 }),
   schoolsLimiter,
   async (req, res) => {
     try {

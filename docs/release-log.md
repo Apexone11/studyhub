@@ -42,6 +42,14 @@ internal log into this file when they describe user-visible behavior.
   fail-closed flag evaluation rendered Phase 1/2/3 features invisible
   in production whenever a deploy preceded the manual seed step. Seed
   failure aborts the deploy by design (no `||` fallback).
+- **CORS hardening — drop `public: true` from CDN-cached endpoints.**
+  `/api/courses/schools`, `/api/courses/popular`, `/api/feed/trending`,
+  and `/api/platform-stats` no longer mark themselves `public` for
+  shared-CDN caching. Cloudflare ignores `Vary: Origin` on non-
+  Enterprise plans, so a shared cache could replay one origin's CORS
+  headers to every other origin. Browser cache (per-user, honors Vary)
+  keeps the same user-perceived speedup. Also drops `/tests` from the
+  sidebar hover-prefetch map since that page has no backend route yet.
 
 ### Sheets
 
