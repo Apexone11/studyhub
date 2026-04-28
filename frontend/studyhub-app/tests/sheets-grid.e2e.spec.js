@@ -178,10 +178,11 @@ test.describe('Sheets Grid view (@phase4-day4 @smoke)', () => {
       .getByRole('button', { name: /grid view/i })
       .click()
 
-    // Grid card has role="link" with the same accessible name as the
-    // List row, but it lives inside a `.sheets-page__grid` container.
+    // Grid card is the <article role="link"> wrapper. Anchor children
+    // inherit a link role, so we narrow to the article element to keep
+    // the count assertion honest as the inner DOM evolves.
     await expect(page.locator('.sheets-page__grid')).toBeVisible()
-    await expect(page.locator('.sheets-page__grid >> [role="link"]')).toHaveCount(1)
+    await expect(page.locator('.sheets-page__grid article[role="link"]')).toHaveCount(1)
 
     const stored = await page.evaluate(() => localStorage.getItem('studyhub.sheets.viewMode'))
     expect(stored).toBe('grid')
@@ -279,7 +280,7 @@ test.describe('Sheets Grid view (@phase4-day4 @smoke)', () => {
     await mockSheetsList(page, [buildSheet({ previewText: null, title: 'No-preview sheet' })])
 
     await page.goto('/sheets?view=grid')
-    const card = page.locator('.sheets-page__grid >> [role="link"]').first()
+    const card = page.locator('.sheets-page__grid article[role="link"]').first()
     await expect(card).toBeVisible()
     await expect(card).toHaveAccessibleName(/open no-preview sheet/i)
     // The preview <p> renders only when previewText is non-empty.
