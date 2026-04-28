@@ -45,6 +45,7 @@ export function useStudyGroupsData() {
     offset: list.offset,
     schools: list.schools,
     courses: list.courses,
+    enrolledSchoolIds: list.enrolledSchoolIds,
 
     // Group CRUD
     createGroup: list.createGroup,

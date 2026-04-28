@@ -45,6 +45,7 @@ export default function GroupDetailView({ groupId }) {
     joinGroup,
     leaveGroup,
     courses: allCourses,
+    enrolledSchoolIds,
     // Sub-resources
     members,
     membersLoading,
@@ -737,6 +738,7 @@ export default function GroupDetailView({ groupId }) {
             onClose={() => setEditModalOpen(false)}
             onSubmit={handleEdit}
             courses={allCourses}
+            enrolledSchoolIds={enrolledSchoolIds}
           />,
           document.body,
         )}

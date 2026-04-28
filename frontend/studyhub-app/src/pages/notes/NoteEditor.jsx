@@ -14,6 +14,7 @@ import DOMPurify from 'dompurify'
 import { MathInline, MathBlock } from '../../components/editor/MathExtension'
 import { lowlight } from '../../components/editor/codeHighlight'
 import EditorToolbar from '../../components/editor/EditorToolbar'
+import CourseSelect from '../../components/CourseSelect'
 import { PAGE_FONT } from '../shared/pageUtils'
 import NoteVersionHistory from './NoteVersionHistory'
 import NoteTagsInput from './NoteTagsInput'
@@ -261,6 +262,7 @@ export default function NoteEditor({
   editorAllowDownloads,
   editorCourseId,
   courses,
+  enrolledSchoolIds,
   saving,
   confirmDelete,
   setConfirmDelete,
@@ -496,27 +498,27 @@ export default function NoteEditor({
             e.currentTarget.style.borderBottomColor = 'transparent'
           }}
         />
-        <select
+        <CourseSelect
+          courses={courses}
+          enrolledSchoolIds={enrolledSchoolIds}
           value={editorCourseId}
           onChange={(e) => handleCourseChange(e.target.value)}
+          ariaLabel="Course"
           style={{
             border: '1px solid var(--sh-border)',
             borderRadius: 8,
-            padding: '6px 10px',
-            fontSize: 12,
+            padding: '8px 14px',
+            fontSize: 13,
             fontFamily: PAGE_FONT,
-            color: 'var(--sh-muted)',
+            color: 'var(--sh-heading)',
             outline: 'none',
             background: 'var(--sh-surface)',
+            minWidth: 160,
+            maxWidth: 240,
+            cursor: 'pointer',
+            fontWeight: 600,
           }}
-        >
-          <option value="">No course</option>
-          {courses.map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.code}
-            </option>
-          ))}
-        </select>
+        />
         <label
           style={{
             display: 'flex',

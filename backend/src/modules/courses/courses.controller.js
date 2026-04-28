@@ -4,6 +4,7 @@ const { sendForbidden } = require('../../lib/accessControl')
 const { sendCourseRequestNotice } = require('../../lib/email/email')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
+const { writeLimiter } = require('../../lib/rateLimiters')
 const {
   POPULAR_THRESHOLD,
   RECOMMENDATION_LIMIT,
@@ -106,7 +107,10 @@ router.get('/recommendations', requireAuth, async (req, res) => {
 })
 
 // Track requests for courses that are not yet available.
-router.post('/request', requireAuth, async (req, res) => {
+// writeLimiter caps this at 60/min/user — without it an authenticated user
+// could spam thousands of distinct RequestedCourse rows by varying the name
+// payload (each unique name is its own row, count updates on duplicates).
+router.post('/request', requireAuth, writeLimiter, async (req, res) => {
   const body = req.body || {}
   const rawName = typeof body.name === 'string' ? body.name.trim() : ''
   const rawCode = typeof body.code === 'string' ? body.code.trim() : ''

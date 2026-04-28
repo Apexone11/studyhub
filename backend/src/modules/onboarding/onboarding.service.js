@@ -334,6 +334,15 @@ async function executeFirstAction(userId, actionType, actionPayload) {
     }
 
     case 'ai_sheet': {
+      // Only validate the inputs and record the action — DO NOT create a
+      // placeholder StudySheet here. Earlier this branch wrote a draft
+      // whose content was the literal prompt (`<p>Generated from
+      // onboarding prompt: ${prompt}</p>`), which deceived users into
+      // thinking the AI had generated something for them. The real
+      // generation happens via Hub AI's streaming endpoint; the frontend
+      // hands off the prompt by navigating to `/ai?prompt=<text>` after
+      // this action succeeds, so the user lands on a prefilled Hub AI
+      // chat where the actual sheet gets generated for real.
       if (!actionPayload || !actionPayload.prompt) {
         throw serviceError(400, 'prompt is required for ai_sheet action.')
       }
@@ -349,18 +358,8 @@ async function executeFirstAction(userId, actionType, actionPayload) {
         })
         if (!course) throw serviceError(404, 'Course not found.')
       }
-
-      // Create a basic placeholder sheet (the actual AI generation happens in the AI module)
-      await prisma.studySheet.create({
-        data: {
-          title: actionPayload.prompt.slice(0, 100),
-          content: `<p>Generated from onboarding prompt: ${actionPayload.prompt}</p>`,
-          contentFormat: 'html',
-          userId,
-          courseId,
-          status: 'draft',
-        },
-      })
+      // Action is recorded by the controller wrapper writing to
+      // OnboardingAction; nothing more to do server-side.
       break
     }
 

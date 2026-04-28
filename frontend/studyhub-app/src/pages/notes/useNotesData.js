@@ -1,14 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * useNotesData.js — Custom hook for notes data fetching, state, and actions
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
 import { useLivePolling } from '../../lib/useLivePolling'
+import { useSession } from '../../lib/session-context'
 import { stripHtmlForPreview } from './noteHtml.js'
-import { flattenSchoolsToCourses } from '../../lib/courses.js'
+import { enrolledSchoolIdsFromUser, flattenSchoolsToCourses } from '../../lib/courses.js'
 
 const NOTE_FILTER_TABS = new Set(['all', 'private', 'shared', 'starred'])
 
@@ -57,6 +58,8 @@ export function useNotesData() {
   const filterTab = NOTE_FILTER_TABS.has(searchParams.get('tab')) ? searchParams.get('tab') : 'all'
   const searchQuery = searchParams.get('q') || ''
   const selectedTag = (searchParams.get('tag') || '').trim().toLowerCase()
+  const { user } = useSession()
+  const enrolledSchoolIds = useMemo(() => enrolledSchoolIdsFromUser(user), [user])
   /* ── State ───────────────────────────────────────────────────────────── */
   const [notes, setNotes] = useState([])
   const [activeNote, setActiveNote] = useState(null)
@@ -272,6 +275,7 @@ export function useNotesData() {
     optimisticApply()
     setNotes((prev) => prev.map((n) => (n.id === targetNoteId ? { ...n, [field]: value } : n)))
     setActiveNote((prev) => (prev?.id === targetNoteId ? { ...prev, [field]: value } : prev))
+    let serverErrorMessage = ''
     try {
       const response = await fetch(`${API}/api/notes/${targetNoteId}/metadata`, {
         method: 'PATCH',
@@ -279,7 +283,15 @@ export function useNotesData() {
         credentials: 'include',
         body: JSON.stringify({ [field]: value }),
       })
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      if (!response.ok) {
+        // Capture the server's error message so the toast can surface it.
+        // Generic "Failed to update note settings" hid CSRF / 403 / 404 /
+        // enrollment-check errors during the prod incident — surface it.
+        const errBody = await response.json().catch(() => ({}))
+        serverErrorMessage =
+          (typeof errBody?.error === 'string' && errBody.error.trim()) || `HTTP ${response.status}`
+        throw new Error(serverErrorMessage)
+      }
       const data = await response.json().catch(() => ({}))
       // Trust the server's normalized row (e.g. it auto-cleared
       // allowDownloads when private went true).
@@ -312,7 +324,12 @@ export function useNotesData() {
           prev?.id === targetNoteId ? { ...prev, [field]: previousRowValue } : prev,
         )
       }
-      showToast('Failed to update note settings', 'error')
+      showToast(
+        serverErrorMessage
+          ? `Failed to update note settings: ${serverErrorMessage}`
+          : 'Failed to update note settings',
+        'error',
+      )
     }
   }
 
@@ -552,6 +569,7 @@ export function useNotesData() {
     editorAllowDownloads,
     editorCourseId,
     courses,
+    enrolledSchoolIds,
     filterTab,
     setFilterTab,
     searchQuery,

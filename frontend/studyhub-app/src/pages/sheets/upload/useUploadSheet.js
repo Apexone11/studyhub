@@ -4,9 +4,10 @@
  * Action handlers (save, discard, import, submit, attachment) are in
  * uploadSheetActions.js to keep this file focused on state and effects.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { API } from '../../../config'
+import { useSession } from '../../../lib/session-context'
 import { useTutorial } from '../../../lib/useTutorial'
 import { UPLOAD_STEPS, TUTORIAL_VERSIONS } from '../../../lib/tutorialSteps'
 import { usePageTitle } from '../../../lib/usePageTitle'
@@ -27,7 +28,7 @@ import {
   makeHandleHtmlImport,
   makeAcknowledgeScanAndDismiss,
 } from './uploadSheetActions'
-import { flattenSchoolsToCourses } from '../../../lib/courses'
+import { enrolledSchoolIdsFromUser, flattenSchoolsToCourses } from '../../../lib/courses'
 
 export default function useUploadSheet() {
   usePageTitle('Upload Sheet')
@@ -36,6 +37,8 @@ export default function useUploadSheet() {
   const [searchParams] = useSearchParams()
   const { id: sheetId } = useParams()
   const isEditing = Boolean(sheetId)
+  const { user } = useSession()
+  const enrolledSchoolIds = useMemo(() => enrolledSchoolIdsFromUser(user), [user])
   const draftQuery = searchParams.get('draft') || ''
   const requestedDraftId = Number.parseInt(draftQuery, 10)
   const hasRequestedDraft = Number.isInteger(requestedDraftId)
@@ -594,6 +597,7 @@ export default function useUploadSheet() {
     canEditHtml,
     canSubmitHtml,
     courses,
+    enrolledSchoolIds,
     error,
     initializing,
     loading,

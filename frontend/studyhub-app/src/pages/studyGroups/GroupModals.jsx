@@ -8,6 +8,7 @@ import { useEffect, useId, useState } from 'react'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { resolveGroupImageUrl } from './studyGroupsHelpers'
+import CourseSelect from '../../components/CourseSelect'
 import { styles } from './studyGroupsStyles'
 
 async function uploadGroupImage(file) {
@@ -140,7 +141,7 @@ function GroupImageField({ name, groupImage }) {
   )
 }
 
-function CreateGroupModal({ open, onClose, onSubmit, courses }) {
+function CreateGroupModal({ open, onClose, onSubmit, courses, enrolledSchoolIds }) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [privacy, setPrivacy] = useState('public')
@@ -229,18 +230,15 @@ function CreateGroupModal({ open, onClose, onSubmit, courses }) {
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Course (optional)</label>
-            <select
+            <CourseSelect
+              courses={courses}
+              enrolledSchoolIds={enrolledSchoolIds}
               value={courseId}
               onChange={(e) => setCourseId(e.target.value)}
+              ariaLabel="Course"
+              placeholderLabel="Select a course"
               style={styles.input}
-            >
-              <option value="">Select a course</option>
-              {courses?.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           {submitError && <div style={styles.alert('danger')}>{submitError}</div>}
@@ -259,7 +257,7 @@ function CreateGroupModal({ open, onClose, onSubmit, courses }) {
   )
 }
 
-export function EditGroupModal({ open, group, onClose, onSubmit, courses }) {
+export function EditGroupModal({ open, group, onClose, onSubmit, courses, enrolledSchoolIds }) {
   const [name, setName] = useState(group?.name || '')
   const [description, setDescription] = useState(group?.description || '')
   const [privacy, setPrivacy] = useState(group?.privacy || 'public')
@@ -350,18 +348,15 @@ export function EditGroupModal({ open, group, onClose, onSubmit, courses }) {
 
           <div style={styles.formGroup}>
             <label style={styles.label}>Course (optional)</label>
-            <select
+            <CourseSelect
+              courses={courses}
+              enrolledSchoolIds={enrolledSchoolIds}
               value={courseId}
               onChange={(e) => setCourseId(e.target.value)}
+              ariaLabel="Course"
+              placeholderLabel="Select a course"
               style={styles.input}
-            >
-              <option value="">Select a course</option>
-              {courses?.map((course) => (
-                <option key={course.id} value={course.id}>
-                  {course.name}
-                </option>
-              ))}
-            </select>
+            />
           </div>
 
           <div style={styles.formGroup}>

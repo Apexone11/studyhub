@@ -70,3 +70,53 @@ export function flattenSchoolsToCourses(schools) {
       : c,
   )
 }
+
+/**
+ * Derive the set of school IDs the user belongs to from a `/api/auth/me`-
+ * style enrollments array. Each enrollment row carries `course.school.id`
+ * (see backend/src/modules/auth/auth.service.js — the include shape).
+ *
+ * Returns a string-coerced Array so consumers can pass directly into
+ * `partitionCoursesBySchool`.
+ */
+export function enrolledSchoolIdsFromUser(user) {
+  if (!user || !Array.isArray(user.enrollments)) return []
+  const ids = new Set()
+  for (const enrollment of user.enrollments) {
+    const id = enrollment?.course?.school?.id ?? enrollment?.course?.schoolId
+    if (id != null) ids.add(String(id))
+  }
+  return Array.from(ids)
+}
+
+/**
+ * Partition a flat course list into "primary" (user's school) vs "other"
+ * buckets so dropdowns can render two `<optgroup>` sections — defaults to
+ * the user's enrolled school but offers a clearly-labeled escape hatch
+ * when the course they want lives at a different school.
+ *
+ * Both arrays are sorted by `code` (case-insensitive, locale-aware) so
+ * the dropdown order is stable across renders.
+ *
+ * `enrolledSchoolIds` may be empty (self-learner with no enrollments yet
+ * or unauthenticated browsing) — in that case everything goes to `other`
+ * and the consumer should render only the "Other schools" optgroup.
+ */
+export function partitionCoursesBySchool(courses, enrolledSchoolIds) {
+  const enrolledSet = new Set((enrolledSchoolIds || []).map((id) => String(id)))
+  const primary = []
+  const other = []
+  for (const c of courses || []) {
+    if (!c) continue
+    if (c.schoolId != null && enrolledSet.has(String(c.schoolId))) {
+      primary.push(c)
+    } else {
+      other.push(c)
+    }
+  }
+  const byCode = (a, b) =>
+    String(a.code || '').localeCompare(String(b.code || ''), undefined, { sensitivity: 'base' })
+  primary.sort(byCode)
+  other.sort(byCode)
+  return { primary, other }
+}

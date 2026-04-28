@@ -29,7 +29,7 @@ export default function AiPage() {
   usePageTitle('Hub AI')
   const { status: authStatus } = useProtectedPage()
   const layout = useResponsiveAppLayout()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const chat = useSharedAiChat()
 
@@ -39,6 +39,21 @@ export default function AiPage() {
     if (convId && !isNaN(convId)) {
       chat.selectConversation(convId)
     }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ?prompt=... is the hand-off used by the AI Suggestion card and other
+  // landing-CTAs that want to drop the user into Hub AI with a starter
+  // prompt already typed. We pass the text down to ChatArea ONCE, then
+  // strip it from the URL so a refresh doesn't re-prefill (and so the
+  // user can't share a URL that pre-types a message). The Suggestion
+  // card already trims and caps to 1000 chars; we still cap defensively
+  // here in case the param is hand-typed.
+  const initialPrompt = (searchParams.get('prompt') || '').slice(0, 1000)
+  useEffect(() => {
+    if (!searchParams.get('prompt')) return
+    const next = new URLSearchParams(searchParams)
+    next.delete('prompt')
+    setSearchParams(next, { replace: true })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (authStatus !== 'ready') {
@@ -135,6 +150,7 @@ export default function AiPage() {
                   onBack={isCompact ? () => chat.selectConversation(null) : null}
                   activeConversationId={chat.activeConversationId}
                   onNewChat={chat.startNewConversation}
+                  initialPrompt={initialPrompt}
                 />
               )}
             </div>
@@ -408,8 +424,13 @@ function ChatArea({
   onBack,
   activeConversationId,
   onNewChat,
+  initialPrompt,
 }) {
-  const [input, setInput] = useState('')
+  // Lazy-initialize from the inbound ?prompt= so the suggestion text
+  // shows up in the textarea on first paint without a setState-in-
+  // effect cascade. The prompt is a starting point the user can edit,
+  // not a forced submission — we intentionally don't auto-send.
+  const [input, setInput] = useState(() => (typeof initialPrompt === 'string' ? initialPrompt : ''))
   const [pendingImages, setPendingImages] = useState([])
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
@@ -418,6 +439,24 @@ function ChatArea({
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingText])
+
+  // When seeded from initialPrompt, focus the textarea and place the
+  // caret at the end so the user can keep typing immediately. Pure DOM
+  // side-effect — no setState here.
+  useEffect(() => {
+    if (typeof initialPrompt !== 'string' || !initialPrompt) return
+    const handle = setTimeout(() => {
+      const el = inputRef.current
+      if (!el) return
+      el.focus()
+      try {
+        el.setSelectionRange(initialPrompt.length, initialPrompt.length)
+      } catch {
+        /* selectionRange isn't supported on some textarea polyfills; safe to ignore */
+      }
+    }, 120)
+    return () => clearTimeout(handle)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Focus input when conversation changes.
   useEffect(() => {

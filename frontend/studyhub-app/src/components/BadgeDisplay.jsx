@@ -75,13 +75,18 @@ export default function BadgeDisplay({ badges }) {
                   color: tier.text,
                   textAlign: 'center',
                   lineHeight: 1.1,
-                  padding: '0 4px',
-                  maxWidth: 56,
+                  padding: '0 3px',
+                  maxWidth: 60,
+                  // Multi-word names ("FIRST COMMENT", "FIRST FOLLOW") were
+                  // hitting the 56px max-width with `nowrap` and rendering
+                  // as "FIRST CO..." — allow wrap so two-word names break
+                  // onto a second line. The hover tooltip carries the
+                  // full name + description.
+                  whiteSpace: 'normal',
                   overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
                   textTransform: 'uppercase',
                   letterSpacing: '0.03em',
+                  wordBreak: 'break-word',
                 }}
               >
                 {badge.name}

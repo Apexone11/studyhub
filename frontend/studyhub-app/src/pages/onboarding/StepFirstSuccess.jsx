@@ -5,6 +5,7 @@
  * Only one card expanded at a time.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { forwardRef, useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { API } from '../../config'
 
 const StepFirstSuccess = forwardRef(function StepFirstSuccess({ onNext, onSkip, submitting }, ref) {
@@ -119,11 +120,18 @@ function StarCard({ expanded, onExpand, onNext, submitting }) {
 
 function AiCard({ expanded, onExpand, onNext, submitting }) {
   const [prompt, setPrompt] = useState('')
+  const navigate = useNavigate()
 
-  function handleGenerate() {
-    if (prompt.trim().length > 0) {
-      onNext({ actionType: 'ai_sheet', prompt: prompt.trim() })
-    }
+  // After the onboarding action records on the backend, hand off to Hub AI
+  // with the prompt prefilled so a real generation happens. The earlier
+  // implementation created a fake placeholder sheet on the backend whose
+  // content was just the literal prompt text — this routes to the actual
+  // streaming AI flow instead. The cap matches AiSuggestionCard's hand-off.
+  async function handleGenerate() {
+    const trimmed = prompt.trim()
+    if (!trimmed) return
+    await onNext({ actionType: 'ai_sheet', prompt: trimmed })
+    navigate(`/ai?prompt=${encodeURIComponent(trimmed.slice(0, 1000))}`)
   }
 
   return (

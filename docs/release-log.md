@@ -28,6 +28,13 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.0.0-beta — in progress
 
+### Avatar / AI hand-off / metadata-toast / dropdown-sizing fixes
+
+- **Six surfaces silently rendered the wrong avatar.** `UserAvatar` only accepted `username` + `avatarUrl` as separate props, but six call sites (admin Analytics, admin Reviews, NoteCommentSection x2, NoteViewerPage, PlagiarismReportPage) all passed `user={...}`. The shortcut prop was being ignored, so every comment / row in those surfaces fell back to the `?` initials placeholder. Extended `UserAvatar` to accept a `user` shortcut (destructured internally with explicit-prop precedence) — all six surfaces start showing real avatars without touching call sites.
+- **AI Suggestion card "Start Practice" CTA was a dead-end.** The `open_chat` action navigated to `/ai` with no context, so the user landed on an empty Hub AI chat and lost the suggestion text. The CTA now forwards the suggestion text as `?prompt=` (URL-encoded, capped at 1000 chars); `AiPage` reads it via lazy-init on the `ChatArea` input so the textarea is pre-filled and focused with the caret at the end. The query param is stripped from the URL after read so refresh doesn't re-prefill.
+- **"Failed to update note settings" toast now surfaces the server error.** The catch block silently dropped the server's error message, so users saw a generic toast for everything from CSRF failures to course-enrollment 403s. Now reads `errBody.error` and includes it in the toast (`Failed to update note settings: <message>`).
+- **"No course" dropdown on the notes editor was unreadable.** 6×10px padding + no min-width left the placeholder rendering as a tiny pill. Bumped padding to 8×14, set min/max width 160/240, fontSize 13, fontWeight 600, and shifted color from `--sh-muted` to `--sh-heading` so the selected course code is legible.
+
 ### Selected-chip CSS fix + register role picker
 
 - **`.sh-chip--active` was silently broken everywhere.** A duplicate `.sh-chip` baseline block in `styles/motion.css` (loaded after `index.css`) overrode the active rule's background at equal specificity, so every chip in the app — sheets filters, feed filters, the register "I am a..." picker — was applying the active class but rendering with the inactive background. Removed the duplicate; bumped the active selector to `.sh-chip.sh-chip--active` so any future source-order accident can't reproduce the bug.

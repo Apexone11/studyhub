@@ -334,6 +334,14 @@ app.post(
 
 // Video chunk upload must also bypass JSON parsing to receive raw binary data.
 // This route uses express.raw() internally to handle 3MB binary chunks.
+//
+// SECURITY: csrfProtection MUST run on this route. Because it's mounted at the
+// app level (above the global `app.use(csrfProtection)` call below), it would
+// otherwise bypass CSRF entirely — a malicious page could replay the victim's
+// session cookie + a forged uploadId to overwrite chunks. Unlike the Stripe
+// webhook (which has signature verification), this route has no compensating
+// control. The CSRF token lives in the X-CSRF-Token header, not the body, so
+// it works correctly with the raw-body parser.
 const videoUploadChunkHandler = (req, res, next) => {
   req.url = '/upload/chunk'
   videoRoutes(req, res, next)
@@ -341,6 +349,7 @@ const videoUploadChunkHandler = (req, res, next) => {
 app.post(
   '/api/video/upload/chunk',
   express.raw({ type: '*/*', limit: '3mb' }),
+  csrfProtection,
   videoUploadChunkHandler,
 )
 
