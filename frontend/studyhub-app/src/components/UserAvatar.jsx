@@ -15,11 +15,20 @@
  *   - Combined badge when user is both Pro and donor
  *   - All colors use CSS custom property tokens for dark mode compliance
  *
- * Usage:
- *   <UserAvatar username="jane" avatarUrl="/uploads/avatar.jpg" size={40} />
- *   <UserAvatar username="admin_user" role="admin" size={32} showStatus online />
- *   <UserAvatar username="pro_user" plan="pro_monthly" size={36} />
- *   <UserAvatar username="donor" isDonor donorLevel="gold" size={36} />
+ * Two prop forms are supported:
+ *
+ *   Explicit:
+ *     <UserAvatar username="jane" avatarUrl="/uploads/avatar.jpg" size={40} />
+ *
+ *   Shortcut (pass a user/author object — username/avatarUrl/role/plan/isDonor/
+ *   donorLevel are pulled out automatically):
+ *     <UserAvatar user={comment.author} size={32} />
+ *
+ *   Explicit props always win when both are provided. The shortcut form
+ *   exists because every comment surface (notes, sheets, study groups,
+ *   feed) carries the user object from the API and was previously
+ *   silently broken — passing user={...} when UserAvatar didn't accept
+ *   it gave every comment the "?" initials fallback.
  */
 import { useState } from 'react'
 import { API } from '../config'
@@ -41,11 +50,12 @@ const DONOR_COLORS = {
 }
 
 export default function UserAvatar({
+  user,
   username,
   avatarUrl,
   role,
   plan,
-  isDonor = false,
+  isDonor,
   donorLevel,
   size = 36,
   border,
@@ -54,20 +64,28 @@ export default function UserAvatar({
   style: extraStyle,
   className,
 }) {
+  // Resolve from the shortcut user object when explicit props are absent.
+  // Explicit props always win — `username="override"` beats `user.username`.
+  const resolvedUsername = username ?? user?.username
+  const resolvedAvatarUrl = avatarUrl ?? user?.avatarUrl
+  const resolvedRole = role ?? user?.role
+  const resolvedPlan = plan ?? user?.plan
+  const resolvedIsDonor = isDonor ?? user?.isDonor ?? false
+  const resolvedDonorLevel = donorLevel ?? user?.donorLevel
   const [imgError, setImgError] = useState(false)
 
-  const initials = (username || '?').slice(0, 2).toUpperCase()
+  const initials = (resolvedUsername || '?').slice(0, 2).toUpperCase()
 
   const resolvedUrl =
-    avatarUrl && !imgError
-      ? avatarUrl.startsWith('http')
-        ? avatarUrl
-        : `${API}${avatarUrl}`
+    resolvedAvatarUrl && !imgError
+      ? resolvedAvatarUrl.startsWith('http')
+        ? resolvedAvatarUrl
+        : `${API}${resolvedAvatarUrl}`
       : null
 
-  const isAdmin = role === 'admin'
-  const hasPro = isPlan(plan)
-  const hasDonor = isDonor || Boolean(donorLevel)
+  const isAdmin = resolvedRole === 'admin'
+  const hasPro = isPlan(resolvedPlan)
+  const hasDonor = resolvedIsDonor || Boolean(resolvedDonorLevel)
   const showBadge = hasPro || hasDonor
 
   // Badge size scales with avatar size (minimum 14px)
@@ -104,7 +122,7 @@ export default function UserAvatar({
         {resolvedUrl ? (
           <img
             src={resolvedUrl}
-            alt={username || ''}
+            alt={resolvedUsername || ''}
             loading="lazy"
             onError={() => setImgError(true)}
             style={{

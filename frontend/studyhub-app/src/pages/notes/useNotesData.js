@@ -272,6 +272,7 @@ export function useNotesData() {
     optimisticApply()
     setNotes((prev) => prev.map((n) => (n.id === targetNoteId ? { ...n, [field]: value } : n)))
     setActiveNote((prev) => (prev?.id === targetNoteId ? { ...prev, [field]: value } : prev))
+    let serverErrorMessage = ''
     try {
       const response = await fetch(`${API}/api/notes/${targetNoteId}/metadata`, {
         method: 'PATCH',
@@ -279,7 +280,15 @@ export function useNotesData() {
         credentials: 'include',
         body: JSON.stringify({ [field]: value }),
       })
-      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      if (!response.ok) {
+        // Capture the server's error message so the toast can surface it.
+        // Generic "Failed to update note settings" hid CSRF / 403 / 404 /
+        // enrollment-check errors during the prod incident — surface it.
+        const errBody = await response.json().catch(() => ({}))
+        serverErrorMessage =
+          (typeof errBody?.error === 'string' && errBody.error.trim()) || `HTTP ${response.status}`
+        throw new Error(serverErrorMessage)
+      }
       const data = await response.json().catch(() => ({}))
       // Trust the server's normalized row (e.g. it auto-cleared
       // allowDownloads when private went true).
@@ -312,7 +321,12 @@ export function useNotesData() {
           prev?.id === targetNoteId ? { ...prev, [field]: previousRowValue } : prev,
         )
       }
-      showToast('Failed to update note settings', 'error')
+      showToast(
+        serverErrorMessage
+          ? `Failed to update note settings: ${serverErrorMessage}`
+          : 'Failed to update note settings',
+        'error',
+      )
     }
   }
 

@@ -499,15 +499,24 @@ export default function NoteEditor({
         <select
           value={editorCourseId}
           onChange={(e) => handleCourseChange(e.target.value)}
+          aria-label="Course"
+          // Right-side toolbar item — was 6×10 with no min-width and the
+          // "No course" placeholder + collapsed text rendered as a tiny
+          // unreadable pill. Bumping padding + min-width gives the
+          // dropdown breathing room without making it dominate the row.
           style={{
             border: '1px solid var(--sh-border)',
             borderRadius: 8,
-            padding: '6px 10px',
-            fontSize: 12,
+            padding: '8px 14px',
+            fontSize: 13,
             fontFamily: PAGE_FONT,
-            color: 'var(--sh-muted)',
+            color: 'var(--sh-heading)',
             outline: 'none',
             background: 'var(--sh-surface)',
+            minWidth: 160,
+            maxWidth: 240,
+            cursor: 'pointer',
+            fontWeight: 600,
           }}
         >
           <option value="">No course</option>

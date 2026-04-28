@@ -54,18 +54,27 @@ function RefreshIcon({ size = 16 }) {
   )
 }
 
-/** Map an action token from the backend to a route. The backend's
+/** Map an action token + suggestion text to a route. The backend's
  *  validateModelOutput pins the allowlist to these three; anything
- *  else is treated as 'open_chat' for safety. */
-function actionToRoute(action) {
+ *  else is treated as 'open_chat' for safety.
+ *
+ *  For open_chat, the suggestion text is forwarded as ?prompt= so Hub
+ *  AI prefills the input — without this the user lands on an empty
+ *  chat and the suggestion's whole purpose (a starting point) is lost.
+ *  Sheet routes don't carry the prompt; those flows are about creating
+ *  or reviewing material, not chatting about it. */
+function actionToRoute(action, suggestionText) {
   switch (action) {
     case 'create_sheet':
       return '/sheets/upload'
     case 'review_sheet':
       return '/sheets'
     case 'open_chat':
-    default:
-      return '/ai'
+    default: {
+      const trimmed = typeof suggestionText === 'string' ? suggestionText.trim() : ''
+      if (!trimmed) return '/ai'
+      return `/ai?prompt=${encodeURIComponent(trimmed.slice(0, 1000))}`
+    }
   }
 }
 
@@ -198,7 +207,7 @@ export default function AiSuggestionCard() {
 
   const handleCtaClick = useCallback(() => {
     if (!suggestion) return
-    navigate(actionToRoute(suggestion.ctaAction))
+    navigate(actionToRoute(suggestion.ctaAction, suggestion.text))
   }, [navigate, suggestion])
 
   // Flag-off → render nothing. Loading the flag itself also returns
