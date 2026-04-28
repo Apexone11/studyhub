@@ -42,6 +42,16 @@ internal log into this file when they describe user-visible behavior.
   fail-closed flag evaluation rendered Phase 1/2/3 features invisible
   in production whenever a deploy preceded the manual seed step. Seed
   failure aborts the deploy by design (no `||` fallback).
+- **Boot-time FeatureFlag auto-provisioning.** `backend/scripts/start.js`
+  now runs `seedFeatureFlags`, `seedRolesV2Flags`, and
+  `seedNotesHardeningFlag` after `prisma migrate deploy` on every Railway
+  boot, so shipped features self-activate without an operator running
+  `seed:flags` from a Railway shell. Idempotent (upsert-only); a seed
+  failure logs loudly but does not block API startup. Gated by
+  `SEED_FEATURE_FLAGS_ON_START` (defaults on when Railway env vars are
+  detected). `railway.toml` `preDeployCommand` slimmed to just the
+  best-effort GeoIP refresh; the two flag-seed scripts that previously
+  only had a CLI now also export reusable helpers.
 - **CORS hardening — drop `public: true` from CDN-cached endpoints.**
   `/api/courses/schools`, `/api/courses/popular`, `/api/feed/trending`,
   and `/api/platform-stats` no longer mark themselves `public` for
