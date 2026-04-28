@@ -396,18 +396,32 @@ export default function SheetHtmlPreviewPage() {
                 ) : (
                   <iframe
                     title={`html-sheet-preview-${sheetId}`}
-                    // Interactive runtime runs the author's inline scripts
-                    // inside a tightly-scoped sandbox that grants only the
-                    // capabilities the runtime actually needs — never the
-                    // capability that would expose the parent app's
-                    // cookies / storage to the iframe. Safe preview gets
-                    // the maximum-restriction sandbox (no scripts, no
-                    // forms, no popups, opaque origin). The document
-                    // still renders; the script-stripped HTML just shows
-                    // as static content.
+                    // Two sandbox modes:
+                    //
+                    //   - Interactive runtime: the author's inline scripts
+                    //     run inside an opaque-origin sandbox. We grant
+                    //     allow-scripts + allow-forms ONLY. Withholding
+                    //     allow-same-origin is the real security boundary
+                    //     here — it prevents any author script from reading
+                    //     the parent app's cookies/storage.
+                    //
+                    //   - Safe preview: scripts are stripped server-side,
+                    //     so the iframe is rendering static, sanitized HTML.
+                    //     We DO grant allow-same-origin in this branch
+                    //     because the iframe src is on a different subdomain
+                    //     (api.getstudyhub.org) from the parent
+                    //     (www.getstudyhub.org), and Chrome blocks
+                    //     cross-origin iframes that have a fully
+                    //     restrictive (empty) sandbox attribute with the
+                    //     "(blocked:origin)" placeholder you see in
+                    //     screenshot 1. With no scripts allowed it cannot
+                    //     do anything dangerous with same-origin access.
+                    //
                     // Test enforcement of these flags lives in
                     // backend/test/interactive-preview.test.js.
-                    sandbox={interactive && runtimeUrl ? 'allow-scripts allow-forms' : ''}
+                    sandbox={
+                      interactive && runtimeUrl ? 'allow-scripts allow-forms' : 'allow-same-origin'
+                    }
                     referrerPolicy="no-referrer"
                     src={interactive && runtimeUrl ? runtimeUrl : state.preview.previewUrl || ''}
                     style={{

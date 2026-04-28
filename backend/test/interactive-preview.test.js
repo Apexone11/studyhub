@@ -262,7 +262,18 @@ describe('Frontend sandbox iframe attributes', () => {
       'utf8',
     )
     expect(source).toContain("'allow-scripts allow-forms'")
-    expect(source).not.toContain('allow-same-origin')
+    // The interactive branch must NOT grant same-origin to the iframe
+    // running author-supplied scripts — that's the real security boundary.
+    // The safe-preview branch is allowed to use allow-same-origin because
+    // scripts are stripped server-side and the iframe loads from a
+    // different subdomain (api.getstudyhub.org), which Chrome refuses to
+    // render under a fully-restrictive sandbox.
+    expect(source).toMatch(/interactive\s*&&\s*runtimeUrl\s*\?\s*['"]allow-scripts allow-forms['"]/)
+    // Specifically reject any quoted string literal that combines allow-scripts
+    // with allow-same-origin in either order — the comment text in the source
+    // file is allowed to mention either token in prose.
+    expect(source).not.toMatch(/['"]allow-scripts[^'"]*allow-same-origin[^'"]*['"]/)
+    expect(source).not.toMatch(/['"]allow-same-origin[^'"]*allow-scripts[^'"]*['"]/)
   })
 
   it('SheetContentPanel does not include allow-top-navigation', () => {
