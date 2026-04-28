@@ -41,25 +41,70 @@ export default function AiPage() {
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ?prompt=... is the hand-off used by the AI Suggestion card and other
-  // landing-CTAs that want to drop the user into Hub AI with a starter
-  // prompt already typed. We pass the text down to ChatArea, then strip
-  // it from the URL so a refresh doesn't re-prefill (and so the user
-  // can't share a URL that pre-types a message). The Suggestion card
-  // already trims and caps to 1000 chars; we still cap defensively
-  // here in case the param is hand-typed.
-  //
-  // Effect reacts to the param itself so a same-page navigation that
-  // adds ?prompt= (e.g. clicking the AI suggestion CTA while already
-  // on /ai) is handled the same as an initial mount with the param.
+  // ?prompt=... is the hand-off used by the AI Suggestion card and
+  // other landing-CTAs that want to drop the user into Hub AI with a
+  // starter prompt already typed. We pass the text down to ChatArea,
+  // then strip it from the URL so a refresh doesn't re-prefill (and so
+  // the user can't share a URL that pre-types a message). The
+  // Suggestion card already trims and caps to 1000 chars; we still
+  // cap defensively here in case the param is hand-typed.
   const promptParam = searchParams.get('prompt') || ''
   const initialPrompt = promptParam.slice(0, 1000)
+
+  // Strip ?prompt= from the URL after capture so a refresh doesn't
+  // re-prefill the textarea. The functional setSearchParams form lets
+  // us drop the redundant `searchParams` dep (the new param map is
+  // computed from `prev`, not from the closed-over searchParams) so
+  // the effect only re-runs when promptParam itself changes.
   useEffect(() => {
     if (!promptParam) return
-    const next = new URLSearchParams(searchParams)
-    next.delete('prompt')
-    setSearchParams(next, { replace: true })
-  }, [promptParam, searchParams, setSearchParams])
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        next.delete('prompt')
+        return next
+      },
+      { replace: true },
+    )
+  }, [promptParam, setSearchParams])
+
+  // Reset ChatArea via a `key` so its internal state (input, focus
+  // effects) re-initializes cleanly when a NEW prompt arrives mid-
+  // mount — e.g. user clicks the AI Suggestion CTA while already on
+  // /ai. This is React's documented "reset state via key" pattern and
+  // avoids the previous in-component setState-during-render dance.
+  //
+  // The trade: any unsent text the user typed in the prior session
+  // is dropped on prompt arrival. That matches the suggestion-CTA
+  // contract — clicking another suggestion is "start a new chat with
+  // this prompt", not "merge into my current draft".
+  //
+  // Lazy init: start at 1 if we mounted WITH a prompt (initial paint
+  // already consumes it via ChatArea's useState lazy init). Subsequent
+  // fresh-prompt arrivals bump the key. The lastSeenPromptRef gates
+  // bumps so unrelated parent re-renders (and the post-strip empty-
+  // prompt re-render) don't unmount ChatArea unnecessarily.
+  const [chatAreaKey, setChatAreaKey] = useState(() => (promptParam ? 1 : 0))
+  const lastSeenPromptRef = useRef(promptParam)
+  useEffect(() => {
+    if (!promptParam) {
+      // After strip, the ref resets so a SECOND identical prompt
+      // arrival later (user clicks the same CTA twice) still counts
+      // as a fresh arrival and bumps the key.
+      lastSeenPromptRef.current = ''
+      return
+    }
+    if (promptParam === lastSeenPromptRef.current) return
+    lastSeenPromptRef.current = promptParam
+    // The setState here is the canonical "synchronize derived state to
+    // an external value (URL search param) when it transitions" case.
+    // It only fires when promptParam actually changes to a fresh non-
+    // empty value, so the cascade is bounded by user navigation, not
+    // by render frequency. eslint's set-state-in-effect rule is right
+    // for the common cases but this is the documented escape hatch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setChatAreaKey((k) => k + 1)
+  }, [promptParam])
 
   if (authStatus !== 'ready') {
     return (
@@ -140,9 +185,12 @@ export default function AiPage() {
                 />
               )}
 
-              {/* Chat Area */}
+              {/* Chat Area — `key={chatAreaKey}` lets a fresh ?prompt=
+                  arrival reset internal state cleanly without any
+                  setState-during-render workaround inside ChatArea. */}
               {(!isCompact || chat.activeConversationId) && (
                 <ChatArea
+                  key={chatAreaKey}
                   messages={chat.messages}
                   streaming={chat.streaming}
                   streamingText={chat.streamingText}
@@ -435,43 +483,29 @@ function ChatArea({
   // shows up in the textarea on first paint. The prompt is a starting
   // point the user can edit, not a forced submission — we intentionally
   // don't auto-send.
+  //
+  // Mid-mount re-seeding (e.g. user clicks the AI Suggestion CTA while
+  // already on /ai) is handled by AiPage bumping a `key` on ChatArea,
+  // which unmounts and remounts this component with the new
+  // initialPrompt. That keeps this file free of any setState-during-
+  // render workarounds and means initialPrompt is effectively a
+  // constant from this component's perspective.
   const [input, setInput] = useState(() => (typeof initialPrompt === 'string' ? initialPrompt : ''))
   const [pendingImages, setPendingImages] = useState([])
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
-
-  // ── Mid-mount prompt re-seeding (React-recommended "adjust state
-  // during render" pattern instead of setState-in-effect, per
-  // https://react.dev/reference/react/useState — avoids the cascading-
-  // render lint and is the documented approach for "reset some state
-  // when a prop changes").
-  //
-  // Why we need this at all: when the user clicks the AI Suggestion
-  // CTA while already on /ai, AiPage adds and strips ?prompt=. ChatArea
-  // is already mounted, so its lazy-init useState above won't pick up
-  // the new prompt. We compare initialPrompt to the prompt we last
-  // consumed (lastSeededPrompt state); when they differ AND the
-  // textarea is either empty or still holds the previous seed, we
-  // overwrite. If the user has typed something new, we record the
-  // change and bail — their input wins.
-  const [lastSeededPrompt, setLastSeededPrompt] = useState(() =>
-    typeof initialPrompt === 'string' ? initialPrompt : '',
-  )
-  if (typeof initialPrompt === 'string' && initialPrompt && initialPrompt !== lastSeededPrompt) {
-    setLastSeededPrompt(initialPrompt)
-    const inputUntouched = input === '' || input === lastSeededPrompt
-    if (inputUntouched) setInput(initialPrompt)
-  }
 
   // Auto-scroll to bottom on new messages.
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingText])
 
-  // When the textarea has been seeded (mount OR mid-mount re-seed),
-  // focus it and place the caret at the end so the user can keep
-  // typing. Pure DOM side-effect; no setState. Reruns whenever
-  // initialPrompt changes.
+  // When this instance was seeded with a non-empty initialPrompt,
+  // focus the textarea and place the caret at the end so the user
+  // can keep typing immediately. Mount-only — initialPrompt is a
+  // per-instance constant (parent's `key` reset unmounts+remounts
+  // when the prompt changes), so no re-runs are needed and the
+  // user's typed input can never be clobbered by a stale prompt.
   useEffect(() => {
     if (typeof initialPrompt !== 'string' || !initialPrompt) return
     const handle = setTimeout(() => {
@@ -485,7 +519,7 @@ function ChatArea({
       }
     }, 120)
     return () => clearTimeout(handle)
-  }, [initialPrompt])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Focus input when conversation changes.
   useEffect(() => {

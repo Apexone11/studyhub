@@ -66,11 +66,25 @@ export default function CourseSelect({
   const hasPrimary = primary.length > 0
   const hasOther = other.length > 0
 
+  // When `allowEmpty` is on, an undefined/null value falls back to
+  // `emptyValue` so the placeholder option is always selectable. The
+  // earlier `value ?? ''` shortcut broke whenever a consumer set
+  // `emptyValue` to a non-empty sentinel ("__none__", etc.) — the
+  // <select> ended up with a value that matched no <option> and
+  // browsers rendered the first option as a phantom selection.
+  //
+  // The trailing `?? ''` guards against the case where a consumer
+  // both omits `value` AND explicitly passes `emptyValue={undefined}`
+  // — without it, resolvedValue would be undefined and React would
+  // flip the <select> from controlled to uncontrolled, logging a
+  // dev warning and breaking subsequent state updates.
+  const resolvedValue = value ?? (allowEmpty ? (emptyValue ?? '') : '')
+
   return (
     <select
       id={id}
       name={name}
-      value={value ?? ''}
+      value={resolvedValue}
       onChange={onChange}
       disabled={disabled}
       required={required}

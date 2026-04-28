@@ -28,8 +28,21 @@ async function disableOverlays(page) {
     window.localStorage.setItem('tutorial_feed_seen', '1')
     window.localStorage.setItem('tutorial_dashboard_seen', '1')
     window.localStorage.setItem('tutorial_sheets_seen', '1')
+    // Task #70: pre-seed self-hosted cookie consent so the new
+    // <CookieConsentBanner /> short-circuits on mount.
+    try {
+      window.localStorage.setItem(
+        'studyhub.cookieConsent',
+        JSON.stringify({ choice: 'essential', timestamp: new Date().toISOString() }),
+      )
+    } catch {
+      /* ignore */
+    }
   })
   await page.addInitScript(() => {
+    // Termly hide selectors retained for the legal-document embed
+    // (Terms / Privacy / Cookie Policy still mount #termly-code-
+    // snippet-support). Joyride overlays — same defense as before.
     const css = `
       #termly-code-snippet-support,
       [class*="termly-styles-module-root"],
@@ -153,8 +166,14 @@ test.describe('MediaComposer quota banner @phase-4', () => {
     await page.goto(`/study-groups/${group.id}`)
 
     // Click into Resources tab then Add Resource to reach the composer.
-    await page.getByRole('tab', { name: /resources/i }).first().click()
-    await page.getByRole('button', { name: /add resource/i }).first().click()
+    await page
+      .getByRole('tab', { name: /resources/i })
+      .first()
+      .click()
+    await page
+      .getByRole('button', { name: /add resource/i })
+      .first()
+      .click()
 
     await expect(page.getByRole('dialog', { name: /add resource/i })).toBeVisible({ timeout: 5000 })
     // Banner text uses a split label: "2/5 media this week"
@@ -177,8 +196,14 @@ test.describe('MediaComposer quota banner @phase-4', () => {
     })
 
     await page.goto(`/study-groups/${group.id}`)
-    await page.getByRole('tab', { name: /resources/i }).first().click()
-    await page.getByRole('button', { name: /add resource/i }).first().click()
+    await page
+      .getByRole('tab', { name: /resources/i })
+      .first()
+      .click()
+    await page
+      .getByRole('button', { name: /add resource/i })
+      .first()
+      .click()
 
     await expect(page.getByRole('dialog', { name: /add resource/i })).toBeVisible({ timeout: 5000 })
     await expect(page.getByRole('link', { name: /upgrade to pro for 100\/week/i })).toBeVisible()
@@ -200,7 +225,14 @@ test.describe('Group header background @phase-4', () => {
     })
     await mockPhase4Endpoints(page, {
       group,
-      quota: { plan: 'free', quota: 5, used: 0, remaining: 5, resetsAt: new Date().toISOString(), unlimited: false },
+      quota: {
+        plan: 'free',
+        quota: 5,
+        used: 0,
+        remaining: 5,
+        resetsAt: new Date().toISOString(),
+        unlimited: false,
+      },
     })
 
     await page.goto(`/study-groups/${group.id}`)
@@ -213,7 +245,14 @@ test.describe('Group header background @phase-4', () => {
     const group = createMockGroup({ id: 2202, userRole: 'admin' })
     await mockPhase4Endpoints(page, {
       group,
-      quota: { plan: 'free', quota: 5, used: 0, remaining: 5, resetsAt: new Date().toISOString(), unlimited: false },
+      quota: {
+        plan: 'free',
+        quota: 5,
+        used: 0,
+        remaining: 5,
+        resetsAt: new Date().toISOString(),
+        unlimited: false,
+      },
     })
 
     await page.goto(`/study-groups/${group.id}`)

@@ -205,7 +205,17 @@ export default function RoleTile({ user }) {
             You have <strong>{remainingText}</strong> to revert to <strong>{previousLabel}</strong>{' '}
             at no cost.
           </Message>
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          {/* S1: right-aligned action row so the buttons sit at the card
+              edge instead of stretching across the full card width. */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 10,
+              flexWrap: 'wrap',
+              justifyContent: 'flex-end',
+              marginTop: 12,
+            }}
+          >
             <Button onClick={() => setRevertOpen(true)}>Revert to {previousLabel}</Button>
             <Button secondary onClick={() => setChangeOpen(true)}>
               Change role
@@ -218,7 +228,11 @@ export default function RoleTile({ user }) {
             Role can be changed {remainingBudget} more time{remainingBudget === 1 ? '' : 's'} in the
             next 30 days. You get a 2-day window to revert for free.
           </p>
-          <Button onClick={() => setChangeOpen(true)}>Change role</Button>
+          {/* S1: right-aligned single action so it doesn't read as
+              full-width inside the card. */}
+          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
+            <Button onClick={() => setChangeOpen(true)}>Change role</Button>
+          </div>
         </>
       )}
 

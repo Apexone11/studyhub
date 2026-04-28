@@ -33,6 +33,7 @@ export default function AccountTab({
   handlePatch,
   syncUser,
   clearSession,
+  onSignOut,
 }) {
   const navigate = useNavigate()
 
@@ -284,6 +285,21 @@ export default function AccountTab({
             </div>
           </div>
         )}
+      </SectionCard>
+
+      {/* Sign Out moved here from the navbar (S1) — destructive nav
+          action belongs adjacent to the Danger Zone, not the search bar.
+          Right-aligned via the flex wrapper to match the new
+          single-action button convention. */}
+      <SectionCard
+        title="Sign out"
+        subtitle="End this session on this device. You'll need to sign in again to come back."
+      >
+        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+          <Button secondary onClick={onSignOut}>
+            Sign out
+          </Button>
+        </div>
       </SectionCard>
 
       <SectionCard

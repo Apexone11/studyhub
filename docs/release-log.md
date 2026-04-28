@@ -28,6 +28,33 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.0.0-beta — in progress
 
+### Review follow-ups (round 3)
+
+- **Cookie consent banner no longer silently dismisses on storage failure.** Codex + Copilot flagged that Safari Private mode (and other no-localStorage contexts) caused `writeConsent` to return null, but the click handler still set `dismissed=true` — analytics never loaded and the user couldn't retry. Banner now keeps itself visible on persistence failure, renders an inline `role="alert"` warning with a "Dismiss anyway" escape hatch, and fires a non-persistent `studyhub:consent-changed` event (with `persisted: false`) so this-session analytics still load at the user's request. Two new component tests pin the failure-path behavior using a mocked `Storage.prototype.setItem`.
+- **`CourseSelect` resolvedValue can no longer be undefined.** Sourcery flagged that `value ?? (allowEmpty ? emptyValue : '')` becomes undefined when a consumer passes `value=undefined` AND `emptyValue=undefined` AND `allowEmpty=true` — flipping the `<select>` from controlled to uncontrolled. Trailing `?? ''` guard added.
+- **`handleSignOut` declaration hoisted above `renderTab`** in `SettingsPage.jsx`. Previous textual order (declaration AFTER the function that closes over it) was a closure-resolves-at-call-time accident that worked but would break if `renderTab` got refactored to an inline arrow or IIFE. Sourcery flagged the textual TDZ; defensive hoist is the right move.
+- **Release log Sign-out capitalization** standardized to match the actual UI label ("Sign out").
+
+### Self-hosted cookie consent banner (Task #70 — Option A locked)
+
+- **Termly resource-blocker replaced with a self-hosted React banner.** Termly's third-party cookies were being aggressively stripped by Chrome incognito / Brave / Safari / Firefox-strict, so the consent prompt re-appeared on every page load and the user's choice never persisted. The new flow lives entirely in our origin: `lib/cookieConsent.js` (read/write + `studyhub:consent-changed` event), `components/CookieConsentBanner.jsx` (bottom-anchored non-modal bar, mounted once at the app root, native shell short-circuits via `window.__SH_NATIVE__`), and a two-phase loader in `index.html` (in-session event listener + returning-visitor immediate-fire).
+- **Microsoft Clarity + Google Ads only fire after explicit "Accept all"** per the founder-locked Option A. Idempotent loader so duplicate consent events can't double-load. Essential-only consent persists the choice without firing analytics.
+- **`*.termly.io` stays in the CSP** because the legal-document embed (Terms / Privacy / Cookie Policy) still loads from app.termly.io. Documented inline in `_headers`.
+- **5 Playwright specs updated** to pre-seed `studyhub.cookieConsent = essential` via `addInitScript` so the new banner short-circuits in tests (route aborts kept as defense in depth).
+- **12 new tests:** 7 component (first-visit render / repeat-visit suppression for both choices / Accept-all + dispatched event / Essential-only / Cookie-settings link to /cookies / native-shell skip), 5 helper (read null on empty / read parsed value / read null on malformed JSON / write all + event / hasAnalyticsConsent gate). Plus a defensive bonus test rejecting unknown choice strings.
+
+### Hub AI prompt hand-off — Copilot R2 follow-ups
+
+- **AiPage now resets ChatArea via a `key` prop when a new `?prompt=` arrives.** Replaces the previous in-component setState-during-render dance with React's documented "reset state via key" pattern. Eliminates the focus-effect-leak case where a user-typed message could have its caret moved when a new prompt was consumed-but-not-applied.
+- **Strip-effect deps simplified** to `[promptParam, setSearchParams]` using the functional `setSearchParams(prev => …)` form — drops the redundant `searchParams` dep so the effect only re-runs when the prompt itself changes.
+- **CourseSelect's `emptyValue` contract honored.** Previous `value ?? ''` shortcut broke when a consumer set `emptyValue="__none__"` (etc.) — the select had no matching option and rendered a phantom selection. Now falls back to `emptyValue` when value is undefined and the placeholder is enabled. Test updated + new test pinning the undefined-value-with-custom-emptyValue branch.
+
+### Settings page polish (S1 from the bug-sweep handoff)
+
+- **Sign out moved out of the top header into the Account tab.** The button was wedged next to the Search bar in the navbar — visually it read as a search peer, not a destructive nav action. Now lives as a dedicated "Sign out" SectionCard right above Danger Zone, with a right-aligned secondary button.
+- **Settings card sections breathe.** Bumped `SectionCard` `marginBottom` 18→24 and `<h3>` `marginBottom` 6→12 so the right-panel spacing doesn't read as cramped between Email Address / Sign out / Danger Zone.
+- **"Change role" + "Revert to" + "Save Privacy Preferences" buttons are right-aligned now.** All three were rendering as full-width inside their cards; wrapping in `flex justify-content: flex-end` puts them at the card edge as natural-width buttons.
+
 ### Avatar / AI hand-off / metadata-toast / dropdown-sizing fixes
 
 - **Six surfaces silently rendered the wrong avatar.** `UserAvatar` only accepted `username` + `avatarUrl` as separate props, but six call sites (admin Analytics, admin Reviews, NoteCommentSection x2, NoteViewerPage, PlagiarismReportPage) all passed `user={...}`. The shortcut prop was being ignored, so every comment / row in those surfaces fell back to the `?` initials placeholder. Extended `UserAvatar` to accept a `user` shortcut (destructured internally with explicit-prop precedence) — all six surfaces start showing real avatars without touching call sites.

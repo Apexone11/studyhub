@@ -125,12 +125,19 @@ export function SectionCard({ title, subtitle, children, danger = false }) {
         border: `1px solid ${danger ? 'var(--sh-danger-border)' : 'var(--sh-border)'}`,
         padding: '24px',
         boxShadow: 'var(--shadow-sm)',
-        marginBottom: 18,
+        // S1: bumped 18→24 so Settings cards visibly breathe between
+        // sections (Email Address ↔ Sign out ↔ Danger Zone). Token
+        // would be ideal but no `--sh-space-6` exists yet — raw 24
+        // matches the spec.
+        marginBottom: 24,
       }}
     >
       <h3
         style={{
-          margin: '0 0 6px',
+          // S1: bumped 6→12 so the section heading has clear optical
+          // separation from its body before the subtitle (or children
+          // when no subtitle is present).
+          margin: '0 0 12px',
           fontSize: 17,
           color: danger ? 'var(--sh-danger)' : 'var(--sh-heading)',
         }}
