@@ -412,10 +412,11 @@ export default function SheetHtmlPreviewPage() {
                     //     (api.getstudyhub.org) from the parent
                     //     (www.getstudyhub.org), and Chrome blocks
                     //     cross-origin iframes that have a fully
-                    //     restrictive (empty) sandbox attribute with the
-                    //     "(blocked:origin)" placeholder you see in
-                    //     screenshot 1. With no scripts allowed it cannot
-                    //     do anything dangerous with same-origin access.
+                    //     restrictive (empty) sandbox attribute, showing
+                    //     a "(blocked:origin)" placeholder instead of the
+                    //     preview content. With no scripts allowed the
+                    //     iframe cannot do anything dangerous with that
+                    //     same-origin access.
                     //
                     // Test enforcement of these flags lives in
                     // backend/test/interactive-preview.test.js.

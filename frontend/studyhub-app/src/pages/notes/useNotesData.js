@@ -250,12 +250,20 @@ export function useNotesData() {
    * was persisted, which made them feel broken.
    */
   async function persistMetadataChange(field, value, optimisticApply, revert) {
-    if (!activeNote?.id) return
+    const note = activeNote
+    if (!note?.id) return
+    // Snapshot the prior list-row value BEFORE the optimistic patch lands.
+    // The earlier version of this code tried to derive the prior value
+    // from the in-flight `value` (e.g. `!value === false ? !value : !value`,
+    // which is just `!value` for any input) and ended up corrupting
+    // numeric courseId rows into booleans on save failure. Capturing the
+    // snapshot up front is the only safe rollback.
+    const previousRowValue = note[field]
     optimisticApply()
-    setNotes((prev) => prev.map((n) => (n.id === activeNote.id ? { ...n, [field]: value } : n)))
-    setActiveNote((prev) => (prev?.id === activeNote.id ? { ...prev, [field]: value } : prev))
+    setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, [field]: value } : n)))
+    setActiveNote((prev) => (prev?.id === note.id ? { ...prev, [field]: value } : prev))
     try {
-      const response = await fetch(`${API}/api/notes/${activeNote.id}/metadata`, {
+      const response = await fetch(`${API}/api/notes/${note.id}/metadata`, {
         method: 'PATCH',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -277,12 +285,10 @@ export function useNotesData() {
     } catch {
       revert()
       setNotes((prev) =>
-        prev.map((n) =>
-          n.id === activeNote.id ? { ...n, [field]: !value === false ? !value : !value } : n,
-        ),
+        prev.map((n) => (n.id === note.id ? { ...n, [field]: previousRowValue } : n)),
       )
       setActiveNote((prev) =>
-        prev?.id === activeNote.id ? { ...prev, [field]: activeNote[field] } : prev,
+        prev?.id === note.id ? { ...prev, [field]: previousRowValue } : prev,
       )
       showToast('Failed to update note settings', 'error')
     }

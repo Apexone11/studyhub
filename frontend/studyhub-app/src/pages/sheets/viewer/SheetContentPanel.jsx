@@ -538,7 +538,20 @@ export default function SheetContentPanel({
             ) : null}
             <iframe
               title={`sheet-html-${sheet.id}`}
-              sandbox={viewerInteractive && runtimeUrl ? 'allow-scripts allow-forms' : ''}
+              // Same two-mode sandbox policy as SheetHtmlPreviewPage:
+              //   - Interactive runtime: allow-scripts + allow-forms ONLY
+              //     (granting allow-same-origin would let author-supplied
+              //     scripts read parent app cookies/storage — never).
+              //   - Safe preview: allow-same-origin only (no scripts/forms).
+              //     Scripts are stripped server-side, and Chrome refuses
+              //     to render a cross-subdomain iframe (api.* serving the
+              //     preview, www.* hosting the parent) under a fully
+              //     restrictive sandbox attribute, so it shows the
+              //     "(blocked:origin)" placeholder instead of content.
+              // Test enforcement lives in backend/test/interactive-preview.test.js.
+              sandbox={
+                viewerInteractive && runtimeUrl ? 'allow-scripts allow-forms' : 'allow-same-origin'
+              }
               referrerPolicy="no-referrer"
               src={viewerInteractive && runtimeUrl ? runtimeUrl : safePreviewUrl}
               style={{ width: '100%', minHeight: 560, border: 'none' }}
