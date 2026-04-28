@@ -100,12 +100,12 @@ describe('CourseSelect', () => {
     expect(screen.queryByRole('option', { name: 'No course' })).toBeNull()
   })
 
-  it('honors a custom placeholderLabel + emptyValue', () => {
+  it('honors a custom placeholderLabel + emptyValue and selects the placeholder when value matches it', () => {
     const { container } = render(
       <CourseSelect
         courses={courses}
         enrolledSchoolIds={[]}
-        value=""
+        value="__none__"
         onChange={() => {}}
         placeholderLabel="Select a course…"
         emptyValue="__none__"
@@ -114,6 +114,21 @@ describe('CourseSelect', () => {
     const placeholder = container.querySelector('option')
     expect(placeholder.textContent).toBe('Select a course…')
     expect(placeholder.value).toBe('__none__')
+    // The select must end up with the matching value, not a phantom
+    // selection — guard against the `value ?? ''` regression.
+    expect(container.querySelector('select').value).toBe('__none__')
+  })
+
+  it('falls back to emptyValue when value is undefined + emptyValue is custom', () => {
+    const { container } = render(
+      <CourseSelect
+        courses={courses}
+        enrolledSchoolIds={[]}
+        onChange={() => {}}
+        emptyValue="__none__"
+      />,
+    )
+    expect(container.querySelector('select').value).toBe('__none__')
   })
 
   it('forwards onChange with the selected option value', () => {

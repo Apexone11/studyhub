@@ -300,17 +300,21 @@ export default function PrivacyTab() {
       </SectionCard>
 
       <MsgList msg={msg} />
-      <Button
-        disabled={saving}
-        onClick={() =>
-          save(
-            ['profileVisibility', 'defaultDownloads', 'defaultContributions'],
-            'Privacy preferences saved.',
-          )
-        }
-      >
-        {saving ? 'Saving...' : 'Save Privacy Preferences'}
-      </Button>
+      {/* S1: right-aligned single action so the button doesn't read as
+          a full-width banner element below the toggle list. */}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
+        <Button
+          disabled={saving}
+          onClick={() =>
+            save(
+              ['profileVisibility', 'defaultDownloads', 'defaultContributions'],
+              'Privacy preferences saved.',
+            )
+          }
+        >
+          {saving ? 'Saving...' : 'Save Privacy Preferences'}
+        </Button>
+      </div>
 
       <ActivityLogDownload />
 

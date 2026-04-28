@@ -1,3 +1,11 @@
+# NOTE: *.termly.io entries below are STILL required after Task #70's
+# self-hosted cookie consent. The legal-document embed (Terms / Privacy
+# Policy / Cookie Policy / Community Guidelines / Disclaimer rendered
+# via lib/useTermlyEmbed.js) loads from app.termly.io even though the
+# resource-blocker / consent banner moved in-house. Removing *.termly.io
+# from script-src / style-src / font-src / connect-src / frame-src
+# would break the legal pages. When (if) we self-host the legal docs
+# too, *.termly.io can come out everywhere in one sweep.
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff

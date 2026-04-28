@@ -29,13 +29,26 @@ async function disableTutorials(page) {
     window.localStorage.setItem('studyhub.upload.tutorial.v1', '1')
     window.localStorage.setItem('tutorial_viewer_seen', '1')
     window.localStorage.setItem('tutorial_lab_seen', '1')
+    // Task #70: pre-seed the self-hosted cookie consent so the new
+    // <CookieConsentBanner /> short-circuits on mount and never
+    // intercepts our locators.
+    try {
+      window.localStorage.setItem(
+        'studyhub.cookieConsent',
+        JSON.stringify({ choice: 'essential', timestamp: new Date().toISOString() }),
+      )
+    } catch {
+      /* ignore */
+    }
   })
 
   // Hide overlays that intercept pointer events in tests:
-  //   - Termly cookie banner (added with the legal pages work)
   //   - react-joyride tutorial tooltips/overlays (defense in depth)
-  // Runs via addInitScript so it applies on every navigation before any
-  // React code mounts.
+  //   - Termly's legal-document embed (Terms / Privacy / Cookie Policy)
+  //     keeps mounting #termly-code-snippet-support even after Task #70
+  //     replaced the resource-blocker; keep those hide selectors so
+  //     specs that hit /terms et al don't accidentally click into the
+  //     Termly iframe.
   await page.addInitScript(() => {
     const hideCss = `
       #termly-code-snippet-support,
@@ -146,7 +159,9 @@ test.describe('Viewer sidebar → Top Contributors panel @phase-2', () => {
 
     await page.goto(`/sheets/${sheet.id}`)
     // Wait for the viewer to load so we don't race the assertion.
-    await expect(page.getByRole('heading', { name: sheet.title }).first()).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('heading', { name: sheet.title }).first()).toBeVisible({
+      timeout: 5000,
+    })
 
     // Panel heading must NOT appear.
     await expect(page.getByRole('heading', { name: /top contributors/i })).toHaveCount(0)
@@ -171,7 +186,12 @@ test.describe('Viewer sidebar → Fork Tree panel @phase-2', () => {
       forks: 2,
       stars: 5,
       createdAt: '2026-03-16T12:00:00.000Z',
-      author: { id: sheet.author.id, username: sheet.author.username, avatarUrl: null, isStaffVerified: false },
+      author: {
+        id: sheet.author.id,
+        username: sheet.author.username,
+        avatarUrl: null,
+        isStaffVerified: false,
+      },
       isCurrent: true,
       children: [
         {
@@ -227,7 +247,9 @@ test.describe('Viewer sidebar → Fork Tree panel @phase-2', () => {
     })
 
     await page.goto(`/sheets/${sheet.id}`)
-    await expect(page.getByRole('heading', { name: sheet.title }).first()).toBeVisible({ timeout: 5000 })
+    await expect(page.getByRole('heading', { name: sheet.title }).first()).toBeVisible({
+      timeout: 5000,
+    })
 
     await expect(page.getByRole('heading', { name: /fork tree/i })).toHaveCount(0)
   })
@@ -247,7 +269,11 @@ test.describe('SheetLab Contribute → pre-submit checklist @phase-2', () => {
       sheet: {
         id: 800,
         forkOf: 500,
-        forkSource: { id: 500, title: 'Original CMSC131 Notes', author: { id: 7, username: 'original_author' } },
+        forkSource: {
+          id: 500,
+          title: 'Original CMSC131 Notes',
+          author: { id: 7, username: 'original_author' },
+        },
         outgoingContributions: [],
       },
     })
@@ -285,7 +311,12 @@ test.describe('SheetLab Contribute → pre-submit checklist @phase-2', () => {
     await page.route(`**/api/sheets/${sheet.id}/working`, async (route) => {
       await route.fulfill({
         status: 200,
-        json: { content: sheet.content, title: sheet.title, description: sheet.description, lastSavedAt: null },
+        json: {
+          content: sheet.content,
+          title: sheet.title,
+          description: sheet.description,
+          lastSavedAt: null,
+        },
       })
     })
 
@@ -299,7 +330,10 @@ test.describe('SheetLab Contribute → pre-submit checklist @phase-2', () => {
 
     const reviewButton = page.getByRole('button', { name: /review changes/i })
     if (!(await reviewButton.isVisible({ timeout: 3000 }).catch(() => false))) {
-      test.skip(true, 'Contribute tab did not expose the expected "Review changes" CTA for this fixture — skipping.')
+      test.skip(
+        true,
+        'Contribute tab did not expose the expected "Review changes" CTA for this fixture — skipping.',
+      )
     }
     await reviewButton.click()
 
@@ -339,7 +373,12 @@ test.describe('SheetLab Reviews → inline comments panel @phase-2', () => {
       reviewComment: '',
       createdAt: '2026-03-22T10:00:00.000Z',
       reviewedAt: null,
-      proposer: { id: 77, username: 'contributor_student', emailVerified: true, isStaffVerified: false },
+      proposer: {
+        id: 77,
+        username: 'contributor_student',
+        emailVerified: true,
+        isStaffVerified: false,
+      },
       reviewer: null,
       forkSheet: {
         id: 601,
@@ -399,7 +438,12 @@ test.describe('SheetLab Reviews → inline comments panel @phase-2', () => {
               body: body.body,
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
-              author: { id: 42, username: 'regression_admin', avatarUrl: null, isStaffVerified: false },
+              author: {
+                id: 42,
+                username: 'regression_admin',
+                avatarUrl: null,
+                isStaffVerified: false,
+              },
             },
           },
         })
@@ -414,7 +458,12 @@ test.describe('SheetLab Reviews → inline comments panel @phase-2', () => {
     await page.route(`**/api/sheets/${sheet.id}/working`, async (route) => {
       await route.fulfill({
         status: 200,
-        json: { content: sheet.content, title: sheet.title, description: sheet.description, lastSavedAt: null },
+        json: {
+          content: sheet.content,
+          title: sheet.title,
+          description: sheet.description,
+          lastSavedAt: null,
+        },
       })
     })
 
@@ -429,7 +478,9 @@ test.describe('SheetLab Reviews → inline comments panel @phase-2', () => {
     // Click the added line — this should highlight it and reveal the form.
     await page.locator('.sheet-lab__diff-line--add').first().click()
 
-    await expect(page.getByPlaceholder(/leave feedback on this line/i)).toBeVisible({ timeout: 3000 })
+    await expect(page.getByPlaceholder(/leave feedback on this line/i)).toBeVisible({
+      timeout: 3000,
+    })
     await expect(page.getByRole('button', { name: /^post comment$/i })).toBeVisible()
 
     // Type and submit.

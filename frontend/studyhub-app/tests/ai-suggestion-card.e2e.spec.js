@@ -29,6 +29,19 @@ async function disableTutorials(page) {
 }
 
 async function blockConsentAndAnalyticsScripts(page) {
+  // Task #70: pre-seed self-hosted cookie consent + keep aborting
+  // Termly + Clarity as defense in depth (Termly still serves the
+  // legal-document embed that some specs render).
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem(
+        'studyhub.cookieConsent',
+        JSON.stringify({ choice: 'essential', timestamp: new Date().toISOString() }),
+      )
+    } catch {
+      /* ignore */
+    }
+  })
   await page.route(/app\.termly\.io|clarity\.ms/, (route) => route.abort())
 }
 

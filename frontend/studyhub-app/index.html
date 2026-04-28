@@ -36,7 +36,22 @@
       integrity="sha384-/o6I2CkkWC//PSjvWC/eYN7l3xM3tJm8ZzVkCOfp//W05QcE3mlGskpoHB6XqI+B"
       crossorigin="anonymous"
     />
-    <!-- Analytics and consent — skip on Capacitor native shell -->
+    <!-- Analytics + consent — Task #70 self-hosted cookie banner.
+         The Termly resource-blocker that used to live here was being
+         aggressively stripped by Chrome incognito / Brave / Safari /
+         Firefox-strict third-party-cookie blocking, so the consent
+         banner never persisted. The new banner is a React component
+         (components/CookieConsentBanner.jsx) backed by a localStorage
+         key (studyhub.cookieConsent). This block now does just two
+         things:
+           1. Detect the Capacitor native shell so we never load any
+              web-only analytics inside the mobile WebView.
+           2. Two-phase loader for Microsoft Clarity + Google Ads:
+              load IFF the user has explicitly accepted ALL cookies.
+              Listens for `studyhub:consent-changed` for the same-
+              session "Accept all" click, AND immediate-fires on page
+              load if a returning visitor already has 'all' stored.
+         Skip on native — same prior behavior. -->
     <script type="text/javascript">
       ;(function () {
         // Detect Capacitor native shell — skip all web analytics/consent banners
@@ -54,47 +69,63 @@
           return
         }
 
-        // Termly Consent Banner — async + defer so it never blocks first paint.
-        // The CSP allows *.termly.io (script-src + connect-src + frame-src +
-        // style-src + font-src) so Termly's resource blocker, status checks,
-        // and persistence beacons can all reach their backend. Without the
-        // wildcard, secondary subdomains (cdn.termly.io, beacon.min.js, etc.)
-        // were blocked by CSP and the banner couldn't persist the user's
-        // consent choice — so it re-appeared on every page load.
-        var ts = document.createElement('script')
-        ts.type = 'text/javascript'
-        ts.async = true
-        ts.defer = true
-        ts.src =
-          'https://app.termly.io/resource-blocker/f44c5c0c-a4fc-4ca4-980b-89068e5aeb41?autoBlock=on'
-        document.head.appendChild(ts)
+        // Idempotent loader — guarded so a stray duplicate consent
+        // event can't double-load Clarity / gtag.
+        var analyticsLoaded = false
+        function loadAnalytics() {
+          if (analyticsLoaded) return
+          analyticsLoaded = true
 
-        // Microsoft Clarity
-        ;(function (c, l, a, r, i, t, y) {
-          c[a] =
-            c[a] ||
-            function () {
-              ;(c[a].q = c[a].q || []).push(arguments)
-            }
-          t = l.createElement(r)
-          t.async = 1
-          t.src = 'https://www.clarity.ms/tag/' + i
-          y = l.getElementsByTagName(r)[0]
-          y.parentNode.insertBefore(t, y)
-        })(window, document, 'clarity', 'script', 'vv9kfyhqe1')
+          // Microsoft Clarity
+          ;(function (c, l, a, r, i, t, y) {
+            c[a] =
+              c[a] ||
+              function () {
+                ;(c[a].q = c[a].q || []).push(arguments)
+              }
+            t = l.createElement(r)
+            t.async = 1
+            t.src = 'https://www.clarity.ms/tag/' + i
+            y = l.getElementsByTagName(r)[0]
+            y.parentNode.insertBefore(t, y)
+          })(window, document, 'clarity', 'script', 'vv9kfyhqe1')
 
-        // Google tag (gtag.js)
-        var gs = document.createElement('script')
-        gs.async = true
-        gs.src = 'https://www.googletagmanager.com/gtag/js?id=AW-18019301841'
-        document.head.appendChild(gs)
-        window.dataLayer = window.dataLayer || []
-        function gtag() {
-          window.dataLayer.push(arguments)
+          // Google tag (gtag.js)
+          var gs = document.createElement('script')
+          gs.async = true
+          gs.src = 'https://www.googletagmanager.com/gtag/js?id=AW-18019301841'
+          document.head.appendChild(gs)
+          window.dataLayer = window.dataLayer || []
+          function gtag() {
+            window.dataLayer.push(arguments)
+          }
+          window.gtag = gtag
+          gtag('js', new Date())
+          gtag('config', 'AW-18019301841')
         }
-        window.gtag = gtag
-        gtag('js', new Date())
-        gtag('config', 'AW-18019301841')
+
+        // Phase 1 — listen for the in-session "Accept all" click. The
+        // CookieConsentBanner dispatches this event from
+        // src/lib/cookieConsent.js → writeConsent('all').
+        window.addEventListener('studyhub:consent-changed', function (e) {
+          if (e && e.detail && e.detail.choice === 'all') loadAnalytics()
+        })
+
+        // Phase 2 — returning visitors who already accepted in a prior
+        // session get analytics fired on this load too. Read the same
+        // localStorage key the lib uses so the contract is single-
+        // sourced (any future schema change only lands in one file —
+        // src/lib/cookieConsent.js — and this string-comparison stays
+        // valid).
+        try {
+          var raw = localStorage.getItem('studyhub.cookieConsent')
+          if (raw) {
+            var parsed = JSON.parse(raw)
+            if (parsed && parsed.choice === 'all') loadAnalytics()
+          }
+        } catch (e) {
+          /* private-mode / disabled storage — banner re-prompts later */
+        }
       })()
     </script>
     <title>StudyHub</title>

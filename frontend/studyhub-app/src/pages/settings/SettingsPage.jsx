@@ -308,6 +308,7 @@ export default function SettingsPage() {
             handlePatch={handlePatch}
             syncUser={syncUser}
             clearSession={clearSession}
+            onSignOut={handleSignOut}
           />
         )
       case 'subscription':
@@ -325,32 +326,17 @@ export default function SettingsPage() {
     }
   }
 
-  /* Sign out action button for navbar */
-  const navActions = (
-    <button
-      onClick={() => signOut().then(() => navigate('/login', { replace: true }))}
-      style={{
-        padding: '6px 14px',
-        borderRadius: 8,
-        border: '1px solid var(--sh-border)',
-        background: 'transparent',
-        color: 'var(--sh-muted)',
-        fontSize: 12,
-        fontWeight: 700,
-        cursor: 'pointer',
-        fontFamily: FONT,
-      }}
-    >
-      Sign Out
-    </button>
-  )
+  /* Sign Out moved out of the navbar (S1 — sign out is a destructive
+     account action, not a content-search peer; lives on the Account
+     tab now via AccountTab's "Sign out" SectionCard). */
+  const handleSignOut = () => signOut().then(() => navigate('/login', { replace: true }))
 
   return (
     <div
       className="sh-app-page"
       style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}
     >
-      <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs actions={navActions} />
+      <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs />
 
       <div
         className="settings-layout sh-ambient-grid sh-ambient-shell"

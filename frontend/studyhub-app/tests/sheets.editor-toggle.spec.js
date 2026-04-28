@@ -31,13 +31,26 @@ async function disableOverlays(page) {
     // tests can reliably click the headers to toggle them.
     window.localStorage.removeItem('sheetlab:editor-pane:html')
     window.localStorage.removeItem('sheetlab:editor-pane:markdown')
+    // Task #70: pre-seed the self-hosted cookie consent so the new
+    // <CookieConsentBanner /> short-circuits on mount and never
+    // intercepts our locators.
+    try {
+      window.localStorage.setItem(
+        'studyhub.cookieConsent',
+        JSON.stringify({ choice: 'essential', timestamp: new Date().toISOString() }),
+      )
+    } catch {
+      /* ignore */
+    }
   })
 
-  // Hide Termly cookie banner + react-joyride overlays that intercept clicks.
+  // The CSS hide for Termly's legacy banner is no longer strictly
+  // needed (Task #70 removed the resource-blocker), but Termly is
+  // still loaded for the legal-document embed (Terms / Privacy /
+  // Cookie Policy). The hide selectors below are inert when those
+  // elements aren't on the page; keep the joyride overlay rules.
   await page.addInitScript(() => {
     const css = `
-      #termly-code-snippet-support,
-      [class*="termly-styles-module-root"],
       .react-joyride__overlay,
       .react-joyride__tooltip,
       #react-joyride-portal {
@@ -93,7 +106,10 @@ test.describe('SheetLab editor mode toggle @phase-3', () => {
     await expect(page.getByRole('tab', { name: /html \/ code/i })).toBeVisible()
 
     // HTML pill is active (aria-selected).
-    await expect(page.getByRole('tab', { name: /html \/ code/i })).toHaveAttribute('aria-selected', 'true')
+    await expect(page.getByRole('tab', { name: /html \/ code/i })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    )
 
     // CodeMirror root appears.
     await expect(page.locator('.sh-html-code-editor .cm-editor')).toBeVisible({ timeout: 5000 })

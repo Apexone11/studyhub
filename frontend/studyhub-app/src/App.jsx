@@ -69,6 +69,7 @@ import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
 import OfflineIndicator from './components/OfflineIndicator'
 import LegalAcceptanceEnforcementModal from './components/LegalAcceptanceEnforcementModal'
+import CookieConsentBanner from './components/CookieConsentBanner'
 import SwUpdateAutoReloader from './components/SwUpdateAutoReloader'
 import DarkModeFx from './components/DarkModeFx'
 import { ChatPanelProvider } from './lib/chatPanelContext.jsx'
@@ -352,6 +353,12 @@ function AppRoutes() {
           <SwUpdateAutoReloader />
           <PreferencesBootstrap />
           <LegalAcceptanceEnforcementModal />
+          {/* Self-hosted cookie consent (Task #70 — replaces the
+              Termly resource-blocker that third-party cookie blockers
+              were stripping). Renders for both authenticated and
+              unauthenticated users; native shell short-circuits via
+              window.__SH_NATIVE__. */}
+          <CookieConsentBanner />
           <AuthenticatedAiProvider>
             <ChatPanelProvider>
               <Suspense fallback={<RouteFallback />}>

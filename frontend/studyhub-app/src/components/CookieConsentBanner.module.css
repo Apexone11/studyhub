@@ -1,0 +1,129 @@
+/*
+ * CookieConsentBanner.module.css — bottom-anchored, non-modal cookie
+ * consent banner. Token-only colors so dark mode "just works".
+ */
+
+.banner {
+  position: fixed;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  max-width: 720px;
+  margin: 0 auto;
+  z-index: 9000;
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-lg, 0 12px 32px rgba(15, 23, 42, 0.18));
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  font-family: var(--font, 'Plus Jakarta Sans', system-ui, sans-serif);
+}
+
+.title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--sh-heading);
+}
+
+.body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.55;
+  color: var(--sh-muted);
+}
+
+.body a {
+  color: var(--sh-brand);
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.settingsLink {
+  margin-right: auto;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sh-brand);
+  background: none;
+  border: none;
+  padding: 8px 0;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-family: inherit;
+}
+
+.settingsLink:hover {
+  color: var(--sh-brand-hover, var(--sh-brand));
+}
+
+.btn {
+  padding: 9px 16px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  font-family: inherit;
+  transition: background 0.12s;
+}
+
+.btnPrimary {
+  background: var(--sh-brand);
+  color: var(--sh-btn-primary-text, #fff);
+  border: 1px solid var(--sh-brand);
+}
+
+.btnPrimary:hover {
+  background: var(--sh-brand-hover, var(--sh-brand));
+  border-color: var(--sh-brand-hover, var(--sh-brand));
+}
+
+.btnSecondary {
+  background: var(--sh-btn-secondary-bg, transparent);
+  color: var(--sh-btn-secondary-text, var(--sh-heading));
+  border: 1px solid var(--sh-btn-secondary-border, var(--sh-border));
+}
+
+.btnSecondary:hover {
+  background: var(--sh-soft);
+}
+
+/* Mobile: stack action buttons full-width below the body copy.
+   Settings link stays inline above the buttons. */
+@media (max-width: 540px) {
+  .banner {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    padding: 16px;
+  }
+
+  .actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    gap: 8px;
+  }
+
+  .settingsLink {
+    margin-right: 0;
+    align-self: flex-start;
+    padding: 0 0 4px;
+  }
+
+  .btn {
+    width: 100%;
+  }
+}

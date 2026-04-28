@@ -25,12 +25,26 @@ async function disableTutorials(page) {
   })
 }
 
-// Termly's consent banner + Microsoft Clarity both load from external
-// CDNs on page boot (see `frontend/studyhub-app/index.html`). In a
-// Playwright run the consent banner renders as a role="alertdialog"
-// that covers the whole viewport and blocks every locator we try to
-// click. Short-circuit both script loads so the banner never mounts.
+// Task #70 replaced the Termly resource-blocker with a self-hosted
+// React banner (CookieConsentBanner.jsx, gated on
+// localStorage["studyhub.cookieConsent"]). For Playwright we:
+//   1. Pre-seed the consent key BEFORE any page navigation so the
+//      banner short-circuits on mount and never blocks our locators.
+//   2. Keep aborting *.termly.io + clarity.ms requests as defense in
+//      depth — Termly is still loaded for the legal-document embed
+//      (Terms / Privacy / Cookie Policy / etc.) and Clarity must
+//      never fire in tests regardless.
 async function blockConsentAndAnalyticsScripts(page) {
+  await page.addInitScript(() => {
+    try {
+      window.localStorage.setItem(
+        'studyhub.cookieConsent',
+        JSON.stringify({ choice: 'essential', timestamp: new Date().toISOString() }),
+      )
+    } catch {
+      /* ignore — Playwright contexts always allow localStorage */
+    }
+  })
   await page.route(/app\.termly\.io|clarity\.ms/, (route) => route.abort())
 }
 
