@@ -1,35 +1,55 @@
 /**
  * courses.js — shared client helpers for the /api/courses/schools response.
  *
- * The /api/courses/schools endpoint groups courses by school. Five different
- * pages (notes, sheets upload, sheets list, study groups, AI sheet setup)
- * all flatten that response into a single dropdown. The naive flatMap
- * produced visible duplicates whenever the same physical course id showed
- * up under more than one school entry (the user being multi-enrolled), and
- * it gave indistinguishable labels when two genuinely-different course rows
- * shared the same code (e.g. CHEM101 at two different schools).
+ * The /api/courses/schools endpoint groups courses by school. Several pages
+ * flatten that response into a single dropdown. A naive flatMap produced
+ * visible duplicates whenever the same physical course id showed up under
+ * more than one school entry (the user being multi-enrolled), and it gave
+ * indistinguishable labels when two genuinely different course rows shared
+ * the same code (e.g. CHEM101 at two different schools).
  *
- * `flattenSchoolsToCourses` consolidates the dedup + disambiguation rules
- * so all five pages stay consistent — fix it here once, never have to chase
- * the same bug across five pages again.
+ * `flattenSchoolsToCourses` centralizes the dedup + disambiguation rules.
+ * Current call sites:
+ *   - pages/notes/useNotesData.js
+ *   - pages/sheets/upload/useUploadSheet.js
+ *   - pages/sheets/lab/AiSheetSetupPage.jsx
+ *   - pages/studyGroups/useGroupList.js
+ *
+ * Pages that intentionally keep the school-grouped catalog (two-level
+ * school > course filter UIs) and so do NOT use this helper:
+ *   - pages/sheets/useSheetsData.js (sheets list)
+ *   - pages/courses/MyCoursesPage.jsx
+ *   - pages/settings/CoursesTab.jsx
+ *   - pages/onboarding/Step{School,Courses}.jsx
+ *
+ * If you add a new flat-dropdown call site, route it through this helper
+ * so all dropdown surfaces stay consistent — fix it here once.
  */
 
 /**
  * Flatten the /api/courses/schools response into a deduplicated list of
  * course rows suitable for a single dropdown. Returns:
- *   [{ id, code, name, schoolName, ... }]
+ *   [{ id, code, name, schoolId, schoolName, schoolShort, ... }]
  *
  * - Keeps only the first occurrence of any given course id (the same
  *   course can appear under multiple school groupings).
  * - When two distinct course ids share the same code, the displayed
  *   `code` is suffixed with the school name (`"CHEM101 (Goucher)"`)
  *   so they are distinguishable in the dropdown.
+ * - Each course is augmented with `schoolId`, `schoolName`, and
+ *   `schoolShort` from its parent school so consumers can filter or
+ *   render with school context.
  */
 export function flattenSchoolsToCourses(schools) {
   if (!Array.isArray(schools)) return []
 
   const flat = schools.flatMap((school) =>
-    (school?.courses || []).map((course) => ({ ...course, schoolName: school?.name })),
+    (school?.courses || []).map((course) => ({
+      ...course,
+      schoolId: school?.id,
+      schoolName: school?.name,
+      schoolShort: school?.short,
+    })),
   )
 
   const byId = new Map()

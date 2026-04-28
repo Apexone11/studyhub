@@ -251,17 +251,25 @@ describe('Frontend sandbox iframe attributes', () => {
         expect(source).toContain("'allow-scripts allow-forms'")
       })
 
-      it('grants allow-same-origin in the safe-preview branch (so cross-subdomain renders)', () => {
+      it('grants allow-same-origin (and ONLY allow-same-origin) in the safe-preview branch', () => {
         const source = readSource(relPath)
         // Regression guard: an empty sandbox attribute on a cross-origin
         // iframe makes Chrome show "(blocked:origin)" instead of content.
-        // The safe-preview ternary must hand the iframe an explicit
-        // 'allow-same-origin' fallback. We check for the literal string
-        // appearing in a quoted JS string (so prose in nearby comments
-        // doesn't satisfy the assertion).
-        expect(source).toMatch(/['"]allow-same-origin['"]/)
-        // Belt-and-suspenders: the ternary should NOT fall back to ''.
-        expect(source).not.toMatch(/\?\s*['"]allow-scripts allow-forms['"]\s*:\s*['"]\s*['"]/)
+        // The safe-preview branch of the sandbox ternary must hand the
+        // iframe an explicit 'allow-same-origin' literal — not '', not
+        // 'allow-same-origin allow-popups' (broader privilege), and never
+        // anything containing allow-scripts (privilege escalation).
+        //
+        // Match the safe branch directly: `: 'allow-...'`. We capture the
+        // string literal so we can assert it equals exactly
+        // 'allow-same-origin'. This makes the test fail loudly if a
+        // future change quietly widens the safe-branch privilege set.
+        const safeBranchMatch = source.match(
+          /\?\s*['"]allow-scripts allow-forms['"]\s*:\s*(['"])([^'"]*)\1/,
+        )
+        expect(safeBranchMatch, 'safe-preview ternary not found').toBeTruthy()
+        const safeBranchValue = safeBranchMatch[2]
+        expect(safeBranchValue).toBe('allow-same-origin')
       })
 
       it('never combines allow-scripts with allow-same-origin in one sandbox literal', () => {

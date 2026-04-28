@@ -16,6 +16,8 @@ const {
   AVATARS_DIR,
   CONTENT_IMAGES_DIR,
   COVERS_DIR,
+  GROUP_MEDIA_DIR,
+  NOTE_IMAGES_DIR,
   SCHOOL_LOGOS_DIR,
   validateUploadStorage,
 } = require('./lib/storage')
@@ -433,6 +435,37 @@ app.use(
       res.setHeader('X-Content-Type-Options', 'nosniff')
       res.setHeader('Cache-Control', 'public, max-age=86400')
       // Prevent content from being framed or used as script
+      res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'")
+    },
+  }),
+)
+
+// Note images — image attachments embedded in notes. Publicly retrievable
+// because notes themselves can be public, and the upload route enforces
+// auth + an image-only mime allowlist on write.
+app.use(
+  '/uploads/note-images',
+  express.static(NOTE_IMAGES_DIR, {
+    index: false,
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff')
+      res.setHeader('Cache-Control', 'public, max-age=86400')
+      res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'")
+    },
+  }),
+)
+
+// Group media — banner backgrounds, discussion attachments, and group
+// resources uploaded via /api/study-groups/:id/resources/upload. The
+// upload route enforces membership + a strict mime allowlist on write,
+// so the served files are safe to expose under a hardened static handler.
+app.use(
+  '/uploads/group-media',
+  express.static(GROUP_MEDIA_DIR, {
+    index: false,
+    setHeaders: (res) => {
+      res.setHeader('X-Content-Type-Options', 'nosniff')
+      res.setHeader('Cache-Control', 'public, max-age=300')
       res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self'")
     },
   }),

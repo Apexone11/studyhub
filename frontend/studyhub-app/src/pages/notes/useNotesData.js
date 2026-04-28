@@ -69,6 +69,15 @@ export function useNotesData() {
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [loadingNotes, setLoadingNotes] = useState(true)
+  // Tracks the currently selected note id so async metadata PATCH responses
+  // can detect when the user navigated to a different note before the
+  // request settled. Without this, a late response would leak its
+  // success-side editor-state mutations or a failed-revert into the new
+  // note's editor and corrupt the UI.
+  const activeNoteIdRef = useRef(null)
+  useEffect(() => {
+    activeNoteIdRef.current = activeNote?.id ?? null
+  }, [activeNote?.id])
 
   const updateSearchParam = useCallback(
     (key, value) => {
@@ -252,6 +261,7 @@ export function useNotesData() {
   async function persistMetadataChange(field, value, optimisticApply, revert) {
     const note = activeNote
     if (!note?.id) return
+    const targetNoteId = note.id
     // Snapshot the prior list-row value BEFORE the optimistic patch lands.
     // The earlier version of this code tried to derive the prior value
     // from the in-flight `value` (e.g. `!value === false ? !value : !value`,
@@ -260,10 +270,10 @@ export function useNotesData() {
     // snapshot up front is the only safe rollback.
     const previousRowValue = note[field]
     optimisticApply()
-    setNotes((prev) => prev.map((n) => (n.id === note.id ? { ...n, [field]: value } : n)))
-    setActiveNote((prev) => (prev?.id === note.id ? { ...prev, [field]: value } : prev))
+    setNotes((prev) => prev.map((n) => (n.id === targetNoteId ? { ...n, [field]: value } : n)))
+    setActiveNote((prev) => (prev?.id === targetNoteId ? { ...prev, [field]: value } : prev))
     try {
-      const response = await fetch(`${API}/api/notes/${note.id}/metadata`, {
+      const response = await fetch(`${API}/api/notes/${targetNoteId}/metadata`, {
         method: 'PATCH',
         headers: { ...authHeaders(), 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -277,19 +287,31 @@ export function useNotesData() {
       if (serverNote) {
         const normalized = normalizeNote(serverNote)
         setNotes((prev) => prev.map((n) => (n.id === normalized.id ? { ...n, ...normalized } : n)))
-        setActiveNote((prev) => (prev?.id === normalized.id ? { ...prev, ...normalized } : prev))
-        if (Object.prototype.hasOwnProperty.call(normalized, 'allowDownloads')) {
-          setEditorAllowDownloads(Boolean(normalized.allowDownloads))
+        // Only sync activeNote + editor-state when the user is still on
+        // the same note. Otherwise a late response would overwrite the
+        // newly-selected note's editor fields.
+        const stillActive = activeNoteIdRef.current === targetNoteId
+        if (stillActive) {
+          setActiveNote((prev) => (prev?.id === normalized.id ? { ...prev, ...normalized } : prev))
+          if (Object.prototype.hasOwnProperty.call(normalized, 'allowDownloads')) {
+            setEditorAllowDownloads(Boolean(normalized.allowDownloads))
+          }
         }
       }
     } catch {
-      revert()
+      // List-row rollback is always safe (keyed by id, doesn't touch the
+      // editor). But the editor-level revert() (and activeNote patch)
+      // must only run if the user is still on the original note.
       setNotes((prev) =>
-        prev.map((n) => (n.id === note.id ? { ...n, [field]: previousRowValue } : n)),
+        prev.map((n) => (n.id === targetNoteId ? { ...n, [field]: previousRowValue } : n)),
       )
-      setActiveNote((prev) =>
-        prev?.id === note.id ? { ...prev, [field]: previousRowValue } : prev,
-      )
+      const stillActive = activeNoteIdRef.current === targetNoteId
+      if (stillActive) {
+        revert()
+        setActiveNote((prev) =>
+          prev?.id === targetNoteId ? { ...prev, [field]: previousRowValue } : prev,
+        )
+      }
       showToast('Failed to update note settings', 'error')
     }
   }
