@@ -47,6 +47,7 @@ model User {
 
   studySheets                StudySheet[]
   enrollments                Enrollment[]
+  schoolEnrollments          UserSchoolEnrollment[]
   comments                   Comment[]
   starredSheets              StarredSheet[]
   passwordResetToken         PasswordResetToken?
@@ -248,15 +249,16 @@ model ContentShare {
 }
 
 model School {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  short       String   @unique
-  city        String   @default("")
-  state       String   @default("MD")
-  schoolType  String   @default("public")
+  id          Int                    @id @default(autoincrement())
+  name        String                 @unique
+  short       String                 @unique
+  city        String                 @default("")
+  state       String                 @default("MD")
+  schoolType  String                 @default("public")
   logoUrl     String?
   emailDomain String?
   courses     Course[]
+  enrollments UserSchoolEnrollment[]
 }
 
 model Course {
@@ -285,6 +287,33 @@ model Enrollment {
   course   Course @relation(fields: [courseId], references: [id], onDelete: Cascade)
 
   @@unique([userId, courseId])
+}
+
+// UserSchoolEnrollment — Phase R1 / Task #64 additive table.
+//
+// Direct user <-> school membership. The legacy Enrollment model is
+// course-level only; school membership is currently inferred via
+// course.school. This table will eventually own that relationship to
+// support dual-enrolled and self-learner users (browsing multiple
+// schools without being enrolled in any of their courses).
+//
+// As of Phase R1 (this migration) the table exists but is not read
+// from anywhere. R2 backfills from existing course enrollments. R3
+// switches read paths and deprecates the inference.
+//
+// `role` is a String (not enum) so future "alumni", "teacher",
+// "self-learner" values can be added without a schema migration.
+model UserSchoolEnrollment {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  schoolId  Int
+  role      String   @default("student") @db.VarChar(32)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  school    School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, schoolId])
+  @@index([schoolId])
 }
 
 model StudySheet {

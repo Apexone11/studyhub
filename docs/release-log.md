@@ -60,6 +60,68 @@ internal log into this file when they describe user-visible behavior.
   headers to every other origin. Browser cache (per-user, honors Vary)
   keeps the same user-perceived speedup. Also drops `/tests` from the
   sidebar hover-prefetch map since that page has no backend route yet.
+- **Backend test-isolation fix (Task #56 — backend half).** Removed
+  the per-test `vi.resetModules()` + `await import(...)` dance from
+  `cacheControl.unit.test.js` (replaced with a single static ESM import;
+  `cacheControl.js` has zero module-level state) and hoisted the
+  repeated `await import('express')` / `node:path` / `node:fs` /
+  `node:os` calls in `security.headers.test.js` to top-of-file ESM
+  imports. Both files passed in isolation but flaked under the full
+  parallel backend suite on Windows due to the heavy per-test dynamic
+  imports timing out worker IO. 29 tests now stable; both files lint-
+  clean. Frontend Playwright smoke flakes (auth.smoke, app.responsive,
+  feed.preview-and-delete, sheets.html-security-tiers, tracks-1-3,
+  tracks-4-6, teach-materials, navigation.regression) are NOT covered
+  by this fix — they share the `mockAuthenticatedApp` catch-all
+  `**/api/**` → `{ status: 200, json: {} }` pattern in
+  `tests/helpers/mockStudyHubApi.js` which crashes any component that
+  does `data.slice()` after a truthy guard on an unmocked endpoint
+  (same root cause as the FollowSuggestions fix in Phase 2 Day 4). That
+  half needs a Playwright run + per-spec mock additions; tracked
+  separately.
+- **Onboarding step 2 silent-failure fix (Task #65).** Removed dead
+  `prisma.enrollment.create({ data: { userId, schoolId } })` call at
+  `onboarding.service.js:188` that has been silently throwing on every
+  step-2 submission since it was written — `Enrollment` is course-level
+  (no `schoolId` column; see `schema.prisma`). Error was caught + logged
+  as a warning, so monitoring + tests never surfaced it. School
+  membership continues to be derived from enrolled courses; a proper
+  `UserSchoolEnrollment` table is Phase R1 / Task #64. 6 new unit tests
+  pin the post-fix invariant + the missing/invalid/unknown payload paths.
+- **Same-site backend domain — incognito sign-in unblocked (Task #73).**
+  Frontend `RAILWAY_BACKEND_URL` swapped from the raw Railway hostname
+  (`studyhub-production-c655.up.railway.app`) to the same-site
+  subdomain `api.getstudyhub.org` (CNAME → `fl8bi234.up.railway.app`,
+  DNS-only, not proxied). The session cookie was previously third-
+  party from the frontend's perspective and silently dropped by Chrome
+  incognito, Brave, Safari, and Firefox strict mode — blocking sign-in
+  entirely for any user with strict privacy settings. Cookies now flow
+  as first-party. Single-line change in `frontend/studyhub-app/src/config.js`.
+- **Phase R1 — `UserSchoolEnrollment` additive schema (Task #11/#64).**
+  New table + Prisma model + relations on `User.schoolEnrollments` and
+  `School.enrollments` to give school membership its own first-class
+  row. Today school membership is inferred from
+  `Enrollment -> Course -> School`, which can't represent dual-enrolled
+  or self-learner users. This deploy is additive only — no backfill,
+  no read cutover. R2 backfills, R3 switches reads. Migration
+  `20260428000004_add_user_school_enrollment` is `IF NOT EXISTS`-guarded
+  and safe to redeploy. Full backend test suite green (1869 pass / 1
+  skip / 118 files).
+- **Defensive Playwright catch-all + widget mocks (Task #56 second
+  half).** `tests/helpers/mockStudyHubApi.js` catch-all now returns
+  `[]` for collection-shaped GET paths (`/popular`, `/trending`,
+  `/recent`, `/leaderboard`, `/me/courses`, etc.) and `{}` for single-
+  resource paths, so components doing `data.X.slice()` after a truthy
+  guard no longer crash on unmocked endpoints — same root cause as
+  the Phase 2 Day 4 FollowSuggestions fix. Added explicit mocks for
+  `/api/users/me/follow-suggestions`, `/api/exams/upcoming`,
+  `/api/ai/suggestions`, `/api/feed/trending`, `/api/announcements`,
+  `/api/study-groups`, `/api/messages/conversations`,
+  `/api/library/popular`, and `/api/platform-stats` so the Phase 1/2/3
+  v2 widgets that load on every authenticated page don't trip the
+  smoke specs that exercise navigation regression / app responsive /
+  feed preview / sheets html security tiers / tracks-1-3 / tracks-4-6
+  / teach-materials / auth.smoke.
 
 ### Sheets
 
@@ -74,6 +136,16 @@ internal log into this file when they describe user-visible behavior.
 - **Sheet Lab history deep-linking (#267).** History tab now reads
   `?tab=history&commit=<id>` and expands the matching commit on load,
   and the commit toggle keeps the URL in sync so links can be shared.
+- **`previewText` consistency hotfix (Task #72).** Centralized sheet
+  content writes through a new `withPreviewText(content)` helper at
+  `backend/src/lib/sheets/applyContentUpdate.js`. Threaded it through
+  contribution-merge accept (`sheets.contributions.controller`),
+  Sheet Lab sync-upstream + restore-to-commit (`sheetLab.operations
+.controller`), and fork creation (`sheets.fork.controller`). Before
+  this fix, those four write paths overwrote `StudySheet.content`
+  without re-extracting `previewText`, so the Sheets Grid card
+  preview went stale after a contribution merged or a Lab restore
+  ran. 10 new unit tests pin the helper contract.
 
 ### Phase 4 — Sheets browse refresh (2026-04-27)
 

@@ -10,6 +10,7 @@ const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.con
 const { serializeSheet } = require('./sheets.serializer')
 const { getUserTier } = require('../../lib/getUserPlan')
 const { PLANS } = require('../payments/payments.constants')
+const { withPreviewText } = require('../../lib/sheets/applyContentUpdate')
 
 const router = express.Router()
 
@@ -120,7 +121,9 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
         data: {
           title: forkTitle,
           description: original.description || '',
-          content: original.content,
+          // Forked sheet starts with the original's body verbatim — extract
+          // previewText now so the Grid card is correct on first publish.
+          ...withPreviewText(original.content),
           contentFormat: original.contentFormat || 'markdown',
           status: SHEET_STATUS.DRAFT,
           courseId: original.courseId,

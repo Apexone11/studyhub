@@ -134,13 +134,34 @@ export async function mockAuthenticatedApp(page, overrides = {}) {
 
   // Catch-all registered FIRST → lowest priority in Playwright's LIFO matching.
   // Any unmocked API request returns empty success to prevent network hangs.
+  //
+  // Defensive shape (Task #56 second half): components routinely do
+  // `data.X.slice()` after a truthy guard like `data?.X || []`. Pre-fix,
+  // the catch-all returned `{}` for every GET — `{}` is truthy, so the
+  // `|| []` short-circuit didn't fire and `.slice()` crashed on
+  // `undefined`. The fix returns either `[]` or a safe object shape per
+  // URL heuristic so common list/object render patterns no longer
+  // throw. Specs that need real data still register explicit mocks
+  // below; those override the catch-all (Playwright LIFO matching).
   await page.route('**/api/**', async (route) => {
     const method = route.request().method()
-    if (method === 'GET') {
-      await route.fulfill({ status: 200, json: {} })
-    } else {
+    if (method !== 'GET') {
       await route.fulfill({ status: 200, json: { ok: true } })
+      return
     }
+    const path = new URL(route.request().url()).pathname
+    // Single-resource paths end in `/<id>` or `/me/<thing>`. Default to {}.
+    // Collection paths default to [] so `.slice() / .map() / .length`
+    // patterns don't crash. Object-shaped collection endpoints (e.g.,
+    // `{ items, total }` paged responses) must mock explicitly below.
+    const looksLikeCollection =
+      /\/(suggestions|recommendations|trending|popular|recent|leaderboard|achievements|badges|tags|courses|sheets|notes|messages|conversations|groups|members|sessions|discussions|exams|materials|videos|books|shelves|bookmarks|donations|payments|reports|appeals|reactions|comments|stars|forks|contributions|invitations|invites|referrals|rewards|reviews|posts|announcements|hashtags|status)$/.test(
+        path,
+      ) ||
+      /\/me\/(courses|sheets|notes|exams|stars|follows|followers|following|invites|referrals|achievements|reports)$/.test(
+        path,
+      )
+    await route.fulfill({ status: 200, json: looksLikeCollection ? [] : {} })
   })
 
   await page.route('**/api/auth/me', async (route) => {
@@ -174,7 +195,15 @@ export async function mockAuthenticatedApp(page, overrides = {}) {
   await page.route('**/api/courses/popular', async (route) => {
     await route.fulfill({
       status: 200,
-      json: [{ id: user.enrollments[0].course.id, code: user.enrollments[0].course.code, name: user.enrollments[0].course.name, school: user.enrollments[0].course.school, sheetCount: 1 }],
+      json: [
+        {
+          id: user.enrollments[0].course.id,
+          code: user.enrollments[0].course.code,
+          name: user.enrollments[0].course.name,
+          school: user.enrollments[0].course.school,
+          sheetCount: 1,
+        },
+      ],
     })
   })
   await page.route('**/api/sheets?*', async (route) => {
@@ -295,6 +324,42 @@ export async function mockAuthenticatedApp(page, overrides = {}) {
   })
   await page.route('**/api/admin/deletion-reasons?page=*', async (route) => {
     await route.fulfill({ status: 200, json: { reasons: [], total: 0, page: 1 } })
+  })
+
+  // Widget endpoints loaded on most authenticated pages. Pre-fix, these
+  // hit the catch-all, returned `{}`, and crashed `.slice()` calls in
+  // FollowSuggestions / UpcomingExamsCard / AiSuggestionCard. Returning
+  // empty success-shaped payloads keeps the components mounted but
+  // hidden (each one early-returns null on empty data).
+  await page.route('**/api/users/me/follow-suggestions', async (route) => {
+    await route.fulfill({ status: 200, json: [] })
+  })
+  await page.route('**/api/exams/upcoming**', async (route) => {
+    await route.fulfill({ status: 200, json: { exams: [] } })
+  })
+  await page.route('**/api/ai/suggestions**', async (route) => {
+    await route.fulfill({ status: 200, json: { suggestions: [], partial: false } })
+  })
+  await page.route('**/api/feed/trending**', async (route) => {
+    await route.fulfill({ status: 200, json: [] })
+  })
+  await page.route('**/api/announcements**', async (route) => {
+    await route.fulfill({ status: 200, json: { announcements: [], total: 0, page: 1 } })
+  })
+  await page.route('**/api/study-groups**', async (route) => {
+    await route.fulfill({ status: 200, json: { groups: [], total: 0, page: 1 } })
+  })
+  await page.route('**/api/messages/conversations**', async (route) => {
+    await route.fulfill({ status: 200, json: { conversations: [], total: 0 } })
+  })
+  await page.route('**/api/library/popular**', async (route) => {
+    await route.fulfill({ status: 200, json: { books: [], total: 0 } })
+  })
+  await page.route('**/api/platform-stats', async (route) => {
+    await route.fulfill({
+      status: 200,
+      json: { totalUsers: 0, totalSheets: 0, totalCourses: 0, totalSchools: 0 },
+    })
   })
 
   return { user, sheet, notes, settingsUser }
