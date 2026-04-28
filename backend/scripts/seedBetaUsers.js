@@ -510,9 +510,6 @@ async function seedSheetsGridFixture(studentUsers) {
  * remove it from here.
  */
 const IN_FLIGHT_DESIGN_V2_FLAGS = [
-  // Phase 4 — Sheets Grid/List toggle + preview. Needs `previewText`
-  // schema column first.
-  'design_v2_sheets_grid',
   // Phase 5 — Auth split layout + referral banner.
   'design_v2_auth_split',
   // Phase 6 — Onboarding polish.
