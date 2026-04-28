@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
-const headers = readFileSync(new URL('../public/_headers', import.meta.url), 'utf8')
+const headers = readFileSync(resolve(process.cwd(), 'public/_headers'), 'utf8')
 
 describe('production CSP', () => {
   it('allows the production API origin for iframe previews', () => {
