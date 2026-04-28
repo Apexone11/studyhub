@@ -192,6 +192,12 @@ export default function UploadSheetPage() {
         open={showDraftsPicker}
         onClose={() => setShowDraftsPicker(false)}
         currentDraftId={hook.draftId}
+        // Flush any pending edits to the current draft before the modal
+        // navigates to a different draft. Switching drafts is a query-only
+        // route change, so the unsaved-changes blocker doesn't fire — we
+        // have to push the in-flight content out ourselves to prevent
+        // losing what the user just typed.
+        onBeforeNavigate={hook.saveDraftNow}
       />
     </div>
   )

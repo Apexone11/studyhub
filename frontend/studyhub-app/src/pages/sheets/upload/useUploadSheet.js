@@ -250,6 +250,21 @@ export default function useUploadSheet() {
           hydrateFromSheet(data.draft)
           setSaved(true)
         } else {
+          // No draft loaded — either the user has none or they hit the
+          // ?fresh=1 entry point. Reset every piece of bound state so the
+          // first /drafts/autosave call creates a brand-new StudySheet row
+          // instead of mutating whichever draft the editor was previously
+          // attached to. Without this, clicking "+ New draft" while editing
+          // draft A keeps draftId=A in memory and silently overwrites it.
+          setDraftId(null)
+          setTitle('')
+          setCourseId('')
+          setDescription('')
+          setAllowDownloads(true)
+          setExistingAttachment(null)
+          setRemoveExistingAttachment(false)
+          setAttachFile(null)
+          setSaved(false)
           setLegacyMarkdownMode(false)
           setContentFormat('html')
           setStatus('draft')

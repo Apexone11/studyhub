@@ -32,7 +32,7 @@ function formatRelative(dateStr) {
   return `${Math.round(diff / (24 * 60 * minute))}d ago`
 }
 
-export default function DraftsPickerModal({ open, onClose, currentDraftId }) {
+export default function DraftsPickerModal({ open, onClose, currentDraftId, onBeforeNavigate }) {
   const navigate = useNavigate()
   const [drafts, setDrafts] = useState([])
   const [loading, setLoading] = useState(false)
@@ -74,16 +74,33 @@ export default function DraftsPickerModal({ open, onClose, currentDraftId }) {
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
-  const openDraft = (draftId) => {
+  // Both navigation paths only change the query string, which means the
+  // useSafeBlocker in useUploadSheet (pathname-only diff) does NOT fire.
+  // We have to explicitly flush whatever the parent considers pending
+  // before swapping drafts, otherwise an in-flight autosave debounce
+  // would land against the wrong draftId once the URL flips.
+  const flushPending = async () => {
+    if (typeof onBeforeNavigate === 'function') {
+      try {
+        await onBeforeNavigate()
+      } catch {
+        /* best-effort flush — proceed even if save errors */
+      }
+    }
+  }
+
+  const openDraft = async (draftId) => {
     if (draftId === currentDraftId) {
       onClose?.()
       return
     }
+    await flushPending()
     onClose?.()
     navigate(`/sheets/upload?draft=${draftId}`)
   }
 
-  const startFreshDraft = () => {
+  const startFreshDraft = async () => {
+    await flushPending()
     onClose?.()
     navigate('/sheets/upload?fresh=1')
   }
@@ -100,7 +117,8 @@ export default function DraftsPickerModal({ open, onClose, currentDraftId }) {
       setConfirmDeleteId(null)
       // If we just deleted the draft we're currently editing, route to a
       // fresh draft so the editor doesn't keep autosaving against a
-      // deleted row.
+      // deleted row. Skip the flush in this case — the row is gone, so
+      // any pending save would 404 anyway.
       if (draftId === currentDraftId) {
         onClose?.()
         navigate('/sheets/upload?fresh=1')

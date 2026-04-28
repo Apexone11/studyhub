@@ -190,20 +190,22 @@ app.use((req, res, next) => {
 app.use(httpLogger)
 
 // Gzip/Brotli compression for all text-based responses.
-// SSE streams (text/event-stream) MUST bypass compression — buffering would
-// hold every Hub AI delta in a 16 KB chunk before flushing, which makes the
-// chat feel frozen for the first 5–20 seconds of a response. The
-// `x-no-compression` request header is the standard escape hatch the
-// `compression` middleware honors via its default filter; SSE routes set
-// the header explicitly before writing.
+// SSE streams MUST bypass compression — buffering would hold every Hub AI
+// delta in a 16 KB chunk before flushing, which makes the chat feel frozen
+// for the first 5–20 seconds of a response. We can't gate on the response
+// Content-Type because `compression()` evaluates its filter on the FIRST
+// `res.write` call, before the route handler has had a chance to call
+// `res.writeHead({'Content-Type': 'text/event-stream'})`. Path-based gating
+// is the reliable signal: register every SSE-emitting route URL here. The
+// `x-no-compression` request header is also honored as a per-request
+// escape hatch (mirrors compression's default behavior).
+const SSE_PATH_PATTERNS = [/^\/api\/ai\/messages(?:\?|$)/]
 app.use(
   compression({
     filter: (req, res) => {
       if (req.headers['x-no-compression']) return false
-      const contentType = res.getHeader('Content-Type')
-      if (typeof contentType === 'string' && contentType.includes('text/event-stream')) {
-        return false
-      }
+      const url = req.originalUrl || req.url || ''
+      if (SSE_PATH_PATTERNS.some((re) => re.test(url))) return false
       return compression.filter(req, res)
     },
   }),
