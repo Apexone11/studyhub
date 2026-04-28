@@ -10,7 +10,7 @@
  *
  * Tagged @smoke so the fast CI lane picks it up.
  */
-import { test, expect, devices } from '@playwright/test'
+import { test, expect } from '@playwright/test'
 
 test.describe('@smoke public docs page', () => {
   test('landing page renders the feature catalog', async ({ page }) => {
@@ -57,18 +57,6 @@ test.describe('@smoke public docs page', () => {
   })
 })
 
-test.describe('@smoke public docs page — mobile viewport', () => {
-  test.use({ ...devices['Pixel 7'] })
-
-  test('renders without horizontal overflow on a phone', async ({ page }) => {
-    await page.goto('/docs')
-    await expect(
-      page.getByRole('heading', { level: 1, name: /everything studyhub does/i }),
-    ).toBeVisible()
-
-    const bodyWidth = await page.evaluate(() => document.body.scrollWidth)
-    const viewportWidth = await page.evaluate(() => window.innerWidth)
-    // Allow 1px of sub-pixel rounding; anything more is real overflow.
-    expect(bodyWidth).toBeLessThanOrEqual(viewportWidth + 1)
-  })
-})
+// The mobile-viewport companion test lives in docs.mobile.smoke.spec.js
+// because Playwright requires `test.use({ ...devices['Pixel 7'] })` at
+// file scope, not inside a describe block.

@@ -50,7 +50,11 @@ router.get(
   '/trending',
   discoveryLimiter,
   optionalAuth,
-  cacheControl(120, { public: true, staleWhileRevalidate: 300 }),
+  // No `public: true` — Cloudflare ignores Vary: Origin on non-Enterprise
+  // plans, so a shared CDN cache here would replay one origin's CORS
+  // headers to other origins. Browser cache only. See identical note in
+  // courses.schools.controller.js for the full rationale.
+  cacheControl(120, { staleWhileRevalidate: 300 }),
   async (req, res) => {
     try {
       const limit = Math.min(Number.parseInt(req.query.limit, 10) || 20, 50)
@@ -643,7 +647,9 @@ router.get(
   '/courses/:courseId/discover',
   discoveryLimiter,
   optionalAuth,
-  cacheControl(300, { public: true, staleWhileRevalidate: 600 }),
+  // Browser cache only — see Cloudflare/Vary note in
+  // courses.schools.controller.js.
+  cacheControl(300, { staleWhileRevalidate: 600 }),
   async (req, res) => {
     const courseId = Number.parseInt(req.params.courseId, 10)
     if (!Number.isFinite(courseId))

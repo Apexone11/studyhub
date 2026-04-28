@@ -42,6 +42,14 @@ internal log into this file when they describe user-visible behavior.
   fail-closed flag evaluation rendered Phase 1/2/3 features invisible
   in production whenever a deploy preceded the manual seed step. Seed
   failure aborts the deploy by design (no `||` fallback).
+- **CORS hardening — drop `public: true` from CDN-cached endpoints.**
+  `/api/courses/schools`, `/api/courses/popular`, `/api/feed/trending`,
+  and `/api/platform-stats` no longer mark themselves `public` for
+  shared-CDN caching. Cloudflare ignores `Vary: Origin` on non-
+  Enterprise plans, so a shared cache could replay one origin's CORS
+  headers to every other origin. Browser cache (per-user, honors Vary)
+  keeps the same user-perceived speedup. Also drops `/tests` from the
+  sidebar hover-prefetch map since that page has no backend route yet.
 
 ### Sheets
 
@@ -56,6 +64,17 @@ internal log into this file when they describe user-visible behavior.
 - **Sheet Lab history deep-linking (#267).** History tab now reads
   `?tab=history&commit=<id>` and expands the matching commit on load,
   and the commit toggle keeps the URL in sync so links can be shared.
+
+### Phase 4 — Sheets browse refresh (2026-04-27)
+
+- Sheets page now offers a Grid/List view toggle (List default; choice
+  persists in localStorage; URL `?view=grid` or `?view=list` overrides).
+- New "Search across StudyHub" toggle on Sheets bypasses the school filter
+  for cross-school discovery.
+- Filter pills now show an active selected state when applied.
+- Sheet cards in Grid view show a 3-line preview extracted from the sheet
+  body (new `previewText` column, backfilled for existing sheets).
+- Behind `design_v2_sheets_grid` feature flag (now SHIPPED in production).
 
 ### Phase 3 — Inline Hub AI suggestion card (2026-04-28)
 

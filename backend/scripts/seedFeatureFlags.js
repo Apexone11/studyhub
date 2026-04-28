@@ -50,6 +50,10 @@ const SHIPPED_DESIGN_V2_FLAGS = [
   // UserProfilePage Overview + /api/ai/suggestions endpoints with
   // PII redaction + shared daily quota with Hub AI.
   'design_v2_ai_card',
+  // Phase 4 — shipped 2026-04-27. Sheets browse refresh: Grid/List
+  // toggle, previewText preview cards, cross-school search toggle,
+  // filter pill selected state.
+  'design_v2_sheets_grid',
 ]
 
 async function seedFeatureFlags(prisma) {
