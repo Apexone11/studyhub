@@ -54,9 +54,17 @@
           return
         }
 
-        // Termly Consent Banner
+        // Termly Consent Banner — async + defer so it never blocks first paint.
+        // The CSP allows *.termly.io (script-src + connect-src + frame-src +
+        // style-src + font-src) so Termly's resource blocker, status checks,
+        // and persistence beacons can all reach their backend. Without the
+        // wildcard, secondary subdomains (cdn.termly.io, beacon.min.js, etc.)
+        // were blocked by CSP and the banner couldn't persist the user's
+        // consent choice — so it re-appeared on every page load.
         var ts = document.createElement('script')
         ts.type = 'text/javascript'
+        ts.async = true
+        ts.defer = true
         ts.src =
           'https://app.termly.io/resource-blocker/f44c5c0c-a4fc-4ca4-980b-89068e5aeb41?autoBlock=on'
         document.head.appendChild(ts)

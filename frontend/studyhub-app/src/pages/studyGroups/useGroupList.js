@@ -152,13 +152,21 @@ export function useGroupList() {
   useEffect(() => {
     let active = true
 
+    // cache: 'no-cache' bypasses any stale 5xx the browser disk cache may
+    // be holding from before recent backend CORS / Cache-Control fixes
+    // shipped. Defensive text→parse below tolerates an empty body
+    // (cached opaque response, CORS-blocked, transient truncation)
+    // without leaking "Unexpected end of JSON input" through .catch.
     fetch(`${API}/api/courses/schools`, {
       credentials: 'include',
       headers: authHeaders(),
+      cache: 'no-cache',
     })
       .then(async (response) => {
         if (!response.ok) throw new Error('Failed to load schools')
-        return response.json()
+        const text = await response.text()
+        if (!text) throw new Error('schools fetch returned empty body')
+        return JSON.parse(text)
       })
       .then((data) => {
         if (active) {
