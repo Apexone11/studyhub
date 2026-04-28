@@ -152,20 +152,6 @@
   border-color: var(--sh-border-strong);
 }
 
-/* ---------- Chip / pill (small radius, never sharp) ---------------------- */
-.sh-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: var(--radius-full);
-  background: var(--sh-soft);
-  border: 1px solid var(--sh-border);
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--sh-heading);
-}
-
 /* ---------- Reduced motion ----------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
   .sh-hover-lift,
