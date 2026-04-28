@@ -216,6 +216,17 @@ export default function SettingsPage() {
     )
   }
 
+  /* Sign Out moved out of the navbar (S1 — sign out is a destructive
+     account action, not a content-search peer; lives on the Account
+     tab now via AccountTab's "Sign out" SectionCard).
+     Declared BEFORE renderTab so the lexical order matches the use
+     order — even though `renderTab` is a function declaration whose
+     closure resolves at call time (which would tolerate the previous
+     bottom-of-component placement), the textual order matters for
+     readability and survives a future refactor that inlines the
+     switch into the JSX or converts renderTab to an arrow. */
+  const handleSignOut = () => signOut().then(() => navigate('/login', { replace: true }))
+
   function renderTab() {
     switch (tab) {
       case 'profile':
@@ -325,11 +336,6 @@ export default function SettingsPage() {
         return null
     }
   }
-
-  /* Sign Out moved out of the navbar (S1 — sign out is a destructive
-     account action, not a content-search peer; lives on the Account
-     tab now via AccountTab's "Sign out" SectionCard). */
-  const handleSignOut = () => signOut().then(() => navigate('/login', { replace: true }))
 
   return (
     <div

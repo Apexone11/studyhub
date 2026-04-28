@@ -42,6 +42,27 @@ function isNativeShell() {
   return typeof window !== 'undefined' && window.__SH_NATIVE__ === true
 }
 
+/**
+ * Fallback used when localStorage.setItem throws (Safari Private mode,
+ * storage extensions, disk full). `writeConsent` returns null in that
+ * case and the persistent `studyhub:consent-changed` event never
+ * fires, so analytics would never load. We dispatch the same event
+ * payload manually here so this-session analytics still load — the
+ * choice just won't be remembered after reload, which is the most
+ * we can do without writable storage.
+ */
+function dispatchInSessionConsent(choice) {
+  try {
+    window.dispatchEvent(
+      new CustomEvent('studyhub:consent-changed', {
+        detail: { choice, timestamp: new Date().toISOString(), persisted: false },
+      }),
+    )
+  } catch {
+    /* CustomEvent constructor unavailable — extremely old browser, give up */
+  }
+}
+
 export default function CookieConsentBanner() {
   // Lazy-init: skip on native, otherwise render only when no valid
   // consent has been recorded. Reading once at mount is correct —
@@ -52,6 +73,33 @@ export default function CookieConsentBanner() {
     if (isNativeShell()) return true
     return readConsent() !== null
   })
+  // True after a writeConsent returned null AND the user clicked
+  // "Dismiss anyway" on the inline failure note. The banner stays
+  // mounted on the first failed click so the user can see what
+  // happened, retry, or dismiss explicitly. Without this two-step,
+  // a Safari-Private user would click "Accept all" → silent drop →
+  // assume the button is broken.
+  const [persistFailed, setPersistFailed] = useState(false)
+
+  /**
+   * Apply a consent choice with proper failure handling. Returns true
+   * if the banner should dismiss (success), false otherwise (storage
+   * failure — keep banner visible with inline error so the user can
+   * retry or dismiss-anyway).
+   */
+  function applyChoice(choice) {
+    const result = writeConsent(choice)
+    if (result !== null) {
+      setDismissed(true)
+      return true
+    }
+    // Persistence failed. Keep banner visible, show inline error, and
+    // dispatch an in-session event so analytics can still fire for
+    // THIS session at the user's request.
+    setPersistFailed(true)
+    dispatchInSessionConsent(choice)
+    return false
+  }
 
   // Escape key → "Essential only" (least-privilege default, matches
   // the spec's accessibility requirement). Listener is attached only
@@ -60,8 +108,7 @@ export default function CookieConsentBanner() {
     if (dismissed) return undefined
     function handleKey(event) {
       if (event.key !== 'Escape') return
-      writeConsent('essential')
-      setDismissed(true)
+      applyChoice('essential')
     }
     window.addEventListener('keydown', handleKey)
     return () => window.removeEventListener('keydown', handleKey)
@@ -69,14 +116,9 @@ export default function CookieConsentBanner() {
 
   if (dismissed) return null
 
-  const handleAcceptAll = () => {
-    writeConsent('all')
-    setDismissed(true)
-  }
-  const handleEssential = () => {
-    writeConsent('essential')
-    setDismissed(true)
-  }
+  const handleAcceptAll = () => applyChoice('all')
+  const handleEssential = () => applyChoice('essential')
+  const handleDismissAnyway = () => setDismissed(true)
 
   return (
     <div
@@ -94,6 +136,20 @@ export default function CookieConsentBanner() {
         also use analytics to understand which features help students study smarter. You can change
         your choice anytime from <Link to="/cookies">Cookie settings</Link>.
       </p>
+      {persistFailed ? (
+        <div
+          role="alert"
+          className={styles.persistError}
+          data-testid="cookie-consent-persist-error"
+        >
+          We couldn&apos;t save your choice — your browser may be in private mode or has storage
+          disabled. We&apos;ll honor your selection for this session, but we&apos;ll need to ask
+          again next time.{' '}
+          <button type="button" onClick={handleDismissAnyway} className={styles.dismissAnyway}>
+            Dismiss anyway
+          </button>
+        </div>
+      ) : null}
       <div className={styles.actions}>
         <Link to="/cookies" className={styles.settingsLink}>
           Cookie settings

@@ -110,4 +110,57 @@ describe('CookieConsentBanner', () => {
     renderBanner()
     expect(screen.queryByTestId('cookie-consent-banner')).toBeNull()
   })
+
+  // Codex + Copilot R3: when localStorage.setItem throws (Safari Private,
+  // disabled storage, etc.) writeConsent returns null and the spec says
+  // the banner must NOT silently dismiss. Three behaviors locked in:
+  //   1. Banner stays visible so the user knows the click didn't fully save.
+  //   2. An inline error explains why + offers a "Dismiss anyway" escape.
+  //   3. A non-persistent studyhub:consent-changed event fires so this-
+  //      session analytics still load at the user's request (with
+  //      `persisted: false` so any future listener can distinguish).
+  describe('persistence-failure UX (Safari Private / disabled storage)', () => {
+    let originalSetItem
+    beforeEach(() => {
+      originalSetItem = Storage.prototype.setItem
+      Storage.prototype.setItem = vi.fn(() => {
+        throw new DOMException('quota', 'QuotaExceededError')
+      })
+    })
+    afterEach(() => {
+      Storage.prototype.setItem = originalSetItem
+    })
+
+    it('Accept all on storage failure: banner stays + inline error renders + in-session event fires', () => {
+      const handler = vi.fn()
+      window.addEventListener('studyhub:consent-changed', handler)
+      try {
+        renderBanner()
+        fireEvent.click(screen.getByTestId('cookie-consent-accept'))
+
+        // Banner stays visible.
+        expect(screen.getByTestId('cookie-consent-banner')).toBeTruthy()
+        // Inline error renders.
+        expect(screen.getByTestId('cookie-consent-persist-error')).toBeTruthy()
+        // In-session event still fired with the chosen consent + a
+        // persisted=false flag so listeners can tell this apart from
+        // a normal accept.
+        expect(handler).toHaveBeenCalledTimes(1)
+        expect(handler.mock.calls[0][0].detail).toMatchObject({
+          choice: 'all',
+          persisted: false,
+        })
+      } finally {
+        window.removeEventListener('studyhub:consent-changed', handler)
+      }
+    })
+
+    it('"Dismiss anyway" closes the banner after a persistence failure', () => {
+      renderBanner()
+      fireEvent.click(screen.getByTestId('cookie-consent-accept'))
+      expect(screen.getByTestId('cookie-consent-persist-error')).toBeTruthy()
+      fireEvent.click(screen.getByRole('button', { name: /dismiss anyway/i }))
+      expect(screen.queryByTestId('cookie-consent-banner')).toBeNull()
+    })
+  })
 })

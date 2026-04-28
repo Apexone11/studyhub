@@ -44,6 +44,35 @@
   text-underline-offset: 2px;
 }
 
+.persistError {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--sh-warning-bg);
+  border: 1px solid var(--sh-warning-border);
+  color: var(--sh-warning-text);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.dismissAnyway {
+  display: inline;
+  margin-left: 6px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--sh-warning-text);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.dismissAnyway:hover {
+  color: var(--sh-heading);
+}
+
 .actions {
   display: flex;
   gap: 10px;
