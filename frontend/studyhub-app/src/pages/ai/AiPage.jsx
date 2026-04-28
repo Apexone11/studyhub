@@ -43,18 +43,23 @@ export default function AiPage() {
 
   // ?prompt=... is the hand-off used by the AI Suggestion card and other
   // landing-CTAs that want to drop the user into Hub AI with a starter
-  // prompt already typed. We pass the text down to ChatArea ONCE, then
-  // strip it from the URL so a refresh doesn't re-prefill (and so the
-  // user can't share a URL that pre-types a message). The Suggestion
-  // card already trims and caps to 1000 chars; we still cap defensively
+  // prompt already typed. We pass the text down to ChatArea, then strip
+  // it from the URL so a refresh doesn't re-prefill (and so the user
+  // can't share a URL that pre-types a message). The Suggestion card
+  // already trims and caps to 1000 chars; we still cap defensively
   // here in case the param is hand-typed.
-  const initialPrompt = (searchParams.get('prompt') || '').slice(0, 1000)
+  //
+  // Effect reacts to the param itself so a same-page navigation that
+  // adds ?prompt= (e.g. clicking the AI suggestion CTA while already
+  // on /ai) is handled the same as an initial mount with the param.
+  const promptParam = searchParams.get('prompt') || ''
+  const initialPrompt = promptParam.slice(0, 1000)
   useEffect(() => {
-    if (!searchParams.get('prompt')) return
+    if (!promptParam) return
     const next = new URLSearchParams(searchParams)
     next.delete('prompt')
     setSearchParams(next, { replace: true })
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [promptParam, searchParams, setSearchParams])
 
   if (authStatus !== 'ready') {
     return (
@@ -427,22 +432,46 @@ function ChatArea({
   initialPrompt,
 }) {
   // Lazy-initialize from the inbound ?prompt= so the suggestion text
-  // shows up in the textarea on first paint without a setState-in-
-  // effect cascade. The prompt is a starting point the user can edit,
-  // not a forced submission — we intentionally don't auto-send.
+  // shows up in the textarea on first paint. The prompt is a starting
+  // point the user can edit, not a forced submission — we intentionally
+  // don't auto-send.
   const [input, setInput] = useState(() => (typeof initialPrompt === 'string' ? initialPrompt : ''))
   const [pendingImages, setPendingImages] = useState([])
   const messagesEndRef = useRef(null)
   const inputRef = useRef(null)
+
+  // ── Mid-mount prompt re-seeding (React-recommended "adjust state
+  // during render" pattern instead of setState-in-effect, per
+  // https://react.dev/reference/react/useState — avoids the cascading-
+  // render lint and is the documented approach for "reset some state
+  // when a prop changes").
+  //
+  // Why we need this at all: when the user clicks the AI Suggestion
+  // CTA while already on /ai, AiPage adds and strips ?prompt=. ChatArea
+  // is already mounted, so its lazy-init useState above won't pick up
+  // the new prompt. We compare initialPrompt to the prompt we last
+  // consumed (lastSeededPrompt state); when they differ AND the
+  // textarea is either empty or still holds the previous seed, we
+  // overwrite. If the user has typed something new, we record the
+  // change and bail — their input wins.
+  const [lastSeededPrompt, setLastSeededPrompt] = useState(() =>
+    typeof initialPrompt === 'string' ? initialPrompt : '',
+  )
+  if (typeof initialPrompt === 'string' && initialPrompt && initialPrompt !== lastSeededPrompt) {
+    setLastSeededPrompt(initialPrompt)
+    const inputUntouched = input === '' || input === lastSeededPrompt
+    if (inputUntouched) setInput(initialPrompt)
+  }
 
   // Auto-scroll to bottom on new messages.
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingText])
 
-  // When seeded from initialPrompt, focus the textarea and place the
-  // caret at the end so the user can keep typing immediately. Pure DOM
-  // side-effect — no setState here.
+  // When the textarea has been seeded (mount OR mid-mount re-seed),
+  // focus it and place the caret at the end so the user can keep
+  // typing. Pure DOM side-effect; no setState. Reruns whenever
+  // initialPrompt changes.
   useEffect(() => {
     if (typeof initialPrompt !== 'string' || !initialPrompt) return
     const handle = setTimeout(() => {
@@ -456,7 +485,7 @@ function ChatArea({
       }
     }, 120)
     return () => clearTimeout(handle)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [initialPrompt])
 
   // Focus input when conversation changes.
   useEffect(() => {
