@@ -13,6 +13,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
+import { resolveImageUrl } from '../../lib/imageUrls'
 import MobileTopBar from '../components/MobileTopBar'
 
 async function fetchProfileByUsername(username) {
@@ -182,6 +183,7 @@ export default function MobileUserProfilePage() {
   if (!profile) return null
 
   const isPrivate = Boolean(profile.isPrivate)
+  const avatarUrl = resolveImageUrl(profile.avatarUrl)
   const showFullStats = !isPrivate || profile.isFollowedByMe || profile.isOwnProfile
 
   let followLabel = 'Follow'
@@ -201,9 +203,9 @@ export default function MobileUserProfilePage() {
             marginBottom: 16,
           }}
         >
-          {profile.avatarUrl ? (
+          {avatarUrl ? (
             <img
-              src={profile.avatarUrl}
+              src={avatarUrl}
               alt=""
               style={{
                 width: 72,

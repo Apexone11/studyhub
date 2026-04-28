@@ -66,18 +66,50 @@ function safeDownloadName(name, fallbackExt = '') {
   return `${base}${ext}`.toLowerCase()
 }
 
+function firstHeaderValue(value) {
+  if (Array.isArray(value)) return firstHeaderValue(value[0])
+  return String(value || '')
+    .split(',')[0]
+    .trim()
+}
+
+function normalizePreviewProtocol(value) {
+  const protocol = firstHeaderValue(value).replace(/:$/, '').toLowerCase()
+  return protocol === 'https' || protocol === 'http' ? protocol : ''
+}
+
+function isLocalPreviewHost(hostname) {
+  const normalized = String(hostname || '').toLowerCase()
+  return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '[::1]'
+}
+
+function publicHttpsOrigin(origin, incomingProtocol = '') {
+  const parsed = new URL(origin)
+  if (
+    parsed.protocol === 'http:' &&
+    incomingProtocol === 'https' &&
+    !isLocalPreviewHost(parsed.hostname)
+  ) {
+    parsed.protocol = 'https:'
+  }
+  return parsed.origin
+}
+
 function resolvePreviewOrigin(req) {
+  const forwardedProtocol = normalizePreviewProtocol(req?.get?.('x-forwarded-proto'))
+  const incomingProtocol = forwardedProtocol || normalizePreviewProtocol(req?.protocol) || 'http'
   const configuredOrigin = String(process.env.HTML_PREVIEW_ORIGIN || '').trim()
 
   if (configuredOrigin) {
     try {
-      return new URL(configuredOrigin).origin
+      return publicHttpsOrigin(configuredOrigin, incomingProtocol)
     } catch {
       // Fall back to the current request origin when misconfigured.
     }
   }
 
-  return `${req.protocol}://${req.get('host')}`
+  const host = firstHeaderValue(req?.get?.('host')) || 'localhost:4000'
+  return `${incomingProtocol}://${host}`
 }
 
 /**

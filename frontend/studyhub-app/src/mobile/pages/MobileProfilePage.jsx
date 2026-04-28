@@ -19,7 +19,7 @@ import MobileTopBar from '../components/MobileTopBar'
 import StatCounter from '../components/StatCounter'
 import SegmentedNav from '../components/SegmentedNav'
 import EmptyState from '../components/EmptyState'
-import { safeImageSrc } from '../lib/safeImage'
+import { resolveImageUrl } from '../../lib/imageUrls'
 
 const PREFERS_REDUCED =
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -344,7 +344,7 @@ export default function MobileProfilePage() {
     [navigate],
   )
 
-  const avatarUrl = safeImageSrc(profile?.avatarUrl || user?.avatarUrl)
+  const avatarUrl = resolveImageUrl(profile?.avatarUrl || user?.avatarUrl)
   const displayName = profile?.displayName || user?.displayName || user?.username || 'Student'
   const username = profile?.username || user?.username || ''
   const bio = profile?.bio || ''

@@ -1,4 +1,4 @@
-import { API } from '../../config'
+import { resolveImageUrl } from '../../lib/imageUrls'
 
 /**
  * Study Groups Helpers
@@ -177,8 +177,7 @@ export function truncateText(text, maxLen) {
  * @returns {string}
  */
 export function resolveGroupImageUrl(avatarUrl) {
-  if (!avatarUrl) return ''
-  return avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`
+  return resolveImageUrl(avatarUrl) || ''
 }
 
 /**

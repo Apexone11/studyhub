@@ -21,6 +21,7 @@ import { fadeInUp } from '../../lib/animations'
 import { useTutorial } from '../../lib/useTutorial'
 import { MY_COURSES_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { usePageTitle } from '../../lib/usePageTitle'
+import { resolveImageUrl } from '../../lib/imageUrls'
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 const authHeaders = () => ({ 'Content-Type': 'application/json' })
@@ -30,6 +31,7 @@ function SchoolLogoCard({ school, selected, onClick, size = 'md' }) {
   const innerPad = size === 'sm' ? 8 : size === 'lg' ? 14 : 12
   const radius = size === 'sm' ? 12 : size === 'lg' ? 18 : 16
   const initials = (school.short || school.name || '??').slice(0, 4).toUpperCase()
+  const logoUrl = resolveImageUrl(school.logoUrl)
 
   return (
     <button
@@ -66,9 +68,9 @@ function SchoolLogoCard({ school, selected, onClick, size = 'md' }) {
           overflow: 'hidden',
         }}
       >
-        {school.logoUrl ? (
+        {logoUrl ? (
           <img
-            src={school.logoUrl.startsWith('http') ? school.logoUrl : `${API}${school.logoUrl}`}
+            src={logoUrl}
             alt={`${school.name} logo`}
             loading="lazy"
             style={{
@@ -85,7 +87,7 @@ function SchoolLogoCard({ school, selected, onClick, size = 'md' }) {
         ) : null}
         <div
           style={{
-            display: school.logoUrl ? 'none' : 'grid',
+            display: logoUrl ? 'none' : 'grid',
             placeItems: 'center',
             width: '100%',
             height: '100%',
@@ -309,7 +311,7 @@ export default function MyCoursesPage() {
 
   const filteredCourses = useMemo(() => {
     if (!selectedSchool?.courses) return []
-    let courses = selectedSchool.courses
+    let { courses } = selectedSchool
     if (deptFilter) {
       courses = courses.filter((c) => {
         const dept = c.department || c.code.replace(/[\d\s-].*/g, '').toUpperCase()
@@ -385,6 +387,8 @@ export default function MyCoursesPage() {
   }
 
   /* ── Render ──────────────────────────────────────────────────────────── */
+  const allDepartmentsActive = deptFilter === ''
+
   return (
     <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)' }}>
       <Navbar crumbs={[{ label: 'My Courses', to: '/my-courses' }]} hideTabs />
@@ -628,11 +632,13 @@ export default function MyCoursesPage() {
                           borderRadius: 8,
                           fontSize: 12,
                           fontWeight: 700,
-                          border: !deptFilter
+                          border: allDepartmentsActive
                             ? '2px solid var(--sh-brand)'
                             : '1px solid var(--sh-border)',
-                          background: !deptFilter ? 'var(--sh-info-bg, #eff6ff)' : 'var(--sh-soft)',
-                          color: !deptFilter ? 'var(--sh-brand)' : 'var(--sh-muted)',
+                          background: allDepartmentsActive
+                            ? 'var(--sh-info-bg, #eff6ff)'
+                            : 'var(--sh-soft)',
+                          color: allDepartmentsActive ? 'var(--sh-brand)' : 'var(--sh-muted)',
                           cursor: 'pointer',
                           fontFamily: 'inherit',
                         }}

@@ -28,6 +28,10 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.0.0-beta — in progress
 
+### Profile media + HTML preview hotfix
+
+- **Profile photos, cover images, school logos, and HTML sheet previews no longer break from mixed-origin URLs.** Shared image URL normalization now prefixes `/uploads/...` through the API origin, rejects unsafe image sources, upgrades public `http:` images to `https:`, and the sheet preview origin now honors forwarded HTTPS headers so sandbox iframes do not get mixed-content blocked in production.
+
 ### Review follow-ups (round 3)
 
 - **Cookie consent banner no longer silently dismisses on storage failure.** Codex + Copilot flagged that Safari Private mode (and other no-localStorage contexts) caused `writeConsent` to return null, but the click handler still set `dismissed=true` — analytics never loaded and the user couldn't retry. Banner now keeps itself visible on persistence failure, renders an inline `role="alert"` warning with a "Dismiss anyway" escape hatch, and fires a non-persistent `studyhub:consent-changed` event (with `persisted: false`) so this-session analytics still load at the user's request. Two new component tests pin the failure-path behavior using a mocked `Storage.prototype.setItem`.

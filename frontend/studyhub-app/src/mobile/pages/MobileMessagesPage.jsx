@@ -11,7 +11,7 @@ import { API } from '../../config'
 import MobileTopBar from '../components/MobileTopBar'
 import SegmentedNav from '../components/SegmentedNav'
 import EmptyState from '../components/EmptyState'
-import { safeImageSrc } from '../lib/safeImage'
+import { resolveImageUrl } from '../../lib/imageUrls'
 import usePullToRefresh from '../hooks/usePullToRefresh'
 
 const PREFERS_REDUCED =
@@ -65,7 +65,7 @@ function ConversationAvatar({ conversation, currentUserId }) {
       : null
 
   const rawAvatarUrl = otherUser?.avatarUrl || conversation.avatarUrl
-  const avatarUrl = safeImageSrc(rawAvatarUrl)
+  const avatarUrl = resolveImageUrl(rawAvatarUrl)
   const name = otherUser?.username || conversation.name || '?'
   const initial = name.charAt(0).toUpperCase()
 

@@ -31,7 +31,7 @@
  *   it gave every comment the "?" initials fallback.
  */
 import { useState } from 'react'
-import { API } from '../config'
+import { resolveImageUrl } from '../lib/imageUrls'
 
 /**
  * Check if a plan string represents an active Pro subscription.
@@ -72,16 +72,11 @@ export default function UserAvatar({
   const resolvedPlan = plan ?? user?.plan
   const resolvedIsDonor = isDonor ?? user?.isDonor ?? false
   const resolvedDonorLevel = donorLevel ?? user?.donorLevel
-  const [imgError, setImgError] = useState(false)
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState(null)
 
   const initials = (resolvedUsername || '?').slice(0, 2).toUpperCase()
-
-  const resolvedUrl =
-    resolvedAvatarUrl && !imgError
-      ? resolvedAvatarUrl.startsWith('http')
-        ? resolvedAvatarUrl
-        : `${API}${resolvedAvatarUrl}`
-      : null
+  const resolvedUrl = resolveImageUrl(resolvedAvatarUrl)
+  const visibleAvatarUrl = resolvedUrl && resolvedUrl !== failedAvatarUrl ? resolvedUrl : null
 
   const isAdmin = resolvedRole === 'admin'
   const hasPro = isPlan(resolvedPlan)
@@ -119,12 +114,12 @@ export default function UserAvatar({
           lineHeight: 1,
         }}
       >
-        {resolvedUrl ? (
+        {visibleAvatarUrl ? (
           <img
-            src={resolvedUrl}
+            src={visibleAvatarUrl}
             alt={resolvedUsername || ''}
             loading="lazy"
-            onError={() => setImgError(true)}
+            onError={() => setFailedAvatarUrl(visibleAvatarUrl)}
             style={{
               width: '100%',
               height: '100%',

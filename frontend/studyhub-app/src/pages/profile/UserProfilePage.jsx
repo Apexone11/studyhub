@@ -19,6 +19,7 @@ import ReportModal from '../../components/ReportModal'
 import SafeJoyride from '../../components/SafeJoyride'
 import { SkeletonProfile } from '../../components/Skeleton'
 import { API } from '../../config'
+import { resolveImageUrl } from '../../lib/imageUrls'
 import { useSession } from '../../lib/session-context'
 import { useTutorial } from '../../lib/useTutorial'
 import { PROFILE_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
@@ -468,6 +469,8 @@ export default function UserProfilePage() {
   /* ═══════════════════════════════════════════════════════════════════════
    * MAIN PROFILE VIEW
    * ═══════════════════════════════════════════════════════════════════════ */
+  const profileCoverImageUrl = resolveImageUrl(profile?.coverImageUrl)
+
   return (
     <div style={pageWrapStyle}>
       <Navbar crumbs={[{ label: profile.username, to: `/users/${username}` }]} hideTabs />
@@ -489,18 +492,14 @@ export default function UserProfilePage() {
             className="profile-hero"
             style={{
               background:
-                profile.coverImageUrl && !coverImgError
+                profileCoverImageUrl && !coverImgError
                   ? 'var(--sh-slate-900)'
                   : 'linear-gradient(135deg, var(--sh-slate-800), var(--sh-brand))',
             }}
           >
-            {profile.coverImageUrl && !coverImgError && (
+            {profileCoverImageUrl && !coverImgError && (
               <img
-                src={
-                  profile.coverImageUrl.startsWith('http')
-                    ? profile.coverImageUrl
-                    : `${API}${profile.coverImageUrl}`
-                }
+                src={profileCoverImageUrl}
                 alt=""
                 loading="lazy"
                 onError={() => setCoverImgError(true)}

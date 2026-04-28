@@ -6,7 +6,7 @@ import { useCallback, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { useSession } from '../../lib/session-context'
 import haptics from '../lib/haptics'
-import { safeImageSrc } from '../lib/safeImage'
+import { resolveImageUrl } from '../../lib/imageUrls'
 import BottomSheet from './BottomSheet'
 import { useScrollDirection } from '../hooks/useScrollDirection'
 import { useReducedMotion } from '../hooks/useReducedMotion'
@@ -124,6 +124,7 @@ export default function BottomTabBar() {
 
   const profileActive = activeTab === 'profile'
   const avatarInitial = (user?.username || user?.displayName || 'U').charAt(0).toUpperCase()
+  const avatarUrl = resolveImageUrl(user?.avatarUrl)
 
   return (
     <>
@@ -187,9 +188,9 @@ export default function BottomTabBar() {
           aria-current={profileActive ? 'page' : undefined}
           aria-label="Profile"
         >
-          {safeImageSrc(user?.avatarUrl) ? (
+          {avatarUrl ? (
             <img
-              src={safeImageSrc(user.avatarUrl)}
+              src={avatarUrl}
               alt=""
               className="sh-m-tabbar__avatar"
               referrerPolicy="no-referrer"

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API } from '../../config'
+import { resolveImageUrl } from '../../lib/imageUrls'
 
 const DISMISS_KEY = 'sh_school_suggest_dismissed'
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
@@ -39,6 +40,7 @@ export default function SchoolSuggestionBanner({ user }) {
   }, [dismissed, hasEnrollments, isEdu, isOther])
 
   if (dismissed || hasEnrollments || !isEdu || isOther || !loaded || !school) return null
+  const logoUrl = resolveImageUrl(school.logoUrl)
 
   const dismiss = () => {
     try {
@@ -62,7 +64,7 @@ export default function SchoolSuggestionBanner({ user }) {
         fontFamily: FONT,
       }}
     >
-      {school.logoUrl ? (
+      {logoUrl ? (
         <div
           style={{
             width: 40,
@@ -77,7 +79,7 @@ export default function SchoolSuggestionBanner({ user }) {
           }}
         >
           <img
-            src={`${API}${school.logoUrl}`}
+            src={logoUrl}
             alt={school.short}
             loading="lazy"
             style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }}

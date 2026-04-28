@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import anime from '../lib/animeCompat'
 import { API } from '../../config'
+import { resolveImageUrl } from '../../lib/imageUrls'
 import MobileTopBar from '../components/MobileTopBar'
 
 const PREFERS_REDUCED =
@@ -121,6 +122,7 @@ export default function MobileStudyGroupDetail() {
   }
 
   const initial = (group.name || '?').charAt(0).toUpperCase()
+  const avatarUrl = resolveImageUrl(group.avatarUrl)
 
   return (
     <div className="mob-group">
@@ -130,8 +132,8 @@ export default function MobileStudyGroupDetail() {
         {/* Header card */}
         <div className="mob-profile-card">
           <div className="mob-profile-avatar">
-            {group.avatarUrl ? (
-              <img src={group.avatarUrl} alt="" className="mob-profile-avatar-img" />
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="mob-profile-avatar-img" />
             ) : (
               <div className="mob-profile-avatar-fallback">{initial}</div>
             )}
