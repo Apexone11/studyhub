@@ -50,6 +50,8 @@ internal log into this file when they describe user-visible behavior.
   headers to every other origin. Browser cache (per-user, honors Vary)
   keeps the same user-perceived speedup. Also drops `/tests` from the
   sidebar hover-prefetch map since that page has no backend route yet.
+- **Preview CSP hotfix.** Production CSP now allows `api.getstudyhub.org`
+  in `frame-src` so API-hosted sheet and attachment previews keep loading.
 
 ### Sheets
 
