@@ -224,17 +224,42 @@ export default function MyCoursesPage() {
     fetch(`${API}/api/courses/schools`, {
       headers: authHeaders(),
       credentials: 'include',
+      // Bypass any stale 5xx that the browser disk cache may be holding
+      // from before recent backend CORS / cache-control fixes shipped.
+      // Without this, a poisoned cached response keeps surfacing the
+      // raw "Unexpected end of JSON input" parse error on every load
+      // until the user manually clears their cache.
+      cache: 'no-cache',
     })
       .then(async (r) => {
         if (!r.ok) throw new Error('Could not load the course catalog.')
-        return r.json()
+        // Defensive parse: if the body is empty (cached 5xx, CORS-blocked
+        // opaque response, or transient network truncation), .json()
+        // throws a noisy "Unexpected end of JSON input" that has been
+        // surfacing verbatim in the UI. Fall back to an empty catalog
+        // and a friendly error message instead of leaking the parse
+        // error to the user.
+        const text = await r.text()
+        if (!text) throw new Error('Could not load the course catalog.')
+        try {
+          return JSON.parse(text)
+        } catch {
+          throw new Error('Could not load the course catalog.')
+        }
       })
       .then((data) => {
         if (!active) return
         setCatalog(Array.isArray(data) ? data : [])
       })
       .catch((err) => {
-        if (active) setCatalogError(err.message || 'Could not load course catalog.')
+        if (!active) return
+        // Always show a clean, user-facing string — never leak raw
+        // parser/network internals to the UI.
+        const friendly =
+          err && typeof err.message === 'string' && err.message.startsWith('Failed to')
+            ? 'Could not load the course catalog.'
+            : err?.message || 'Could not load the course catalog.'
+        setCatalogError(friendly)
       })
       .finally(() => {
         if (active) setCatalogLoading(false)
