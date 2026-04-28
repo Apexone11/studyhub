@@ -65,10 +65,15 @@ const TRANSCODE_PRESETS = {
 }
 
 // ── Video status values ──────────────────────────────────────────────────
+// BLOCKED is set when an admin rejects a video (e.g. via the moderation
+// queue). It's a real DB value already written elsewhere — having a
+// constant here means feed gating, sweepers, and the appeal flow can
+// reference it instead of typing the string literal in every file.
 const VIDEO_STATUS = {
   PROCESSING: 'processing',
   READY: 'ready',
   FAILED: 'failed',
+  BLOCKED: 'blocked',
 }
 
 // ── Playback speed options (for frontend reference) ──────────────────────

@@ -396,6 +396,17 @@ export default function SheetHtmlPreviewPage() {
                 ) : (
                   <iframe
                     title={`html-sheet-preview-${sheetId}`}
+                    // Interactive runtime runs the author's inline scripts
+                    // inside a tightly-scoped sandbox that grants only the
+                    // capabilities the runtime actually needs — never the
+                    // capability that would expose the parent app's
+                    // cookies / storage to the iframe. Safe preview gets
+                    // the maximum-restriction sandbox (no scripts, no
+                    // forms, no popups, opaque origin). The document
+                    // still renders; the script-stripped HTML just shows
+                    // as static content.
+                    // Test enforcement of these flags lives in
+                    // backend/test/interactive-preview.test.js.
                     sandbox={interactive && runtimeUrl ? 'allow-scripts allow-forms' : ''}
                     referrerPolicy="no-referrer"
                     src={interactive && runtimeUrl ? runtimeUrl : state.preview.previewUrl || ''}

@@ -128,11 +128,37 @@ const thumbnailUpload = multer({
   limits: { fileSize: MAX_THUMBNAIL_UPLOAD_BYTES },
   fileFilter: (_req, file, cb) => {
     if (!ALLOWED_THUMBNAIL_MIMES.has(file.mimetype)) {
-      return cb(new Error('Only JPG and PNG images are allowed for thumbnails.'))
+      // statusCode + code on the Error so the route handler can map this
+      // user-input failure to a 4xx instead of letting the global error
+      // handler treat it as a 500.
+      const err = new Error('Only JPG and PNG images are allowed for thumbnails.')
+      err.statusCode = 400
+      err.code = 'INVALID_THUMBNAIL_MIME'
+      return cb(err)
     }
     cb(null, true)
   },
 })
+
+/**
+ * Wrap multer's middleware so MIME / file-size errors come back to the
+ * client as proper 4xx responses instead of being caught by the global
+ * 500 handler. Multer surfaces its own file-size error with
+ * `code === 'LIMIT_FILE_SIZE'`; our fileFilter above already attaches
+ * `statusCode = 400` for the MIME case.
+ */
+function thumbnailUploadHandler(req, res, next) {
+  thumbnailUpload.single('file')(req, res, (err) => {
+    if (!err) return next()
+    if (err.code === 'LIMIT_FILE_SIZE') {
+      return res.status(413).json({ error: 'Thumbnail must be 2 MB or smaller.', code: err.code })
+    }
+    if (Number.isInteger(err.statusCode) && err.statusCode < 500) {
+      return res.status(err.statusCode).json({ error: err.message, code: err.code })
+    }
+    return res.status(400).json({ error: err.message || 'Invalid thumbnail upload.' })
+  })
+}
 
 // Magic-byte check — never trust client-provided MIME alone.
 // JPEG files start with FF D8 FF; PNG with the 8-byte PNG signature.
@@ -732,7 +758,7 @@ router.patch(
   '/:id/thumbnail',
   requireAuth,
   videoThumbnailLimiter,
-  thumbnailUpload.single('file'),
+  thumbnailUploadHandler,
   async (req, res) => {
     try {
       const videoId = parseInt(req.params.id, 10)
@@ -757,11 +783,9 @@ router.patch(
       } else {
         const ts = Number(req.body?.frameTimestamp)
         if (!Number.isFinite(ts) || ts < 0) {
-          return res
-            .status(400)
-            .json({
-              error: 'frameTimestamp must be a non-negative number, or upload an image file.',
-            })
+          return res.status(400).json({
+            error: 'frameTimestamp must be a non-negative number, or upload an image file.',
+          })
         }
         thumbKey = await regenerateThumbnailFromFrame(videoId, ts)
       }

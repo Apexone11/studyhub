@@ -50,20 +50,29 @@ export async function renameConversation(id, title) {
 
 /**
  * Send a message and return a reader for the SSE stream.
- * The caller handles consuming events from the reader.
+ *
+ * Returns `{ reader, controller }`:
+ *   - `reader` is the ReadableStreamDefaultReader the caller pulls deltas from.
+ *   - `controller` is an AbortController; calling `.abort()` closes the
+ *     underlying HTTP request, which fires `req.on('close')` on the backend
+ *     and causes Claude's stream to abort. Without this, calling
+ *     `reader.cancel()` releases the read lock but leaves the request open
+ *     long enough that the bubble's Stop button feels unresponsive.
  *
  * @param {object} params
  * @param {number} params.conversationId
  * @param {string} params.content
  * @param {string} [params.currentPage]
  * @param {Array}  [params.images] - Array of { base64, mediaType }
- * @returns {Promise<ReadableStreamDefaultReader>}
+ * @returns {Promise<{ reader: ReadableStreamDefaultReader, controller: AbortController }>}
  */
 export async function sendMessage({ conversationId, content, currentPage, images }) {
+  const controller = new AbortController()
   const res = await fetch(`${BASE}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ conversationId, content, currentPage, images }),
+    signal: controller.signal,
   })
 
   if (!res.ok) {
@@ -71,7 +80,7 @@ export async function sendMessage({ conversationId, content, currentPage, images
     throw new Error(err.error || 'Failed to send message')
   }
 
-  return res.body.getReader()
+  return { reader: res.body.getReader(), controller }
 }
 
 /* ── Usage ──────────────────────────────────────────────────────── */

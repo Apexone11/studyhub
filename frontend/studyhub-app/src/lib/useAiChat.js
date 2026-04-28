@@ -157,15 +157,23 @@ export function useAiChat() {
       setError(null)
       setTruncated(false)
 
+      let reader = null
+      let controller = null
       try {
-        const reader = await aiService.sendMessage({
+        const sent = await aiService.sendMessage({
           conversationId: convId,
           content: content.trim(),
           currentPage: location.pathname,
           images: images || undefined,
         })
+        reader = sent.reader
+        controller = sent.controller
 
-        abortRef.current = reader
+        // Store the controller so stopStreaming() can abort the underlying
+        // fetch. Calling reader.cancel() alone leaves the connection open
+        // long enough that the bubble's Stop button feels broken — abort
+        // closes the socket and fires req.on('close') on the backend.
+        abortRef.current = controller
         const decoder = new TextDecoder()
         const feedSSE = createSSEParser()
         let fullText = ''
@@ -286,7 +294,16 @@ export function useAiChat() {
   // ── Stop streaming ───────────────────────────────────────────────
   const stopStreaming = useCallback(() => {
     if (abortRef.current) {
-      abortRef.current.cancel()
+      // abortRef holds an AbortController (see sendMessage). Calling
+      // .abort() closes the underlying fetch, which makes the read()
+      // loop reject with AbortError (caught silently below) and trips
+      // req.on('close') on the backend so Claude stops generating
+      // immediately instead of burning tokens we'll never display.
+      try {
+        abortRef.current.abort()
+      } catch {
+        /* already aborted */
+      }
       abortRef.current = null
       setStreaming(false)
       // Keep whatever text has streamed so far as the final message.

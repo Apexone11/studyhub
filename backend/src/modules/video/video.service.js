@@ -142,17 +142,25 @@ function probeVideo(filePath) {
 
 /**
  * Generate a thumbnail from a video file at a specific timestamp.
+ * The default of 3 seconds is for the initial pipeline thumbnail (so we
+ * skip past intro fades / black frames). Frame-picker callers from the
+ * thumbnail editor pass in arbitrary timestamps and need them honored
+ * exactly — we only clamp to a non-negative value here, leaving any
+ * upper-bound clamping (vs. video duration) to the caller that has
+ * the duration metadata in hand.
+ *
  * @param {string} inputPath - Source video path
  * @param {string} outputPath - Destination thumbnail path (.jpg)
- * @param {number} timestamp - Seek position in seconds (default 3)
+ * @param {number} timestamp - Seek position in seconds
  * @returns {Promise<string>} outputPath on success
  */
 function generateThumbnail(inputPath, outputPath, timestamp = 3) {
   return new Promise((resolve, reject) => {
+    const seekSeconds = Math.max(0, Number(timestamp) || 0)
     const args = [
       '-y',
       '-ss',
-      String(Math.min(timestamp, 3)),
+      String(seekSeconds),
       '-i',
       inputPath,
       '-vframes',
@@ -375,9 +383,33 @@ async function processVideo(videoId) {
     const { body } = await r2.getObject(video.r2Key)
     const writeStream = fs.createWriteStream(rawPath)
     await new Promise((resolve, reject) => {
+      // Disk full / permissions / OOM on the temp directory used to
+      // leave this Promise hanging because only `body.on('error')` was
+      // wired. Listen on the sink too and destroy the source on failure.
+      let settled = false
+      const settle = (fn, arg) => {
+        if (settled) return
+        settled = true
+        fn(arg)
+      }
+      body.on('error', (err) => {
+        try {
+          writeStream.destroy(err)
+        } catch {
+          /* already destroyed */
+        }
+        settle(reject, err)
+      })
+      writeStream.on('error', (err) => {
+        try {
+          if (typeof body.destroy === 'function') body.destroy(err)
+        } catch {
+          /* already destroyed */
+        }
+        settle(reject, err)
+      })
+      writeStream.on('finish', () => settle(resolve))
       body.pipe(writeStream)
-      body.on('error', reject)
-      writeStream.on('finish', resolve)
     })
 
     // Compute SHA-256 content hash for plagiarism detection
@@ -648,9 +680,35 @@ async function regenerateThumbnailFromFrame(videoId, frameTimestamp) {
     const { body } = await r2.getObject(video.r2Key)
     const writeStream = fs.createWriteStream(rawPath)
     await new Promise((resolve, reject) => {
+      // Without a writeStream error listener, a disk-full / EACCES /
+      // ENOSPC error on the temp directory would leave this Promise
+      // dangling forever (the body.pipe upstream wouldn't reject). Listen
+      // on both ends and tear down the source stream when the sink fails
+      // so we fail fast and the caller's `finally` cleanup runs.
+      let settled = false
+      const settle = (fn, arg) => {
+        if (settled) return
+        settled = true
+        fn(arg)
+      }
+      body.on('error', (err) => {
+        try {
+          writeStream.destroy(err)
+        } catch {
+          /* already destroyed */
+        }
+        settle(reject, err)
+      })
+      writeStream.on('error', (err) => {
+        try {
+          if (typeof body.destroy === 'function') body.destroy(err)
+        } catch {
+          /* already destroyed */
+        }
+        settle(reject, err)
+      })
+      writeStream.on('finish', () => settle(resolve))
       body.pipe(writeStream)
-      body.on('error', reject)
-      writeStream.on('finish', resolve)
     })
 
     await generateThumbnail(rawPath, thumbPath, safeTimestamp)

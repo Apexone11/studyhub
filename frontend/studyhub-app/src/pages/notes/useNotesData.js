@@ -7,6 +7,7 @@ import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
 import { useLivePolling } from '../../lib/useLivePolling'
+import { stripHtmlForPreview } from './noteHtml.js'
 
 const NOTE_FILTER_TABS = new Set(['all', 'private', 'shared', 'starred'])
 
@@ -41,8 +42,13 @@ function normalizeNote(note) {
   }
 }
 
+// Search needs the same plain-text projection the sidebar preview uses
+// so a search for "hello" matches a note with `<p>hello</p>` AND a note
+// containing `&amp;` rendered as `&`. Previously this was a naive
+// `replace(/<[^>]+>/g, ' ')` that left HTML entities raw and produced
+// search misses on entity-encoded characters.
 function stripHtml(html) {
-  return typeof html === 'string' ? html.replace(/<[^>]+>/g, ' ') : ''
+  return stripHtmlForPreview(html)
 }
 
 export function useNotesData() {

@@ -23,6 +23,7 @@ import NoteConflictBanner from './NoteConflictBanner.jsx'
 import ConflictCompareModal from './ConflictCompareModal.jsx'
 import { sanitizePastedHtml } from './notePaste.js'
 import { useNotesHardeningEnabled } from './useNotesHardeningFlag.js'
+import { deriveTitleFromHtml as sharedDeriveTitleFromHtml } from './noteHtml.js'
 import '../../components/editor/richTextEditor.css'
 
 function getNoteTags(tagsValue) {
@@ -53,44 +54,11 @@ marked.setOptions({ breaks: true, gfm: true })
 // even if the user typed it before the auto-derive heuristic ran.
 const UNTITLED_PLACEHOLDERS = new Set(['', 'untitled', 'untitled note'])
 
-// Pull a clean title candidate out of the editor's HTML output. We
-// prefer the first `<h1>` (or `<h2>` as a fallback if no H1 exists)
-// because that mirrors how documents are usually titled. If neither
-// is present we fall back to the first non-empty line of plain text
-// — same behavior as Google Docs / Notion. Returns null if nothing
-// usable is found so the caller can leave the title untouched.
-function deriveTitleFromHtml(html) {
-  if (typeof html !== 'string' || !html.trim()) return null
-
-  const headingMatch =
-    html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/i) || html.match(/<h2[^>]*>([\s\S]*?)<\/h2>/i)
-  let candidate = headingMatch ? headingMatch[1] : ''
-
-  if (!candidate) {
-    const plain = html
-      .replace(/<style[\s\S]*?<\/style>/gi, '')
-      .replace(/<script[\s\S]*?<\/script>/gi, '')
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/&nbsp;/gi, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
-    candidate = plain.split(/(?<=[.!?])\s+|\n+/)[0] || plain
-  }
-
-  const cleaned = candidate
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-    .replace(/\s+/g, ' ')
-    .trim()
-
-  if (!cleaned) return null
-  return cleaned.length > 80 ? `${cleaned.slice(0, 77).trim()}…` : cleaned
-}
+// Re-export under the original local name so the JSX call sites below
+// stay readable. The shared implementation in noteHtml.js is the source
+// of truth — keep both call sites consistent so the sidebar excerpt and
+// the auto-derived editor title can never disagree about the first line.
+const deriveTitleFromHtml = sharedDeriveTitleFromHtml
 
 /* ── Detect whether content is markdown vs HTML ─────────────── */
 function isMarkdown(content) {

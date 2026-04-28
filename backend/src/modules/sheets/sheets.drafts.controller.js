@@ -42,6 +42,85 @@ router.get('/drafts/latest', requireAuth, async (req, res) => {
   }
 })
 
+// List all of the current user's in-progress drafts so the upload page
+// can show a Gmail-style picker. Returns the lightweight summary shape
+// (no HTML body) — clicking a draft loads the full record via
+// /api/sheets/:id. Limited to 50 to keep the picker snappy; the schema
+// already supports an arbitrary number of draft rows per user (each
+// /drafts/autosave without an id creates a new row), this endpoint just
+// surfaces them.
+router.get('/drafts', requireAuth, async (req, res) => {
+  try {
+    const drafts = await prisma.studySheet.findMany({
+      where: {
+        userId: req.user.userId,
+        status: SHEET_STATUS.DRAFT,
+      },
+      orderBy: { updatedAt: 'desc' },
+      take: 50,
+      select: {
+        id: true,
+        title: true,
+        description: true,
+        contentFormat: true,
+        updatedAt: true,
+        createdAt: true,
+        course: { select: { id: true, code: true, name: true } },
+      },
+    })
+
+    res.json({
+      drafts: drafts.map((draft) => ({
+        id: draft.id,
+        title: draft.title || 'Untitled draft',
+        description: draft.description || '',
+        contentFormat: draft.contentFormat,
+        updatedAt: draft.updatedAt,
+        createdAt: draft.createdAt,
+        course: draft.course
+          ? { id: draft.course.id, code: draft.course.code, name: draft.course.name }
+          : null,
+      })),
+      total: drafts.length,
+    })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// Owner-only delete for in-progress drafts. The published-sheet delete
+// endpoint already exists elsewhere; this one is scoped to status=draft
+// so the picker can offer a "discard" action without ever touching a
+// published sheet by accident.
+router.delete('/drafts/:id', requireAuth, async (req, res) => {
+  const draftId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(draftId)) {
+    return res.status(400).json({ error: 'Draft id must be an integer.' })
+  }
+
+  try {
+    const draft = await prisma.studySheet.findUnique({
+      where: { id: draftId },
+      select: { id: true, userId: true, status: true },
+    })
+
+    if (!draft) return res.status(404).json({ error: 'Draft not found.' })
+    if (draft.userId !== req.user.userId && req.user.role !== 'admin') {
+      return sendForbidden(res, 'Not your draft.')
+    }
+    if (draft.status !== SHEET_STATUS.DRAFT) {
+      return res.status(409).json({ error: 'Only drafts can be discarded from this endpoint.' })
+    }
+
+    await prisma.studySheet.delete({ where: { id: draftId } })
+    res.json({ message: 'Draft discarded.' })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 router.post(
   '/drafts/autosave',
   requireAuth,

@@ -134,16 +134,29 @@ function detectHighRiskBehaviors(html) {
     })
   }
 
-  // Keylogging: key event listeners combined with storage or network
+  // Keylogging: a key listener is only suspicious when the handler also
+  // *reads the keystroke itself* (`event.key`, `event.code`, `e.which`,
+  // `e.keyCode`, `event.charCode`) AND ships data outward via network
+  // (`fetch`, `XMLHttpRequest`, `sendBeacon`). Practice tests, study
+  // sheets, and feature-flag toggles routinely add `addEventListener
+  // ('keydown', ...)` next to a `localStorage.setItem('exam_progress',
+  // ...)` call to save progress — that pattern is benign and used to
+  // get auto-flagged into Tier 2 for review. Localstorage alone no
+  // longer escalates; we require an actual exfiltration channel before
+  // calling something keylogging.
   const hasKeyListener = /addEventListener\s*\(\s*["']key(?:down|press|up)["']/gi.test(value)
-  const hasStorageOrNetwork =
-    /\b(?:localStorage|sessionStorage|fetch|XMLHttpRequest|sendBeacon)\b/gi.test(value)
-  if (hasKeyListener && hasStorageOrNetwork) {
+  const readsKeystroke =
+    /\b(?:event|e|ev|evt)\s*\.\s*(?:key|code|which|keyCode|charCode)\b/gi.test(value) ||
+    /\bgetModifierState\s*\(/gi.test(value)
+  const hasNetworkExfil = /\b(?:fetch|XMLHttpRequest|sendBeacon|WebSocket|EventSource)\b/g.test(
+    value,
+  )
+  if (hasKeyListener && readsKeystroke && hasNetworkExfil) {
     behaviors.push({
       category: 'keylogging',
       severity: 'high',
       message:
-        'Keypress listener combined with storage or network API detected — possible keylogging.',
+        'Keystroke handler reads `event.key`/`event.code` and ships data out over the network — possible keylogging.',
     })
   }
 

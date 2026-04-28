@@ -13,6 +13,7 @@ const { feedWriteLimiter, attachmentDownloadLimiter } = require('./feed.constant
 const { formatFeedPostDetail, safeDownloadName } = require('./feed.service')
 const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { runAbuseChecks } = require('../../lib/abuseDetection')
+const { VIDEO_STATUS } = require('../video/video.constants')
 
 const router = express.Router()
 
@@ -43,15 +44,15 @@ router.post('/posts', feedWriteLimiter, async (req, res) => {
       if (video.userId !== req.user.userId) {
         return res.status(403).json({ error: 'You do not own this video.' })
       }
-      if (video.status === 'processing') {
+      if (video.status === VIDEO_STATUS.PROCESSING) {
         return res
           .status(409)
           .json({ error: 'Video is still processing. Wait until it turns ready, then post.' })
       }
-      if (video.status === 'failed') {
+      if (video.status === VIDEO_STATUS.FAILED) {
         return res.status(409).json({ error: 'Video processing failed. Remove it and try again.' })
       }
-      if (video.status === 'blocked') {
+      if (video.status === VIDEO_STATUS.BLOCKED) {
         return res.status(409).json({ error: 'This video was blocked and cannot be posted.' })
       }
     }

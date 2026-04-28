@@ -552,6 +552,11 @@ async function streamMessage({ user, conversationId, content, currentPage, image
 
 function sendSSE(res, data) {
   res.write(`data: ${JSON.stringify(data)}\n\n`)
+  // `compression()` injects a `flush()` method onto the response when it
+  // wraps it; calling it forces the gzip buffer (or the OS socket buffer
+  // when compression is bypassed for SSE) to drain immediately so the
+  // delta arrives at the client without waiting for a 16 KB chunk fill.
+  if (typeof res.flush === 'function') res.flush()
 }
 
 // ── Usage stats ────────────────────────────────────────────────────

@@ -2,9 +2,13 @@
  * VideoThumbnailEditor.jsx — modal for editing a video's thumbnail.
  *
  * Two paths to a new thumbnail:
- *   1. Frame picker — three timestamps (10%, 50%, 90% of duration) plus
- *      a current-playhead "Use this frame" button. Sends frameTimestamp
- *      to PATCH /api/video/:id/thumbnail; backend re-runs ffmpeg.
+ *   1. Frame picker — three quick-pick timestamps (Start = ~5% of
+ *      duration but at least 1s in to skip the typical fade-in,
+ *      Middle = duration/2, End = duration - 1s so we never request
+ *      a frame past the last keyframe) plus a current-playhead
+ *      "Use this frame" button. The chosen timestamp is sent as
+ *      `frameTimestamp` to PATCH /api/video/:id/thumbnail; the
+ *      backend re-runs ffmpeg at that exact second.
  *   2. Custom upload — JPG/PNG file ≤ 2 MB, validated server-side by
  *      magic bytes. Sent as multipart to the same endpoint.
  *
