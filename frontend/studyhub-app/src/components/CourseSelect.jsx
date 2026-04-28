@@ -1,31 +1,38 @@
 /**
- * CourseSelect — shared dropdown that scopes courses to the user's school
- * with an explicit "Other schools" group as an escape hatch.
+ * CourseSelect — shared dropdown for choosing from a flattened course
+ * list, optionally grouped by whether each course belongs to one of the
+ * viewer's enrolled schools.
  *
  * Used by every flat-list course dropdown surface (notes editor, sheets
- * upload, AI sheet setup, study-groups create). Renders native <select>
- * + <optgroup> so the dropdown is theme-agnostic (browser draws it) and
- * works correctly in both light and dark mode without custom CSS.
+ * upload, AI sheet setup, study-groups create/edit). Renders a native
+ * <select> and only emits <optgroup> elements when grouping actually
+ * helps, so the dropdown stays theme-agnostic (browser draws it) and
+ * works correctly in light and dark mode without custom CSS.
  *
- * Behavior:
- *   - Always renders a "No course" option as the first entry.
- *   - When the user has enrollments, courses at their school(s) appear
- *     first under the "Your school" optgroup. The "Other schools"
- *     optgroup appears below it, only when there are non-primary
- *     courses to show.
- *   - Self-learners (no enrollments) and unauthenticated viewers see a
- *     single "Browse by school" group containing every course — no
- *     dead empty group rendered.
- *   - Falls back to a flat list when no enrolled-school context is
- *     available (consumer didn't pass `enrolledSchoolIds`).
+ * Render modes (decided from the `partitionCoursesBySchool` output):
+ *   - primary AND other → two `<optgroup>`s: "Your school" then
+ *     "Other schools". This is the common case for an enrolled student
+ *     whose school doesn't host the course they're after.
+ *   - primary only       → flat list, no `<optgroup>` wrapper.
+ *   - other only         → flat list, no `<optgroup>` wrapper. This is
+ *     what a self-learner with no enrollments or an unauthenticated
+ *     viewer sees, and what a multi-school self-learner sees if they
+ *     haven't enrolled in any of the listed courses' schools.
  *
- * Props: same as a native <select> for value/onChange/disabled/required,
- * plus:
- *   - courses        Array — flattened by `flattenSchoolsToCourses`
- *   - enrolledSchoolIds Array<string|number> — user's school ids
- *   - placeholderLabel string — default "No course"
- *   - allowEmpty     boolean — show the "no course" option (default true)
- *   - className/style — passed through to the <select>
+ * The placeholder/empty option is rendered only when `allowEmpty` is
+ * true (default). Its label is `placeholderLabel` (default "No course")
+ * and its value is `emptyValue` (default "") so consumers can opt out
+ * of an empty selection or rename it ("Select a course…").
+ *
+ * Props: every standard <select> prop you'd expect (value, onChange,
+ * disabled, required, id, name, className, style), plus:
+ *   - courses              Array — flattened by `flattenSchoolsToCourses`
+ *   - enrolledSchoolIds    Array<string|number> — viewer's school ids;
+ *                          empty/missing puts everything in "other"
+ *   - ariaLabel            string — accessible name for the select
+ *   - placeholderLabel     string (default "No course")
+ *   - allowEmpty           boolean (default true)
+ *   - emptyValue           string (default "")
  */
 import { useMemo } from 'react'
 import { partitionCoursesBySchool } from '../lib/courses'
