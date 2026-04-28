@@ -29,7 +29,11 @@ router.post('/posts', feedWriteLimiter, async (req, res) => {
   }
 
   try {
-    // If a videoId is provided, verify the user owns it
+    // If a videoId is provided, verify ownership AND that processing
+    // succeeded. Posting a still-processing video lands a feed card that
+    // never plays; posting a failed/blocked video leaks a broken card to
+    // followers. Both are blocked here with a clear reason so the
+    // composer can surface the right message.
     if (videoId) {
       const video = await prisma.video.findUnique({
         where: { id: videoId },
@@ -38,6 +42,17 @@ router.post('/posts', feedWriteLimiter, async (req, res) => {
       if (!video) return res.status(404).json({ error: 'Video not found.' })
       if (video.userId !== req.user.userId) {
         return res.status(403).json({ error: 'You do not own this video.' })
+      }
+      if (video.status === 'processing') {
+        return res
+          .status(409)
+          .json({ error: 'Video is still processing. Wait until it turns ready, then post.' })
+      }
+      if (video.status === 'failed') {
+        return res.status(409).json({ error: 'Video processing failed. Remove it and try again.' })
+      }
+      if (video.status === 'blocked') {
+        return res.status(409).json({ error: 'This video was blocked and cannot be posted.' })
       }
     }
 

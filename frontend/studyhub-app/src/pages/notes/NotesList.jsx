@@ -6,6 +6,28 @@ import { PAGE_FONT, timeAgo } from '../shared/pageUtils'
 import { staggerEntrance } from '../../lib/animations'
 import { SkeletonList } from '../../components/Skeleton'
 
+// Sidebar previews show plain text only. Notes are stored as HTML
+// (TipTap output), so a naive `content.slice(0, N)` exposes raw markup
+// like `<p><strong>...` to the user. Mirrors the sanitize pattern in
+// NoteEditor.jsx:htmlWordCount and the sheet extractor — kept inline
+// here so the sidebar never has to re-parse the editor's HTML tree.
+function stripHtmlForPreview(html) {
+  if (typeof html !== 'string' || !html.trim()) return ''
+  return html
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#\d+;/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export default function NotesList({
   visibleNotes,
   activeNote,
@@ -386,22 +408,26 @@ export default function NotesList({
                     {note.private !== false ? 'Private' : 'Shared'}
                   </span>
                 </div>
-                {note.content?.trim() ? (
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: 'var(--sh-subtext, #94a3b8)',
-                      lineHeight: 1.5,
-                      marginBottom: 6,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                      maxWidth: '100%',
-                    }}
-                  >
-                    {note.content.slice(0, 80)}
-                  </div>
-                ) : null}
+                {(() => {
+                  const previewText = stripHtmlForPreview(note.content)
+                  if (!previewText) return null
+                  return (
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: 'var(--sh-subtext, #94a3b8)',
+                        lineHeight: 1.5,
+                        marginBottom: 6,
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                        maxWidth: '100%',
+                      }}
+                    >
+                      {previewText.slice(0, 80)}
+                    </div>
+                  )
+                })()}
                 {note.tags?.length ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 8 }}>
                     {note.tags.slice(0, 3).map((tag) => (

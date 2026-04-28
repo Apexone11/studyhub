@@ -150,10 +150,10 @@ export async function mockAuthenticatedApp(page, overrides = {}) {
       return
     }
     const path = new URL(route.request().url()).pathname
-    // Single-resource paths end in `/<id>` or `/me/<thing>`. Default to {}.
-    // Collection paths default to [] so `.slice() / .map() / .length`
-    // patterns don't crash. Object-shaped collection endpoints (e.g.,
-    // `{ items, total }` paged responses) must mock explicitly below.
+    // Collection-like paths matched by the regexes below default to []
+    // so `.slice() / .map() / .length` patterns don't crash. All other
+    // GET paths fall back to {}. Object-shaped collection endpoints
+    // (e.g., `{ items, total }` paged responses) must mock explicitly below.
     const looksLikeCollection =
       /\/(suggestions|recommendations|trending|popular|recent|leaderboard|achievements|badges|tags|courses|sheets|notes|messages|conversations|groups|members|sessions|discussions|exams|materials|videos|books|shelves|bookmarks|donations|payments|reports|appeals|reactions|comments|stars|forks|contributions|invitations|invites|referrals|rewards|reviews|posts|announcements|hashtags|status)$/.test(
         path,

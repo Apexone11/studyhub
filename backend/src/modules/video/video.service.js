@@ -481,10 +481,19 @@ async function processVideo(videoId) {
     const maxDuration = VIDEO_DURATION_LIMITS[userPlan] || MAX_VIDEO_DURATION
 
     if (metadata.duration > maxDuration) {
+      // Mark failed AND immediately free R2 bytes — a duration-rejected
+      // raw upload would otherwise sit in the bucket forever costing
+      // money. Wrapped in try/catch so a temporary R2 hiccup doesn't
+      // block the FAILED transition.
       await prisma.video.update({
         where: { id: videoId },
         data: { status: VIDEO_STATUS.FAILED },
       })
+      try {
+        await deleteVideoAssetRefs({ ...video, ...{} })
+      } catch (delErr) {
+        captureError(delErr, { context: 'video-failed-cleanup', videoId })
+      }
       cleanup(baseDir)
       return
     }
@@ -574,18 +583,125 @@ async function processVideo(videoId) {
     captureError(err, { context: 'video-process-pipeline', videoId })
     console.error(`[video:process] Pipeline failed for video ${videoId}:`, err.message)
 
-    // Mark as failed
+    // Mark as failed AND free R2 bytes. The raw upload + any partial
+    // variants/thumbnail/manifest are useless once we transition to
+    // FAILED — leaving them costs money on every failed upload. The
+    // re-fetch is needed because partial uploads may have written
+    // thumbnailR2Key / variants / hlsManifestR2Key after the original
+    // `video` snapshot was taken.
     try {
-      await prisma.video.update({
+      const failed = await prisma.video.update({
         where: { id: videoId },
         data: { status: VIDEO_STATUS.FAILED },
       })
+      try {
+        await deleteVideoAssetRefs(failed)
+      } catch (delErr) {
+        captureError(delErr, { context: 'video-failed-cleanup', videoId })
+      }
     } catch {
       // Database update failed too — nothing more we can do
     }
   } finally {
     cleanup(baseDir)
   }
+}
+
+/**
+ * Re-extract a thumbnail from the video's source file at the given
+ * timestamp (seconds). Owner-side flow: the user picks a frame in the
+ * thumbnail editor, we re-run ffmpeg, upload the new JPG over the
+ * existing thumbnailR2Key (so all old `getPublicUrl` references stay
+ * valid), and return the new public URL.
+ *
+ * Returns the new thumbnail R2 key, or throws if ffmpeg is missing or
+ * the frame extraction fails. Caller is responsible for ownership.
+ */
+async function regenerateThumbnailFromFrame(videoId, frameTimestamp) {
+  ensureTempDir()
+
+  if (!isFfmpegAvailable()) {
+    const err = new Error('Video processing tools are unavailable on this server.')
+    err.statusCode = 503
+    throw err
+  }
+
+  const video = await prisma.video.findUnique({ where: { id: videoId } })
+  if (!video) {
+    const err = new Error('Video not found.')
+    err.statusCode = 404
+    throw err
+  }
+  if (video.status !== VIDEO_STATUS.READY) {
+    const err = new Error('Video must finish processing before its thumbnail can be edited.')
+    err.statusCode = 409
+    throw err
+  }
+
+  const safeTimestamp = Math.max(0, Math.min(Number(frameTimestamp) || 0, video.duration || 0))
+  const baseDir = path.join(TEMP_DIR, `thumb-${videoId}-${Date.now()}`)
+  fs.mkdirSync(baseDir, { recursive: true })
+  const rawPath = path.join(baseDir, 'raw.mp4')
+  const thumbPath = path.join(baseDir, 'thumb.jpg')
+
+  try {
+    const { body } = await r2.getObject(video.r2Key)
+    const writeStream = fs.createWriteStream(rawPath)
+    await new Promise((resolve, reject) => {
+      body.pipe(writeStream)
+      body.on('error', reject)
+      writeStream.on('finish', resolve)
+    })
+
+    await generateThumbnail(rawPath, thumbPath, safeTimestamp)
+
+    const thumbKey = video.thumbnailR2Key || r2.generateThumbnailKey(video.r2Key)
+    const thumbBuf = fs.readFileSync(thumbPath)
+    await r2.uploadObject(thumbKey, thumbBuf, { contentType: 'image/jpeg' })
+
+    if (!video.thumbnailR2Key) {
+      await prisma.video.update({
+        where: { id: videoId },
+        data: { thumbnailR2Key: thumbKey },
+      })
+    }
+
+    return thumbKey
+  } finally {
+    cleanup(baseDir)
+  }
+}
+
+/**
+ * Replace a video's thumbnail with a user-uploaded image buffer. The
+ * caller is expected to have already validated magic bytes — this
+ * function trusts the buffer is a JPG/PNG and just streams it to R2
+ * over the existing thumbnailR2Key.
+ */
+async function replaceThumbnailFromUpload(videoId, imageBuffer, contentType) {
+  const video = await prisma.video.findUnique({ where: { id: videoId } })
+  if (!video) {
+    const err = new Error('Video not found.')
+    err.statusCode = 404
+    throw err
+  }
+  if (video.status !== VIDEO_STATUS.READY) {
+    const err = new Error('Video must finish processing before its thumbnail can be edited.')
+    err.statusCode = 409
+    throw err
+  }
+
+  const thumbKey = video.thumbnailR2Key || r2.generateThumbnailKey(video.r2Key)
+  await r2.uploadObject(thumbKey, imageBuffer, { contentType: contentType || 'image/jpeg' })
+
+  if (!video.thumbnailR2Key) {
+    await prisma.video.update({
+      where: { id: videoId },
+      data: { thumbnailR2Key: thumbKey },
+    })
+  }
+
+  return thumbKey
 }
 
 /**
@@ -648,6 +764,8 @@ module.exports = {
   transcodeToPreset,
   generateHlsManifest,
   processVideo,
+  regenerateThumbnailFromFrame,
+  replaceThumbnailFromUpload,
   deleteVideoAssets,
   deleteVideoAssetRefs,
 }

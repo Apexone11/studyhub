@@ -84,6 +84,7 @@ const mocks = vi.hoisted(() => {
   const rateLimiters = {
     videoUploadInitLimiter: passThrough,
     videoUploadChunkLimiter: passThrough,
+    videoThumbnailLimiter: passThrough,
     readLimiter: passThrough,
     writeLimiter: passThrough,
   }

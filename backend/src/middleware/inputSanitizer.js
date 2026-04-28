@@ -16,7 +16,13 @@
  * guiding attackers.
  */
 
-const MAX_FIELD_LENGTH = 10 * 1024 // 10 KB per field
+// 5 MB matches the express.json() body cap mounted in src/index.js. The
+// previous 10 KB cap silently rejected any legitimate large field —
+// imported HTML sheets, AI-generated sheets, chunked-note bodies (32 KB
+// per chunk), and Hub AI prompts — with the generic "Invalid request
+// payload" message. The middleware's real purpose is null-byte /
+// control-char rejection; that check runs regardless of length.
+const MAX_FIELD_LENGTH = 5 * 1024 * 1024
 const MAX_DEPTH = 5
 
 /**

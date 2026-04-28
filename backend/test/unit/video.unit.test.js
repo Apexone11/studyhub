@@ -94,6 +94,7 @@ const mocks = vi.hoisted(() => {
   const rateLimiters = {
     videoUploadInitLimiter: passThrough,
     videoUploadChunkLimiter: passThrough,
+    videoThumbnailLimiter: passThrough,
     readLimiter: passThrough,
     writeLimiter: passThrough,
   }
@@ -703,5 +704,4 @@ describe('video.routes DELETE /api/video/:id', () => {
   })
 })
 
- 
 const _unused = Readable // keep import tree-shake-safe for potential stream helpers.
