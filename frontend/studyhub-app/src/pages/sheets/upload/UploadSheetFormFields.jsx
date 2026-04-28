@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { IconEye, IconUpload, IconPen } from '../../../components/Icons'
 import StackedEditorPane from '../../../components/editor/StackedEditorPane'
+import CourseSelect from '../../../components/CourseSelect'
 import { FONT, MiniPreview, tierColor, tierLabel } from './uploadSheetConstants'
 
 /* ── First-upload helper card ──────────────────────────────────────────── */
@@ -113,6 +114,7 @@ export function InfoFields({
   allowDownloads,
   setAllowDownloads,
   courses,
+  enrolledSchoolIds,
   error,
   setHasUnsavedChanges,
 }) {
@@ -178,12 +180,16 @@ export function InfoFields({
         >
           COURSE
         </label>
-        <select
+        <CourseSelect
+          courses={courses}
+          enrolledSchoolIds={enrolledSchoolIds}
           value={courseId}
           onChange={(event) => {
             setCourseId(event.target.value)
             setHasUnsavedChanges(true)
           }}
+          ariaLabel="Course"
+          placeholderLabel="Select a course…"
           style={{
             width: '100%',
             padding: '8px 12px',
@@ -195,14 +201,7 @@ export function InfoFields({
             color: courseId ? 'var(--sh-text)' : 'var(--sh-muted)',
             boxSizing: 'border-box',
           }}
-        >
-          <option value="">Select a course…</option>
-          {courses.map((course) => (
-            <option key={course.id} value={course.id}>
-              {course.code} — {course.name}
-            </option>
-          ))}
-        </select>
+        />
       </div>
 
       <div>

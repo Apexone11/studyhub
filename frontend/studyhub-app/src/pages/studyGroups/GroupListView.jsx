@@ -66,6 +66,7 @@ export default function GroupListView() {
     loadGroups,
     schools: allSchools,
     courses: allCourses,
+    enrolledSchoolIds,
   } = useStudyGroupsData()
 
   const hasActiveFilters = search || schoolId || courseId || mineOnly
@@ -316,6 +317,7 @@ export default function GroupListView() {
             onClose={() => setCreateModalOpen(false)}
             onSubmit={handleCreateGroup}
             courses={allCourses}
+            enrolledSchoolIds={enrolledSchoolIds}
           />,
           document.body,
         )}

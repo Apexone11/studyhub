@@ -14,6 +14,7 @@ import DOMPurify from 'dompurify'
 import { MathInline, MathBlock } from '../../components/editor/MathExtension'
 import { lowlight } from '../../components/editor/codeHighlight'
 import EditorToolbar from '../../components/editor/EditorToolbar'
+import CourseSelect from '../../components/CourseSelect'
 import { PAGE_FONT } from '../shared/pageUtils'
 import NoteVersionHistory from './NoteVersionHistory'
 import NoteTagsInput from './NoteTagsInput'
@@ -261,6 +262,7 @@ export default function NoteEditor({
   editorAllowDownloads,
   editorCourseId,
   courses,
+  enrolledSchoolIds,
   saving,
   confirmDelete,
   setConfirmDelete,
@@ -496,14 +498,12 @@ export default function NoteEditor({
             e.currentTarget.style.borderBottomColor = 'transparent'
           }}
         />
-        <select
+        <CourseSelect
+          courses={courses}
+          enrolledSchoolIds={enrolledSchoolIds}
           value={editorCourseId}
           onChange={(e) => handleCourseChange(e.target.value)}
-          aria-label="Course"
-          // Right-side toolbar item — was 6×10 with no min-width and the
-          // "No course" placeholder + collapsed text rendered as a tiny
-          // unreadable pill. Bumping padding + min-width gives the
-          // dropdown breathing room without making it dominate the row.
+          ariaLabel="Course"
           style={{
             border: '1px solid var(--sh-border)',
             borderRadius: 8,
@@ -518,14 +518,7 @@ export default function NoteEditor({
             cursor: 'pointer',
             fontWeight: 600,
           }}
-        >
-          <option value="">No course</option>
-          {courses.map((c) => (
-            <option key={c.id} value={String(c.id)}>
-              {c.code}
-            </option>
-          ))}
-        </select>
+        />
         <label
           style={{
             display: 'flex',

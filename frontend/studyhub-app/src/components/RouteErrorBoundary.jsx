@@ -217,7 +217,7 @@ function ErrorFallback({ error, resetErrorBoundary }) {
             style={{
               padding: '10px 18px',
               borderRadius: 10,
-              border: '1px solid #cbd5e1',
+              border: '1px solid var(--sh-border, #cbd5e1)',
               background: 'var(--sh-surface, #fff)',
               color: 'var(--sh-slate-600, #475569)',
               fontSize: 14,

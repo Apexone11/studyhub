@@ -23,7 +23,9 @@ import { usePageTitle } from '../../../lib/usePageTitle'
 import { pageShell } from '../../../lib/ui'
 import { API } from '../../../config'
 import { PAGE_FONT, authHeaders } from '../../shared/pageUtils'
-import { flattenSchoolsToCourses } from '../../../lib/courses'
+import { useSession } from '../../../lib/session-context'
+import { enrolledSchoolIdsFromUser, flattenSchoolsToCourses } from '../../../lib/courses'
+import CourseSelect from '../../../components/CourseSelect'
 
 export default function AiSheetSetupPage() {
   usePageTitle('Publish AI Sheet')
@@ -52,6 +54,8 @@ export default function AiSheetSetupPage() {
   const [loadingCourses, setLoadingCourses] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const { user } = useSession()
+  const enrolledSchoolIds = useMemo(() => enrolledSchoolIdsFromUser(user), [user])
 
   // Fetch enrolled courses.
   const loadCourses = useCallback(async () => {
@@ -296,9 +300,13 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
                       Loading courses...
                     </div>
                   ) : (
-                    <select
+                    <CourseSelect
+                      courses={courses}
+                      enrolledSchoolIds={enrolledSchoolIds}
                       value={courseId}
                       onChange={(e) => setCourseId(e.target.value)}
+                      ariaLabel="Course"
+                      placeholderLabel="Select a course..."
                       style={{
                         width: '100%',
                         padding: '8px 12px',
@@ -310,14 +318,7 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
                         color: courseId ? 'var(--sh-text)' : 'var(--sh-muted)',
                         boxSizing: 'border-box',
                       }}
-                    >
-                      <option value="">Select a course...</option>
-                      {courses.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.code} -- {c.name}
-                        </option>
-                      ))}
-                    </select>
+                    />
                   )}
                   {courses.length === 0 && !loadingCourses && (
                     <div style={{ fontSize: 11, color: 'var(--sh-warning-text)', marginTop: 4 }}>

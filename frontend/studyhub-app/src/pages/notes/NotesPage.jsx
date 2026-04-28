@@ -128,6 +128,7 @@ export default function NotesPage() {
               editorAllowDownloads={data.editorAllowDownloads}
               editorCourseId={data.editorCourseId}
               courses={data.courses}
+              enrolledSchoolIds={data.enrolledSchoolIds}
               saving={data.saving}
               confirmDelete={data.confirmDelete}
               setConfirmDelete={data.setConfirmDelete}

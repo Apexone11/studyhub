@@ -89,6 +89,7 @@ export default function UploadSheetPage() {
           allowDownloads={hook.allowDownloads}
           setAllowDownloads={hook.setAllowDownloads}
           courses={hook.courses}
+          enrolledSchoolIds={hook.enrolledSchoolIds}
           error={hook.error}
           setHasUnsavedChanges={hook.setHasUnsavedChanges}
         />

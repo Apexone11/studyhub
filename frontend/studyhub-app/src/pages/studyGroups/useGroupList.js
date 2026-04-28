@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
-import { flattenSchoolsToCourses } from '../../lib/courses'
+import { useSession } from '../../lib/session-context'
+import { enrolledSchoolIdsFromUser, flattenSchoolsToCourses } from '../../lib/courses'
 
 /**
  * Hook for managing study group list, filters, and pagination
@@ -11,6 +12,8 @@ import { flattenSchoolsToCourses } from '../../lib/courses'
  */
 export function useGroupList() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const { user } = useSession()
+  const enrolledSchoolIds = useMemo(() => enrolledSchoolIdsFromUser(user), [user])
 
   // Group list state
   const [groups, setGroups] = useState([])
@@ -211,6 +214,7 @@ export function useGroupList() {
     offset,
     schools,
     courses,
+    enrolledSchoolIds,
     setFilters,
     setPagination,
   }

@@ -1,14 +1,15 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * useNotesData.js — Custom hook for notes data fetching, state, and actions
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
 import { useLivePolling } from '../../lib/useLivePolling'
+import { useSession } from '../../lib/session-context'
 import { stripHtmlForPreview } from './noteHtml.js'
-import { flattenSchoolsToCourses } from '../../lib/courses.js'
+import { enrolledSchoolIdsFromUser, flattenSchoolsToCourses } from '../../lib/courses.js'
 
 const NOTE_FILTER_TABS = new Set(['all', 'private', 'shared', 'starred'])
 
@@ -57,6 +58,8 @@ export function useNotesData() {
   const filterTab = NOTE_FILTER_TABS.has(searchParams.get('tab')) ? searchParams.get('tab') : 'all'
   const searchQuery = searchParams.get('q') || ''
   const selectedTag = (searchParams.get('tag') || '').trim().toLowerCase()
+  const { user } = useSession()
+  const enrolledSchoolIds = useMemo(() => enrolledSchoolIdsFromUser(user), [user])
   /* ── State ───────────────────────────────────────────────────────────── */
   const [notes, setNotes] = useState([])
   const [activeNote, setActiveNote] = useState(null)
@@ -566,6 +569,7 @@ export function useNotesData() {
     editorAllowDownloads,
     editorCourseId,
     courses,
+    enrolledSchoolIds,
     filterTab,
     setFilterTab,
     searchQuery,
