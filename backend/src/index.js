@@ -81,6 +81,7 @@ const referralRoutes = require('./modules/referrals')
 const hashtagsRoutes = require('./modules/hashtags')
 const sectionsRoutes = require('./modules/sections')
 const materialsRoutes = require('./modules/materials')
+const creatorAuditRoutes = require('./modules/creatorAudit')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -508,6 +509,10 @@ app.use('/api/dashboard', dashboardRoutes)
 // Frontend is flag-gated by `design_v2_upcoming_exams`; server keeps endpoints
 // available to authenticated users so the flag flip is one-sided.
 app.use('/api/exams', examRoutes)
+
+// Mount Creator Audit foundation endpoints. Frontend rollout remains flag-gated;
+// the server keeps the owner-checked audit and consent primitives available.
+app.use('/api/creator-audit', creatorAuditRoutes)
 
 // Mount settings endpoints under /api/settings.
 app.use('/api/settings', settingsRoutes)

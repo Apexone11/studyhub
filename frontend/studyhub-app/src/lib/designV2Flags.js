@@ -32,6 +32,7 @@ import { API } from '../config'
  *   - design_v2_onboarding         — Phase 6: Onboarding polish (skips + tour).
  *   - design_v2_feed_polish        — Phase 7: Feed density + swipe gestures.
  *   - design_v2_home_hero          — Phase 8: Public home hero + for-role cards.
+ *   - design_v2_creator_audit      — Path A: Creator Audit consent + audit UI.
  */
 
 const FLAG_NAMES = {
@@ -53,6 +54,7 @@ const FLAG_NAMES = {
   // Week 3 — Section-aware publishing (Sections + Materials + bulk assign).
   // See docs/internal/design-refresh-v2-week2-to-week5-execution.md §W3.
   teachSections: 'design_v2_teach_sections',
+  creatorAudit: 'design_v2_creator_audit',
 }
 
 // Module-level cache keyed by flag name → Promise<boolean>. Shared across
@@ -105,6 +107,7 @@ const DEFAULTS = {
   roleChecklist: false,
   weeklyFocus: false,
   teachSections: false,
+  creatorAudit: false,
   loading: true,
 }
 
@@ -128,6 +131,7 @@ export function useDesignV2Flags() {
       fetchFlag(FLAG_NAMES.roleChecklist),
       fetchFlag(FLAG_NAMES.weeklyFocus),
       fetchFlag(FLAG_NAMES.teachSections),
+      fetchFlag(FLAG_NAMES.creatorAudit),
     ])
       .then(
         ([
@@ -145,6 +149,7 @@ export function useDesignV2Flags() {
           roleChecklist,
           weeklyFocus,
           teachSections,
+          creatorAudit,
         ]) => {
           if (cancelled) return
           setFlags({
@@ -162,6 +167,7 @@ export function useDesignV2Flags() {
             roleChecklist,
             weeklyFocus,
             teachSections,
+            creatorAudit,
             loading: false,
           })
         },

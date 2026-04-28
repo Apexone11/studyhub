@@ -392,7 +392,7 @@ Founder-approved design refresh in progress. Context for any agent picking up th
 - Phase 2: Upcoming Exams (read + write, preparednessPercent column, /api/exams CRUD, component-kit foundation) — SHIPPED 2026-04-24 behind `design_v2_upcoming_exams`, fail-CLOSED per decision #20.
 - Phase 3: Inline Hub AI suggestion card (AiSuggestion model, /api/ai/suggestions endpoints, PII redaction, shared daily quota with Hub AI) — SHIPPED 2026-04-28 behind `design_v2_ai_card`.
 - Phase 4: Sheets browse refresh (Grid/List toggle, server-extracted previewText cards, Search across StudyHub cross-school toggle, filter pill `selected` state on Chip primitive, §1 school-scoped sheet discovery) — SHIPPED 2026-04-27 behind `design_v2_sheets_grid`.
-- Next phase: Phase 5 — Auth split, Onboarding polish, Feed polish (minor only), HomePage hero redesign, Sheet custom CSS (3-week cycle). HomePage hero is the largest Figma lift; design first.
+- Phase 5 auth split remains parked while Path A advances. Current in-flight path: Creator Audit backend foundation behind `design_v2_creator_audit` (consent table, audit-grade columns, `/api/creator-audit`, five audit primitives) is implemented; next Creator Audit slice is the frontend consent/audit UI, publish-flow wiring, seed fixtures, and backfill job. Sheet custom CSS still chains after Creator Audit.
 - Hard rules for this cycle (with the v2.1 dependency exception carved out below):
   - No auth logic changes without founder approval.
   - No git commits without founder approval.

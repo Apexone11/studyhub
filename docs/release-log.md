@@ -28,6 +28,10 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.0.0-beta — in progress
 
+### Creator Audit backend foundation
+
+- **Creator Audit now has backend audit primitives behind a fail-closed in-flight flag.** Added consent storage, audit-grade columns, five audit checks, owner-checked `/api/creator-audit` endpoints, centralized rate limits, and regression tests for PII redaction, ReDoS resistance, malformed asset URLs, report caps, consent privacy, and route auth/CSRF behavior.
+
 ### Profile media + HTML preview hotfix
 
 - **Profile photos, cover images, school logos, and HTML sheet previews no longer break from mixed-origin URLs.** Shared image URL normalization now prefixes `/uploads/...` through the API origin, rejects unsafe image sources, upgrades public `http:` images to `https:`, and the sheet preview origin now honors forwarded HTTPS headers so sandbox iframes do not get mixed-content blocked in production.

@@ -51,6 +51,7 @@ describe('useDesignV2Flags fail-closed contract (decision #20)', () => {
     expect(result.current.upcomingExams).toBe(false)
     expect(result.current.aiCard).toBe(false)
     expect(result.current.sheetsGrid).toBe(false)
+    expect(result.current.creatorAudit).toBe(false)
   })
 
   it('respects an explicit DISABLED response (row exists, enabled=false)', async () => {
@@ -105,5 +106,6 @@ describe('useDesignV2Flags fail-closed contract (decision #20)', () => {
     })
 
     expect(result.current.upcomingExams).toBe(true)
+    expect(result.current.creatorAudit).toBe(true)
   })
 })

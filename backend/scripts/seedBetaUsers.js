@@ -526,6 +526,9 @@ const IN_FLIGHT_DESIGN_V2_FLAGS = [
   'design_v2_role_checklist',
   'design_v2_weekly_focus',
   'design_v2_teach_sections',
+  // Path A — Creator Audit consent + audit UI; backend foundation is present,
+  // but no shipped flag row exists until the UI ships.
+  'design_v2_creator_audit',
 ]
 
 async function main() {
