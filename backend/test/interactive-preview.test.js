@@ -222,48 +222,68 @@ describe('html-preview endpoint — canInteract flag', () => {
  * 6) Sandbox iframe attributes — frontend verification
  * ═══════════════════════════════════════════════════════════════════════════ */
 describe('Frontend sandbox iframe attributes', () => {
-  it('SheetContentPanel uses allow-scripts allow-forms for interactive mode', () => {
+  // Helper: read a frontend source file relative to the repo root.
+  const readSource = (relPath) => {
     const fs = require('node:fs')
     const path = require('node:path')
-    const source = fs.readFileSync(
-      path.join(
-        __dirname,
-        '../../frontend/studyhub-app/src/pages/sheets/viewer/SheetContentPanel.jsx',
-      ),
+    return fs.readFileSync(
+      path.join(__dirname, '../../frontend/studyhub-app/src/', relPath),
       'utf8',
     )
-    expect(source).toContain("'allow-scripts allow-forms'")
-    // Must NOT contain allow-same-origin (would break sandbox isolation)
-    expect(source).not.toContain('allow-same-origin')
-  })
+  }
 
-  it('SheetContentPanel uses empty sandbox for safe mode', () => {
-    const fs = require('node:fs')
-    const path = require('node:path')
-    const source = fs.readFileSync(
-      path.join(
-        __dirname,
-        '../../frontend/studyhub-app/src/pages/sheets/viewer/SheetContentPanel.jsx',
-      ),
-      'utf8',
-    )
-    // The ternary should fall back to empty string for safe mode
-    expect(source).toMatch(/sandbox=\{.*\? 'allow-scripts allow-forms' : ''/s)
-  })
+  // Two iframes live in the codebase, one in the sheet viewer and one in
+  // the dedicated HTML preview page. Both must follow the same two-mode
+  // sandbox policy: interactive runtime gets `allow-scripts allow-forms`
+  // (NEVER combined with allow-same-origin), and safe preview gets
+  // `allow-same-origin` alone (so cross-subdomain Chrome renders it
+  // instead of showing the "(blocked:origin)" placeholder). These rules
+  // apply identically across the two surfaces.
+  const SANDBOX_BEARING_FILES = [
+    'pages/sheets/viewer/SheetContentPanel.jsx',
+    'pages/preview/SheetHtmlPreviewPage.jsx',
+  ]
 
-  it('SheetHtmlPreviewPage uses allow-scripts allow-forms for interactive mode', () => {
-    const fs = require('node:fs')
-    const path = require('node:path')
-    const source = fs.readFileSync(
-      path.join(
-        __dirname,
-        '../../frontend/studyhub-app/src/pages/preview/SheetHtmlPreviewPage.jsx',
-      ),
-      'utf8',
-    )
-    expect(source).toContain("'allow-scripts allow-forms'")
-    expect(source).not.toContain('allow-same-origin')
-  })
+  for (const relPath of SANDBOX_BEARING_FILES) {
+    describe(`sandbox policy in ${relPath}`, () => {
+      it('grants allow-scripts allow-forms in the interactive branch', () => {
+        const source = readSource(relPath)
+        expect(source).toContain("'allow-scripts allow-forms'")
+      })
+
+      it('grants allow-same-origin (and ONLY allow-same-origin) in the safe-preview branch', () => {
+        const source = readSource(relPath)
+        // Regression guard: an empty sandbox attribute on a cross-origin
+        // iframe makes Chrome show "(blocked:origin)" instead of content.
+        // The safe-preview branch of the sandbox ternary must hand the
+        // iframe an explicit 'allow-same-origin' literal — not '', not
+        // 'allow-same-origin allow-popups' (broader privilege), and never
+        // anything containing allow-scripts (privilege escalation).
+        //
+        // Match the safe branch directly: `: 'allow-...'`. We capture the
+        // string literal so we can assert it equals exactly
+        // 'allow-same-origin'. This makes the test fail loudly if a
+        // future change quietly widens the safe-branch privilege set.
+        const safeBranchMatch = source.match(
+          /\?\s*['"]allow-scripts allow-forms['"]\s*:\s*(['"])([^'"]*)\1/,
+        )
+        expect(safeBranchMatch, 'safe-preview ternary not found').toBeTruthy()
+        const safeBranchValue = safeBranchMatch[2]
+        expect(safeBranchValue).toBe('allow-same-origin')
+      })
+
+      it('never combines allow-scripts with allow-same-origin in one sandbox literal', () => {
+        const source = readSource(relPath)
+        // The interactive branch is the one running author-supplied
+        // scripts. Granting allow-same-origin there would let those
+        // scripts read the parent app's cookies/storage. Reject any
+        // quoted string literal that pairs the two tokens in either
+        // order. Comment prose can still mention either token.
+        expect(source).not.toMatch(/['"]allow-scripts[^'"]*allow-same-origin[^'"]*['"]/)
+        expect(source).not.toMatch(/['"]allow-same-origin[^'"]*allow-scripts[^'"]*['"]/)
+      })
+    })
+  }
 
   it('SheetContentPanel does not include allow-top-navigation', () => {
     const fs = require('node:fs')

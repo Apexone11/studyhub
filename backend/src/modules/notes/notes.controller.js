@@ -1386,11 +1386,124 @@ async function appendChunk(req, res) {
   return updateNote(req, res)
 }
 
+/**
+ * PATCH /api/notes/:id/metadata — Update privacy / course / allowDownloads
+ *
+ * Why a dedicated endpoint (parallels /star, /pin, /tags) instead of
+ * piggy-backing on PATCH /:id ?
+ *   1. The hardened content-save path runs revision-conflict + content-hash
+ *      no-op detection that would suppress a metadata-only change whenever
+ *      the body content was unchanged.
+ *   2. Toggling Private should NOT create a NoteVersion snapshot.
+ *   3. The frontend was previously updating these fields in local React
+ *      state only — the values never reached the server. After reload the
+ *      Private/Course/Downloads selectors snapped back to their persisted
+ *      values, which made the controls look broken.
+ *
+ * Body: { private?: boolean, courseId?: number|null, allowDownloads?: boolean }
+ * Returns: 200 { note } with the updated row.
+ */
+async function updateNoteMetadata(req, res) {
+  const noteId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1)
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
+
+  const body = req.body || {}
+  const data = {}
+
+  if (Object.prototype.hasOwnProperty.call(body, 'private')) {
+    if (typeof body.private !== 'boolean') {
+      return sendError(res, 400, 'private must be a boolean.', ERROR_CODES.BAD_REQUEST)
+    }
+    data.private = body.private
+    // Mirrors the existing client behavior: going private hides downloads.
+    if (body.private === true) data.allowDownloads = false
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'allowDownloads')) {
+    if (typeof body.allowDownloads !== 'boolean') {
+      return sendError(res, 400, 'allowDownloads must be a boolean.', ERROR_CODES.BAD_REQUEST)
+    }
+    // The private:true branch above takes precedence — don't overwrite it.
+    if (data.allowDownloads === undefined) data.allowDownloads = body.allowDownloads
+  }
+
+  if (Object.prototype.hasOwnProperty.call(body, 'courseId')) {
+    if (body.courseId === null || body.courseId === '') {
+      data.courseId = null
+    } else {
+      const courseId = Number.parseInt(body.courseId, 10)
+      if (!Number.isInteger(courseId) || courseId < 1) {
+        return sendError(
+          res,
+          400,
+          'courseId must be a positive integer or null.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
+      data.courseId = courseId
+    }
+  }
+
+  if (Object.keys(data).length === 0) {
+    return sendError(
+      res,
+      400,
+      'Provide at least one of private, allowDownloads, courseId.',
+      ERROR_CODES.BAD_REQUEST,
+    )
+  }
+
+  try {
+    const note = await prisma.note.findUnique({
+      where: { id: noteId },
+      select: { id: true, userId: true },
+    })
+    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    if (
+      !assertOwnerOrAdmin({
+        res,
+        user: req.user,
+        ownerId: note.userId,
+        message: 'Not your note.',
+        targetType: 'note',
+        targetId: noteId,
+      })
+    )
+      return
+
+    // If a courseId was supplied, verify the user is actually enrolled in
+    // that course. Without this check a note could be filed under a
+    // course the user has no access to, leaking it onto that course's
+    // sidebar listing.
+    if (data.courseId != null) {
+      const enrollment = await prisma.enrollment.findFirst({
+        where: { userId: req.user.userId, courseId: data.courseId },
+        select: { id: true },
+      })
+      if (!enrollment && req.user.role !== 'admin') {
+        return sendError(res, 403, 'You are not enrolled in that course.', ERROR_CODES.FORBIDDEN)
+      }
+    }
+
+    const updated = await prisma.note.update({
+      where: { id: noteId },
+      data,
+      include: NOTE_INCLUDE,
+    })
+    return res.status(200).json({ note: serializeNote(updated) })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+  }
+}
+
 module.exports = {
   getNoteById,
   listNotes,
   createNote,
   updateNote,
+  updateNoteMetadata,
   deleteNote,
   listNoteComments,
   createNoteComment,

@@ -189,24 +189,34 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
       <PasswordHint password={form.password} confirmPassword={form.confirmPassword} />
 
       {/* Account type */}
-      <div className="register-field" style={{ marginTop: 14 }}>
+      <div
+        className="register-field"
+        style={{ marginTop: 14 }}
+        role="radiogroup"
+        aria-label="I am a..."
+      >
         <label className="register-label">I am a...</label>
-        <div style={{ display: 'flex', gap: 8 }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           {[
             ['student', 'Student'],
             ['teacher', 'Teacher / TA'],
             ['other', 'Self-learner'],
-          ].map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setField('accountType', value)}
-              className={`sh-chip${form.accountType === value ? ' sh-chip--active' : ''}`}
-              style={{ padding: '8px 16px', fontSize: 13, fontWeight: 600 }}
-            >
-              {label}
-            </button>
-          ))}
+          ].map(([value, label]) => {
+            const selected = form.accountType === value
+            return (
+              <button
+                key={value}
+                type="button"
+                role="radio"
+                aria-checked={selected}
+                onClick={() => setField('accountType', value)}
+                className={`sh-chip sh-chip--role-pick${selected ? ' sh-chip--active' : ''}`}
+                style={{ padding: '8px 16px', fontSize: 13, fontWeight: 600 }}
+              >
+                {label}
+              </button>
+            )
+          })}
         </div>
       </div>
 

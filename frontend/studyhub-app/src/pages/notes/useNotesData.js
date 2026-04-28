@@ -8,6 +8,7 @@ import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { stripHtmlForPreview } from './noteHtml.js'
+import { flattenSchoolsToCourses } from '../../lib/courses.js'
 
 const NOTE_FILTER_TABS = new Set(['all', 'private', 'shared', 'starred'])
 
@@ -68,6 +69,15 @@ export function useNotesData() {
   const [creating, setCreating] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [loadingNotes, setLoadingNotes] = useState(true)
+  // Tracks the currently selected note id so async metadata PATCH responses
+  // can detect when the user navigated to a different note before the
+  // request settled. Without this, a late response would leak its
+  // success-side editor-state mutations or a failed-revert into the new
+  // note's editor and corrupt the UI.
+  const activeNoteIdRef = useRef(null)
+  useEffect(() => {
+    activeNoteIdRef.current = activeNote?.id ?? null
+  }, [activeNote?.id])
 
   const updateSearchParam = useCallback(
     (key, value) => {
@@ -175,12 +185,7 @@ export function useNotesData() {
         return JSON.parse(text)
       })
       .then((data) => {
-        if (active)
-          setCourses(
-            (data || []).flatMap((school) =>
-              (school.courses || []).map((course) => ({ ...course, schoolName: school.name })),
-            ),
-          )
+        if (active) setCourses(flattenSchoolsToCourses(data))
       })
       .catch(() => {
         if (active) {
@@ -241,16 +246,115 @@ export function useNotesData() {
   function handleContentChange(value) {
     setEditorContent(value)
   }
+
+  /**
+   * Persist a metadata change (private / allowDownloads / courseId) for the
+   * active note via PATCH /api/notes/:id/metadata. Updates the local React
+   * state optimistically, also patches the sidebar list row so the new
+   * value is visible immediately, and reverts on failure with a toast.
+   *
+   * Why: the hardened content-save path only persists `title`/`content`,
+   * so these three controls were updating client state but never reaching
+   * the backend. After a reload the selectors snapped back to whatever
+   * was persisted, which made them feel broken.
+   */
+  async function persistMetadataChange(field, value, optimisticApply, revert) {
+    const note = activeNote
+    if (!note?.id) return
+    const targetNoteId = note.id
+    // Snapshot the prior list-row value BEFORE the optimistic patch lands.
+    // The earlier version of this code tried to derive the prior value
+    // from the in-flight `value` (e.g. `!value === false ? !value : !value`,
+    // which is just `!value` for any input) and ended up corrupting
+    // numeric courseId rows into booleans on save failure. Capturing the
+    // snapshot up front is the only safe rollback.
+    const previousRowValue = note[field]
+    optimisticApply()
+    setNotes((prev) => prev.map((n) => (n.id === targetNoteId ? { ...n, [field]: value } : n)))
+    setActiveNote((prev) => (prev?.id === targetNoteId ? { ...prev, [field]: value } : prev))
+    try {
+      const response = await fetch(`${API}/api/notes/${targetNoteId}/metadata`, {
+        method: 'PATCH',
+        headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ [field]: value }),
+      })
+      if (!response.ok) throw new Error(`HTTP ${response.status}`)
+      const data = await response.json().catch(() => ({}))
+      // Trust the server's normalized row (e.g. it auto-cleared
+      // allowDownloads when private went true).
+      const serverNote = data?.note
+      if (serverNote) {
+        const normalized = normalizeNote(serverNote)
+        setNotes((prev) => prev.map((n) => (n.id === normalized.id ? { ...n, ...normalized } : n)))
+        // Only sync activeNote + editor-state when the user is still on
+        // the same note. Otherwise a late response would overwrite the
+        // newly-selected note's editor fields.
+        const stillActive = activeNoteIdRef.current === targetNoteId
+        if (stillActive) {
+          setActiveNote((prev) => (prev?.id === normalized.id ? { ...prev, ...normalized } : prev))
+          if (Object.prototype.hasOwnProperty.call(normalized, 'allowDownloads')) {
+            setEditorAllowDownloads(Boolean(normalized.allowDownloads))
+          }
+        }
+      }
+    } catch {
+      // List-row rollback is always safe (keyed by id, doesn't touch the
+      // editor). But the editor-level revert() (and activeNote patch)
+      // must only run if the user is still on the original note.
+      setNotes((prev) =>
+        prev.map((n) => (n.id === targetNoteId ? { ...n, [field]: previousRowValue } : n)),
+      )
+      const stillActive = activeNoteIdRef.current === targetNoteId
+      if (stillActive) {
+        revert()
+        setActiveNote((prev) =>
+          prev?.id === targetNoteId ? { ...prev, [field]: previousRowValue } : prev,
+        )
+      }
+      showToast('Failed to update note settings', 'error')
+    }
+  }
+
   function handlePrivateChange(value) {
-    setEditorPrivate(value)
-    // When going private, downloads are auto-reset by backend — reflect locally
-    if (value) setEditorAllowDownloads(false)
+    const previous = editorPrivate
+    const previousDownloads = editorAllowDownloads
+    persistMetadataChange(
+      'private',
+      value,
+      () => {
+        setEditorPrivate(value)
+        // Mirror the backend behavior locally so the Downloads checkbox
+        // doesn't blink — going private clears downloads.
+        if (value) setEditorAllowDownloads(false)
+      },
+      () => {
+        setEditorPrivate(previous)
+        setEditorAllowDownloads(previousDownloads)
+      },
+    )
   }
   function handleAllowDownloadsChange(value) {
-    setEditorAllowDownloads(value)
+    const previous = editorAllowDownloads
+    persistMetadataChange(
+      'allowDownloads',
+      value,
+      () => setEditorAllowDownloads(value),
+      () => setEditorAllowDownloads(previous),
+    )
   }
   function handleCourseChange(value) {
-    setEditorCourseId(value)
+    const previous = editorCourseId
+    // The dropdown emits string values ("" for "No course"). Convert to
+    // null/number for the backend so the metadata controller's parseInt
+    // succeeds and the courseId column is set correctly.
+    const courseIdForServer = value === '' || value == null ? null : Number.parseInt(value, 10)
+    persistMetadataChange(
+      'courseId',
+      courseIdForServer,
+      () => setEditorCourseId(value),
+      () => setEditorCourseId(previous),
+    )
   }
 
   /* ── Create / Delete ─────────────────────────────────────────────────── */

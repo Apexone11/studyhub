@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
+import { flattenSchoolsToCourses } from '../../lib/courses'
 
 /**
  * Hook for managing study group list, filters, and pagination
@@ -184,14 +185,11 @@ export function useGroupList() {
     }
   }, [])
 
-  const courses = schools.flatMap((school) =>
-    (school.courses || []).map((course) => ({
-      ...course,
-      schoolId: school.id,
-      schoolName: school.name,
-      schoolShort: school.short,
-    })),
-  )
+  // Use the shared flattener so duplicate course ids (multi-enrollment)
+  // collapse to one row and same-code-different-school cases get a school
+  // suffix on `code`. Matches the dropdown contract used by the notes,
+  // sheets-upload, and AI-sheet-setup pages.
+  const courses = flattenSchoolsToCourses(schools)
 
   return {
     // State

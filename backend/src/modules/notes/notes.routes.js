@@ -231,6 +231,12 @@ router.patch('/:id/pin', requireAuth, mutateLimiter, notesController.toggleNoteP
 // ── PATCH /api/notes/:id/tags — Update tags ──────────────────────
 router.patch('/:id/tags', requireAuth, mutateLimiter, notesController.updateNoteTags)
 
+// ── PATCH /api/notes/:id/metadata — Privacy / course / downloads ─
+// Owner-only (assertOwnerOrAdmin runs in the controller). Lives outside
+// the hardened content-save path so toggling Private doesn't trigger a
+// version snapshot or get suppressed by content-hash no-op detection.
+router.patch('/:id/metadata', requireAuth, mutateLimiter, notesController.updateNoteMetadata)
+
 // ═══════════════════════════════════════════════════════════════════════════
 // Note Image Upload
 // ═══════════════════════════════════════════════════════════════════════════

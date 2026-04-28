@@ -28,6 +28,37 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.0.0-beta — in progress
 
+### Selected-chip CSS fix + register role picker
+
+- **`.sh-chip--active` was silently broken everywhere.** A duplicate `.sh-chip` baseline block in `styles/motion.css` (loaded after `index.css`) overrode the active rule's background at equal specificity, so every chip in the app — sheets filters, feed filters, the register "I am a..." picker — was applying the active class but rendering with the inactive background. Removed the duplicate; bumped the active selector to `.sh-chip.sh-chip--active` so any future source-order accident can't reproduce the bug.
+- **Register role picker has unmistakable selected feedback now.** New `.sh-chip--role-pick` modifier paints the selected role with solid brand fill + white text + a brief 220ms scale-bounce. Reduced-motion users get only the color change. Added `role="radiogroup"` / `role="radio"` / `aria-checked` so screen readers announce selection correctly.
+- **Homepage link audit.** Verified all 10 homepage CTA / footer links (`/register`, `/sheets`, `/supporters`, `/pricing`, `/about`, `/docs`, `/terms`, `/privacy`, `/cookies`, `/guidelines`) resolve to mounted routes — no broken targets.
+
+### Study group uploads + reviewer follow-ups (round 2)
+
+- **Group banner / discussion / resource uploads no longer 403.** `uploadGroupMedia` was a raw XHR that bypassed the `window.fetch` shim that auto-injects `X-CSRF-Token`, so file POSTs hit the server with no CSRF header and got rejected. Helper now resolves the cached CSRF token (bootstrapping via `/api/auth/me` if absent), sets `X-Requested-With`, and on Capacitor adds `X-Client: mobile` + `Authorization: Bearer <native>`. Repairs **all** study-group uploads, not just backgrounds.
+- **`/uploads/group-media` and `/uploads/note-images` now have static handlers.** Files were being uploaded successfully but the served URLs would 404 in the browser because no `express.static` mount existed at those paths. Added with `nosniff`, `Cache-Control`, and `default-src 'none'; img-src 'self'` CSP per the existing avatar/cover pattern.
+- **Background picker UX expanded.** Drag-and-drop onto the preview pane, client-side image-mime + 10 MB size validation (fast friendly errors before the upload fires), confirm-on-clear when there's a saved background, inline upload progress bar, and quota-aware copy on 429. Char counter on the attribution field.
+- **Late-response race fixed in `persistMetadataChange`.** Switching notes mid-PATCH no longer leaks the original note's revert (or success-side `setEditorAllowDownloads`) into the newly-selected note's editor state. Gated the editor-level side effects on an `activeNoteIdRef` check; list-row patches stay keyed by id.
+- **Sandbox regression test now asserts safe-preview is exactly `allow-same-origin`.** Earlier version accepted any string containing the token, which would have allowed silent privilege widening (`allow-same-origin allow-popups`, etc.). Captures the safe-branch literal and asserts equality.
+- **Course dropdown helper migration completed for study-groups list.** `useGroupList.js` was still doing the naive flatMap the shared helper was meant to replace, producing visible course-code duplicates for multi-enrolled users. Migrated to `flattenSchoolsToCourses` and extended the helper to expose `schoolId`/`schoolShort` (additive — required by `GroupListFilters` school filter).
+- **PATCH /api/notes/:id/metadata test coverage added.** 17 tests covering id validation, field-type validation, owner-only auth + admin override, private→allowDownloads server-side normalization, individual field persistence, and course-enrollment 403 (with admin bypass).
+
+### Reviewer follow-ups (Copilot + security pass)
+
+- **Sheet viewer iframe also got the cross-subdomain fix.** `SheetContentPanel.jsx` had the same `sandbox=''` bug in its safe-preview branch as the standalone preview page; both now grant `allow-same-origin` only on the script-stripped path so production Chrome no longer renders the embedded sheet as `(blocked:origin)`.
+- **Sandbox regression test now asserts the safe-preview branch HAS allow-same-origin** (and is parameterized over both iframe-bearing files), so a future revert to an empty sandbox attribute fails CI instead of silently shipping the placeholder bug again.
+- **Rollback path in notes-metadata persist no longer corrupts courseId.** A security scan caught a tautological `!value === false ? !value : !value` (always `!value`) in the optimistic-update revert that flipped numeric `courseId` rows into booleans on save failure. Now snapshots the prior list-row value before the optimistic patch and restores it verbatim.
+- Reworded a stale "screenshot 1" comment in `SheetHtmlPreviewPage.jsx` to describe the Chrome behavior directly.
+
+### Notes metadata persistence
+
+- **Private/Shared toggle, course picker, and Downloads checkbox now actually save.** New `PATCH /api/notes/:id/metadata` endpoint (parallels `/star`/`/pin`/`/tags`) accepts `{private, courseId, allowDownloads}` with owner-only auth and an enrollment check on `courseId`. Frontend handlers in `useNotesData` now optimistically apply the change, hit the endpoint, sync the sidebar list row, and revert on failure with a toast. Lives outside the hardened content-save path so toggling Private doesn't trigger a version snapshot or get suppressed by content-hash no-op detection.
+
+### Course dropdown dedup
+
+- **Course pickers no longer show duplicate course codes.** The `/api/courses/schools` response groups courses by school; if a user is enrolled at multiple schools that share a code (CHEM101 / BIOL101 / etc.), the naive flatMap in five different pages produced visible duplicates. New shared `lib/courses.js` helper dedupes by course id and disambiguates collisions by appending the school name. Applied to Notes, Sheet Upload, and AI Sheet Setup pages.
+
 ### Reviewer follow-ups (Sourcery + Codex)
 
 - **SSE compression bypass actually works.** Filter now gates on URL path (`/api/ai/messages`) instead of `Content-Type`, since the response Content-Type isn't set yet when `compression()` evaluates its filter on first write.

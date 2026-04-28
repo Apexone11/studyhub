@@ -1030,10 +1030,50 @@ textarea.sh-input {
   background: var(--sh-soft);
 }
 
-.sh-chip--active {
+/* Specificity bumped to .sh-chip.sh-chip--active so source-order accidents
+   (e.g. another stylesheet redefining .sh-chip later) can't silently knock
+   out the selected-state background. The selected state must always win
+   when the active modifier is present. */
+.sh-chip.sh-chip--active {
   background: var(--sh-brand-soft);
   color: var(--sh-brand-hover);
-  border-color: var(--sh-brand-soft);
+  border-color: var(--sh-brand);
+  box-shadow: inset 0 0 0 1px var(--sh-brand);
+}
+
+/* Role-picker variant — registration's "I am a..." 3-button group needs
+   stronger selection feedback than a generic filter chip. A subtle tint
+   was getting reported as "the click didn't register" because the change
+   was too small to notice on a one-off form interaction. Solid brand fill
+   + white text removes the ambiguity. The select-bounce keyframe gives a
+   brief tactile confirmation; reduced-motion users get only the static
+   color change. */
+.sh-chip.sh-chip--role-pick.sh-chip--active {
+  background: var(--sh-brand);
+  color: #fff;
+  border-color: var(--sh-brand);
+  box-shadow:
+    inset 0 0 0 1px var(--sh-brand),
+    0 2px 8px var(--sh-brand-soft-bg);
+  animation: sh-chip-select-bounce 220ms ease-out;
+}
+
+@keyframes sh-chip-select-bounce {
+  0% {
+    transform: scale(1);
+  }
+  45% {
+    transform: scale(1.06);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-chip.sh-chip--role-pick.sh-chip--active {
+    animation: none;
+  }
 }
 
 /* ── Alert banners ──────────────────────────────────────────────────────── */

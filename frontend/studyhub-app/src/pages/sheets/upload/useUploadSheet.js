@@ -27,6 +27,7 @@ import {
   makeHandleHtmlImport,
   makeAcknowledgeScanAndDismiss,
 } from './uploadSheetActions'
+import { flattenSchoolsToCourses } from '../../../lib/courses'
 
 export default function useUploadSheet() {
   usePageTitle('Upload Sheet')
@@ -178,11 +179,7 @@ export default function useUploadSheet() {
         credentials: 'include',
       })
       const data = await response.json().catch(() => [])
-      setCourses(
-        (data || []).flatMap((school) =>
-          (school.courses || []).map((course) => ({ ...course, schoolName: school.name })),
-        ),
-      )
+      setCourses(flattenSchoolsToCourses(data))
     } catch {
       setCourses([])
     }
