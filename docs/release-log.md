@@ -57,6 +57,17 @@ internal log into this file when they describe user-visible behavior.
   `?tab=history&commit=<id>` and expands the matching commit on load,
   and the commit toggle keeps the URL in sync so links can be shared.
 
+### Phase 4 — Sheets browse refresh (2026-04-27)
+
+- Sheets page now offers a Grid/List view toggle (List default; choice
+  persists in localStorage; URL `?view=grid` or `?view=list` overrides).
+- New "Search across StudyHub" toggle on Sheets bypasses the school filter
+  for cross-school discovery.
+- Filter pills now show an active selected state when applied.
+- Sheet cards in Grid view show a 3-line preview extracted from the sheet
+  body (new `previewText` column, backfilled for existing sheets).
+- Behind `design_v2_sheets_grid` feature flag (now SHIPPED in production).
+
 ### Phase 3 — Inline Hub AI suggestion card (2026-04-28)
 
 - New `AiSuggestion` model with daily quota shared with Hub AI's
