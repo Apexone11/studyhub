@@ -37,7 +37,7 @@ const FAQ_ITEMS = [
 const FREE_FEATURES = [
   'Browse all study sheets',
   '10 uploads per month',
-  '10 AI messages per day (Hub AI)',
+  '30 AI messages per day (60 once you verify your email)',
   '30-minute video uploads',
   '50 library bookmarks',
   '2 private study groups',

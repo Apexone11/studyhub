@@ -9,24 +9,26 @@ describe('video.constants.js', () => {
       expect(typeof constants.VIDEO_DURATION_LIMITS).toBe('object')
     })
 
-    it('has durations for free plan', () => {
-      expect(constants.VIDEO_DURATION_LIMITS.free).toBe(1800)
+    it('matches the canonical PLANS spec in payments.constants — Free 30 / Donor 45 / Pro 60 / Admin 90 minutes', () => {
+      // Earlier the file hardcoded a flat 600s for every tier, which
+      // contradicted the pricing page (Free=30 min, Pro=60 min). The
+      // pin keeps the two source files in sync and prevents a regression
+      // where a future edit silently re-flattens the durations.
+      expect(constants.VIDEO_DURATION_LIMITS).toMatchObject({
+        free: 30 * 60,
+        donor: 45 * 60,
+        pro_monthly: 60 * 60,
+        pro_yearly: 60 * 60,
+        admin: 90 * 60,
+      })
     })
 
-    it('has durations for pro_monthly plan', () => {
-      expect(constants.VIDEO_DURATION_LIMITS.pro_monthly).toBe(3600)
-    })
-
-    it('has durations for pro_yearly plan', () => {
-      expect(constants.VIDEO_DURATION_LIMITS.pro_yearly).toBe(3600)
-    })
-
-    it('has durations for donor plan', () => {
-      expect(constants.VIDEO_DURATION_LIMITS.donor).toBe(2700)
-    })
-
-    it('has durations for admin plan', () => {
-      expect(constants.VIDEO_DURATION_LIMITS.admin).toBe(7200)
+    it('paid tiers must allow longer videos than free (no flattening regression)', () => {
+      const free = constants.VIDEO_DURATION_LIMITS.free
+      expect(constants.VIDEO_DURATION_LIMITS.donor).toBeGreaterThan(free)
+      expect(constants.VIDEO_DURATION_LIMITS.pro_monthly).toBeGreaterThan(free)
+      expect(constants.VIDEO_DURATION_LIMITS.pro_yearly).toBeGreaterThan(free)
+      expect(constants.VIDEO_DURATION_LIMITS.admin).toBeGreaterThan(free)
     })
 
     it('all durations are positive integers', () => {
@@ -59,8 +61,12 @@ describe('video.constants.js', () => {
     })
 
     it('pro plans have larger size limits than free', () => {
-      expect(constants.VIDEO_SIZE_LIMITS.pro_monthly).toBeGreaterThan(constants.VIDEO_SIZE_LIMITS.free)
-      expect(constants.VIDEO_SIZE_LIMITS.pro_yearly).toBeGreaterThan(constants.VIDEO_SIZE_LIMITS.free)
+      expect(constants.VIDEO_SIZE_LIMITS.pro_monthly).toBeGreaterThan(
+        constants.VIDEO_SIZE_LIMITS.free,
+      )
+      expect(constants.VIDEO_SIZE_LIMITS.pro_yearly).toBeGreaterThan(
+        constants.VIDEO_SIZE_LIMITS.free,
+      )
     })
   })
 
@@ -81,12 +87,19 @@ describe('video.constants.js', () => {
   })
 
   describe('MAX_VIDEO_DURATION', () => {
-    it('exports MAX_VIDEO_DURATION constant', () => {
+    // The fallback used by the upload + transcode path when the user's
+    // plan is unknown / unauthenticated. It MUST match the free-tier
+    // cap so an unauthenticated request gets the most-restrictive cap
+    // by default (least privilege). Earlier this was hardcoded to 600s
+    // even after the per-tier values were tier-differentiated; the
+    // assertions below pin it to the free-tier value so the two can't
+    // drift again.
+    it('exports MAX_VIDEO_DURATION as the free-tier fallback', () => {
       expect(constants.MAX_VIDEO_DURATION).toBeDefined()
-      expect(constants.MAX_VIDEO_DURATION).toBe(1800)
+      expect(constants.MAX_VIDEO_DURATION).toBe(constants.VIDEO_DURATION_LIMITS.free)
     })
 
-    it('MAX_VIDEO_DURATION is 30 minutes (1800 seconds)', () => {
+    it('matches the pricing-page Free claim of 30 minutes (1800 seconds)', () => {
       expect(constants.MAX_VIDEO_DURATION).toBe(30 * 60)
     })
 
@@ -225,8 +238,12 @@ describe('video.constants.js', () => {
     })
 
     it('presets have increasing quality resolutions', () => {
-      expect(constants.TRANSCODE_PRESETS['360p'].width).toBeLessThan(constants.TRANSCODE_PRESETS['720p'].width)
-      expect(constants.TRANSCODE_PRESETS['720p'].width).toBeLessThan(constants.TRANSCODE_PRESETS['1080p'].width)
+      expect(constants.TRANSCODE_PRESETS['360p'].width).toBeLessThan(
+        constants.TRANSCODE_PRESETS['720p'].width,
+      )
+      expect(constants.TRANSCODE_PRESETS['720p'].width).toBeLessThan(
+        constants.TRANSCODE_PRESETS['1080p'].width,
+      )
     })
 
     it('each preset may have bitrate information', () => {

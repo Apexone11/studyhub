@@ -28,13 +28,28 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.0.0-beta — in progress
 
+### Subscription-tier alignment fixes (post-merge audit pass)
+
+- **Video duration cap was flat 10 minutes for every plan**, contradicting the pricing page's Free=30/Donor=45/Pro=60-minute claims. `VIDEO_DURATION_LIMITS` and `VIDEO_SIZE_LIMITS` in `backend/src/modules/video/video.constants.js` now derive from the canonical `PLANS` spec in `payments.constants.js` so the two files can't drift again. Admin uploads (used for announcements) keep a separate 90-minute cap. Test pin added so a future regression that re-flattens the durations fails CI.
+- **Pricing page now matches the actual AI quotas** — Free tier reads "30 AI messages per day (60 once you verify your email)" instead of "10 AI messages per day". Backend `DAILY_LIMITS` (default=30, verified=60) was already enforcing the higher numbers; this aligns the UI claim with reality and surfaces the email-verification perk as a sales lever. `payments.constants.js:PLANS.free` records both `aiMessagesPerDay: 30` and `aiMessagesPerDayVerified: 60` for documentation parity.
+- **TestTakerPage hardcoded slate hex colors** (background / borders / heading / muted / link) are now `var(--sh-*)` tokens so the "planned for v2" holding page themes correctly in dark mode.
+
+### Expanded security hardening sweep
+
+- **A deeper 10-loop security sweep closed privacy, upload, HTML, socket, and enrollment edge cases.** Hub AI now redacts PII before and after model calls, socket leave events only broadcast for rooms the caller actually joined, multi-school users keep their full enrollment set in `/api/users/me`, video uploads honor the locked 10-minute cap, uploads validate magic bytes instead of MIME alone, direct HTML sheet create/update paths persist risk-tier scans and quarantine Tier 3 content, and note HTML word counts now use inert parsing instead of an `innerHTML` sink.
+
 ### Creator Audit backend foundation
 
 - **Creator Audit now has backend audit primitives behind a fail-closed in-flight flag.** Added consent storage, audit-grade columns, five audit checks, owner-checked `/api/creator-audit` endpoints, centralized rate limits, and regression tests for PII redaction, ReDoS resistance, malformed asset URLs, report caps, consent privacy, and route auth/CSRF behavior.
 
 ### Profile media + HTML preview hotfix
 
-- **Profile photos, cover images, school logos, and HTML sheet previews no longer break from mixed-origin URLs.** Shared image URL normalization now prefixes `/uploads/...` through the API origin, rejects unsafe image sources, upgrades public `http:` images to `https:`, and the sheet preview origin now honors forwarded HTTPS headers so sandbox iframes do not get mixed-content blocked in production.
+- **Profile photos, cover images, school logos, and HTML sheet previews no longer break from mixed-origin URLs.** Shared image URL normalization now prefixes slash-relative paths through the API origin, rejects unsafe image sources, upgrades public `http:` images to `https:`, and the sheet preview origin now honors forwarded HTTPS headers so sandbox iframes do not get mixed-content blocked in production.
+- **Editor uploads and moderation attachment previews now use the same safe media URL rules.** Uploaded editor images go through shared URL normalization, and moderation previews recover image/PDF attachments from MIME types while keeping PDF iframes restricted to backend-relative URLs.
+- **Creator Audit persistence and consent metadata are hardened.** Audit reports no longer save onto content that changed mid-run, consent IP/user-agent metadata is validated before persistence, accessibility parsing is bounded, and truncated reports now keep severity counts.
+- **Creator Audit schema indexing was cleaned up.** The consent table now relies on its existing unique `userId` index without creating a duplicate non-unique index.
+- **Roles v2 feature flags now fail closed.** Missing rows, network errors, malformed responses, and non-200 flag responses keep Roles v2 surfaces disabled unless the backend returns `enabled: true`.
+- **GIF search no longer ships a hardcoded Tenor key.** Tenor is now configured through `VITE_TENOR_API_KEY` / runtime config, and the GIF picker stays disabled without making external requests when no key is configured.
 
 ### Review follow-ups (round 3)
 
