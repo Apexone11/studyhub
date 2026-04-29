@@ -1,4 +1,5 @@
 const crypto = require('node:crypto')
+const net = require('node:net')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
@@ -36,10 +37,12 @@ const EU_COUNTRY_CODES = new Set([
 ])
 
 function clientIp(req) {
-  const forwarded = String(req.get?.('x-forwarded-for') || '')
-    .split(',')[0]
-    .trim()
-  return forwarded || req.ip || req.socket?.remoteAddress || ''
+  const forwardedIps = String(req.get?.('x-forwarded-for') || '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+  const candidates = [...forwardedIps, req.ip, req.socket?.remoteAddress]
+  return candidates.find((candidate) => net.isIP(String(candidate || '').trim())) || ''
 }
 
 function isEuRequest(req) {
@@ -54,6 +57,12 @@ function persistedIp(req) {
   if (!ip) return null
   if (!isEuRequest(req)) return ip.slice(0, 64)
   return crypto.createHash('sha256').update(ip).digest('hex')
+}
+
+function persistedUserAgent(req) {
+  const value = String(req.get?.('user-agent') || '')
+  const printable = value.replace(/[^\x20-\x7e]/g, '')
+  return printable.slice(0, 512) || null
 }
 
 async function loadAuditEntity(entityType, entityId, userId) {
@@ -98,7 +107,13 @@ async function loadAuditEntity(entityType, entityId, userId) {
   }
 }
 
-async function persistAuditResult(entityType, entityId, userId, report) {
+async function persistAuditResult(
+  entityType,
+  entityId,
+  userId,
+  report,
+  expectedContentHtml = undefined,
+) {
   const data = {
     lastAuditGrade: report.grade,
     lastAuditReport: report,
@@ -106,13 +121,35 @@ async function persistAuditResult(entityType, entityId, userId, report) {
   }
 
   if (entityType === 'sheet') {
-    const result = await prisma.studySheet.updateMany({ where: { id: entityId, userId }, data })
-    return result.count > 0
+    const where = { id: entityId, userId }
+    if (expectedContentHtml !== undefined) where.content = expectedContentHtml
+    const result = await prisma.studySheet.updateMany({ where, data })
+    if (result.count > 0) return true
+    if (expectedContentHtml !== undefined) {
+      const current = await loadAuditEntity(entityType, entityId, userId)
+      if (!current || current.forbidden) return false
+      if (current.contentHtml !== expectedContentHtml) return 'stale'
+    }
+    return false
   }
 
   if (entityType === 'note') {
-    const result = await prisma.note.updateMany({ where: { id: entityId, userId }, data })
-    return result.count > 0
+    const where = { id: entityId, userId }
+    if (expectedContentHtml !== undefined) where.content = expectedContentHtml
+    const result = await prisma.note.updateMany({ where, data })
+    if (result.count > 0) return true
+    if (expectedContentHtml !== undefined) {
+      const current = await loadAuditEntity(entityType, entityId, userId)
+      if (!current || current.forbidden) return false
+      if (current.contentHtml !== expectedContentHtml) return 'stale'
+    }
+    return false
+  }
+
+  if (expectedContentHtml !== undefined) {
+    const current = await loadAuditEntity(entityType, entityId, userId)
+    if (!current || current.forbidden) return false
+    if (current.contentHtml !== expectedContentHtml) return 'stale'
   }
 
   const result = await prisma.material.updateMany({
@@ -134,7 +171,21 @@ async function runCreatorAudit(req, res) {
     }
 
     const report = await runAudit({ contentHtml: entity.contentHtml, userId: req.user.userId })
-    const persisted = await persistAuditResult(entityType, entityId, req.user.userId, report)
+    const persisted = await persistAuditResult(
+      entityType,
+      entityId,
+      req.user.userId,
+      report,
+      entity.contentHtml,
+    )
+    if (persisted === 'stale') {
+      return sendError(
+        res,
+        409,
+        'Content changed while the audit was running. Please run the audit again.',
+        ERROR_CODES.CONFLICT,
+      )
+    }
     if (!persisted) {
       return sendError(res, 404, 'Content not found.', ERROR_CODES.NOT_FOUND)
     }
@@ -195,13 +246,13 @@ async function acceptConsent(req, res) {
         userId: req.user.userId,
         docVersion,
         ipAddress: persistedIp(req),
-        userAgent: String(req.get?.('user-agent') || '').slice(0, 512),
+        userAgent: persistedUserAgent(req),
       },
       update: {
         docVersion,
         acceptedAt: new Date(),
         ipAddress: persistedIp(req),
-        userAgent: String(req.get?.('user-agent') || '').slice(0, 512),
+        userAgent: persistedUserAgent(req),
       },
       select: { docVersion: true, acceptedAt: true },
     })
@@ -233,6 +284,7 @@ module.exports = {
   loadAuditEntity,
   persistAuditResult,
   persistedIp,
+  persistedUserAgent,
   revokeConsent,
   runCreatorAudit,
 }

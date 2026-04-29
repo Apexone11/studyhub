@@ -1,4 +1,7 @@
 const CURRENT_CREATOR_RESPONSIBILITY_DOC_VERSION = '2026.04'
+// The audit runs on 50KB bounded HTML and all five checks run in parallel.
+// 2500ms keeps pathological inputs from tying up the request while still leaving
+// headroom for the lightweight HTML, asset, PII, accessibility, and copyright passes.
 const CHECK_TIMEOUT_MS = 2500
 const MAX_AUDIT_REPORT_BYTES = 50 * 1024
 

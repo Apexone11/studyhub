@@ -3,7 +3,7 @@
  *
  * Extracted to keep UserProfilePage.jsx a thin orchestrator.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { IconBook, IconSheets, IconStar } from '../../components/Icons'
 import BadgeDisplay from '../../components/BadgeDisplay'
@@ -11,6 +11,8 @@ import StudyStatusChip from '../../components/StudyStatusChip'
 import UserAvatar from '../../components/UserAvatar'
 import { resolveImageUrl } from '../../lib/imageUrls'
 import { FONT, cardStyle, sectionHeadingStyle, pillStyle } from './profileConstants'
+
+const AVATAR_RETRY_DELAY_MS = 30000
 
 /* ── Avatar ─────────────────────────────────────────────────────────────── */
 export function ProfileAvatar({ profile, initials, isOwnProfile, onAvatarClick }) {
@@ -21,6 +23,14 @@ export function ProfileAvatar({ profile, initials, isOwnProfile, onAvatarClick }
   const profileAvatarUrl = resolveImageUrl(profile.avatarUrl)
   const visibleAvatarUrl =
     profileAvatarUrl && profileAvatarUrl !== failedAvatarUrl ? profileAvatarUrl : null
+
+  useEffect(() => {
+    if (!failedAvatarUrl) return undefined
+    const retryTimer = window.setTimeout(() => {
+      setFailedAvatarUrl((current) => (current === failedAvatarUrl ? null : current))
+    }, AVATAR_RETRY_DELAY_MS)
+    return () => window.clearTimeout(retryTimer)
+  }, [failedAvatarUrl])
 
   const DONOR_COLORS = { bronze: '#cd7f32', silver: '#94a3b8', gold: '#f59e0b' }
 

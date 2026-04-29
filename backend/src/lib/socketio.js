@@ -296,11 +296,17 @@ function initSocketIO(httpServer) {
         try {
           const { conversationId } = data
           if (!conversationId) return
+          const room = `conversation:${conversationId}`
 
-          socket.leave(`conversation:${conversationId}`)
+          // Leaving a room should only notify real participants in rooms this
+          // socket actually joined. Otherwise any authenticated socket could
+          // spoof noisy leave events into arbitrary conversation rooms.
+          if (!socket.rooms.has(room)) return
+
+          socket.leave(room)
 
           // Notify others in conversation
-          io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.USER_LEFT, {
+          io.to(room).emit(SOCKET_EVENTS.USER_LEFT, {
             userId: socket.userId,
             conversationId,
           })

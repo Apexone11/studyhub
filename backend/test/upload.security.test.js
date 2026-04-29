@@ -17,8 +17,11 @@ import { describe, expect, it } from 'vitest'
 const require = createRequire(import.meta.url)
 
 const {
+  detectBufferSignature,
   detectFileSignature,
+  signatureMatchesExpectedFromBuffer,
   signatureMatchesExpected,
+  validateMagicBytesFromBuffer,
   validateMagicBytes,
   validateSvgContent,
 } = require('../src/lib/fileSignatures')
@@ -36,21 +39,31 @@ describe('Magic byte validation', () => {
 
   it('detects valid JPEG by magic bytes', () => {
     // JPEG starts with FF D8 FF
-    const { filePath, cleanup } = writeTempFile('photo.jpg', Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]))
+    const { filePath, cleanup } = writeTempFile(
+      'photo.jpg',
+      Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]),
+    )
     try {
       const result = detectFileSignature(filePath)
       expect(result).not.toBeNull()
       expect(result.mime).toBe('image/jpeg')
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('detects valid PNG by magic bytes', () => {
-    const { filePath, cleanup } = writeTempFile('image.png', Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]))
+    const { filePath, cleanup } = writeTempFile(
+      'image.png',
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    )
     try {
       const result = detectFileSignature(filePath)
       expect(result).not.toBeNull()
       expect(result.mime).toBe('image/png')
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('detects valid PDF by magic bytes', () => {
@@ -59,7 +72,9 @@ describe('Magic byte validation', () => {
       const result = detectFileSignature(filePath)
       expect(result).not.toBeNull()
       expect(result.mime).toBe('application/pdf')
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('rejects .jpg file with non-image content (plain text)', () => {
@@ -72,7 +87,9 @@ describe('Magic byte validation', () => {
       // validateMagicBytes should fail
       const magic = validateMagicBytes(filePath, 'image/jpeg')
       expect(magic.valid).toBe(false)
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('rejects .jpg file that is actually a PDF', () => {
@@ -82,7 +99,9 @@ describe('Magic byte validation', () => {
       expect(magic.valid).toBe(false)
       expect(magic.detectedType).toBe('application/pdf')
       expect(magic.declaredType).toBe('image/jpeg')
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('rejects .png file with JPEG magic bytes', () => {
@@ -91,7 +110,9 @@ describe('Magic byte validation', () => {
       const magic = validateMagicBytes(filePath, 'image/png')
       expect(magic.valid).toBe(false)
       expect(magic.detectedType).toBe('image/jpeg')
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('signatureMatchesExpected rejects file outside expected MIME list', () => {
@@ -100,7 +121,28 @@ describe('Magic byte validation', () => {
       const result = signatureMatchesExpected(filePath, ['image/jpeg', 'image/png', 'image/webp'])
       expect(result.ok).toBe(false)
       expect(result.detected.mime).toBe('application/pdf')
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
+  })
+
+  it('validates memory-upload buffers before storage', () => {
+    const buffer = Buffer.from('%PDF-1.7 masquerading as image')
+
+    expect(signatureMatchesExpectedFromBuffer(buffer, ['image/png']).ok).toBe(false)
+    expect(validateMagicBytesFromBuffer(buffer, 'image/png')).toMatchObject({
+      valid: false,
+      detectedType: 'application/pdf',
+    })
+  })
+
+  it('accepts MP4-compatible signatures for quicktime uploads', () => {
+    const buffer = Buffer.from([
+      0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x71, 0x74, 0x20, 0x20,
+    ])
+
+    expect(detectBufferSignature(buffer)).toMatchObject({ mime: 'video/mp4', type: 'video' })
+    expect(validateMagicBytesFromBuffer(buffer, 'video/quicktime').valid).toBe(true)
   })
 })
 
@@ -116,19 +158,27 @@ describe('SVG content safety (validateSvgContent)', () => {
   }
 
   it('accepts clean SVG', () => {
-    const { filePath, cleanup } = writeSvg('<svg xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40"/></svg>')
+    const { filePath, cleanup } = writeSvg(
+      '<svg xmlns="http://www.w3.org/2000/svg"><circle cx="50" cy="50" r="40"/></svg>',
+    )
     try {
       const result = validateSvgContent(filePath)
       expect(result.safe).toBe(true)
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('accepts SVG with XML declaration', () => {
-    const { filePath, cleanup } = writeSvg('<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>')
+    const { filePath, cleanup } = writeSvg(
+      '<?xml version="1.0"?><svg xmlns="http://www.w3.org/2000/svg"><rect/></svg>',
+    )
     try {
       const result = validateSvgContent(filePath)
       expect(result.safe).toBe(true)
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('rejects SVG with inline <script>', () => {
@@ -137,7 +187,9 @@ describe('SVG content safety (validateSvgContent)', () => {
       const result = validateSvgContent(filePath)
       expect(result.safe).toBe(false)
       expect(result.reason).toMatch(/script/)
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('rejects SVG with onload event handler', () => {
@@ -145,39 +197,57 @@ describe('SVG content safety (validateSvgContent)', () => {
     try {
       const result = validateSvgContent(filePath)
       expect(result.safe).toBe(false)
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('rejects SVG with onerror event handler', () => {
-    const { filePath, cleanup } = writeSvg('<svg><image onerror="fetch(\'https://evil.com\')"/></svg>')
+    const { filePath, cleanup } = writeSvg(
+      '<svg><image onerror="fetch(\'https://evil.com\')"/></svg>',
+    )
     try {
       const result = validateSvgContent(filePath)
       expect(result.safe).toBe(false)
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('rejects SVG with javascript: URI', () => {
-    const { filePath, cleanup } = writeSvg('<svg><a xlink:href="javascript:alert(1)"><text>click</text></a></svg>')
+    const { filePath, cleanup } = writeSvg(
+      '<svg><a xlink:href="javascript:alert(1)"><text>click</text></a></svg>',
+    )
     try {
       const result = validateSvgContent(filePath)
       expect(result.safe).toBe(false)
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('rejects SVG with <foreignObject> (can embed HTML)', () => {
-    const { filePath, cleanup } = writeSvg('<svg><foreignObject><body xmlns="http://www.w3.org/1999/xhtml"><script>alert(1)</script></body></foreignObject></svg>')
+    const { filePath, cleanup } = writeSvg(
+      '<svg><foreignObject><body xmlns="http://www.w3.org/1999/xhtml"><script>alert(1)</script></body></foreignObject></svg>',
+    )
     try {
       const result = validateSvgContent(filePath)
       expect(result.safe).toBe(false)
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('rejects SVG with data:text/html embed', () => {
-    const { filePath, cleanup } = writeSvg('<svg><image href="data:text/html,<script>alert(1)</script>"/></svg>')
+    const { filePath, cleanup } = writeSvg(
+      '<svg><image href="data:text/html,<script>alert(1)</script>"/></svg>',
+    )
     try {
       const result = validateSvgContent(filePath)
       expect(result.safe).toBe(false)
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 
   it('rejects non-SVG content pretending to be SVG', () => {
@@ -186,7 +256,9 @@ describe('SVG content safety (validateSvgContent)', () => {
       const result = validateSvgContent(filePath)
       expect(result.safe).toBe(false)
       expect(result.reason).toMatch(/not.*valid SVG/)
-    } finally { cleanup() }
+    } finally {
+      cleanup()
+    }
   })
 })
 
@@ -276,7 +348,13 @@ describe('Upload MIME allowlists', () => {
   })
 
   it('attachment allowlist does not include SVG or HTML', () => {
-    const ATTACHMENT_ALLOWED_MIME = new Set(['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+    const ATTACHMENT_ALLOWED_MIME = new Set([
+      'application/pdf',
+      'image/jpeg',
+      'image/png',
+      'image/gif',
+      'image/webp',
+    ])
     expect(ATTACHMENT_ALLOWED_MIME.has('image/svg+xml')).toBe(false)
     expect(ATTACHMENT_ALLOWED_MIME.has('text/html')).toBe(false)
   })

@@ -16,7 +16,10 @@ const __dirname = path.dirname(__filename)
 // ── Cookie parsing helper (extracted logic from socketio.js) ──
 function parseCookie(cookieHeader, name) {
   if (!cookieHeader) return undefined
-  const match = cookieHeader.split(';').map((c) => c.trim()).find((c) => c.startsWith(`${name}=`))
+  const match = cookieHeader
+    .split(';')
+    .map((c) => c.trim())
+    .find((c) => c.startsWith(`${name}=`))
   return match ? match.split('=')[1] : undefined
 }
 
@@ -27,7 +30,9 @@ describe('socketio.js', () => {
     })
 
     it('parses cookie from a multi-cookie header', () => {
-      expect(parseCookie('other=value; studyhub_session=my-token; third=value', 'studyhub_session')).toBe('my-token')
+      expect(
+        parseCookie('other=value; studyhub_session=my-token; third=value', 'studyhub_session'),
+      ).toBe('my-token')
     })
 
     it('returns undefined for missing cookie', () => {
@@ -139,6 +144,16 @@ describe('socketio.js', () => {
 
       // Verify rate limiting is implemented (20/min for typing, 30/min for join)
       expect(source).toMatch(/rate|limit|throttle/i)
+    })
+
+    it('guards conversation leave broadcasts to joined rooms only', async () => {
+      const fs = await import('node:fs')
+      const modulePath = path.resolve(__dirname, '../src/lib/socketio.js')
+      const source = fs.readFileSync(modulePath, 'utf-8')
+
+      expect(source).toContain('if (!socket.rooms.has(room)) return')
+      expect(source).toContain('socket.leave(room)')
+      expect(source).toContain('io.to(room).emit(SOCKET_EVENTS.USER_LEFT')
     })
   })
 })

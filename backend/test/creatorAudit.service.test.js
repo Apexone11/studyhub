@@ -77,6 +77,8 @@ describe('compactReport', () => {
 
     expect(compacted.truncated).toBe(true)
     expect(compacted.totalFindings).toBe(5000)
+    expect(compacted.truncatedFindings).toBe(4900)
+    expect(compacted.truncatedFindingsBySeverity.unknown).toBe(4900)
     expect(Buffer.byteLength(JSON.stringify(compacted), 'utf8')).toBeLessThanOrEqual(50 * 1024)
   })
 })

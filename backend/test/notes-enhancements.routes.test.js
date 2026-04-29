@@ -79,6 +79,7 @@ const mocks = vi.hoisted(() => {
     },
     storage: {
       NOTE_IMAGES_DIR: '/tmp/test-note-images',
+      safeUnlinkFile: vi.fn(),
       cleanupNoteImageIfUnused: vi.fn(async () => true),
       extractNoteImageUrlsFromTexts: vi.fn(() => []),
     },

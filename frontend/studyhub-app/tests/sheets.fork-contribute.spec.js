@@ -330,6 +330,8 @@ test.describe('SheetLab Contribute → pre-submit checklist @phase-2', () => {
 
     const reviewButton = page.getByRole('button', { name: /review changes/i })
     if (!(await reviewButton.isVisible({ timeout: 3000 }).catch(() => false))) {
+      // TODO(sheet-lab-contribute-fixture): Replace this defensive skip with a
+      // fixture that always exposes the review CTA for contribution coverage.
       test.skip(
         true,
         'Contribute tab did not expose the expected "Review changes" CTA for this fixture — skipping.',

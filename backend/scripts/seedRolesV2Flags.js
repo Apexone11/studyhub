@@ -2,8 +2,8 @@
  * Seed the three Roles v2 feature flags (docs/internal/roles-and-permissions-plan.md §13).
  *
  * Safe to run multiple times — uses upsert, so existing rows keep their
- * `enabled` state. New rows are created with `enabled: true` so rollout
- * matches the fail-open frontend default.
+ * `enabled` state. New rows are created with `enabled: true`; the frontend is
+ * fail-closed, so production must run this seed before relying on the flags.
  *
  * Usage (prod):
  *   DATABASE_URL=... DIRECT_URL=... node scripts/seedRolesV2Flags.js

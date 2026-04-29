@@ -123,15 +123,29 @@ function normalizeSettledResult(result, fallbackName) {
   }
 }
 
+function summarizeFindingSeverities(findings) {
+  return findings.reduce((summary, finding) => {
+    const severity = String(finding.severity || finding.level || 'unknown').toLowerCase()
+    summary[severity] = (summary[severity] || 0) + 1
+    return summary
+  }, {})
+}
+
 function compactReport(report) {
   let serialized = JSON.stringify(report)
   if (Buffer.byteLength(serialized, 'utf8') <= MAX_AUDIT_REPORT_BYTES) return report
+
+  const retainedFindings = report.findings.slice(0, 100)
+  const truncatedFindings = report.findings.slice(retainedFindings.length)
 
   const compacted = {
     ...report,
     truncated: true,
     totalFindings: report.findings.length,
-    findings: report.findings.slice(0, 100),
+    retainedFindings: retainedFindings.length,
+    truncatedFindings: truncatedFindings.length,
+    truncatedFindingsBySeverity: summarizeFindingSeverities(truncatedFindings),
+    findings: retainedFindings,
     checks: Object.fromEntries(
       Object.entries(report.checks).map(([name, check]) => [
         name,
@@ -197,4 +211,5 @@ module.exports = {
   publishDecisionFor,
   runAudit,
   runWithTimeout,
+  summarizeFindingSeverities,
 }

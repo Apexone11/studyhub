@@ -3,7 +3,8 @@ const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const requireAuth = require('../../core/auth/requireAuth')
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
-const { validateHtmlForSubmission } = require('../../lib/html/htmlSecurity')
+const { validateHtmlForSubmission, RISK_TIER } = require('../../lib/html/htmlSecurity')
+const { scanHtmlContentForPersistence } = require('../../lib/html/htmlDraftValidation')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const { updateFingerprint } = require('../../lib/plagiarismService')
 const { findSimilarSheets } = require('../../lib/plagiarism')
@@ -72,6 +73,7 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
       }
     }
 
+    let htmlScanFields = null
     if (contentFormat === 'html') {
       const killSwitch = await isHtmlUploadsEnabled()
       if (!killSwitch.enabled) {
@@ -88,6 +90,7 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
           issues: validation.issues,
         })
       }
+      htmlScanFields = await scanHtmlContentForPersistence(content)
     }
 
     /* Use user's defaultDownloads preference when not explicitly set in request */
@@ -104,11 +107,15 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
         previewText: extractPreviewText(trimmedContent),
         content: trimmedContent,
         contentFormat,
-        status: nextStatus,
+        status:
+          htmlScanFields?.htmlRiskTier === RISK_TIER.QUARANTINED
+            ? SHEET_STATUS.QUARANTINED
+            : nextStatus,
         courseId: Number.parseInt(courseId, 10),
         userId: req.user.userId,
         forkOf: forkOf ? Number.parseInt(forkOf, 10) : null,
         allowDownloads: resolvedAllowDownloads,
+        ...(htmlScanFields || {}),
       },
       include: {
         author: { select: AUTHOR_SELECT },
@@ -123,9 +130,11 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
     res.status(201).json({
       ...serializeSheet(sheet),
       message:
-        nextStatus === SHEET_STATUS.PENDING_REVIEW
+        sheet.status === SHEET_STATUS.PENDING_REVIEW
           ? 'HTML sheet submitted for admin review.'
-          : 'Sheet published.',
+          : sheet.status === SHEET_STATUS.QUARANTINED
+            ? 'HTML sheet quarantined for security review.'
+            : 'Sheet published.',
     })
 
     /* Async content moderation — scan title + description + markdown content */

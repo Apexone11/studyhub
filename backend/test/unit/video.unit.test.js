@@ -499,9 +499,8 @@ describe('video.service.processVideo', () => {
     expect(mocks.r2.uploadObject).not.toHaveBeenCalled()
   })
 
-  // processVideo's happy path writes temp files to disk and pipes a stream from
-  // r2.getObject. Validating the full pipeline requires a real filesystem and a
-  // real stream mock; that level of coupling exceeds the scope of a unit test.
+  // TODO(video-pipeline-integration): Move this into an integration spec with
+  // temp-file isolation and a real readable stream mock for r2.getObject.
   it.skip('happy path: probes, transcodes 3 variants, uploads each + manifest (integration)', () => {
     // Skipped: tightly coupled to fs.createWriteStream + r2 stream piping.
     // Covered end-to-end by the video routes integration suite.

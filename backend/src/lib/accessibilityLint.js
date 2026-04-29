@@ -1,8 +1,17 @@
+const MAX_ATTRIBUTE_TEXT_LENGTH = 8192
+const MAX_ATTRIBUTES_PER_ELEMENT = 50
+
 function parseAttributes(rawAttributes = '') {
   const attrs = {}
+  const seen = new Set()
+  const attributeText = String(rawAttributes || '').slice(0, MAX_ATTRIBUTE_TEXT_LENGTH)
   const attrPattern = /([a-z0-9:-]+)(?:\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+)))?/gi
-  for (const match of rawAttributes.matchAll(attrPattern)) {
-    attrs[match[1].toLowerCase()] = match[2] ?? match[3] ?? match[4] ?? ''
+  for (const match of attributeText.matchAll(attrPattern)) {
+    const key = match[1].toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    attrs[key] = match[2] ?? match[3] ?? match[4] ?? ''
+    if (seen.size >= MAX_ATTRIBUTES_PER_ELEMENT) break
   }
   return attrs
 }

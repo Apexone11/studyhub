@@ -5,9 +5,9 @@ import { API } from '../config'
  * Roles v2 feature-flag wrapper (docs/internal/roles-and-permissions-plan.md §13).
  *
  * Each flag is evaluated via the existing `/api/flags/evaluate/:name` endpoint
- * and cached in-memory. Evaluation failures (network, missing flag row) are
- * fail-open: behaviour defaults to enabled so the rollout doesn't regress
- * when a flag hasn't been seeded yet.
+ * and cached in-memory. Evaluation is fail-closed per decision #20: missing
+ * rows, network errors, non-200 responses, and malformed JSON all disable the
+ * gated UI. `backend/scripts/seedRolesV2Flags.js` provisions shipped rows.
  *
  * Flags:
  *   - flag_roles_v2                  — Self-learner feed redesign + sidebar topics.
@@ -32,11 +32,10 @@ async function fetchFlag(name) {
       fetch(`${API}/api/flags/evaluate/${name}`, { credentials: 'include' })
         .then((r) => (r.ok ? r.json() : null))
         .then((data) => {
-          // Fail-open: treat unknown or missing flag as enabled.
-          if (!data || typeof data.enabled !== 'boolean') return true
-          return data.enabled
+          if (!data || typeof data.enabled !== 'boolean') return false
+          return data.enabled === true
         })
-        .catch(() => true),
+        .catch(() => false),
     )
   }
   return cache.get(name)
@@ -46,7 +45,7 @@ export function clearRolesV2FlagCache() {
   cache.clear()
 }
 
-const DEFAULTS = { core: true, oauthPicker: true, revertWindow: true, loading: true }
+const DEFAULTS = { core: false, oauthPicker: false, revertWindow: false, loading: true }
 
 export function useRolesV2Flags() {
   const [flags, setFlags] = useState(DEFAULTS)

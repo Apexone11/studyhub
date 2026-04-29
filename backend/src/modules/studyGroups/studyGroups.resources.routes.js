@@ -14,7 +14,8 @@ const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { readLimiter, writeLimiter, groupMediaUploadLimiter } = require('../../lib/rateLimiters')
-const { GROUP_MEDIA_DIR, buildGroupMediaUrl } = require('../../lib/storage')
+const { GROUP_MEDIA_DIR, buildGroupMediaUrl, safeUnlinkFile } = require('../../lib/storage')
+const { signatureMatchesExpected, validateMagicBytes } = require('../../lib/fileSignatures')
 const {
   parseId,
   requireGroupMember,
@@ -57,6 +58,23 @@ const GROUP_MEDIA_ALLOWED_MIME = new Set([
   'text/plain',
   'text/markdown',
 ])
+const GROUP_MEDIA_ALLOWED_EXT = new Set([
+  '.jpg',
+  '.jpeg',
+  '.png',
+  '.gif',
+  '.webp',
+  '.avif',
+  '.mp4',
+  '.webm',
+  '.mov',
+  '.pdf',
+  '.zip',
+  '.txt',
+  '.md',
+  '.markdown',
+])
+const GROUP_MEDIA_TEXT_MIMES = new Set(['text/plain', 'text/markdown'])
 
 function mediaKindForMime(mime) {
   if (typeof mime !== 'string') return 'file'
@@ -83,7 +101,8 @@ const groupMediaUpload = multer({
   storage: groupMediaDiskStorage,
   limits: { fileSize: GROUP_MEDIA_MAX_BYTES },
   fileFilter: (_req, file, cb) => {
-    if (!GROUP_MEDIA_ALLOWED_MIME.has(file.mimetype)) {
+    const ext = path.extname(file.originalname).toLowerCase()
+    if (!GROUP_MEDIA_ALLOWED_MIME.has(file.mimetype) || !GROUP_MEDIA_ALLOWED_EXT.has(ext)) {
       return cb(new Error('Unsupported file type.'))
     }
     cb(null, true)
@@ -188,14 +207,28 @@ router.post('/upload', groupMediaUploadLimiter, requireAuth, (req, res) => {
       return res.status(400).json({ error: 'No file provided.' })
     }
 
+    if (!GROUP_MEDIA_TEXT_MIMES.has(req.file.mimetype)) {
+      if (!signatureMatchesExpected(req.file.path, Array.from(GROUP_MEDIA_ALLOWED_MIME)).ok) {
+        safeUnlinkFile(req.file.path)
+        return res.status(400).json({ error: 'File contents do not match a supported type.' })
+      }
+      const magic = validateMagicBytes(req.file.path, req.file.mimetype)
+      if (!magic.valid) {
+        safeUnlinkFile(req.file.path)
+        return res.status(400).json({ error: 'File signature does not match its declared type.' })
+      }
+    }
+
     try {
       const groupId = parseId(req.params.id)
       if (groupId === null) {
+        safeUnlinkFile(req.file.path)
         return res.status(400).json({ error: 'Invalid group ID.' })
       }
 
       const member = await requireGroupMember(groupId, req.user.userId)
       if (!member) {
+        safeUnlinkFile(req.file.path)
         return res.status(404).json({ error: 'Not a member.' })
       }
 
@@ -233,6 +266,7 @@ router.post('/upload', groupMediaUploadLimiter, requireAuth, (req, res) => {
         originalName: req.file.originalname,
       })
     } catch (err) {
+      safeUnlinkFile(req.file?.path)
       captureError(err, { route: req.originalUrl, method: req.method })
       res.status(500).json({ error: 'Server error.' })
     }

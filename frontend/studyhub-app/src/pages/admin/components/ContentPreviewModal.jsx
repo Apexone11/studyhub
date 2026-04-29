@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { API } from '../../../config'
+import { resolveImageUrl } from '../../../lib/imageUrls'
 import AdminModal from './AdminModal'
 import AdminSplitPanel from './AdminSplitPanel'
 import { AdminPill } from './index'
@@ -7,7 +8,22 @@ import { ExternalLinkIcon } from './icons'
 import { formatDateTime, formatLabel } from '../adminConstants'
 import './admin-primitives.css'
 
-function ContentPane({ preview }) {
+function resolveApiRelativeUrl(raw) {
+  const value = typeof raw === 'string' ? raw.trim() : ''
+  if (!value || !value.startsWith('/') || value.startsWith('//')) return null
+  return `${API}${value}`
+}
+
+function attachmentKind(att) {
+  const declaredKind = String(att.kind || '').toLowerCase()
+  if (declaredKind) return declaredKind
+  const type = String(att.type || '').toLowerCase()
+  if (type.startsWith('image/')) return 'image'
+  if (type === 'application/pdf' || type === 'pdf') return 'pdf'
+  return type || 'file'
+}
+
+export function ContentPane({ preview }) {
   if (!preview) return <div className="admin-loading">Loading preview...</div>
 
   return (
@@ -66,11 +82,14 @@ function ContentPane({ preview }) {
       {preview.attachments && preview.attachments.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginTop: 12 }}>
           {preview.attachments.map((att, i) => {
-            if (att.kind === 'image') {
+            const kind = attachmentKind(att)
+            if (kind === 'image') {
+              const imageUrl = resolveImageUrl(att.previewUrl || att.url)
+              if (!imageUrl) return null
               return (
                 <img
                   key={i}
-                  src={`${API}${att.previewUrl || att.url}`}
+                  src={imageUrl}
                   alt="Attachment"
                   loading="lazy"
                   style={{
@@ -86,11 +105,13 @@ function ContentPane({ preview }) {
                 />
               )
             }
-            if (att.kind === 'pdf') {
+            if (kind === 'pdf') {
+              const pdfUrl = resolveApiRelativeUrl(att.url)
+              if (!pdfUrl) return null
               return (
                 <iframe
                   key={i}
-                  src={`${API}${att.url}`}
+                  src={pdfUrl}
                   title="PDF Preview"
                   style={{
                     width: '100%',
@@ -114,7 +135,7 @@ function ContentPane({ preview }) {
                   fontFamily: "'Plus Jakarta Sans', sans-serif",
                 }}
               >
-                Attachment: {att.filename || 'file'} ({att.kind})
+                Attachment: {att.filename || att.name || 'file'} ({kind})
               </div>
             )
           })}

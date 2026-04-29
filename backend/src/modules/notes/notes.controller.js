@@ -10,7 +10,11 @@ const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { normalizeCommentGifAttachments } = require('../../lib/commentGifAttachments')
-const { cleanupNoteImageIfUnused, extractNoteImageUrlsFromTexts } = require('../../lib/storage')
+const {
+  cleanupNoteImageIfUnused,
+  extractNoteImageUrlsFromTexts,
+  safeUnlinkFile,
+} = require('../../lib/storage')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { defaultChunkBuffer } = require('./notes.chunks.js')
 const { buildWordDiff } = require('./notes.diff.js')
@@ -1318,8 +1322,10 @@ async function updateNoteTags(req, res) {
  */
 async function uploadNoteImage(req, res) {
   const noteId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(noteId) || noteId < 1)
+  if (!Number.isInteger(noteId) || noteId < 1) {
+    safeUnlinkFile(req.file?.path)
     return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
+  }
 
   if (!req.file) {
     return res
@@ -1332,7 +1338,10 @@ async function uploadNoteImage(req, res) {
       where: { id: noteId },
       select: { id: true, userId: true },
     })
-    if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    if (!note) {
+      safeUnlinkFile(req.file?.path)
+      return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    }
     if (
       !assertOwnerOrAdmin({
         res,
@@ -1342,13 +1351,16 @@ async function uploadNoteImage(req, res) {
         targetType: 'note',
         targetId: noteId,
       })
-    )
+    ) {
+      safeUnlinkFile(req.file?.path)
       return
+    }
 
     // Return the URL for markdown embedding
     const imageUrl = `/uploads/note-images/${req.file.filename}`
     res.status(201).json({ url: imageUrl, markdown: `![image](${imageUrl})` })
   } catch (uploadErr) {
+    safeUnlinkFile(req.file?.path)
     captureError(uploadErr, { route: req.originalUrl, method: req.method })
     sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }

@@ -30,7 +30,7 @@
  *   silently broken — passing user={...} when UserAvatar didn't accept
  *   it gave every comment the "?" initials fallback.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { resolveImageUrl } from '../lib/imageUrls'
 
 /**
@@ -48,6 +48,7 @@ const DONOR_COLORS = {
   silver: '#94a3b8',
   gold: '#f59e0b',
 }
+const AVATAR_RETRY_DELAY_MS = 30000
 
 export default function UserAvatar({
   user,
@@ -77,6 +78,14 @@ export default function UserAvatar({
   const initials = (resolvedUsername || '?').slice(0, 2).toUpperCase()
   const resolvedUrl = resolveImageUrl(resolvedAvatarUrl)
   const visibleAvatarUrl = resolvedUrl && resolvedUrl !== failedAvatarUrl ? resolvedUrl : null
+
+  useEffect(() => {
+    if (!failedAvatarUrl) return undefined
+    const retryTimer = window.setTimeout(() => {
+      setFailedAvatarUrl((current) => (current === failedAvatarUrl ? null : current))
+    }, AVATAR_RETRY_DELAY_MS)
+    return () => window.clearTimeout(retryTimer)
+  }, [failedAvatarUrl])
 
   const isAdmin = resolvedRole === 'admin'
   const hasPro = isPlan(resolvedPlan)

@@ -11,6 +11,3 @@ CREATE TABLE IF NOT EXISTS "CreatorAuditConsent" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "CreatorAuditConsent_userId_key"
   ON "CreatorAuditConsent" ("userId");
-
-CREATE INDEX IF NOT EXISTS "CreatorAuditConsent_userId_idx"
-  ON "CreatorAuditConsent" ("userId");

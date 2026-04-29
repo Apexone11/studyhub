@@ -136,9 +136,18 @@ export function wordCount(text) {
  */
 export function countWordsFromHtml(html) {
   if (!html?.trim()) return 0
-  const el = document.createElement('div')
-  el.innerHTML = html
-  const text = el.textContent || ''
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+  doc.body?.querySelectorAll('script, style, noscript').forEach((node) => node.remove())
+  const walker = document.createTreeWalker(doc.body || doc, NodeFilter.SHOW_TEXT)
+  const textParts = []
+  let node = walker.nextNode()
+  while (node) {
+    const value = node.textContent?.trim()
+    if (value) textParts.push(value)
+    node = walker.nextNode()
+  }
+  const text = textParts.join(' ')
   if (!text.trim()) return 0
   return text.trim().split(/\s+/).filter(Boolean).length
 }

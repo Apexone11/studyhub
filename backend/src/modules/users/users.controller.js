@@ -16,8 +16,20 @@ const {
   getUserLegalStatus,
 } = require('../legal/legal.service')
 
-function getPrimarySchoolId(enrollments = []) {
-  return enrollments?.[0]?.course?.school?.id || null
+function getEnrollmentSchoolIds(enrollments = []) {
+  return Array.from(
+    new Set(
+      (enrollments || [])
+        .map((enrollment) => enrollment?.course?.school?.id)
+        .filter((id) => Number.isInteger(id)),
+    ),
+  )
+}
+
+function sharesAnySchool(leftSchoolIds = [], rightSchoolIds = []) {
+  if (!leftSchoolIds.length || !rightSchoolIds.length) return false
+  const rightSet = new Set(rightSchoolIds)
+  return leftSchoolIds.some((id) => rightSet.has(id))
 }
 
 async function loadProfilePii(userId, req) {
@@ -678,7 +690,6 @@ const getMe = async (req, res) => {
           },
         },
         enrollments: {
-          take: 1,
           include: { course: { include: { school: true } } },
         },
         _count: {
@@ -702,6 +713,14 @@ const getMe = async (req, res) => {
       isOwner: true,
     })
     const school = user.enrollments?.[0]?.course?.school || null
+    const schools = Array.from(
+      new Map(
+        (user.enrollments || [])
+          .map((enrollment) => enrollment?.course?.school)
+          .filter(Boolean)
+          .map((enrollmentSchool) => [enrollmentSchool.id, enrollmentSchool]),
+      ).values(),
+    )
 
     res.json({
       id: user.id,
@@ -715,6 +734,9 @@ const getMe = async (req, res) => {
       createdAt: user.createdAt,
       schoolId: school?.id || null,
       school,
+      schoolIds: schools.map((enrollmentSchool) => enrollmentSchool.id),
+      schools,
+      enrollments: user.enrollments || [],
       _count: user._count,
       ...profilePresentation,
     })
@@ -752,7 +774,6 @@ const getFollowSuggestions = async (req, res) => {
       where: { id: req.user.userId },
       select: {
         enrollments: {
-          take: 1,
           select: {
             course: {
               select: {
@@ -763,7 +784,7 @@ const getFollowSuggestions = async (req, res) => {
         },
       },
     })
-    const currentSchoolId = getPrimarySchoolId(currentUser?.enrollments)
+    const currentSchoolIds = getEnrollmentSchoolIds(currentUser?.enrollments)
 
     // Prefer users from the same school, then by sheet count
     const suggestions = await prisma.user.findMany({
@@ -778,7 +799,6 @@ const getFollowSuggestions = async (req, res) => {
         avatarUrl: true,
         bio: true,
         enrollments: {
-          take: 1,
           select: {
             course: {
               select: {
@@ -795,19 +815,27 @@ const getFollowSuggestions = async (req, res) => {
 
     // Sort: same school first, then by follower count
     const sorted = suggestions.sort((a, b) => {
-      const aSchool =
-        currentSchoolId && getPrimarySchoolId(a.enrollments) === currentSchoolId ? 1 : 0
-      const bSchool =
-        currentSchoolId && getPrimarySchoolId(b.enrollments) === currentSchoolId ? 1 : 0
+      const aSchool = sharesAnySchool(currentSchoolIds, getEnrollmentSchoolIds(a.enrollments))
+        ? 1
+        : 0
+      const bSchool = sharesAnySchool(currentSchoolIds, getEnrollmentSchoolIds(b.enrollments))
+        ? 1
+        : 0
       if (bSchool !== aSchool) return bSchool - aSchool
       return (b._count?.followers || 0) - (a._count?.followers || 0)
     })
 
     res.json(
-      sorted.slice(0, 8).map(({ enrollments, ...suggestion }) => ({
-        ...suggestion,
-        schoolId: getPrimarySchoolId(enrollments),
-      })),
+      sorted.slice(0, 8).map(({ enrollments, ...suggestion }) => {
+        const schoolIds = getEnrollmentSchoolIds(enrollments)
+        return {
+          ...suggestion,
+          // Keep schoolId for older clients, but expose the full parallel-school
+          // set so new surfaces do not rebuild a primary-school assumption.
+          schoolId: schoolIds[0] || null,
+          schoolIds,
+        }
+      }),
     )
   } catch (err) {
     captureError(err, { route: req.originalUrl })
@@ -1312,7 +1340,7 @@ async function requestAccountTypeChange(req, res) {
       )
     }
 
-    const userId = req.user.userId
+    const { userId } = req.user
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -1438,7 +1466,7 @@ async function requestAccountTypeChange(req, res) {
 
 async function getAccountTypeStatus(req, res) {
   try {
-    const userId = req.user.userId
+    const { userId } = req.user
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -1451,8 +1479,7 @@ async function getAccountTypeStatus(req, res) {
     if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
 
     // Expire stale revert windows so the client doesn't see fake state.
-    let previousAccountType = user.previousAccountType
-    let roleRevertDeadline = user.roleRevertDeadline
+    let { previousAccountType, roleRevertDeadline } = user
     if (roleRevertDeadline && new Date(roleRevertDeadline).getTime() <= Date.now()) {
       await prisma.user.update({
         where: { id: userId },

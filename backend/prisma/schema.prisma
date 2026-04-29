@@ -183,8 +183,6 @@ model CreatorAuditConsent {
   ipAddress  String?  @db.VarChar(64)
   userAgent  String?  @db.VarChar(512)
   user       User     @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-
-  @@index([userId])
 }
 
 model LegalDocument {

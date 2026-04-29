@@ -53,12 +53,9 @@ async function disableTutorials(page) {
   })
 }
 
-// The email/password signup form requires walking a custom legal-acceptance
-// modal that marks all 3 documents as reviewed before the Accept button
-// enables. Driving that modal reliably in Playwright is a separate task.
-// The happy-path contract is already covered by role.oauth-picker.spec.js
-// (backend creates the Self-learner user) and role.feed-redesign.spec.js
-// (post-signup feed renders correctly for Self-learners).
+// TODO(self-learner-signup-e2e): Add stable helpers for the legal-acceptance
+// modal before re-enabling this full email/password path. The happy-path
+// contract is covered by role.oauth-picker.spec.js and role.feed-redesign.spec.js.
 test.skip('Self-learner signup picks Self-learner chip, follows topics, lands on feed @smoke', async ({
   page,
 }) => {

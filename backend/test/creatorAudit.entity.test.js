@@ -145,16 +145,30 @@ describe('persistAuditResult', () => {
     mocks.prisma.studySheet.updateMany.mockResolvedValueOnce({ count: 1 })
     const report = { grade: 'B', findings: [] }
 
-    await expect(persistAuditResult('sheet', 3, 7, report)).resolves.toBe(true)
+    await expect(persistAuditResult('sheet', 3, 7, report, '<h1>Sheet</h1>')).resolves.toBe(true)
 
     expect(mocks.prisma.studySheet.updateMany).toHaveBeenCalledWith({
-      where: { id: 3, userId: 7 },
+      where: { id: 3, userId: 7, content: '<h1>Sheet</h1>' },
       data: {
         lastAuditGrade: 'B',
         lastAuditReport: report,
         lastAuditedAt: expect.any(Date),
       },
     })
+  })
+
+  it('returns stale when sheet content changes before audit persistence', async () => {
+    mocks.prisma.studySheet.updateMany.mockResolvedValueOnce({ count: 0 })
+    mocks.prisma.studySheet.findUnique.mockResolvedValueOnce({
+      id: 3,
+      userId: 7,
+      title: 'Sheet',
+      content: '<h1>Changed</h1>',
+    })
+
+    await expect(
+      persistAuditResult('sheet', 3, 7, { grade: 'A' }, '<h1>Original</h1>'),
+    ).resolves.toBe('stale')
   })
 
   it('returns false when the owner-scoped audit persistence guard updates no rows', async () => {

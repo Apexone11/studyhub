@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import { createRequire } from 'node:module'
+import { performance } from 'node:perf_hooks'
 
 const require = createRequire(import.meta.url)
-const { lintHtml } = require('../src/lib/accessibilityLint')
+const { lintHtml, parseAttributes } = require('../src/lib/accessibilityLint')
 
 function ruleIds(html) {
   return lintHtml(html).failures.map((failure) => failure.ruleId)
@@ -41,5 +42,15 @@ describe('lintHtml', () => {
     expect(ruleIds('<p style="color: #fff; background: #fff">Hidden</p>')).toContain(
       'color-contrast',
     )
+  })
+
+  it('caps pathological attribute parsing work', () => {
+    const pathologicalAttributes = `${Array.from({ length: 5000 }, (_, index) => `data-x${index}::::::::`).join(' ')} alt="ok"`
+    const startedAt = performance.now()
+    const attrs = parseAttributes(pathologicalAttributes)
+    const elapsedMs = performance.now() - startedAt
+
+    expect(elapsedMs).toBeLessThan(100)
+    expect(Object.keys(attrs)).toHaveLength(50)
   })
 })

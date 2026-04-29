@@ -38,9 +38,12 @@ describe('safeImageSrc', () => {
 })
 
 describe('resolveImageUrl', () => {
-  it('resolves managed upload paths through the API origin', () => {
+  it('resolves slash-relative paths through the API origin', () => {
     expect(resolveImageUrl('/uploads/avatars/u.png', 'https://api.getstudyhub.org')).toBe(
       'https://api.getstudyhub.org/uploads/avatars/u.png',
+    )
+    expect(resolveImageUrl('/school/logo.png', 'https://api.getstudyhub.org')).toBe(
+      'https://api.getstudyhub.org/school/logo.png',
     )
   })
 

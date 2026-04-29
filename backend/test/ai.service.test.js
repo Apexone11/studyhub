@@ -50,9 +50,17 @@ const mocks = vi.hoisted(() => {
   const mockStream = {
     _iteratorFn: null,
     _finalMessageFn: null,
-    [Symbol.asyncIterator]() { return mockStream._iteratorFn ? mockStream._iteratorFn() : ({ next: () => Promise.resolve({ done: true }) }) },
+    [Symbol.asyncIterator]() {
+      return mockStream._iteratorFn
+        ? mockStream._iteratorFn()
+        : { next: () => Promise.resolve({ done: true }) }
+    },
     abort() {},
-    finalMessage() { return mockStream._finalMessageFn ? mockStream._finalMessageFn() : Promise.resolve({ usage: { input_tokens: 0, output_tokens: 0 } }) },
+    finalMessage() {
+      return mockStream._finalMessageFn
+        ? mockStream._finalMessageFn()
+        : Promise.resolve({ usage: { input_tokens: 0, output_tokens: 0 } })
+    },
   }
 
   /** Mutable holder -- tests set streamImpl to control what stream() does. */
@@ -72,7 +80,9 @@ const mocks = vi.hoisted(() => {
   const streamCalls = []
 
   // Must be a regular function (not arrow) so it works with `new`.
-  function AnthropicClass() { return mockAnthropicInstance }
+  function AnthropicClass() {
+    return mockAnthropicInstance
+  }
 
   return {
     prisma,
@@ -103,10 +113,7 @@ const mocks = vi.hoisted(() => {
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
-  [
-    require.resolve('@anthropic-ai/sdk'),
-    { default: mocks.AnthropicClass, __esModule: true },
-  ],
+  [require.resolve('@anthropic-ai/sdk'), { default: mocks.AnthropicClass, __esModule: true }],
 ])
 
 const originalModuleLoad = Module._load
@@ -206,7 +213,7 @@ describe('getOrCreateUsage', () => {
         where: { userId_date: expect.objectContaining({ userId: 1 }) },
         create: expect.objectContaining({ userId: 1, messageCount: 0, tokenCount: 0 }),
         update: {},
-      })
+      }),
     )
     expect(result).toEqual(mockUsage)
   })
@@ -215,7 +222,14 @@ describe('getOrCreateUsage', () => {
 describe('listConversations', () => {
   it('returns conversations with count and total', async () => {
     const mockConvs = [
-      { id: 1, title: 'Test', model: 'claude-sonnet-4-20250514', createdAt: new Date(), updatedAt: new Date(), _count: { messages: 3 } },
+      {
+        id: 1,
+        title: 'Test',
+        model: 'claude-sonnet-4-20250514',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        _count: { messages: 3 },
+      },
     ]
     mocks.prisma.aiConversation.findMany.mockResolvedValue(mockConvs)
     mocks.prisma.aiConversation.count.mockResolvedValue(1)
@@ -230,7 +244,7 @@ describe('listConversations', () => {
         orderBy: { updatedAt: 'desc' },
         skip: 0,
         take: 10,
-      })
+      }),
     )
   })
 
@@ -241,7 +255,7 @@ describe('listConversations', () => {
     await aiService.listConversations(1)
 
     expect(mocks.prisma.aiConversation.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ skip: 0, take: 30 })
+      expect.objectContaining({ skip: 0, take: 30 }),
     )
   })
 })
@@ -255,7 +269,7 @@ describe('getConversation', () => {
     expect(mocks.prisma.aiConversation.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: 5, userId: 1 },
-      })
+      }),
     )
     expect(result).toBeTruthy()
   })
@@ -270,7 +284,13 @@ describe('getConversation', () => {
 
 describe('createConversation', () => {
   it('creates conversation with userId and optional title', async () => {
-    const mockConv = { id: 10, title: 'My Chat', model: 'claude-sonnet-4-20250514', createdAt: new Date(), updatedAt: new Date() }
+    const mockConv = {
+      id: 10,
+      title: 'My Chat',
+      model: 'claude-sonnet-4-20250514',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }
     mocks.prisma.aiConversation.create.mockResolvedValue(mockConv)
 
     const result = await aiService.createConversation(1, 'My Chat')
@@ -278,7 +298,7 @@ describe('createConversation', () => {
     expect(mocks.prisma.aiConversation.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: { userId: 1, title: 'My Chat' },
-      })
+      }),
     )
     expect(result).toEqual(mockConv)
   })
@@ -291,7 +311,7 @@ describe('createConversation', () => {
     expect(mocks.prisma.aiConversation.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: { userId: 1, title: null },
-      })
+      }),
     )
   })
 })
@@ -304,7 +324,9 @@ describe('deleteConversation', () => {
 
     const result = await aiService.deleteConversation(5, 1)
 
-    expect(mocks.prisma.aiConversation.findFirst).toHaveBeenCalledWith({ where: { id: 5, userId: 1 } })
+    expect(mocks.prisma.aiConversation.findFirst).toHaveBeenCalledWith({
+      where: { id: 5, userId: 1 },
+    })
     expect(mocks.prisma.aiConversation.delete).toHaveBeenCalledWith({ where: { id: 5 } })
     expect(result).toEqual(conv)
   })
@@ -331,7 +353,7 @@ describe('renameConversation', () => {
       expect.objectContaining({
         where: { id: 5 },
         data: { title: 'New Title' },
-      })
+      }),
     )
   })
 
@@ -366,7 +388,11 @@ describe('streamMessage', () => {
 
   it('sends rate-limited error when daily limit is reached', async () => {
     mocks.prisma.aiConversation.findFirst.mockResolvedValue({ id: 1, userId: 1 })
-    mocks.prisma.aiUsageLog.upsert.mockResolvedValue({ userId: 1, messageCount: 30, tokenCount: 5000 })
+    mocks.prisma.aiUsageLog.upsert.mockResolvedValue({
+      userId: 1,
+      messageCount: 30,
+      tokenCount: 5000,
+    })
     const res = makeMockRes()
 
     await aiService.streamMessage({
@@ -394,7 +420,9 @@ describe('streamMessage', () => {
     mocks.prisma.aiMessage.create.mockResolvedValue({ id: 100 })
     mocks.prisma.aiMessage.count.mockResolvedValue(1) // first message
     mocks.prisma.aiConversation.update.mockResolvedValue({})
-    mocks.prisma.aiMessage.findMany.mockResolvedValue([{ role: 'user', content: 'What is photosynthesis?' }])
+    mocks.prisma.aiMessage.findMany.mockResolvedValue([
+      { role: 'user', content: 'What is photosynthesis?' },
+    ])
 
     // Mock async iterator for streaming
     const streamEvents = [
@@ -410,9 +438,10 @@ describe('streamMessage', () => {
         return Promise.resolve({ done: true })
       },
     })
-    mocks.mockStream._finalMessageFn = () => Promise.resolve({
-      usage: { input_tokens: 100, output_tokens: 50 },
-    })
+    mocks.mockStream._finalMessageFn = () =>
+      Promise.resolve({
+        usage: { input_tokens: 100, output_tokens: 50 },
+      })
 
     const res = makeMockRes()
 
@@ -429,9 +458,8 @@ describe('streamMessage', () => {
     expect(titleEvent.title).toBe('What is photosynthesis?')
 
     const deltas = events.filter((e) => e.type === 'delta')
-    expect(deltas).toHaveLength(2)
-    expect(deltas[0].text).toBe('Photo')
-    expect(deltas[1].text).toBe('synthesis is...')
+    expect(deltas).toHaveLength(1)
+    expect(deltas[0].text).toBe('Photosynthesis is...')
 
     const doneEvent = events.find((e) => e.type === 'done')
     expect(doneEvent).toBeTruthy()
@@ -449,11 +477,13 @@ describe('streamMessage', () => {
     mocks.prisma.aiMessage.count.mockResolvedValue(1)
     mocks.prisma.aiConversation.update.mockResolvedValue({})
 
-    const longMessage = 'This is a very long message that should definitely be truncated because it exceeds sixty characters by a wide margin'
+    const longMessage =
+      'This is a very long message that should definitely be truncated because it exceeds sixty characters by a wide margin'
     mocks.prisma.aiMessage.findMany.mockResolvedValue([{ role: 'user', content: longMessage }])
 
     // Default iterator (no events) and finalMessage are already set by beforeEach.
-    mocks.mockStream._finalMessageFn = () => Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
+    mocks.mockStream._finalMessageFn = () =>
+      Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
 
     const res = makeMockRes()
 
@@ -480,10 +510,13 @@ describe('streamMessage', () => {
     mocks.prisma.aiMessage.create.mockResolvedValue({ id: 100 })
     mocks.prisma.aiMessage.count.mockResolvedValue(1)
     mocks.prisma.aiConversation.update.mockResolvedValue({})
-    mocks.prisma.aiMessage.findMany.mockResolvedValue([{ role: 'user', content: 'Create a study sheet for biology' }])
+    mocks.prisma.aiMessage.findMany.mockResolvedValue([
+      { role: 'user', content: 'Create a study sheet for biology' },
+    ])
 
     // Default iterator (no events) and finalMessage are already set by beforeEach.
-    mocks.mockStream._finalMessageFn = () => Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
+    mocks.mockStream._finalMessageFn = () =>
+      Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
 
     const res = makeMockRes()
 
@@ -498,7 +531,7 @@ describe('streamMessage', () => {
     expect(mocks.streamCalls[0][0]).toEqual(
       expect.objectContaining({
         max_tokens: 16384,
-      })
+      }),
     )
   })
 
@@ -512,10 +545,13 @@ describe('streamMessage', () => {
     mocks.prisma.aiMessage.create.mockResolvedValue({ id: 100 })
     mocks.prisma.aiMessage.count.mockResolvedValue(1)
     mocks.prisma.aiConversation.update.mockResolvedValue({})
-    mocks.prisma.aiMessage.findMany.mockResolvedValue([{ role: 'user', content: 'What is gravity?' }])
+    mocks.prisma.aiMessage.findMany.mockResolvedValue([
+      { role: 'user', content: 'What is gravity?' },
+    ])
 
     // Default iterator (no events) and finalMessage are already set by beforeEach.
-    mocks.mockStream._finalMessageFn = () => Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
+    mocks.mockStream._finalMessageFn = () =>
+      Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
 
     const res = makeMockRes()
 
@@ -530,7 +566,7 @@ describe('streamMessage', () => {
     expect(mocks.streamCalls[0][0]).toEqual(
       expect.objectContaining({
         max_tokens: 2048,
-      })
+      }),
     )
   })
 
@@ -540,7 +576,11 @@ describe('streamMessage', () => {
     mocks.prisma.note.findMany.mockResolvedValue([])
 
     mocks.prisma.aiConversation.findFirst.mockResolvedValue({ id: 1, userId: 1, model: null })
-    mocks.prisma.aiUsageLog.upsert.mockResolvedValue({ userId: 1, messageCount: 2, tokenCount: 500 })
+    mocks.prisma.aiUsageLog.upsert.mockResolvedValue({
+      userId: 1,
+      messageCount: 2,
+      tokenCount: 500,
+    })
     mocks.prisma.aiMessage.create.mockResolvedValue({ id: 100 })
     mocks.prisma.aiMessage.count.mockResolvedValue(3)
 
@@ -552,7 +592,8 @@ describe('streamMessage', () => {
     ])
 
     // Default iterator (no events) and finalMessage are already set by beforeEach.
-    mocks.mockStream._finalMessageFn = () => Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
+    mocks.mockStream._finalMessageFn = () =>
+      Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
 
     const res = makeMockRes()
 
@@ -567,7 +608,7 @@ describe('streamMessage', () => {
     expect(mocks.prisma.aiMessage.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
         orderBy: { createdAt: 'desc' },
-      })
+      }),
     )
 
     // The messages passed to Claude should be in chronological (asc) order
@@ -576,6 +617,81 @@ describe('streamMessage', () => {
     expect(streamCall.messages[0].content).toBe('first')
     expect(streamCall.messages[1].content).toBe('second')
     expect(streamCall.messages[2].content).toBe('third')
+  })
+
+  it('redacts PII before model input, client output, and DB persistence', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue({
+      username: 'student@example.edu',
+      accountType: 'student',
+      enrollments: [],
+    })
+    mocks.prisma.studySheet.findMany.mockResolvedValue([
+      { id: 7, title: 'Call 123-456-7890 for lab notes', course: null },
+    ])
+    mocks.prisma.note.findMany.mockResolvedValue([])
+
+    mocks.prisma.aiConversation.findFirst.mockResolvedValue({
+      id: 1,
+      userId: 1,
+      title: 'Existing chat',
+      model: null,
+    })
+    mocks.prisma.aiUsageLog.upsert.mockResolvedValue({ userId: 1, messageCount: 0, tokenCount: 0 })
+    mocks.prisma.aiMessage.create.mockResolvedValue({ id: 100 })
+    mocks.prisma.aiMessage.count.mockResolvedValue(2)
+    mocks.prisma.aiMessage.findMany.mockResolvedValue([
+      { role: 'assistant', content: 'Old response mentioned mentor@school.edu' },
+      { role: 'user', content: 'My old phone was 555-123-4567' },
+    ])
+
+    const streamEvents = [
+      { type: 'content_block_delta', delta: { text: 'Email mentor@school.edu ' } },
+      { type: 'content_block_delta', delta: { text: 'or call 123-456-7890.' } },
+    ]
+    let idx = 0
+    mocks.mockStream._iteratorFn = () => ({
+      next: () => {
+        if (idx < streamEvents.length) {
+          return Promise.resolve({ value: streamEvents[idx++], done: false })
+        }
+        return Promise.resolve({ done: true })
+      },
+    })
+    mocks.mockStream._finalMessageFn = () =>
+      Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
+
+    const res = makeMockRes()
+
+    await aiService.streamMessage({
+      user: baseUser,
+      conversationId: 1,
+      content: 'Reach me at student@example.edu and 123-456-7890',
+      res,
+    })
+
+    const streamCall = mocks.streamCalls[0][0]
+    const modelPayload = JSON.stringify({
+      system: streamCall.system,
+      messages: streamCall.messages,
+    })
+    expect(modelPayload).not.toContain('student@example.edu')
+    expect(modelPayload).not.toContain('mentor@school.edu')
+    expect(modelPayload).not.toContain('555-123-4567')
+    expect(modelPayload).not.toContain('123-456-7890')
+    expect(modelPayload).toContain('[redacted-email]')
+    expect(modelPayload).toContain('[redacted-phone]')
+
+    const events = res.getEvents()
+    const deltaText = events.find((e) => e.type === 'delta')?.text || ''
+    expect(deltaText).toBe('Email [redacted-email] or call [redacted-phone].')
+    expect(deltaText).not.toContain('mentor@school.edu')
+    expect(deltaText).not.toContain('123-456-7890')
+
+    const userCreate = mocks.prisma.aiMessage.create.mock.calls[0][0].data
+    expect(userCreate.content).toBe('Reach me at [redacted-email] and [redacted-phone]')
+
+    const assistantCreate = mocks.prisma.aiMessage.create.mock.calls.at(-1)[0].data
+    expect(assistantCreate.content).toBe('Email [redacted-email] or call [redacted-phone].')
   })
 
   it('builds multi-part content for image messages', async () => {
@@ -591,7 +707,8 @@ describe('streamMessage', () => {
     mocks.prisma.aiMessage.findMany.mockResolvedValue([{ role: 'user', content: 'What is this?' }])
 
     // Default iterator (no events) and finalMessage are already set by beforeEach.
-    mocks.mockStream._finalMessageFn = () => Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
+    mocks.mockStream._finalMessageFn = () =>
+      Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
 
     const res = makeMockRes()
 
@@ -612,14 +729,18 @@ describe('streamMessage', () => {
       expect.objectContaining({
         type: 'image',
         source: expect.objectContaining({ type: 'base64', media_type: 'image/png' }),
-      })
+      }),
     )
   })
 })
 
 describe('getUsageStats', () => {
   it('returns formatted usage stats', async () => {
-    mocks.prisma.aiUsageLog.upsert.mockResolvedValue({ userId: 1, messageCount: 10, tokenCount: 2000 })
+    mocks.prisma.aiUsageLog.upsert.mockResolvedValue({
+      userId: 1,
+      messageCount: 10,
+      tokenCount: 2000,
+    })
 
     const stats = await aiService.getUsageStats(baseUser)
 
@@ -631,7 +752,11 @@ describe('getUsageStats', () => {
   })
 
   it('clamps remaining to 0 when over limit', async () => {
-    mocks.prisma.aiUsageLog.upsert.mockResolvedValue({ userId: 1, messageCount: 35, tokenCount: 5000 })
+    mocks.prisma.aiUsageLog.upsert.mockResolvedValue({
+      userId: 1,
+      messageCount: 35,
+      tokenCount: 5000,
+    })
 
     const stats = await aiService.getUsageStats(baseUser)
 

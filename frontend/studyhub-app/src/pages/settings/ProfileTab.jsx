@@ -88,6 +88,7 @@ export default function ProfileTab({
   const coverUrl = user?.coverImageUrl || sessionUser?.coverImageUrl
   const avatarImageUrl = resolveImageUrl(avatarUrl)
   const coverImageUrl = resolveImageUrl(coverUrl)
+  const hasCoverUrl = Boolean(String(coverUrl || '').trim())
   const initials = (user?.username || '??').slice(0, 2).toUpperCase()
 
   useEffect(() => {
@@ -252,9 +253,9 @@ export default function ProfileTab({
               fontFamily: 'inherit',
             }}
           >
-            {coverImageUrl ? 'Change cover' : 'Upload cover'}
+            {hasCoverUrl ? 'Change cover' : 'Upload cover'}
           </button>
-          {coverImageUrl && (
+          {hasCoverUrl && (
             <button
               type="button"
               disabled={removingCover}

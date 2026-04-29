@@ -3,7 +3,7 @@ const multer = require('multer')
 const path = require('node:path')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
-const { SCHOOL_LOGOS_DIR } = require('../../lib/storage')
+const { SCHOOL_LOGOS_DIR, safeUnlinkFile } = require('../../lib/storage')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { validateMagicBytes, validateSvgContent } = require('../../lib/fileSignatures')
 
@@ -67,6 +67,7 @@ router.post('/schools/:id/logo', logoUpload.single('logo'), async (req, res) => 
   try {
     const schoolId = Number.parseInt(req.params.id, 10)
     if (!Number.isInteger(schoolId)) {
+      safeUnlinkFile(req.file?.path)
       return sendError(res, 400, 'Invalid school ID.', ERROR_CODES.UPLOAD_INVALID)
     }
 
@@ -115,6 +116,7 @@ router.post('/schools/:id/logo', logoUpload.single('logo'), async (req, res) => 
     })
 
     if (!school) {
+      safeUnlinkFile(req.file?.path)
       return sendError(res, 404, 'School not found.', ERROR_CODES.SERVER_ERROR)
     }
 
@@ -138,6 +140,7 @@ router.post('/schools/:id/logo', logoUpload.single('logo'), async (req, res) => 
 
     return res.json({ logoUrl })
   } catch (error) {
+    safeUnlinkFile(req.file?.path)
     captureError(error, { route: req.originalUrl, method: req.method })
     return sendError(res, 500, 'Could not upload logo.', ERROR_CODES.SERVER_ERROR)
   }

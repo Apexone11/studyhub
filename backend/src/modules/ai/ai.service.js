@@ -6,7 +6,7 @@
 const Anthropic = require('@anthropic-ai/sdk')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
-const { buildContext } = require('./ai.context')
+const { buildContext, redactPII } = require('./ai.context')
 const {
   DEFAULT_MODEL,
   SYSTEM_PROMPT,
@@ -293,6 +293,7 @@ function generateTitle(firstMessage) {
  */
 async function streamMessage({ user, conversationId, content, currentPage, images, res, signal }) {
   const userId = user.id || user.userId
+  const safeContent = redactPII(content)
 
   // 1. Verify conversation ownership.
   const conversation = await prisma.aiConversation.findFirst({
@@ -344,7 +345,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
       captureError(new Error(`AI prompt injection attempt: ${scan.reason}`), {
         userId,
         conversationId,
-        contentPreview: content.slice(0, 200),
+        contentPreview: safeContent.slice(0, 200),
       })
     }
   } catch {
@@ -358,7 +359,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
       conversation: { connect: { id: conversationId } },
       user: userId ? { connect: { id: userId } } : undefined,
       role: 'user',
-      content,
+      content: safeContent,
       hasImage: hasImg,
       imageDescription: hasImg ? `${images.length} image(s) uploaded` : null,
     },
@@ -367,7 +368,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   // 4. Auto-title the conversation if this is the first message.
   const messageCount = await prisma.aiMessage.count({ where: { conversationId } })
   if (messageCount === 1 && !conversation.title) {
-    const autoTitle = generateTitle(content)
+    const autoTitle = generateTitle(safeContent)
     await prisma.aiConversation.update({
       where: { id: conversationId },
       data: { title: autoTitle },
@@ -377,7 +378,9 @@ async function streamMessage({ user, conversationId, content, currentPage, image
 
   // 5. Build context and conversation history for Claude.
   const contextBlock = await buildContext(userId, { currentPage })
-  const fullSystemPrompt = SYSTEM_PROMPT + contextBlock
+  // Decision #17 requires PII to be stripped at the model boundary;
+  // context can include note/sheet titles that users typed months ago.
+  const fullSystemPrompt = redactPII(SYSTEM_PROMPT + contextBlock)
 
   // Fetch the most recent conversation history (descending, then reverse
   // to chronological order). This ensures we always send the latest context
@@ -394,14 +397,14 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   // is already included in `history`).
   const claudeMessages = history.map((msg) => ({
     role: msg.role,
-    content: msg.content,
+    content: redactPII(msg.content),
   }))
 
   // If images were uploaded, replace the last user message content with
   // a multi-part content block (text + images).
   if (images && images.length > 0) {
     const lastIdx = claudeMessages.length - 1
-    const contentParts = [{ type: 'text', text: content }]
+    const contentParts = [{ type: 'text', text: safeContent }]
     for (const img of images) {
       contentParts.push({
         type: 'image',
@@ -414,12 +417,13 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   // Determine max output tokens based on whether the user is asking for a sheet.
   const isSheetRequest =
     /\b(create|make|generate|build|write|design)\b.*\b(sheet|cheatsheet|cheat sheet|study guide|reference sheet|review sheet|formula sheet)\b/i.test(
-      content,
+      safeContent,
     )
   const maxTokens = isSheetRequest ? MAX_OUTPUT_TOKENS_SHEET : MAX_OUTPUT_TOKENS_QA
 
   // 6. Stream from Claude.
   let fullResponse = ''
+  let safeResponse = ''
   let totalInputTokens = 0
   let totalOutputTokens = 0
   let wasTruncated = false
@@ -455,19 +459,19 @@ async function streamMessage({ user, conversationId, content, currentPage, image
           ttftMs = Math.round(performance.now() - ttftStart)
         }
         fullResponse += event.delta.text
-        sendSSE(res, { type: 'delta', text: event.delta.text })
       }
     }
 
     // If the client disconnected mid-stream, skip persistence and usage tracking.
     if (aborted) {
+      safeResponse = redactPII(fullResponse)
       // Still save whatever partial response we got so the conversation stays coherent.
-      if (fullResponse) {
+      if (safeResponse) {
         await prisma.aiMessage.create({
           data: {
             conversation: { connect: { id: conversationId } },
             role: 'assistant',
-            content: fullResponse,
+            content: safeResponse,
             model: conversation.model || DEFAULT_MODEL,
             metadata: { partial: true },
           },
@@ -485,6 +489,11 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     if (finalMessage?.stop_reason === 'max_tokens') {
       wasTruncated = true
       sendSSE(res, { type: 'truncated' })
+    }
+
+    safeResponse = redactPII(fullResponse)
+    if (safeResponse) {
+      sendSSE(res, { type: 'delta', text: safeResponse })
     }
   } catch (err) {
     // Abort errors from client disconnect are expected; don't report them.
@@ -511,7 +520,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     data: {
       conversation: { connect: { id: conversationId } },
       role: 'assistant',
-      content: fullResponse,
+      content: safeResponse,
       tokenCount: totalTokens,
       model: conversation.model || DEFAULT_MODEL,
       metadata: msgMetadata,

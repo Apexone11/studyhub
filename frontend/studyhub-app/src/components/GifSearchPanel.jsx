@@ -16,11 +16,13 @@ export default function GifSearchPanel({
   const timerRef = useRef(null)
 
   const trimmedQuery = query.trim()
-  const displayResults = trimmedQuery ? results : []
-  const displayLoading = trimmedQuery ? loading : false
+  const hasTenorApiKey = Boolean(String(TENOR_API_KEY || '').trim())
+  const displayResults = hasTenorApiKey && trimmedQuery ? results : []
+  const displayLoading = hasTenorApiKey && trimmedQuery ? loading : false
 
   useEffect(() => {
     if (!trimmedQuery) return undefined
+    if (!hasTenorApiKey) return undefined
 
     let cancelled = false
     if (timerRef.current) clearTimeout(timerRef.current)
@@ -55,7 +57,7 @@ export default function GifSearchPanel({
       cancelled = true
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [trimmedQuery])
+  }, [hasTenorApiKey, trimmedQuery])
 
   return (
     <div
@@ -143,7 +145,21 @@ export default function GifSearchPanel({
           </div>
         ) : null}
 
-        {!displayLoading && displayResults.length === 0 && trimmedQuery ? (
+        {!hasTenorApiKey && trimmedQuery ? (
+          <div
+            style={{
+              gridColumn: '1 / -1',
+              textAlign: 'center',
+              color: 'var(--sh-muted)',
+              fontSize: 12,
+              padding: 10,
+            }}
+          >
+            GIF search is unavailable
+          </div>
+        ) : null}
+
+        {hasTenorApiKey && !displayLoading && displayResults.length === 0 && trimmedQuery ? (
           <div
             style={{
               gridColumn: '1 / -1',
