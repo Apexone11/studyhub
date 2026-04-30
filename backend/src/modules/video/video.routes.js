@@ -424,9 +424,35 @@ router.post('/upload/complete', requireAuth, async (req, res) => {
         await prisma.video.update({ where: { id: videoId }, data: { status: VIDEO_STATUS.FAILED } })
         return res.status(400).json({ error: 'File failed security scan.' })
       }
+      // Fail-CLOSED in production when the scanner is unreachable.
+      // Without this, a transient ClamAV outage silently bypasses the
+      // AV gate. Dev still passes through (scanner often missing
+      // locally) and CLAMAV_DISABLED=true short-circuits to 'clean'
+      // upstream.
+      if (scanResult && scanResult.status === 'error' && process.env.NODE_ENV === 'production') {
+        await r2.deleteObject(r2Key)
+        await prisma.video.update({ where: { id: videoId }, data: { status: VIDEO_STATUS.FAILED } })
+        captureError(new Error(`ClamAV scanner error: ${scanResult.message}`), {
+          context: 'video-clamav-scan',
+          videoId,
+        })
+        return res.status(503).json({ error: 'Security scanner unavailable. Please retry.' })
+      }
     } catch (scanErr) {
-      // ClamAV scan failure is non-fatal (may not be configured in dev)
       captureError(scanErr, { context: 'video-clamav-scan', videoId })
+      // Catch-all also fail-CLOSED in production.
+      if (process.env.NODE_ENV === 'production') {
+        try {
+          await r2.deleteObject(r2Key)
+          await prisma.video.update({
+            where: { id: videoId },
+            data: { status: VIDEO_STATUS.FAILED },
+          })
+        } catch (cleanupErr) {
+          captureError(cleanupErr, { context: 'video-clamav-cleanup', videoId })
+        }
+        return res.status(503).json({ error: 'Security scanner unavailable. Please retry.' })
+      }
     }
 
     // Return the video immediately, then process in background

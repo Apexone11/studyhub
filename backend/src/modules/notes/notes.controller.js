@@ -265,6 +265,17 @@ async function createNote(req, res) {
     /* Content fingerprinting for plagiarism detection (fire-and-forget) */
     void updateFingerprint('note', note.id, contentStr)
 
+    // Achievements V2 — emit note.create so first-note / note-taker / archivist
+    // / organized criteria can match. Fire-and-forget.
+    try {
+      const { emitAchievementEvent, EVENT_KINDS } = require('../../lib/badges')
+      void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.NOTE_CREATE, {
+        noteId: note.id,
+      })
+    } catch {
+      /* best effort */
+    }
+
     res.status(201).json(serializeNote(note, { _starred: false }))
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })

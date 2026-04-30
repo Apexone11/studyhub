@@ -31,7 +31,7 @@ The repo currently has all of the following — **don't recreate them**:
 - `backend/.env.example` (172 lines, every env var documented)
 - `frontend/studyhub-app/.env.example` (sectioned, every `VITE_*` documented)
 - `.gitignore` covering `.env`, `node_modules/`, `dist/`, `build/`, `.DS_Store`, etc.
-- TypeScript across both workspaces (`npm run typecheck` exits clean)
+- JavaScript-only codebase (TypeScript was tried briefly on 2026-04-30 and reverted same day; runtime cost without a transpiler outweighed the static-analysis benefit)
 - All 6 OWASP HTTP headers (CSP, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy always-on; HSTS production-only by design — sending HSTS over HTTP would be self-defeating)
 - Helmet middleware + strict CSP
 - ClamAV antivirus enforcement in production
@@ -82,7 +82,7 @@ Pick one (and use the same one in About page hero, GitHub About description, soc
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![version](https://img.shields.io/badge/version-v2.2.0-success)
 ![stack](https://img.shields.io/badge/stack-Express%205%20%2B%20React%2019-black)
-![language](https://img.shields.io/badge/language-TypeScript-3178C6)
+![language](https://img.shields.io/badge/language-JavaScript-f7df1e)
 ![db](https://img.shields.io/badge/db-Postgres%20%2B%20Prisma%206-336791)
 ![ai](https://img.shields.io/badge/AI-Claude%20Sonnet%204-orange)
 ![realtime](https://img.shields.io/badge/realtime-Socket.io%204-010101)
@@ -236,7 +236,7 @@ GitHub renders MP4 in READMEs (drag-and-drop into an issue → URL). MP4 is 5–
 ![license](https://img.shields.io/badge/license-MIT-blue)
 ![version](https://img.shields.io/badge/version-v2.2.0-success)
 ![stack](https://img.shields.io/badge/stack-Express%205%20%2B%20React%2019-black)
-![language](https://img.shields.io/badge/language-TypeScript-3178C6)
+![language](https://img.shields.io/badge/language-JavaScript-f7df1e)
 ![db](https://img.shields.io/badge/db-Postgres%20%2B%20Prisma%206-336791)
 ![ai](https://img.shields.io/badge/AI-Claude%20Sonnet%204-orange)
 ![realtime](https://img.shields.io/badge/realtime-Socket.io%204-010101)
@@ -299,7 +299,7 @@ It includes:
 
 ## Tech stack
 
-**Language:** TypeScript across both backend and frontend (incremental migration from JS — `tsc --noEmit` exits clean on both)
+**Language:** JavaScript (CommonJS on the backend, ES modules on the frontend). JSDoc for type hints in the editor.
 **Frontend:** React 19, React Router 7, Vite 8, Socket.io client 4, Sentry, PostHog
 **Backend:** Node 20, Express 5, Prisma 6 (PostgreSQL), Socket.io 4, Stripe, Anthropic SDK, Helmet
 **Infra:** Railway (production), GitHub Actions (CI), Sentry (errors), Cloudflare R2 (media), ClamAV (antivirus)
@@ -343,7 +343,7 @@ You'll need:
 
 - `backend/` — Express API, Prisma data layer, Vitest tests (~2000 tests)
 - `frontend/studyhub-app/` — React 19 + Vite SPA, Vitest, Playwright
-- `shared/types/` — TypeScript declarations shared across the two workspaces
+- (Internal documentation, e.g. `docs/internal/audits/`, holds per-feature handoff plans)
 - `docs/` — release notes + media
 
 Backend is modularized under `backend/src/modules/<name>/` (21+ modules, each with `routes.js`, `controller.js`, `service.js`, `constants.js`).
@@ -354,7 +354,7 @@ Backend is modularized under `backend/src/modules/<name>/` (21+ modules, each wi
 
 Contributions are welcome. Read `CONTRIBUTING.md` and `CODE_OF_CONDUCT.md` first.
 
-StudyHub is migrating from JavaScript to TypeScript. **All new files must be `.ts` or `.tsx`.** Existing `.js` / `.jsx` files are converted incrementally — feel free to convert one as part of any PR you open. See the "TypeScript Conventions" section in `CLAUDE.md`.
+StudyHub is JavaScript-only. New files are `.js` (backend, CommonJS) or `.jsx` (frontend, ES modules). Use JSDoc for type hints. See the "Language policy" section in `CLAUDE.md`.
 
 Quick path:
 
@@ -420,7 +420,7 @@ PRE-FLIGHT
 [X] frontend/studyhub-app/.env.example complete
 [X] FIELD_ENCRYPTION_KEY enforced at startup
 [X] All 6 OWASP HTTP headers
-[X] TypeScript wired in both workspaces
+[X] JavaScript across both workspaces (TypeScript reverted 2026-04-30)
 
 CREATOR AUDIT DEPLOY (v2.2.0 prod ship)
 [X] Code deployed
@@ -480,7 +480,7 @@ ANNOUNCE
 When you (the AI on the main computer) execute this plan:
 
 - The repo follows the conventions in `CLAUDE.md` at the project root. **Read it before editing anything.**
-- **All new files must be `.ts` or `.tsx`.** Existing `.js` / `.jsx` files are migrated incrementally as touched.
+- **All new files are `.js` (backend) or `.jsx` (frontend).** TypeScript is not used in this repo (founder-locked 2026-04-30).
 - After every code change run: `npm --prefix backend run lint`, `npm --prefix backend run typecheck`, `npm --prefix backend test`, `npm --prefix frontend/studyhub-app run lint`, `npm --prefix frontend/studyhub-app run typecheck`, `npm --prefix frontend/studyhub-app run build`.
 - All inline style colors must use `var(--sh-*)` tokens. No new hex codes.
 - No emojis in UI chrome. Emojis are allowed only inside user-generated content (feed posts, messages, notes, comments, group discussions, profile bios).
@@ -492,5 +492,5 @@ When the user comes back to take screenshots, the dev environment should already
 
 ---
 
-End of plan. Email this to yourself, open it on the main computer, and hand the file to your AI assistant there.
+End of plan. Email this to yourself, open it on the main computer,
 ```

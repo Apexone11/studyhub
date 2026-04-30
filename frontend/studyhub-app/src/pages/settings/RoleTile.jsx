@@ -175,13 +175,26 @@ export default function RoleTile({ user }) {
     )
   }
   if (!revertFlagEnabled) {
-    // Flag-gated: fall back to a read-only tile so the label is still visible.
+    // Flag-gated: compact read-only tile so the label is still visible.
     const currentLabel = roleLabel(status?.accountType || user?.accountType)
     return (
-      <SectionCard title="Your role" subtitle={`You are a ${currentLabel}.`}>
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--sh-muted)' }}>
-          Role changes are temporarily unavailable. Contact support if you need to update this.
-        </p>
+      <SectionCard title="Your role">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ fontSize: 13, color: 'var(--sh-text)' }}>
+            Currently: <strong>{currentLabel}</strong>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+            Role changes are temporarily unavailable.
+          </div>
+        </div>
       </SectionCard>
     )
   }
@@ -198,15 +211,13 @@ export default function RoleTile({ user }) {
   const remainingBudget = Math.max(0, Number(status.changesRemainingLast30Days ?? 0))
 
   return (
-    <SectionCard title="Your role" subtitle={`You are a ${currentLabel}.`}>
+    <SectionCard title="Your role" subtitle={inRevertWindow ? `You are a ${currentLabel}.` : null}>
       {inRevertWindow ? (
         <>
           <Message tone="warning">
             You have <strong>{remainingText}</strong> to revert to <strong>{previousLabel}</strong>{' '}
             at no cost.
           </Message>
-          {/* S1: right-aligned action row so the buttons sit at the card
-              edge instead of stretching across the full card width. */}
           <div
             style={{
               display: 'flex',
@@ -223,17 +234,27 @@ export default function RoleTile({ user }) {
           </div>
         </>
       ) : (
-        <>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--sh-subtext)' }}>
-            Role can be changed {remainingBudget} more time{remainingBudget === 1 ? '' : 's'} in the
-            next 30 days. You get a 2-day window to revert for free.
-          </p>
-          {/* S1: right-aligned single action so it doesn't read as
-              full-width inside the card. */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-            <Button onClick={() => setChangeOpen(true)}>Change role</Button>
+        // Compact treatment: status + action collapse to a single row.
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sh-text)' }}>
+              Currently: <strong>{currentLabel}</strong>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+              {remainingBudget} change{remainingBudget === 1 ? '' : 's'} remaining in the next 30
+              days · 2-day free revert
+            </div>
           </div>
-        </>
+          <Button onClick={() => setChangeOpen(true)}>Change role</Button>
+        </div>
       )}
 
       <Modal

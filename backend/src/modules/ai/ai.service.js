@@ -389,6 +389,17 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     },
   })
 
+  // Achievements V2 — fire ai.message so ai-curious / ai-power-user criteria
+  // can match. Fire-and-forget; failures never affect the streaming response.
+  if (userId) {
+    try {
+      const { emitAchievementEvent, EVENT_KINDS } = require('../../lib/badges')
+      void emitAchievementEvent(prisma, userId, EVENT_KINDS.AI_MESSAGE, { conversationId })
+    } catch {
+      /* best effort */
+    }
+  }
+
   // 4. Auto-title the conversation if this is the first message.
   const messageCount = await prisma.aiMessage.count({ where: { conversationId } })
   if (messageCount === 1 && !conversation.title) {

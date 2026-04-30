@@ -1,9 +1,13 @@
 /// <reference types="node" />
 import { readFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-const headersPath = join(process.cwd(), 'public', '_headers')
+// Anchor the path to THIS file's location so the test passes regardless of
+// the cwd vitest is launched from (root, workspace, monorepo runner, etc.).
+const here = dirname(fileURLToPath(import.meta.url))
+const headersPath = join(here, '..', '..', 'public', '_headers')
 
 function readFrontendCsp(): string {
   const headers = readFileSync(headersPath, 'utf8')

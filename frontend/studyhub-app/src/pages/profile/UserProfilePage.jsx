@@ -62,6 +62,16 @@ import {
   EnrolledCoursesSection,
   FollowModal,
 } from './ProfileWidgets'
+// Achievements V2 (2026-04-30) — replaces the legacy BadgesSection on the
+// Achievements tab and adds the pinned-6 strip to the Overview tab. Plan:
+// docs/internal/audits/2026-04-30-achievements-v2-plan.md
+import AchievementGallery from '../../features/achievements/AchievementGallery'
+import PinnedBadgesStrip from '../../features/achievements/PinnedBadgesStrip'
+import LevelChip from '../../features/achievements/LevelChip'
+import {
+  useUserAchievements,
+  usePinnedAchievements,
+} from '../../features/achievements/useAchievements'
 
 /* Re-use dashboard widgets directly */
 import {
@@ -1156,7 +1166,11 @@ export default function UserProfilePage() {
               {activeTab === 'posts' && <PostsTab profileId={profile?.id} />}
 
               {activeTab === 'achievements' && (
-                <AchievementsTab activityData={activityData} badges={badges} />
+                <AchievementsTab
+                  activityData={activityData}
+                  profile={profile}
+                  isOwner={isOwnProfile}
+                />
               )}
             </div>
           </>
@@ -1247,6 +1261,8 @@ function OwnOverviewTab({
             <ActivityHeatmap data={activityData} weeks={12} />
           </div>
         )}
+        {/* Achievements V2 — pinned-6 strip on own profile Overview. */}
+        <PinnedBadgesCard username={profile.username} ownerView />
         <BadgesSection badges={badges} />
         {phase1On ? (
           <TopContributors
@@ -1432,8 +1448,58 @@ function PostsTab({ profileId }) {
   )
 }
 
+/* ── Pinned achievements card (Achievements V2) ──────────────────────────── */
+//
+// Renders the pinned-6 hexagons on the profile Overview. Hidden when there
+// are no pinned items and the viewer isn't the owner. Owner-empty shows a
+// "Pin up to 6" hint with a link to /achievements.
+function PinnedBadgesCard({ username, ownerView }) {
+  const { items, loading } = usePinnedAchievements(username)
+  if (!loading && items.length === 0 && !ownerView) return null
+  return (
+    <div style={cardStyle}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          marginBottom: 10,
+        }}
+      >
+        <h2 style={{ ...sectionHeadingStyle, margin: 0 }}>Featured achievements</h2>
+        {ownerView && (
+          <Link
+            to="/achievements"
+            style={{ fontSize: 12, color: 'var(--sh-link)', textDecoration: 'none' }}
+          >
+            Manage →
+          </Link>
+        )}
+      </div>
+      <PinnedBadgesStrip
+        items={items}
+        loading={loading}
+        ownerView={ownerView}
+        emptyHint={
+          ownerView
+            ? 'Pin up to 6 unlocked achievements from /achievements to feature them here.'
+            : undefined
+        }
+      />
+    </div>
+  )
+}
+
 /* ── Achievements tab (both modes) ───────────────────────────────────────── */
-function AchievementsTab({ activityData, badges }) {
+//
+// Achievements V2: rebuilt to render the new full-state gallery (locked +
+// unlocked + secret) with level chip + XP header + filter chips. The legacy
+// `badges` prop is kept on the call signature so existing parents don't break;
+// the gallery fetches the canonical state from /api/achievements/users/:username.
+function AchievementsTab({ activityData, profile, isOwner }) {
+  const username = profile?.username
+  const { items, stats, loading, error, reload } = useUserAchievements(username)
+
   return (
     <div className="profile-columns">
       {activityData.length > 0 && (
@@ -1441,8 +1507,23 @@ function AchievementsTab({ activityData, badges }) {
           <ActivityHeatmap data={activityData} weeks={12} />
         </div>
       )}
-      <BadgesSection badges={badges} />
-      {activityData.length === 0 && badges.length === 0 && (
+
+      {loading ? (
+        <div style={{ ...cardStyle, textAlign: 'center', padding: 32, color: 'var(--sh-muted)' }}>
+          Loading achievements…
+        </div>
+      ) : error ? (
+        <div
+          style={{
+            ...cardStyle,
+            textAlign: 'center',
+            padding: 24,
+            color: 'var(--sh-warning-text)',
+          }}
+        >
+          Couldn't load achievements.
+        </div>
+      ) : items.length === 0 ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: '48px 24px' }}>
           <div style={{ fontSize: 36, marginBottom: 12, color: 'var(--sh-muted)' }}>
             <IconStar size={36} />
@@ -1456,6 +1537,10 @@ function AchievementsTab({ activityData, badges }) {
             Start studying and contributing to unlock badges.
           </div>
         </div>
+      ) : (
+        <div style={cardStyle}>
+          <AchievementGallery items={items} stats={stats} ownerView={isOwner} onMutate={reload} />
+        </div>
       )}
     </div>
   )
@@ -1466,6 +1551,8 @@ function OtherOverviewTab({ profile, activityData, badges }) {
   return (
     <div className="profile-columns">
       <ProfileStatsWidget username={profile.username} />
+      {/* Achievements V2 — pinned-6 strip on other user's profile Overview. */}
+      <PinnedBadgesCard username={profile.username} ownerView={false} />
       <PinnedSheetsSection sheets={profile.pinnedSheets} />
       <SharedShelvesSection shelves={profile.sharedShelves} isOwnProfile={false} />
       <BadgesSection badges={badges} />

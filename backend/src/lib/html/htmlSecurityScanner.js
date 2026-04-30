@@ -92,9 +92,17 @@ function detectHighRiskBehaviors(html) {
   const value = String(html || '')
   const behaviors = []
 
-  // Obfuscated JS: String.fromCharCode chains
+  // Obfuscated JS: String.fromCharCode chains.
+  //
+  // Threshold was 3, raised to 8: practice-test sheets that generate
+  // multiple-choice option labels (A/B/C/D…) inline routinely use
+  // `String.fromCharCode(65+i)` inside a `.map` callback and accumulate
+  // 4-7 occurrences in source even though the intent is benign. Real
+  // obfuscators use this primitive in the dozens (often wrapped in
+  // `String.fromCharCode(...arr)` calls reconstructing entire strings),
+  // so 8 still catches them without burning legitimate quiz code.
   const fromCharCodeMatches = (value.match(/String\s*\.\s*fromCharCode/gi) || []).length
-  if (fromCharCodeMatches >= 3) {
+  if (fromCharCodeMatches >= 8) {
     behaviors.push({
       category: 'obfuscation',
       severity: 'high',

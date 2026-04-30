@@ -53,6 +53,9 @@ router.patch('/read-all', writeLimiter, async (req, res) => {
 // ── PATCH /api/notifications/:id/read ─────────────────────────
 router.patch('/:id/read', writeLimiter, async (req, res) => {
   const notifId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(notifId) || notifId <= 0) {
+    return sendError(res, 400, 'Invalid notification id.', ERROR_CODES.BAD_REQUEST)
+  }
   try {
     const notif = await prisma.notification.findUnique({ where: { id: notifId } })
     if (!notif) return sendError(res, 404, 'Notification not found.', ERROR_CODES.NOT_FOUND)
@@ -96,6 +99,9 @@ router.delete('/read', writeLimiter, async (req, res) => {
 // ── DELETE /api/notifications/:id ─────────────────────────────
 router.delete('/:id', writeLimiter, async (req, res) => {
   const notifId = parseInt(req.params.id, 10)
+  if (!Number.isInteger(notifId) || notifId <= 0) {
+    return sendError(res, 400, 'Invalid notification id.', ERROR_CODES.BAD_REQUEST)
+  }
   try {
     const notif = await prisma.notification.findUnique({ where: { id: notifId } })
     if (!notif) return sendError(res, 404, 'Notification not found.', ERROR_CODES.NOT_FOUND)

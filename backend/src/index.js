@@ -82,6 +82,7 @@ const hashtagsRoutes = require('./modules/hashtags')
 const sectionsRoutes = require('./modules/sections')
 const materialsRoutes = require('./modules/materials')
 const creatorAuditRoutes = require('./modules/creatorAudit')
+const achievementsRoutes = require('./modules/achievements')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -161,7 +162,21 @@ const trustedOrigins = new Set(
   allowedOrigins.map((origin) => normalizeOrigin(origin)).filter(Boolean),
 )
 
-const appSurfaceCsp = [
+// CSP violation reporting endpoint — when present, browsers POST a JSON
+// report any time a directive blocks something. Set CSP_REPORT_URI to
+// e.g. a Sentry CSP intake URL (`https://o<org>.ingest.sentry.io/api/<id>/security/?sentry_key=<dsn-public-key>`)
+// or any internal endpoint that accepts `application/csp-report`. Empty
+// string disables reporting (no `report-uri` directive emitted).
+const cspReportUri = (process.env.CSP_REPORT_URI || '').trim()
+const cspReportDirective = cspReportUri ? `report-uri ${cspReportUri}` : null
+
+function buildCsp(directives) {
+  const filtered = directives.filter(Boolean)
+  if (cspReportDirective) filtered.push(cspReportDirective)
+  return filtered.join('; ')
+}
+
+const appSurfaceCsp = buildCsp([
   "default-src 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'",
@@ -173,10 +188,15 @@ const appSurfaceCsp = [
   "object-src 'none'",
   "script-src 'none'",
   "style-src 'none'",
-].join('; ')
+  // Belt-and-suspenders for HSTS preload: tell the browser to upgrade
+  // any stray http:// resource to https://. Catches mixed-content from
+  // user-pasted URLs that slip past `resolveImageUrl`. CSP3 directive,
+  // supported by every modern browser.
+  'upgrade-insecure-requests',
+])
 
 const previewFrameAncestors = Array.from(trustedOrigins)
-const previewSurfaceCsp = [
+const previewSurfaceCsp = buildCsp([
   "default-src 'none'",
   "base-uri 'none'",
   `frame-ancestors ${previewFrameAncestors.length > 0 ? previewFrameAncestors.join(' ') : "'none'"}`,
@@ -189,7 +209,7 @@ const previewSurfaceCsp = [
   "script-src 'none'",
   "style-src 'unsafe-inline' https://fonts.googleapis.com",
   "style-src-elem 'unsafe-inline' https://fonts.googleapis.com",
-].join('; ')
+])
 
 app.disable('x-powered-by')
 
@@ -240,7 +260,12 @@ app.use(
   helmet({
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: false,
-    hsts: isProd,
+    // HSTS preload: 1 year max-age + includeSubDomains + preload, only
+    // in prod. Submit the apex domain to https://hstspreload.org once
+    // every subdomain confirmed serves HTTPS — getting on the preload
+    // list bakes HSTS into Chrome/Firefox/Safari ship builds so a MITM
+    // can't strip it on the user's first visit.
+    hsts: isProd ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }),
 )
@@ -378,12 +403,32 @@ app.post(
 // Without this, the express default 100KB cap rejected any legitimate
 // HTML import or AI sheet save with PayloadTooLargeError before the
 // route ever ran.
-app.use(express.json({ limit: '5mb' }))
+// Strict content-type: only accept `application/json`. Without this,
+// Express defaults match `application/*+json` and treat missing
+// Content-Type as JSON, which lets attackers slip
+// `application/x-www-form-urlencoded` past JSON-shaped validation.
+// Routes that legitimately need urlencoded must opt in explicitly via
+// their own `express.urlencoded()` middleware.
+app.use(express.json({ limit: '5mb', type: 'application/json' }))
 
 // Phase 5: reject payloads with null bytes, control chars, excessive
 // nesting/length, or duplicate query params before they reach routes.
 const inputSanitizer = require('./middleware/inputSanitizer')
 app.use(inputSanitizer)
+
+// Default `Cache-Control: no-store` on every API response. Auth-bearing
+// endpoints (e.g. `/api/users/me`) must NEVER be cached — a misconfigured
+// CDN keying only on URL would otherwise serve user A's session payload
+// to user B. Routes that legitimately benefit from caching (public
+// schools list, platform-stats, popular courses) override via the
+// existing `cacheControl()` middleware. Only `/api/*` paths get the
+// default; static/preview surfaces opt in elsewhere.
+app.use('/api', (_req, res, next) => {
+  if (!res.getHeader('Cache-Control')) {
+    res.setHeader('Cache-Control', 'no-store')
+  }
+  next()
+})
 
 // Optional emergency write-guard for non-admin requests.
 app.use(guardedMode)
@@ -527,6 +572,11 @@ app.use('/api/dashboard', dashboardRoutes)
 // Frontend is flag-gated by `design_v2_upcoming_exams`; server keeps endpoints
 // available to authenticated users so the flag flip is one-sided.
 app.use('/api/exams', examRoutes)
+
+// Achievements V2 (2026-04-30) — gallery, detail page, pinned strip, stats.
+// Catalog endpoints are public (optionalAuth); pin / visibility writes require auth.
+// Plan: docs/internal/audits/2026-04-30-achievements-v2-plan.md
+app.use('/api/achievements', achievementsRoutes)
 
 // Mount Creator Audit foundation endpoints. Frontend rollout remains flag-gated;
 // the server keeps the owner-checked audit and consent primitives available.

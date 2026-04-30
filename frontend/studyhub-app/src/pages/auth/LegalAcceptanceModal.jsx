@@ -3,7 +3,6 @@ import { createPortal } from 'react-dom'
 import LegalDocumentText from '../../components/LegalDocumentText'
 import { LEGAL_DOCUMENT_LABELS, POLICY_URLS } from '../../lib/legalVersions'
 import { useCurrentLegalDocument } from '../../lib/legalService'
-import useTermlyEmbed from '../../lib/useTermlyEmbed'
 
 const TABS = [
   { key: 'terms', label: LEGAL_DOCUMENT_LABELS.terms },
@@ -233,8 +232,6 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
   const [activeTab, setActiveTab] = useState('terms')
   const [viewedTabs, setViewedTabs] = useState(new Set())
   const guidelinesRef = useRef(null)
-  const termsContainerRef = useRef(null)
-  const privacyContainerRef = useRef(null)
 
   const termsDocument = useCurrentLegalDocument('terms', { enabled: open })
   const privacyDocument = useCurrentLegalDocument('privacy', { enabled: open })
@@ -249,24 +246,6 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
     })
   }, [])
 
-  const markTermsViewed = useCallback(() => markViewed('terms'), [markViewed])
-  const markPrivacyViewed = useCallback(() => markViewed('privacy'), [markViewed])
-
-  const termsEmbed = useTermlyEmbed(termsContainerRef, termsDocument.document?.termlyEmbedId, {
-    enabled: open && activeTab === 'terms' && Boolean(termsDocument.document?.termlyEmbedId),
-    onLoad: markTermsViewed,
-    onTimeout: markTermsViewed,
-  })
-  const privacyEmbed = useTermlyEmbed(
-    privacyContainerRef,
-    privacyDocument.document?.termlyEmbedId,
-    {
-      enabled: open && activeTab === 'privacy' && Boolean(privacyDocument.document?.termlyEmbedId),
-      onLoad: markPrivacyViewed,
-      onTimeout: markPrivacyViewed,
-    },
-  )
-
   useEffect(() => {
     if (!open) return
     const frameId = window.requestAnimationFrame(() => {
@@ -278,53 +257,17 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
 
   useEffect(() => {
     if (!open || activeTab !== 'terms') return
-
-    const shouldMarkTermsViewed = Boolean(
-      termsDocument.document?.bodyText &&
-      (!termsDocument.document?.termlyEmbedId || termsEmbed.timedOut),
-    )
-
-    if (shouldMarkTermsViewed) {
-      const frameId = window.requestAnimationFrame(() => {
-        markViewed('terms')
-      })
-      return () => window.cancelAnimationFrame(frameId)
-    }
-
-    return undefined
-  }, [
-    activeTab,
-    markViewed,
-    open,
-    termsDocument.document?.bodyText,
-    termsDocument.document?.termlyEmbedId,
-    termsEmbed.timedOut,
-  ])
+    if (!termsDocument.document?.bodyText) return undefined
+    const frameId = window.requestAnimationFrame(() => markViewed('terms'))
+    return () => window.cancelAnimationFrame(frameId)
+  }, [activeTab, markViewed, open, termsDocument.document?.bodyText])
 
   useEffect(() => {
     if (!open || activeTab !== 'privacy') return
-
-    const shouldMarkPrivacyViewed = Boolean(
-      privacyDocument.document?.bodyText &&
-      (!privacyDocument.document?.termlyEmbedId || privacyEmbed.timedOut),
-    )
-
-    if (shouldMarkPrivacyViewed) {
-      const frameId = window.requestAnimationFrame(() => {
-        markViewed('privacy')
-      })
-      return () => window.cancelAnimationFrame(frameId)
-    }
-
-    return undefined
-  }, [
-    activeTab,
-    markViewed,
-    open,
-    privacyDocument.document?.bodyText,
-    privacyDocument.document?.termlyEmbedId,
-    privacyEmbed.timedOut,
-  ])
+    if (!privacyDocument.document?.bodyText) return undefined
+    const frameId = window.requestAnimationFrame(() => markViewed('privacy'))
+    return () => window.cancelAnimationFrame(frameId)
+  }, [activeTab, markViewed, open, privacyDocument.document?.bodyText])
 
   const handleGuidelinesScroll = useCallback(
     (e) => {
@@ -400,30 +343,17 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
 
         {/* Content area */}
         <div style={styles.content}>
-          {/* Terms embed */}
+          {/* Terms — self-hosted bodyText only. */}
           {activeTab === 'terms' && (
             <div style={styles.scrollRegion}>
               {termsDocument.loading && !termsDocument.document && (
                 <div style={styles.loading}>Loading Terms of Use...</div>
               )}
-              {termsDocument.document && !termsDocument.document.termlyEmbedId && (
+              {termsDocument.document?.bodyText && (
                 <FallbackDocumentPanel
                   bodyText={termsDocument.document.bodyText}
-                  linkUrl={termsDocument.document.termlyUrl || POLICY_URLS.terms}
+                  linkUrl={POLICY_URLS.terms}
                   showBackupBadge={false}
-                  note="This version is served directly from StudyHub because no hosted Termly embed is configured for the current Terms of Use document."
-                />
-              )}
-              {termsDocument.document?.termlyEmbedId &&
-                !termsEmbed.loaded &&
-                !termsEmbed.timedOut &&
-                !termsDocument.loading && <div style={styles.loading}>Loading Terms of Use...</div>}
-              {termsEmbed.timedOut && termsDocument.document?.bodyText && (
-                <FallbackDocumentPanel
-                  bodyText={termsDocument.document.bodyText}
-                  linkUrl={termsDocument.document.termlyUrl || POLICY_URLS.terms}
-                  showBackupBadge
-                  note="The hosted Terms of Use viewer did not load in time, so StudyHub is showing the matching backup copy for this legal version."
                 />
               )}
               {termsDocument.error && !termsDocument.document && (
@@ -438,47 +368,20 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                   {termsDocument.error}
                 </div>
               )}
-              <div
-                ref={termsContainerRef}
-                style={{
-                  minHeight: 320,
-                  opacity: termsEmbed.loaded ? 1 : 0,
-                  transition: 'opacity 0.3s ease',
-                  display:
-                    termsEmbed.timedOut || !termsDocument.document?.termlyEmbedId
-                      ? 'none'
-                      : 'block',
-                }}
-              />
             </div>
           )}
 
-          {/* Privacy embed */}
+          {/* Privacy — self-hosted bodyText only. */}
           {activeTab === 'privacy' && (
             <div style={styles.scrollRegion}>
               {privacyDocument.loading && !privacyDocument.document && (
                 <div style={styles.loading}>Loading Privacy Policy...</div>
               )}
-              {privacyDocument.document && !privacyDocument.document.termlyEmbedId && (
+              {privacyDocument.document?.bodyText && (
                 <FallbackDocumentPanel
                   bodyText={privacyDocument.document.bodyText}
-                  linkUrl={privacyDocument.document.termlyUrl || POLICY_URLS.privacy}
+                  linkUrl={POLICY_URLS.privacy}
                   showBackupBadge={false}
-                  note="This version is served directly from StudyHub because no hosted Termly embed is configured for the current Privacy Policy document."
-                />
-              )}
-              {privacyDocument.document?.termlyEmbedId &&
-                !privacyEmbed.loaded &&
-                !privacyEmbed.timedOut &&
-                !privacyDocument.loading && (
-                  <div style={styles.loading}>Loading Privacy Policy...</div>
-                )}
-              {privacyEmbed.timedOut && privacyDocument.document?.bodyText && (
-                <FallbackDocumentPanel
-                  bodyText={privacyDocument.document.bodyText}
-                  linkUrl={privacyDocument.document.termlyUrl || POLICY_URLS.privacy}
-                  showBackupBadge
-                  note="The hosted Privacy Policy viewer did not load in time, so StudyHub is showing the matching backup copy for this legal version."
                 />
               )}
               {privacyDocument.error && !privacyDocument.document && (
@@ -493,18 +396,6 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                   {privacyDocument.error}
                 </div>
               )}
-              <div
-                ref={privacyContainerRef}
-                style={{
-                  minHeight: 320,
-                  opacity: privacyEmbed.loaded ? 1 : 0,
-                  transition: 'opacity 0.3s ease',
-                  display:
-                    privacyEmbed.timedOut || !privacyDocument.document?.termlyEmbedId
-                      ? 'none'
-                      : 'block',
-                }}
-              />
             </div>
           )}
 

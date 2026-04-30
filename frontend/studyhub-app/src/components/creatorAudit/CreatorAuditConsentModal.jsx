@@ -61,11 +61,15 @@ export default function CreatorAuditConsentModal({
   useEffect(() => {
     if (!open) return
     function onKey(e) {
-      if (e.key === 'Escape' && !submitting) onDismiss?.()
+      // Escape mirrors the backdrop rule: while an error banner is up, the
+      // user has to read it and explicitly Cancel. Without this they can
+      // hit Escape after a failed accept and lose the only feedback they
+      // had about why publishing is still gated.
+      if (e.key === 'Escape' && !submitting && !error) onDismiss?.()
     }
     document.addEventListener('keydown', onKey)
     return () => document.removeEventListener('keydown', onKey)
-  }, [open, submitting, onDismiss])
+  }, [open, submitting, error, onDismiss])
 
   if (!open) return null
 

@@ -17,7 +17,7 @@ const { getUserTier } = require('../../lib/getUserPlan')
 const { PLANS } = require('../payments/payments.constants')
 const { trackActivity } = require('../../lib/activityTracker')
 const { runAbuseChecks } = require('../../lib/abuseDetection')
-const { checkAndAwardBadges } = require('../../lib/badges')
+const { checkAndAwardBadges, emitAchievementEvent, EVENT_KINDS } = require('../../lib/badges')
 const {
   resolveNextSheetStatus,
   normalizeContentFormat,
@@ -153,6 +153,21 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
 
     trackActivity(prisma, req.user.userId, 'sheets')
     checkAndAwardBadges(prisma, req.user.userId)
+    // Achievements V2 — emit a typed event so early-bird / night-owl / polyglot
+    // criteria can match against hour + lang metadata. Fire-and-forget; failures
+    // never bubble back to the response.
+    if (sheet.status === SHEET_STATUS.PUBLISHED) {
+      const hour = new Date().getHours()
+      // Loop-3 finding F-E: void prefix matches the canonical fire-and-forget
+      // form used by the notes / groups / AI trigger sites. The engine wraps
+      // its own body in try/catch so an unwrapped rejection is impossible
+      // today, but `void` is defensive against future engine changes.
+      void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.SHEET_PUBLISH, {
+        hour,
+        sheetId: sheet.id,
+        courseId: sheet.courseId,
+      })
+    }
 
     res.status(201).json({
       ...serializeSheet(sheet),

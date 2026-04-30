@@ -192,6 +192,20 @@ async function createGroup(req, res) {
     })
 
     const formatted = await formatGroup(group, req.user.userId)
+
+    // Achievements V2 — group founder + group joiner (creator joins their own group).
+    try {
+      const { emitAchievementEvent, EVENT_KINDS } = require('../../lib/badges')
+      void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.GROUP_CREATE, {
+        groupId: group.id,
+      })
+      void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.GROUP_JOIN, {
+        groupId: group.id,
+      })
+    } catch {
+      /* best effort */
+    }
+
     res.status(201).json(formatted)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -570,6 +584,18 @@ async function joinGroup(req, res) {
         ...(joinMessage ? { joinMessage } : {}),
       },
     })
+
+    // Achievements V2 — group joiner unlock (only for active joins, not pending).
+    if (status === 'active') {
+      try {
+        const { emitAchievementEvent, EVENT_KINDS } = require('../../lib/badges')
+        void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.GROUP_JOIN, {
+          groupId,
+        })
+      } catch {
+        /* best effort */
+      }
+    }
 
     // Notify group creator if user joined (not pending)
     if (status === 'active') {

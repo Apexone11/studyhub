@@ -97,6 +97,9 @@ export default function NotificationsPage() {
         setLoadError(false)
       })
     } catch {
+      // Network failure or thrown error — surface the same staleness UI as
+      // a 5xx response so users aren't misled by an empty state.
+      setLoadError(true)
       setLoading(false)
     }
   }

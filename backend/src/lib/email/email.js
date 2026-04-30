@@ -11,6 +11,7 @@ const {
   sendCourseRequestNotice,
   sendHighRiskSheetAlert,
   sendEmailSmoke,
+  sendDataRequest,
 } = require('./emailTemplates')
 
 module.exports = {
@@ -23,5 +24,6 @@ module.exports = {
   sendCourseRequestNotice,
   sendHighRiskSheetAlert,
   sendEmailSmoke,
+  sendDataRequest,
   validateEmailTransport,
 }

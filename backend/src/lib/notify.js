@@ -87,6 +87,13 @@ const OPTIONAL_IN_APP_PREFERENCE_BY_TYPE = Object.freeze({
   group_invite: 'inAppStudyGroups',
   group_session: 'inAppStudyGroups',
   group_post: 'inAppStudyGroups',
+  // Achievements V2 (loop-3 finding F-F): register the new type so the
+  // notify pipeline routes its in-app preference correctly. The lookup
+  // already defaults to `return true` for unknown types so this is
+  // forward-looking — users get a `inAppSocial` opt-out hook instead of
+  // the silent always-on default. No email pref intentionally — we don't
+  // want to spam users with an email per badge unlock.
+  achievement_unlock: 'inAppSocial',
 })
 const EMAIL_TYPE_LABELS = Object.freeze({
   mention: 'You Were Mentioned',
@@ -392,20 +399,25 @@ async function _maybeSendNotificationEmail(
 ) {
   if (performerUserId && performerUserId === userId) return
 
-  // Effective dedup key: callers that don't pass an explicit dedupKey
-  // (most social events: star / fork / follow) still need rate limiting,
-  // otherwise every event sends an email unconditionally. Falling back to
-  // `type` gives one-email-per-(recipient,type)-per-window protection.
-  const effectiveDedupKey = dedupKey || type
+  // Dedup-key fallback applies ONLY to fan-out social types whose callers
+  // intentionally omit dedupKey (star / fork / follow). Critical types like
+  // moderation, payment_failed, and legal_acceptance_required must stay able
+  // to send back-to-back distinct alerts within the dedup window — a strike
+  // followed by an account-restriction email in the same enforcement flow
+  // would otherwise be silently merged. High-priority events also bypass the
+  // fallback so the burst digest can still queue legitimate distinct events.
+  const FAN_OUT_FALLBACK_TYPES = new Set(['star', 'fork', 'follow', 'follow_request'])
+  const effectiveDedupKey =
+    dedupKey || (priority !== 'high' && FAN_OUT_FALLBACK_TYPES.has(type) ? type : null)
 
   if (priority !== 'high') {
-    if (_isDuplicate(userId, type, effectiveDedupKey)) return
-    _recordSent(userId, type, effectiveDedupKey)
+    if (effectiveDedupKey && _isDuplicate(userId, type, effectiveDedupKey)) return
+    if (effectiveDedupKey) _recordSent(userId, type, effectiveDedupKey)
     await sendNotificationEmail(prisma, { userId, type, message, linkPath, priority })
     return
   }
 
-  if (_isDuplicate(userId, type, effectiveDedupKey)) return
+  if (effectiveDedupKey && _isDuplicate(userId, type, effectiveDedupKey)) return
 
   const now = Date.now()
   let queue = _burstQueues.get(userId)
@@ -422,11 +434,11 @@ async function _maybeSendNotificationEmail(
     if (!queue.timer) {
       queue.timer = setTimeout(() => _flushBurstDigest(prisma, userId), BURST_FLUSH_DELAY_MS)
     }
-    _recordSent(userId, type, effectiveDedupKey)
+    if (effectiveDedupKey) _recordSent(userId, type, effectiveDedupKey)
     return
   }
 
-  _recordSent(userId, type, effectiveDedupKey)
+  if (effectiveDedupKey) _recordSent(userId, type, effectiveDedupKey)
   await sendNotificationEmail(prisma, {
     userId,
     type,

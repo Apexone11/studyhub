@@ -32,4 +32,4 @@ Disallow: /preview
 # Block API endpoints from being crawled
 Disallow: /api/
 
-Sitemap: https://studyhub-app.up.railway.app/sitemap.xml
+Sitemap: https://getstudyhub.org/sitemap.xml

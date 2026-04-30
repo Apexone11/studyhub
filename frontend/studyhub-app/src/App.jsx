@@ -64,6 +64,9 @@ const ReviewPage = lazy(() => import('./pages/review/ReviewPage'))
 const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'))
 const InvitePage = lazy(() => import('./pages/invite/InvitePage'))
 const PlagiarismReportPage = lazy(() => import('./pages/plagiarism/PlagiarismReportPage'))
+const AchievementsPage = lazy(() => import('./features/achievements/AchievementsPage'))
+const AchievementDetailPage = lazy(() => import('./features/achievements/AchievementDetailPage'))
+const AchievementUnlockModal = lazy(() => import('./features/achievements/AchievementUnlockModal'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 import ScrollToTop from './components/ScrollToTop'
@@ -126,6 +129,7 @@ const ROUTE_TITLES = {
   '/sheets/new/lab': 'Publish AI Sheet',
   '/announcements': 'Announcements',
   '/notifications': 'Notifications',
+  '/achievements': 'Achievements',
   '/submit': 'Submit Request',
   '/my-courses': 'My Courses',
   '/admin': 'Admin',
@@ -439,7 +443,17 @@ function AppRoutes() {
                     }
                   />
                   {/* Teacher workspace — v2 design refresh Week 2. Non-
-                     teachers are redirected inside the component to /sheets. */}
+                     teachers are redirected inside the component to /sheets.
+                     Bare `/teach` redirects to the materials index so a
+                     direct URL or a sidebar shortcut without the segment
+                     doesn't 404. */}
+                  <Route path="/teach" element={<Navigate to="/teach/materials" replace />} />
+                  {/* Bare `/signup` is a common URL the OAuth role picker
+                     and external links land on. Without this redirect, the
+                     Cancel button on the role picker (which navigates to
+                     `/signup`) 404s instead of returning the user to the
+                     register form. */}
+                  <Route path="/signup" element={<Navigate to="/register" replace />} />
                   <Route
                     path="/teach/materials"
                     element={
@@ -617,6 +631,23 @@ function AppRoutes() {
                       </PrivateRoute>
                     }
                   />
+                  {/* Achievements V2 (2026-04-30) — full gallery + detail page. */}
+                  <Route
+                    path="/achievements"
+                    element={
+                      <PrivateRoute>
+                        <AchievementsPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/achievements/:slug"
+                    element={
+                      <PrivateRoute>
+                        <AchievementDetailPage />
+                      </PrivateRoute>
+                    }
+                  />
                   <Route
                     path="/submit"
                     element={
@@ -693,6 +724,12 @@ function AppRoutes() {
               <ScrollToTop />
               <ToastContainer />
               <OfflineIndicator />
+              {/* Achievements V2 — celebration modal for ?celebrate=:slug
+                  fires globally so unlocks anywhere in the app surface a
+                  visible moment without per-page mounting. */}
+              <Suspense fallback={null}>
+                <AchievementUnlockModal />
+              </Suspense>
               <AuthenticatedBubble />
             </ChatPanelProvider>
           </AuthenticatedAiProvider>

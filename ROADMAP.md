@@ -10,13 +10,13 @@ V2.2.0 is the live production release. It carries forward everything from V2.0.0
 
 ### What's new in V2.2.0 (since V2.0.0)
 
-| Area           | Change                                                                                                                                                                                                                    |
-| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Creator Audit  | Frontend consent modal + publish-flow gate, soft-delete revocation, `acceptanceMethod` provenance, server-side 5-check audit (HTML / asset origin / PII / accessibility / copyright).                                     |
-| Notifications  | Real-time Socket.io push (`notification:new`), full-page `/notifications` route with type filters and bulk actions, type-coloured icons, viral fan-out dedup so a sheet that gets 1000 stars no longer creates 1000 rows. |
-| Plagiarism UX  | Fork lineage (ancestors + descendants + siblings) excluded from similarity scans — forks no longer trip the plagiarism flag. Notification copy is now actionable instead of accusatory.                                   |
-| TypeScript     | Both workspaces compile cleanly under `tsc --noEmit`. New code is `.ts` / `.tsx`. Shared API shapes live in `shared/types/`.                                                                                              |
-| Privacy & docs | New public `PRIVACY.md` at the repo root, `FIELD_ENCRYPTION_KEY` enforced at production startup, complete `.env.example` for the frontend, SSRF allowlist scaffold ready for Scholar tier.                                |
+| Area            | Change                                                                                                                                                                                                                                                        |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Creator Audit   | Frontend consent modal + publish-flow gate, soft-delete revocation, `acceptanceMethod` provenance, server-side 5-check audit (HTML / asset origin / PII / accessibility / copyright).                                                                         |
+| Notifications   | Real-time Socket.io push (`notification:new`), full-page `/notifications` route with type filters and bulk actions, type-coloured icons, viral fan-out dedup so a sheet that gets 1000 stars no longer creates 1000 rows.                                     |
+| Plagiarism UX   | Fork lineage (ancestors + descendants + siblings) excluded from similarity scans — forks no longer trip the plagiarism flag. Notification copy is now actionable instead of accusatory.                                                                       |
+| Achievements V2 | 54 badges across 10 categories with 5 visible tiers + secret tier, XP / Level system, hexagon SVG visual, public profile gallery, pinned-6 strip on every Overview tab, dedicated `/achievements` and `/achievements/:slug` routes, unlock celebration modal. |
+| Privacy & docs  | New public `PRIVACY.md` at the repo root, `FIELD_ENCRYPTION_KEY` enforced at production startup, complete `.env.example` for the frontend, SSRF allowlist scaffold ready for Scholar tier.                                                                    |
 
 ### V2.0.0 — V2.2.0 Feature Summary (cumulative)
 
@@ -133,4 +133,4 @@ V3.0 focuses on **smarter studying**, **deeper collaboration**, and **campus exp
 
 ## Contributing to the Roadmap
 
-Have an idea? Open a GitHub Issue with the `enhancement` label. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+Have an idea? Open a GitHub Issue with the `enhancement` label. See [CONTRIBUTING.md] for details.

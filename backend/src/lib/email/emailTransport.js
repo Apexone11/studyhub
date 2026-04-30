@@ -2,7 +2,11 @@ const fs = require('node:fs/promises')
 const path = require('node:path')
 const nodemailer = require('nodemailer')
 const prisma = require('../prisma')
-const DEFAULT_ADMIN_EMAIL = 'abdulrfornah@getstudyhub.org'
+// Service-account default. Used when neither ADMIN_EMAIL nor EMAIL_USER
+// is set. Prefer a role address ("noreply@") over a personal one so
+// outbound mail and error responses don't disclose a real human's
+// inbox to anonymous recipients.
+const DEFAULT_ADMIN_EMAIL = 'noreply@getstudyhub.org'
 const RESEND_API_BASE_URL = 'https://api.resend.com'
 
 function getPublicAppUrl() {

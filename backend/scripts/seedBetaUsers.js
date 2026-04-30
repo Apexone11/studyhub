@@ -567,6 +567,117 @@ const IN_FLIGHT_DESIGN_V2_FLAGS = [
   'design_v2_teach_sections',
 ]
 
+/**
+ * seedAchievementsV2 — make beta_student1 a usable demo account.
+ *
+ * Per CLAUDE.md §11: every UI surface needs a seed update so a fresh
+ * `npm run seed:beta` produces a localhost state where the feature is visible
+ * end-to-end without manual data setup.
+ *
+ * Strategy:
+ *   1. Upsert all 54 badges from BADGE_CATALOG (idempotent).
+ *   2. For beta_student1, unlock 12 badges across categories + 3 secrets,
+ *      pin 6, and write the UserAchievementStats row directly so the level
+ *      chip renders without waiting for an event.
+ *   3. For beta_student2, unlock 6.
+ *   4. For beta_student3, unlock 2.
+ *   5. For beta_admin, unlock the founding-member badge.
+ */
+async function seedAchievementsV2(users) {
+  const {
+    BADGE_CATALOG: _BADGE_CATALOG,
+    seedBadgeCatalog,
+    recomputeUserAchievementStats,
+  } = require('../src/modules/achievements')
+
+  // 1. Upsert the catalog.
+  await seedBadgeCatalog(prisma)
+
+  // 2. Look up badge IDs once.
+  const allBadges = await prisma.badge.findMany()
+  const bySlug = new Map(allBadges.map((b) => [b.slug, b]))
+
+  const userByName = new Map(users.map((u) => [u.username, u]))
+  const beta1 = userByName.get(process.env.BETA_STUDENT1_USERNAME || 'beta_student1')
+  const beta2 = userByName.get(process.env.BETA_STUDENT2_USERNAME || 'beta_student2')
+  const beta3 = userByName.get(process.env.BETA_STUDENT3_USERNAME || 'beta_student3')
+  const betaAdmin = userByName.get(process.env.BETA_ADMIN_USERNAME || 'beta_admin')
+
+  async function unlockMany(userId, slugs, pinnedSlugs = []) {
+    if (!userId) return
+    const pinSet = new Set(pinnedSlugs)
+    let pinOrder = 1
+    for (const slug of slugs) {
+      const badge = bySlug.get(slug)
+      if (!badge) continue
+      const pinned = pinSet.has(slug)
+      try {
+        await prisma.userBadge.upsert({
+          where: { userId_badgeId: { userId, badgeId: badge.id } },
+          update: pinned ? { pinned: true, pinOrder: pinOrder++ } : {},
+          create: {
+            userId,
+            badgeId: badge.id,
+            pinned,
+            pinOrder: pinned ? pinOrder++ : null,
+          },
+        })
+      } catch {
+        /* duplicate — ignore */
+      }
+    }
+    await recomputeUserAchievementStats(prisma, userId)
+  }
+
+  if (beta1) {
+    // 12 unlocked + 3 secrets unlocked, 6 pinned. Mix of categories + tiers
+    // so the gallery filters all show real data.
+    await unlockMany(
+      beta1.id,
+      [
+        'first-sheet',
+        'prolific-author-s',
+        'first-fork',
+        'fork-machine-s',
+        'first-contribution',
+        'contributor-s',
+        'first-review',
+        'first-note',
+        'note-taker-s',
+        'group-joiner',
+        'first-follower',
+        'streak-7',
+        'ai-curious',
+        'early-bird',
+        'lab-rat',
+        'quickdraw',
+      ],
+      ['prolific-author-s', 'fork-machine-s', 'contributor-s', 'streak-7', 'lab-rat', 'quickdraw'],
+    )
+  }
+
+  if (beta2) {
+    await unlockMany(beta2.id, [
+      'first-sheet',
+      'first-fork',
+      'first-note',
+      'group-joiner',
+      'first-follower',
+      'ai-curious',
+    ])
+  }
+
+  if (beta3) {
+    await unlockMany(beta3.id, ['first-sheet', 'first-follower'])
+  }
+
+  if (betaAdmin) {
+    await unlockMany(betaAdmin.id, ['founding-member'])
+  }
+
+  console.log('Seeded Achievements V2 catalog + beta unlocks.')
+}
+
 async function main() {
   assertLocalDatabase('beta test-user seed')
   const specs = getBetaUsers()
@@ -589,13 +700,14 @@ async function main() {
   await seedAiSuggestions(studentUsers)
   await seedSheetsGridFixture(studentUsers)
   await seedCreatorAuditConsent(users)
+  await seedAchievementsV2(users)
   await seedFeatureFlags(prisma)
 
   console.log('Local beta users are ready:')
   for (const user of users) {
     console.log(`- ${user.role.padEnd(7)} ${user.username} (password set)`)
   }
-  console.log('Seeded upcoming exams + design_v2_* feature flags for local beta.')
+  console.log('Seeded upcoming exams + Achievements V2 + design_v2_* feature flags for local beta.')
 }
 
 module.exports = { IN_FLIGHT_DESIGN_V2_FLAGS }
