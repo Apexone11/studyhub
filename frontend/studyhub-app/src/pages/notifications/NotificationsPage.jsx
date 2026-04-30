@@ -49,6 +49,20 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState('all')
   const [sessionExpired, setSessionExpired] = useState(false)
+  const [loadError, setLoadError] = useState(false)
+
+  /* eslint-disable react-hooks/set-state-in-effect --
+   * Re-enable polling when the user re-authenticates in another tab and the
+   * session context delivers a fresh user object. Without this, a single 401
+   * permanently wedges the page until a hard refresh. There is no external
+   * system to sync with — this is the simplest correct pattern. */
+  useEffect(() => {
+    if (user) {
+      setSessionExpired(false)
+      setLoadError(false)
+    }
+  }, [user])
+  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function refresh({ signal, startTransition } = {}) {
     if (!user) return
@@ -66,13 +80,21 @@ export default function NotificationsPage() {
         setLoading(false)
         return
       }
-      if (!res.ok) return
+      // Distinguish a server error from "genuinely empty inbox": if the
+      // request fails with a 5xx, surface it instead of letting the empty
+      // state pretend everything is fine.
+      if (!res.ok) {
+        setLoadError(true)
+        setLoading(false)
+        return
+      }
       const data = await res.json()
       const apply = (fn) => (startTransition ? startTransition(fn) : fn())
       apply(() => {
         setNotifications(data.notifications || [])
         setUnreadCount(data.unreadCount || 0)
         setLoading(false)
+        setLoadError(false)
       })
     } catch {
       setLoading(false)
@@ -279,6 +301,28 @@ export default function NotificationsPage() {
           })}
         </div>
 
+        {/* Staleness banner — show whenever a refresh fails, even if we
+         * already have notifications cached from an earlier successful
+         * load. Without this, a user with a non-empty inbox sees stale
+         * data with zero indication that the most recent refresh failed. */}
+        {loadError && notifications.length > 0 && (
+          <div
+            role="alert"
+            style={{
+              padding: '10px 24px',
+              fontSize: 13,
+              fontWeight: 600,
+              background: 'var(--sh-warning-bg)',
+              color: 'var(--sh-warning-text)',
+              borderBottom: '1px solid var(--sh-border)',
+              textAlign: 'center',
+            }}
+          >
+            Showing cached notifications — the latest refresh failed. Pull to refresh or try again
+            in a moment.
+          </div>
+        )}
+
         {/* List */}
         <div role="list">
           {loading ? (
@@ -286,6 +330,26 @@ export default function NotificationsPage() {
               <Skeleton height={64} />
               <Skeleton height={64} />
               <Skeleton height={64} />
+            </div>
+          ) : loadError && filtered.length === 0 ? (
+            <div
+              role="alert"
+              style={{
+                padding: '40px 24px',
+                textAlign: 'center',
+                background: 'var(--sh-danger-bg)',
+                color: 'var(--sh-danger-text)',
+                border: '1px solid var(--sh-danger-border, var(--sh-border))',
+                margin: 16,
+                borderRadius: 12,
+              }}
+            >
+              <div style={{ fontWeight: 700, fontSize: 15, marginBottom: 6 }}>
+                Could not load notifications
+              </div>
+              <div style={{ fontSize: 13 }}>
+                The server returned an error. Try refreshing in a moment.
+              </div>
             </div>
           ) : filtered.length === 0 ? (
             <div

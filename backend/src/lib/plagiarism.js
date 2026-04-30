@@ -85,10 +85,14 @@ async function getForkLineageIds(db, sheetId) {
 
     /* BFS-expand descendants from every node currently in lineage. This catches
      * direct children, siblings (children of an ancestor), and cousins. Caps
-     * total visited at 500 to bound cost on pathological fork trees. */
+     * total visited at 500 to bound cost on pathological fork trees AND to
+     * keep the resulting `notIn:` Prisma parameter list under PostgreSQL's
+     * ~65k bind-parameter limit. The inner check breaks as soon as the cap
+     * is reached so we don't blow past 500 within a single batch on a
+     * very wide fork tree. */
     const MAX_VISITED = 500
     const queue = [...lineage]
-    while (queue.length > 0 && lineage.size < MAX_VISITED) {
+    outer: while (queue.length > 0 && lineage.size < MAX_VISITED) {
       const batch = queue.splice(0, Math.min(queue.length, 25))
       const children = await db.studySheet.findMany({
         where: { forkOf: { in: batch } },
@@ -96,6 +100,7 @@ async function getForkLineageIds(db, sheetId) {
         take: MAX_VISITED,
       })
       for (const child of children) {
+        if (lineage.size >= MAX_VISITED) break outer
         if (!lineage.has(child.id)) {
           lineage.add(child.id)
           queue.push(child.id)

@@ -134,8 +134,23 @@ export function useSocket() {
     socketRef.current.connect()
 
     return () => {
-      if (socketRef.current) {
-        socketRef.current.disconnect()
+      // Remove every listener AND null the ref so a future effect run cannot
+      // accidentally attach a second copy of the same listener to a stale
+      // manager. Without this, repeated isAuthenticated toggles can stack
+      // duplicate listeners on the underlying io manager (which survives
+      // disconnect()), causing setConnected/setConnectionError to fire N
+      // times per reconnect event in long sessions.
+      const sock = socketRef.current
+      if (sock) {
+        try {
+          sock.io?.off?.('reconnect_failed')
+          sock.io?.off?.('reconnect')
+          sock.removeAllListeners?.()
+          sock.disconnect()
+        } catch {
+          /* ignore — defensive cleanup, never throw on teardown */
+        }
+        socketRef.current = null
       }
     }
   }, [isAuthenticated])

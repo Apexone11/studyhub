@@ -38,19 +38,29 @@ export default function UploadSheetPage() {
 
   /* Creator Audit publish gate (flag-gated, fail-closed). When the flag is on
    * and the user has not yet acknowledged the responsibility doc, the modal
-   * intercepts publish and re-runs handleSubmit only after consent is recorded. */
+   * intercepts publish and re-runs handleSubmit only after consent is recorded.
+   *
+   * Destructure stable primitives instead of capturing the whole `consent`
+   * object — the hook returns a new object reference on every render, which
+   * would otherwise re-create the navActions tree on every keystroke. */
   const flags = useDesignV2Flags()
   const consent = useCreatorConsent({ enabled: flags.creatorAudit === true })
+  const {
+    accepted: consentAccepted,
+    loading: consentLoading,
+    requireConsent: requireCreatorConsent,
+  } = consent
+  const submitFromHook = hook.handleSubmit
 
   const handleGatedSubmit = useCallback(
     (...args) => {
-      if (flags.creatorAudit && !consent.accepted && !consent.loading) {
-        consent.requireConsent(() => hook.handleSubmit(...args))
+      if (flags.creatorAudit && !consentAccepted && !consentLoading) {
+        requireCreatorConsent(() => submitFromHook(...args))
         return
       }
-      hook.handleSubmit(...args)
+      submitFromHook(...args)
     },
-    [flags.creatorAudit, consent, hook],
+    [flags.creatorAudit, consentAccepted, consentLoading, requireCreatorConsent, submitFromHook],
   )
 
   const navActions = (

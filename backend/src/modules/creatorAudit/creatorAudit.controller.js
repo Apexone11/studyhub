@@ -254,11 +254,14 @@ async function acceptConsent(req, res) {
     })
 
     // Already-active consent on this version: idempotent no-op.
+    // Guard acceptedAt with optional chaining — backfill rows or rows
+    // inserted via direct SQL may have a null acceptedAt and we must
+    // not crash the idempotent re-POST path with a TypeError.
     if (existingConsent?.docVersion === docVersion && !existingConsent.revokedAt) {
       return res.json({
         accepted: true,
         docVersion: existingConsent.docVersion,
-        acceptedAt: existingConsent.acceptedAt.toISOString(),
+        acceptedAt: existingConsent.acceptedAt?.toISOString() ?? null,
       })
     }
 

@@ -131,8 +131,20 @@ function resolvePreviewOrigin(req) {
     }
   }
 
-  const host = normalizePreviewHost(req?.get?.('host')) || 'localhost:4000'
-  return `${incomingProtocol}://${host}`
+  // Host header is client-controlled. We pass it through normalizePreviewHost,
+  // which validates the hostname against an allowlist (isTrustedPreviewHost)
+  // — so a spoofed Host that doesn't match a known StudyHub origin is
+  // rejected and we fall back to a safe default. In production the default
+  // is the canonical API origin; in dev it's localhost:4000.
+  const trustedHost = normalizePreviewHost(req?.get?.('host'))
+  if (trustedHost) {
+    return `${incomingProtocol}://${trustedHost}`
+  }
+
+  const fallbackHost =
+    process.env.NODE_ENV === 'production' ? 'api.getstudyhub.org' : 'localhost:4000'
+  const fallbackProtocol = process.env.NODE_ENV === 'production' ? 'https' : incomingProtocol
+  return `${fallbackProtocol}://${fallbackHost}`
 }
 
 /**

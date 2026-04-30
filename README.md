@@ -65,7 +65,7 @@ Built by students, for students — StudyHub turns scattered notes, dead group c
 
 ## Project Structure
 
-```
+```text
 studyhub/
   backend/              Express API + Prisma data layer
     src/
@@ -105,11 +105,11 @@ npm --prefix backend run dev          # API on port 4000
 npm --prefix frontend/studyhub-app run dev   # Frontend on port 5173
 ```
 
-## Current Release: V2.0.0
+## Current Release: V2.2.0
 
-StudyHub V2.0.0 is the current live release. See [ROADMAP.md](ROADMAP.md) for what's next.
+StudyHub V2.2.0 is the current live release. See [ROADMAP.md](ROADMAP.md) for what's next.
 
-### V2.0.0 Highlights
+### V2.0.0 - V2.2.0 Highlights
 
 - Hub AI: Claude-powered AI assistant with streaming responses, context-aware suggestions, and AI-generated study sheets
 - Video platform: chunked uploads to Cloudflare R2, custom player with theater mode, video feed posts
@@ -122,6 +122,7 @@ StudyHub V2.0.0 is the current live release. See [ROADMAP.md](ROADMAP.md) for wh
 - Authentication: WebAuthn passkeys, Google OAuth, JWT httpOnly cookies
 - Global search across sheets, courses, users, notes, and groups
 - Block/mute system enforced across all social features
+- Creator Audit consent, provenance, and publish-flow trust gates
 - 49 rate limiters, Prisma field encryption, provenance manifests
 
 ## Why StudyHub
@@ -133,10 +134,11 @@ StudyHub V2.0.0 is the current live release. See [ROADMAP.md](ROADMAP.md) for wh
 
 ## Resources
 
-- Website: https://www.getstudyhub.net
-- About and roadmap: https://www.getstudyhub.net/about
-- Source code: https://github.com/Apexone11/studyhub
-- Issues and feedback: https://github.com/Apexone11/studyhub/issues
+- Website: [https://www.getstudyhub.org](https://www.getstudyhub.org)
+- About and roadmap: [https://www.getstudyhub.org/about](https://www.getstudyhub.org/about)
+- Backup domain: [https://www.getstudyhub.net](https://www.getstudyhub.net)
+- Source code: [https://github.com/Apexone11/studyhub](https://github.com/Apexone11/studyhub)
+- Issues and feedback: [https://github.com/Apexone11/studyhub/issues](https://github.com/Apexone11/studyhub/issues)
 
 ## Contributing
 

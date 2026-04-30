@@ -67,6 +67,13 @@ async function main({ dryRun = false } = {}) {
         }
         throw err
       }
+      // Progress every 100 users so an operator running this on a large
+      // production user table sees the script is still alive.
+      if (processed % 100 === 0) {
+        console.log(
+          `[backfillCreatorConsent] progress: processed=${processed}/${usersWithoutConsent.length}`,
+        )
+      }
     }
   } finally {
     console.log(
