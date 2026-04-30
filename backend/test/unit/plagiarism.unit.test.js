@@ -301,6 +301,8 @@ describe('plagiarismService.findSimilarContent', () => {
     })
 
     mocks.prisma.studySheet.findMany
+      // Lineage BFS query (no descendants for this test)
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           id: 2,
@@ -389,27 +391,30 @@ describe('plagiarismService.findSimilarContent', () => {
       createdAt: new Date('2026-01-01'),
     })
 
-    // Phase 1: no exact-hash matches
-    mocks.prisma.studySheet.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([
-      {
-        id: 2,
-        title: 'Near Duplicate',
-        userId: 20,
-        createdAt: new Date('2026-02-01'),
-        contentSimhash: fpNear.simhash,
-        contentHash: fpNear.exactHash,
-        author: { id: 20, username: 'near' },
-      },
-      {
-        id: 3,
-        title: 'Unrelated Topic',
-        userId: 30,
-        createdAt: new Date('2026-02-02'),
-        contentSimhash: fpDifferent.simhash,
-        contentHash: fpDifferent.exactHash,
-        author: { id: 30, username: 'other' },
-      },
-    ])
+    // Lineage BFS (no descendants), then Phase 1 (no exact-hash matches), then Phase 2 simhash matches
+    mocks.prisma.studySheet.findMany
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([
+        {
+          id: 2,
+          title: 'Near Duplicate',
+          userId: 20,
+          createdAt: new Date('2026-02-01'),
+          contentSimhash: fpNear.simhash,
+          contentHash: fpNear.exactHash,
+          author: { id: 20, username: 'near' },
+        },
+        {
+          id: 3,
+          title: 'Unrelated Topic',
+          userId: 30,
+          createdAt: new Date('2026-02-02'),
+          contentSimhash: fpDifferent.simhash,
+          contentHash: fpDifferent.exactHash,
+          author: { id: 30, username: 'other' },
+        },
+      ])
     mocks.prisma.note.findMany.mockResolvedValue([])
 
     const result = await plagiarismService.findSimilarContent({
@@ -439,6 +444,8 @@ describe('plagiarismService.findSimilarContent', () => {
     })
 
     mocks.prisma.studySheet.findMany
+      // Lineage BFS (no descendants)
+      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([
         {
           id: 2,
@@ -493,7 +500,11 @@ describe('plagiarismService.findSimilarContent', () => {
       author: { id: 500 + i, username: `copier${i}` },
     }))
 
-    mocks.prisma.studySheet.findMany.mockResolvedValueOnce(fakeMatches).mockResolvedValueOnce([])
+    mocks.prisma.studySheet.findMany
+      // Lineage BFS (no descendants)
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(fakeMatches)
+      .mockResolvedValueOnce([])
     mocks.prisma.note.findMany.mockResolvedValue([])
 
     const result = await plagiarismService.findSimilarContent({

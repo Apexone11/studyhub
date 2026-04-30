@@ -131,6 +131,7 @@ model User {
   subscription               Subscription?
   payments                   Payment[]
   donations                  Donation[]
+  creatorAuditConsent        CreatorAuditConsent?
   commentReactions           CommentReaction[]
   feedPostCommentReactions   FeedPostCommentReaction[]
   noteCommentReactions       NoteCommentReaction[]
@@ -172,6 +173,25 @@ model User {
   @@index([role])
   @@index([emailHash])
   @@index([lastActiveAt])
+}
+
+model CreatorAuditConsent {
+  id               Int       @id @default(autoincrement())
+  userId           Int       @unique
+  acceptedAt       DateTime  @default(now())
+  docVersion       String    @db.VarChar(16)
+  ipAddress        String?   @db.VarChar(64)
+  userAgent        String?   @db.VarChar(512)
+  // Provenance of the row so auditors and legal can tell genuine
+  // acceptances from synthetic ones. 'user' = clicked through the
+  // modal, 'backfill' = inserted by backfillCreatorConsent.js at
+  // ship time, 'seed' = inserted by seedBetaUsers.js for local dev.
+  acceptanceMethod String    @default("user") @db.VarChar(16)
+  // Soft-delete: revocation sets revokedAt instead of deleting the
+  // row, preserving the audit trail for legal disputes. Active
+  // consent = revokedAt IS NULL AND docVersion = current.
+  revokedAt        DateTime?
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 }
 
 model LegalDocument {
@@ -354,6 +374,9 @@ model StudySheet {
   aiReviewFindings       String?      @db.Text // JSON findings array
   aiReviewReasoning      String?      @db.Text // 1-3 sentence reasoning
   aiReviewedAt           DateTime?
+  lastAuditGrade         String?      @db.VarChar(1)
+  lastAuditReport        Json?
+  lastAuditedAt          DateTime?
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
   course                 Course       @relation(fields: [courseId], references: [id])
@@ -497,6 +520,9 @@ model Note {
   moderationStatus String         @default("clean")
   contentHash      String?
   contentSimhash   String?
+  lastAuditGrade   String?        @db.VarChar(1)
+  lastAuditReport  Json?
+  lastAuditedAt    DateTime?
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
   author           User           @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -598,6 +624,7 @@ model Notification {
   actor     User?    @relation("NotifActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([userId, read, createdAt(sort: Desc)])
+  @@index([userId, type, actorId, sheetId, createdAt(sort: Desc)], map: "Notification_fanout_dedup_idx")
 }
 
 model UserFollow {
@@ -2553,6 +2580,9 @@ model Material {
   instructions String   @default("")
   week         Int?
   archived     Boolean  @default(false)
+  lastAuditGrade  String?   @db.VarChar(1)
+  lastAuditReport Json?
+  lastAuditedAt   DateTime?
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 

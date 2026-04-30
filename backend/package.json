@@ -1,12 +1,13 @@
 {
   "name": "studyhub-backend",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "private": true,
   "main": "src/index.js",
   "scripts": {
     "build": "node --check src/index.js",
     "dev": "nodemon src/index.js",
-    "lint": "eslint . --ext .js",
+    "lint": "eslint . --ext .js,.ts",
+    "typecheck": "tsc --noEmit",
     "start": "node scripts/start.js",
     "db:migrate": "prisma migrate deploy",
     "db:push": "prisma db push",
@@ -21,6 +22,7 @@
     "seed:notes-hardening-flag": "node scripts/seedNotesHardeningFlag.js",
     "backfill:note-version-bytes": "node scripts/backfillNoteVersionBytes.js",
     "backfill:previewText": "node scripts/backfillPreviewText.js",
+    "backfill:creator-consent": "node scripts/backfillCreatorConsent.js",
     "smoke:routes": "node scripts/smokeRoutes.js",
     "migrate:readiness": "node scripts/checkMigrationReadiness.js",
     "migrate:readiness:deploy": "node scripts/checkMigrationReadiness.js --deploy",
@@ -70,6 +72,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.1",
+    "@types/bcryptjs": "~2.4.6",
+    "@types/compression": "~1.7.5",
+    "@types/cors": "~2.8.17",
+    "@types/express": "~5.0.0",
+    "@types/jsonwebtoken": "~9.0.7",
+    "@types/multer": "~1.4.12",
+    "@types/node": "~20.17.10",
+    "@types/sanitize-html": "~2.13.0",
     "autocannon": "^8.0.0",
     "eslint": "^10.1.0",
     "eslint-config-prettier": "^10.1.5",
@@ -77,6 +87,7 @@
     "nodemon": "^3.1.14",
     "prisma": "^6.19.2",
     "supertest": "^7.1.4",
+    "typescript": "~5.6.3",
     "vitest": "^4.0.4"
   },
   "overrides": {

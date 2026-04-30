@@ -1,7 +1,8 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('path')
-const { NOTE_IMAGES_DIR } = require('../../lib/storage')
+const { NOTE_IMAGES_DIR, safeUnlinkFile } = require('../../lib/storage')
+const { signatureMatchesExpected, validateMagicBytes } = require('../../lib/fileSignatures')
 const requireAuth = require('../../middleware/auth')
 const requireVerifiedEmail = require('../../middleware/requireVerifiedEmail')
 const optionalAuth = require('../../core/auth/optionalAuth')
@@ -94,7 +95,7 @@ router.post(
   async (req, res) => {
     const noteId = parseInt(req.params.id, 10)
     const commentId = parseInt(req.params.commentId, 10)
-    const userId = req.user.userId
+    const { userId } = req.user
     const { type } = req.body || {}
 
     if (!Number.isInteger(noteId) || noteId < 1)
@@ -273,6 +274,27 @@ router.post('/:id/images', requireAuth, mutateLimiter, requireVerifiedEmail, (re
       return sendError(res, 400, 'Image must be 5 MB or smaller.', ERROR_CODES.BAD_REQUEST)
     }
     if (err) return sendError(res, 400, err.message, ERROR_CODES.BAD_REQUEST)
+    if (req.file) {
+      if (!signatureMatchesExpected(req.file.path, Array.from(NOTE_IMAGE_ALLOWED_MIME)).ok) {
+        safeUnlinkFile(req.file.path)
+        return sendError(
+          res,
+          400,
+          'Image contents do not match a supported image format.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
+      const magic = validateMagicBytes(req.file.path, req.file.mimetype)
+      if (!magic.valid) {
+        safeUnlinkFile(req.file.path)
+        return sendError(
+          res,
+          400,
+          'Image file signature does not match its declared type.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
+    }
     notesController.uploadNoteImage(req, res)
   })
 })
@@ -280,7 +302,7 @@ router.post('/:id/images', requireAuth, mutateLimiter, requireVerifiedEmail, (re
 // ── POST /api/notes/:id/react — Like or dislike a note ──────────────────
 router.post('/:id/react', requireAuth, commentReactLimiter, async (req, res) => {
   const noteId = parseInt(req.params.id, 10)
-  const userId = req.user.userId
+  const { userId } = req.user
   const { type } = req.body || {}
 
   if (!['like', 'dislike'].includes(type)) {

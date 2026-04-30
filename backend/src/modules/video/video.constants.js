@@ -1,27 +1,48 @@
 /**
- * video.constants.js — Configuration constants for the video module
+ * video.constants.js — Configuration constants for the video module.
+ *
+ * Subscription tier caps for video duration + size are derived from
+ * the canonical PLANS spec in `payments.constants.js`. Earlier this
+ * file hardcoded a flat 10-minute cap for every tier even though the
+ * pricing page advertises Free=30 min / Donor=45 min / Pro=60 min —
+ * users on paid tiers were silently denied the longer uploads they
+ * paid for. Re-deriving from PLANS guarantees the two files can't
+ * drift again. `admin` keeps a separate, generous cap because the
+ * admin announcements feature lives in this same module and §2 of
+ * the feature-expansion roadmap calls for longer official broadcasts
+ * than student uploads.
  */
 
+const { PLANS } = require('../payments/payments.constants')
+
 // ── Upload limits ────────────────────────────────────────────────────────
-// Duration limits by subscription tier (seconds)
+// Duration limits by subscription tier (seconds). Derived from PLANS.
 const VIDEO_DURATION_LIMITS = {
-  free: 30 * 60, // 30 minutes
-  pro_monthly: 60 * 60, // 1 hour
-  pro_yearly: 60 * 60, // 1 hour
-  donor: 45 * 60, // 45 minutes
-  admin: 2 * 60 * 60, // 2 hours
+  free: PLANS.free.videoMinutes * 60,
+  donor: PLANS.donor.videoMinutes * 60,
+  pro_monthly: PLANS.pro_monthly.videoMinutes * 60,
+  pro_yearly: PLANS.pro_yearly.videoMinutes * 60,
+  // Admin uploads (announcements) get a 50% bump above Pro so official
+  // broadcasts can run longer than student uploads. Matches the §2
+  // roadmap "10-minute cap suggested" reasoning — we land at 90 min
+  // because admin video is rare and content-quality vetted.
+  admin: 90 * 60,
 }
 
-// Default fallback (for unknown plans)
+// Default fallback (for unknown plans / unauthenticated requests).
 const MAX_VIDEO_DURATION = VIDEO_DURATION_LIMITS.free
 
-// File size limits by subscription tier (bytes)
+// File size limits by subscription tier (bytes). Derived from PLANS,
+// converted from MB to bytes here so the rest of the module can stay
+// in bytes (multer / Range / chunk math).
 const VIDEO_SIZE_LIMITS = {
-  free: 500 * 1024 * 1024, // 500 MB
-  pro_monthly: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
-  pro_yearly: 1.5 * 1024 * 1024 * 1024, // 1.5 GB
-  donor: 1 * 1024 * 1024 * 1024, // 1 GB
-  admin: 2 * 1024 * 1024 * 1024, // 2 GB
+  free: PLANS.free.videoSizeMb * 1024 * 1024,
+  donor: PLANS.donor.videoSizeMb * 1024 * 1024,
+  pro_monthly: PLANS.pro_monthly.videoSizeMb * 1024 * 1024,
+  pro_yearly: PLANS.pro_yearly.videoSizeMb * 1024 * 1024,
+  // Admin gets a slightly larger cap than Pro for announcement
+  // archives. 2 GB matches what we used to hardcode here.
+  admin: 2 * 1024 * 1024 * 1024,
 }
 
 const MAX_VIDEO_SIZE = VIDEO_SIZE_LIMITS.free

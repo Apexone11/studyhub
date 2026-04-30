@@ -21,11 +21,27 @@ const RECOMMENDED = [
   { key: 'FRONTEND_URL', description: 'Frontend origin for CORS + redirects' },
 ]
 
+/* Required only when NODE_ENV === 'production'. Missing → hard exit at boot.
+ * Promoted from OPTIONAL on 2026-04-30 after the security audit found that a
+ * missing FIELD_ENCRYPTION_KEY in prod would cause encrypted PII columns to
+ * silently fall back to plaintext. */
+const REQUIRED_IN_PRODUCTION = [
+  {
+    key: 'FIELD_ENCRYPTION_KEY',
+    // 64 hex chars = 32 raw bytes for AES-256, matching the runtime check
+    // in lib/fieldEncryption.js. A shorter value would pass the boot check
+    // but crash on the first encrypt/decrypt call.
+    minLength: 64,
+    pattern: /^[0-9a-fA-F]{64}$/,
+    description:
+      'Field-level encryption key for the PII vault. Must be a 64-char hex string (32 bytes).',
+  },
+]
+
 const OPTIONAL = [
   { key: 'GOOGLE_CLIENT_ID', description: 'Google OAuth' },
   { key: 'GOOGLE_CLIENT_SECRET', description: 'Google OAuth' },
   { key: 'KMS_KEY_ARN', description: 'AWS KMS PII vault encryption' },
-  { key: 'FIELD_ENCRYPTION_KEY', description: 'Field-level encryption' },
   { key: 'CLAMAV_HOST', description: 'ClamAV antivirus scanner' },
   { key: 'R2_ACCOUNT_ID', description: 'Cloudflare R2 storage' },
 ]
@@ -39,6 +55,24 @@ function validateSecrets() {
     const value = process.env[secret.key]
     if (!value || (secret.minLength && value.length < secret.minLength)) {
       missing.push(`${secret.key} — ${secret.description}`)
+    }
+  }
+
+  if (isProduction) {
+    for (const secret of REQUIRED_IN_PRODUCTION) {
+      const value = process.env[secret.key]
+      const wrongLength = secret.minLength && (!value || value.length < secret.minLength)
+      const wrongPattern = secret.pattern && value && !secret.pattern.test(value)
+      if (!value || wrongLength || wrongPattern) {
+        missing.push(`${secret.key} — ${secret.description}`)
+      }
+    }
+  } else {
+    // In dev/test we surface as a warning so contributors know it exists.
+    for (const secret of REQUIRED_IN_PRODUCTION) {
+      if (!process.env[secret.key]) {
+        warnings.push(`${secret.key} — ${secret.description} (required in production)`)
+      }
     }
   }
 
@@ -62,10 +96,19 @@ function validateSecrets() {
     for (const w of warnings) console.warn(`  - ${w}`)
   }
 
-  const configured = REQUIRED.length + RECOMMENDED.length + OPTIONAL.length
-  const set = [...REQUIRED, ...RECOMMENDED, ...OPTIONAL].filter((s) => process.env[s.key]).length
+  const configured =
+    REQUIRED.length + REQUIRED_IN_PRODUCTION.length + RECOMMENDED.length + OPTIONAL.length
+  const set = [...REQUIRED, ...REQUIRED_IN_PRODUCTION, ...RECOMMENDED, ...OPTIONAL].filter(
+    (s) => process.env[s.key],
+  ).length
 
   console.warn(`[SECURITY] Secrets: ${set}/${configured} configured.`)
 }
 
-module.exports = { validateSecrets, REQUIRED, RECOMMENDED, OPTIONAL }
+module.exports = {
+  validateSecrets,
+  REQUIRED,
+  REQUIRED_IN_PRODUCTION,
+  RECOMMENDED,
+  OPTIONAL,
+}

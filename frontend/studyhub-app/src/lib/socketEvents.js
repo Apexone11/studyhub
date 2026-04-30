@@ -37,4 +37,9 @@ export const SOCKET_EVENTS = {
   // Study group discussion events
   GROUP_DISCUSSION_NEW: 'group:discussion:new',
   GROUP_DISCUSSION_REPLY: 'group:discussion:reply',
+
+  // Notification events (per-user push delivery)
+  NOTIFICATION_NEW: 'notification:new',
+  NOTIFICATION_READ: 'notification:read',
+  NOTIFICATION_CLEAR: 'notification:clear',
 }

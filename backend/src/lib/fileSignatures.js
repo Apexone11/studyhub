@@ -5,6 +5,72 @@ function bytesToAscii(buffer, start = 0, end = buffer.length) {
   return buffer.subarray(start, end).toString('ascii')
 }
 
+function detectBufferSignature(input) {
+  const head = Buffer.isBuffer(input)
+    ? input.subarray(0, 32)
+    : Buffer.from(input || '').subarray(0, 32)
+
+  if (head.length >= 5 && bytesToAscii(head, 0, 5) === '%PDF-') {
+    return { mime: 'application/pdf', type: 'pdf' }
+  }
+  if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) {
+    return { mime: 'image/jpeg', type: 'image' }
+  }
+  if (
+    head.length >= 8 &&
+    head[0] === 0x89 &&
+    bytesToAscii(head, 1, 4) === 'PNG' &&
+    head[4] === 0x0d &&
+    head[5] === 0x0a &&
+    head[6] === 0x1a &&
+    head[7] === 0x0a
+  ) {
+    return { mime: 'image/png', type: 'image' }
+  }
+  if (head.length >= 6) {
+    const gifHeader = bytesToAscii(head, 0, 6)
+    if (gifHeader === 'GIF87a' || gifHeader === 'GIF89a') {
+      return { mime: 'image/gif', type: 'image' }
+    }
+  }
+  if (
+    head.length >= 12 &&
+    bytesToAscii(head, 0, 4) === 'RIFF' &&
+    bytesToAscii(head, 8, 12) === 'WEBP'
+  ) {
+    return { mime: 'image/webp', type: 'image' }
+  }
+  if (head.length >= 12 && bytesToAscii(head, 4, 8) === 'ftyp') {
+    const brand = bytesToAscii(head, 8, 12).toLowerCase()
+    if (brand === 'avif') return { mime: 'image/avif', type: 'image' }
+    return { mime: 'video/mp4', type: 'video' }
+  }
+  if (head.length >= 8 && bytesToAscii(head, 4, 8) === 'moov') {
+    return { mime: 'video/mp4', type: 'video' }
+  }
+  if (
+    head.length >= 4 &&
+    head[0] === 0x1a &&
+    head[1] === 0x45 &&
+    head[2] === 0xdf &&
+    head[3] === 0xa3
+  ) {
+    return { mime: 'video/webm', type: 'video' }
+  }
+  // ZIP-based formats (DOCX, XLSX, PPTX, plain ZIP)
+  if (
+    head.length >= 4 &&
+    head[0] === 0x50 &&
+    head[1] === 0x4b &&
+    head[2] === 0x03 &&
+    head[3] === 0x04
+  ) {
+    return { mime: 'application/zip', type: 'archive' }
+  }
+
+  return null
+}
+
 function detectFileSignature(filePath) {
   const resolvedPath = path.resolve(String(filePath || ''))
   const buffer = Buffer.alloc(32)
@@ -15,48 +81,7 @@ function detectFileSignature(filePath) {
     const bytesRead = fs.readSync(fd, buffer, 0, buffer.length, 0)
     const head = buffer.subarray(0, bytesRead)
 
-    if (head.length >= 5 && bytesToAscii(head, 0, 5) === '%PDF-') {
-      return { mime: 'application/pdf', type: 'pdf' }
-    }
-    if (head.length >= 3 && head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) {
-      return { mime: 'image/jpeg', type: 'image' }
-    }
-    if (
-      head.length >= 8 &&
-      head[0] === 0x89 &&
-      bytesToAscii(head, 1, 4) === 'PNG' &&
-      head[4] === 0x0d &&
-      head[5] === 0x0a &&
-      head[6] === 0x1a &&
-      head[7] === 0x0a
-    ) {
-      return { mime: 'image/png', type: 'image' }
-    }
-    if (head.length >= 6) {
-      const gifHeader = bytesToAscii(head, 0, 6)
-      if (gifHeader === 'GIF87a' || gifHeader === 'GIF89a') {
-        return { mime: 'image/gif', type: 'image' }
-      }
-    }
-    if (
-      head.length >= 12 &&
-      bytesToAscii(head, 0, 4) === 'RIFF' &&
-      bytesToAscii(head, 8, 12) === 'WEBP'
-    ) {
-      return { mime: 'image/webp', type: 'image' }
-    }
-    // ZIP-based formats (DOCX, XLSX, PPTX, plain ZIP)
-    if (
-      head.length >= 4 &&
-      head[0] === 0x50 &&
-      head[1] === 0x4b &&
-      head[2] === 0x03 &&
-      head[3] === 0x04
-    ) {
-      return { mime: 'application/zip', type: 'archive' }
-    }
-
-    return null
+    return detectBufferSignature(head)
   } catch {
     return null
   } finally {
@@ -78,6 +103,27 @@ const ZIP_COMPATIBLE_MIMES = new Set([
   'application/vnd.openxmlformats-officedocument.presentationml.presentation',
 ])
 
+const MP4_COMPATIBLE_MIMES = new Set(['video/mp4', 'video/quicktime'])
+
+function isSignatureCompatible(detectedMime, declaredMime) {
+  if (detectedMime === declaredMime) return true
+  if (detectedMime === 'image/jpeg' && declaredMime === 'image/jpg') return true
+  if (detectedMime === 'application/zip' && ZIP_COMPATIBLE_MIMES.has(declaredMime)) return true
+  if (detectedMime === 'video/mp4' && MP4_COMPATIBLE_MIMES.has(declaredMime)) return true
+  return false
+}
+
+function signatureMatchesAnyExpected(detectedMime, expectedMimes = []) {
+  const normalizedExpected = new Set(
+    expectedMimes.map((value) => String(value || '').toLowerCase()).filter(Boolean),
+  )
+  return (
+    normalizedExpected.size === 0 ||
+    normalizedExpected.has(detectedMime) ||
+    Array.from(normalizedExpected).some((expected) => isSignatureCompatible(detectedMime, expected))
+  )
+}
+
 function validateMagicBytes(filePath, declaredMimeType) {
   const detected = detectFileSignature(filePath)
   const declared = String(declaredMimeType || '').toLowerCase()
@@ -86,18 +132,22 @@ function validateMagicBytes(filePath, declaredMimeType) {
     return { valid: false, detectedType: null, declaredType: declared }
   }
 
-  // Exact match
-  if (detected.mime === declared) {
+  if (isSignatureCompatible(detected.mime, declared)) {
     return { valid: true, detectedType: detected.mime, declaredType: declared }
   }
 
-  // JPEG has multiple valid MIME representations
-  if (detected.mime === 'image/jpeg' && declared === 'image/jpg') {
-    return { valid: true, detectedType: detected.mime, declaredType: declared }
+  return { valid: false, detectedType: detected.mime, declaredType: declared }
+}
+
+function validateMagicBytesFromBuffer(buffer, declaredMimeType) {
+  const detected = detectBufferSignature(buffer)
+  const declared = String(declaredMimeType || '').toLowerCase()
+
+  if (!detected) {
+    return { valid: false, detectedType: null, declaredType: declared }
   }
 
-  // ZIP-based Office formats all share the PK magic bytes
-  if (detected.mime === 'application/zip' && ZIP_COMPATIBLE_MIMES.has(declared)) {
+  if (isSignatureCompatible(detected.mime, declared)) {
     return { valid: true, detectedType: detected.mime, declaredType: declared }
   }
 
@@ -113,12 +163,23 @@ function signatureMatchesExpected(filePath, expectedMimes = []) {
     }
   }
 
-  const normalizedExpected = new Set(
-    expectedMimes.map((value) => String(value || '').toLowerCase()).filter(Boolean),
-  )
+  return {
+    ok: signatureMatchesAnyExpected(detected.mime, expectedMimes),
+    detected,
+  }
+}
+
+function signatureMatchesExpectedFromBuffer(buffer, expectedMimes = []) {
+  const detected = detectBufferSignature(buffer)
+  if (!detected) {
+    return {
+      ok: false,
+      detected: null,
+    }
+  }
 
   return {
-    ok: normalizedExpected.size === 0 || normalizedExpected.has(detected.mime),
+    ok: signatureMatchesAnyExpected(detected.mime, expectedMimes),
     detected,
   }
 }
@@ -166,8 +227,11 @@ function validateSvgContent(filePath) {
 }
 
 module.exports = {
+  detectBufferSignature,
   detectFileSignature,
+  signatureMatchesExpectedFromBuffer,
   signatureMatchesExpected,
+  validateMagicBytesFromBuffer,
   validateMagicBytes,
   validateSvgContent,
 }

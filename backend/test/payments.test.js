@@ -201,7 +201,11 @@ describe('payments.constants', () => {
       const freePlan = paymentsConstants.PLANS.free
       expect(freePlan.name).toBe('Free')
       expect(freePlan.uploadsPerMonth).toBe(10)
-      expect(freePlan.aiMessagesPerDay).toBe(10)
+      // Updated 2026-04-30: Free tier was raised from 10 → 30 daily AI
+      // messages (with a 60-message bump for verified email) per the
+      // pricing-page alignment in the v2 release log.
+      expect(freePlan.aiMessagesPerDay).toBe(30)
+      expect(freePlan.aiMessagesPerDayVerified).toBe(60)
       expect(freePlan.storageMb).toBe(500)
       expect(freePlan.prioritySupport).toBe(false)
       expect(freePlan.proBadge).toBe(false)
@@ -288,7 +292,7 @@ describe('payments.service — Webhook Handlers', () => {
             plan: 'pro_monthly',
             status: 'active',
           }),
-        })
+        }),
       )
     })
 
@@ -322,9 +326,7 @@ describe('payments.service — Webhook Handlers', () => {
       mocks.email.sendSubscriptionWelcome.mockRejectedValue(new Error('Email service down'))
 
       // Should not throw, error should be logged
-      await expect(
-        paymentsService.handleCheckoutCompleted(session)
-      ).resolves.toBeUndefined()
+      await expect(paymentsService.handleCheckoutCompleted(session)).resolves.toBeUndefined()
     })
 
     it('handles missing user ID gracefully', async () => {
@@ -398,7 +400,7 @@ describe('payments.service — Webhook Handlers', () => {
             status: 'completed',
             stripePaymentIntentId: 'pi_123',
           },
-        })
+        }),
       )
       expect(mocks.prisma.payment.create).toHaveBeenCalledWith({
         data: {
@@ -455,9 +457,7 @@ describe('payments.service — Webhook Handlers', () => {
       mocks.email.sendDonationThankYou.mockRejectedValue(new Error('Email failed'))
 
       // Should not throw
-      await expect(
-        paymentsService.handleCheckoutCompleted(session)
-      ).resolves.toBeUndefined()
+      await expect(paymentsService.handleCheckoutCompleted(session)).resolves.toBeUndefined()
     })
   })
 
@@ -491,7 +491,7 @@ describe('payments.service — Webhook Handlers', () => {
             status: 'past_due',
             cancelAtPeriodEnd: true,
           }),
-        })
+        }),
       )
     })
 
@@ -553,7 +553,7 @@ describe('payments.service — Webhook Handlers', () => {
             status: 'canceled',
             canceledAt: expect.any(Date),
           },
-        })
+        }),
       )
     })
 
@@ -603,7 +603,7 @@ describe('payments.service — Webhook Handlers', () => {
             status: 'succeeded',
             type: 'subscription',
           }),
-        })
+        }),
       )
     })
 
@@ -670,7 +670,7 @@ describe('payments.service — Webhook Handlers', () => {
           amountCents: 499,
           description: 'Pro Plan — Monthly',
           receiptUrl: 'https://stripe.com/invoice/456',
-        })
+        }),
       )
     })
   })
@@ -691,7 +691,7 @@ describe('payments.service — Webhook Handlers', () => {
         expect.objectContaining({
           where: { stripeCustomerId: 'cus_123' },
           data: { status: 'past_due' },
-        })
+        }),
       )
     })
 
@@ -722,9 +722,7 @@ describe('payments.service — Webhook Handlers', () => {
       mocks.notify.createNotification.mockRejectedValue(new Error('DB down'))
 
       // Should not throw
-      await expect(
-        paymentsService.handleInvoicePaymentFailed(invoice)
-      ).resolves.toBeUndefined()
+      await expect(paymentsService.handleInvoicePaymentFailed(invoice)).resolves.toBeUndefined()
     })
   })
 })
@@ -799,7 +797,7 @@ describe('payments.service — Queries', () => {
           username: 'donor1',
           totalAmount: 50000,
           donationCount: 5,
-        })
+        }),
       )
       expect(result[1]).toEqual(
         expect.objectContaining({
@@ -807,7 +805,7 @@ describe('payments.service — Queries', () => {
           username: 'donor2',
           totalAmount: 25000,
           donationCount: 2,
-        })
+        }),
       )
     })
 
@@ -823,7 +821,7 @@ describe('payments.service — Queries', () => {
           status: 'completed',
           anonymous: false,
           NOT: [{ userId: null }],
-        })
+        }),
       )
     })
   })
@@ -853,7 +851,7 @@ describe('payments.service — Queries', () => {
           userId: 20,
           username: 'subscriber1',
           plan: 'pro_monthly',
-        })
+        }),
       )
     })
 
@@ -867,7 +865,7 @@ describe('payments.service — Queries', () => {
         expect.objectContaining({
           status: { in: ['active', 'trialing'] },
           plan: { in: ['pro_monthly', 'pro_yearly'] },
-        })
+        }),
       )
     })
   })
@@ -909,7 +907,7 @@ describe('payments.service — Queries', () => {
         expect.objectContaining({
           skip: 50, // (3-1) * 25
           take: 25,
-        })
+        }),
       )
       expect(result.totalPages).toBe(4) // ceil(100/25)
     })
@@ -993,7 +991,7 @@ describe('payments.service — Queries', () => {
         expect.objectContaining({
           orderBy: { createdAt: 'desc' },
           take: 20,
-        })
+        }),
       )
     })
   })

@@ -5,6 +5,7 @@
  */
 import { useCallback, useRef, useState } from 'react'
 import { API } from '../../config'
+import { resolveImageUrl } from '../../lib/imageUrls'
 import { authHeaders } from '../../pages/sheets/lab/sheetLabConstants'
 import { showToast } from '../../lib/toast'
 
@@ -237,7 +238,8 @@ export default function EditorToolbar({ editor, themeAware = false }) {
         if (!response.ok) throw new Error(data.error || 'Upload failed.')
 
         // Insert image into editor at current cursor position
-        const imageUrl = data.url.startsWith('http') ? data.url : `${API}${data.url}`
+        const imageUrl = resolveImageUrl(data.url)
+        if (!imageUrl) throw new Error('Upload returned an invalid image URL.')
         editor
           .chain()
           .focus()

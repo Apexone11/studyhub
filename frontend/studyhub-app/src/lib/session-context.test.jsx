@@ -95,9 +95,8 @@ describe('SessionProvider auth refresh policy', () => {
 })
 
 describe('Session-expired modal', () => {
-  // The in-app session-expired modal was replaced by a redirect to
-  // /login?expired=1 (see session-context.jsx handleAuthExpired). Keeping the
-  // test skipped documents the prior behavior and the deliberate change.
+  // TODO(session-expired-modal): Re-enable only if the in-app modal returns.
+  // Current behavior redirects to /login?expired=1 from handleAuthExpired.
   it.skip('shows modal when AUTH_SESSION_EXPIRED_EVENT fires', async () => {
     seedUser()
 

@@ -30,10 +30,8 @@ function renderHomePage() {
 }
 
 describe('HomePage', () => {
-  // The landing hero no longer renders an inline search input; the Hero now
-  // routes visitors to /register or /sheets via CTA buttons. Keeping the test
-  // skipped (not deleted) so it is trivial to re-enable if the search bar
-  // returns as part of a later hero redesign.
+  // TODO(hero-search): Re-enable this only if a future hero redesign restores
+  // the inline search box. The current hero uses CTA links, covered below.
   it.skip('navigates to the sheets page using the search query parameter', async () => {
     const user = userEvent.setup()
 

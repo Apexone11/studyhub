@@ -6,7 +6,15 @@ const PLANS = {
   free: {
     name: 'Free',
     uploadsPerMonth: 10,
-    aiMessagesPerDay: 10,
+    // Documents the per-tier ceiling that ai.constants.js DAILY_LIMITS
+    // actually enforces. Free unverified students get 30/day; flipping
+    // to 60/day is a perk for verifying their email (see ai.service.js
+    // resolveDailyLimit — `verified` branch). The pricing page calls
+    // this out explicitly so the verification perk is visible without
+    // surprising readers who notice they're getting more than the
+    // advertised "10/day" claim ever was.
+    aiMessagesPerDay: 30,
+    aiMessagesPerDayVerified: 60,
     privateGroups: 2,
     libraryBookmarks: 50,
     playgroundProjects: 3,

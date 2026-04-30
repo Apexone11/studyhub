@@ -3,7 +3,8 @@ const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const requireAuth = require('../../core/auth/requireAuth')
 const { cleanupAttachmentIfUnused } = require('../../lib/storage')
-const { validateHtmlForSubmission } = require('../../lib/html/htmlSecurity')
+const { validateHtmlForSubmission, RISK_TIER } = require('../../lib/html/htmlSecurity')
+const { scanHtmlContentForPersistence } = require('../../lib/html/htmlDraftValidation')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const { updateFingerprint } = require('../../lib/plagiarismService')
 const { findSimilarSheets } = require('../../lib/plagiarism')
@@ -117,6 +118,7 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
       (req.body && Object.hasOwn(req.body, 'status'))
 
     if (contentChanged) {
+      let htmlScanFields = null
       const wantsDraft = requestedStatus === SHEET_STATUS.DRAFT
       const nextStatus = wantsDraft
         ? SHEET_STATUS.DRAFT
@@ -142,10 +144,15 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
           if (!validation.ok) {
             return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
           }
+          htmlScanFields = await scanHtmlContentForPersistence(htmlToValidate)
         }
       }
 
-      data.status = nextStatus
+      if (htmlScanFields) Object.assign(data, htmlScanFields)
+      data.status =
+        htmlScanFields?.htmlRiskTier === RISK_TIER.QUARANTINED
+          ? SHEET_STATUS.QUARANTINED
+          : nextStatus
     }
     // When only metadata changed (title, description, courseId, allowDownloads),
     // preserve the current status — do not re-run moderation pipeline.

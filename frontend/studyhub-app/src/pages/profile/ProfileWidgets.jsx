@@ -3,21 +3,34 @@
  *
  * Extracted to keep UserProfilePage.jsx a thin orchestrator.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { IconBook, IconSheets, IconStar } from '../../components/Icons'
 import BadgeDisplay from '../../components/BadgeDisplay'
 import StudyStatusChip from '../../components/StudyStatusChip'
 import UserAvatar from '../../components/UserAvatar'
-import { API } from '../../config'
+import { resolveImageUrl } from '../../lib/imageUrls'
 import { FONT, cardStyle, sectionHeadingStyle, pillStyle } from './profileConstants'
+
+const AVATAR_RETRY_DELAY_MS = 30000
 
 /* ── Avatar ─────────────────────────────────────────────────────────────── */
 export function ProfileAvatar({ profile, initials, isOwnProfile, onAvatarClick }) {
-  const [imgError, setImgError] = useState(false)
+  const [failedAvatarUrl, setFailedAvatarUrl] = useState(null)
   const hasPro = profile.plan === 'pro_monthly' || profile.plan === 'pro_yearly'
   const hasDonor = profile.isDonor || Boolean(profile.donorLevel)
   const showBadge = hasPro || hasDonor
+  const profileAvatarUrl = resolveImageUrl(profile.avatarUrl)
+  const visibleAvatarUrl =
+    profileAvatarUrl && profileAvatarUrl !== failedAvatarUrl ? profileAvatarUrl : null
+
+  useEffect(() => {
+    if (!failedAvatarUrl) return undefined
+    const retryTimer = window.setTimeout(() => {
+      setFailedAvatarUrl((current) => (current === failedAvatarUrl ? null : current))
+    }, AVATAR_RETRY_DELAY_MS)
+    return () => window.clearTimeout(retryTimer)
+  }, [failedAvatarUrl])
 
   const DONOR_COLORS = { bronze: '#cd7f32', silver: '#94a3b8', gold: '#f59e0b' }
 
@@ -53,16 +66,12 @@ export function ProfileAvatar({ profile, initials, isOwnProfile, onAvatarClick }
         }
         aria-label={isOwnProfile ? 'Upload profile photo' : undefined}
       >
-        {profile.avatarUrl && !imgError ? (
+        {visibleAvatarUrl ? (
           <img
-            src={
-              profile.avatarUrl.startsWith('http')
-                ? profile.avatarUrl
-                : `${API}${profile.avatarUrl}`
-            }
+            src={visibleAvatarUrl}
             alt={profile.username}
             loading="lazy"
-            onError={() => setImgError(true)}
+            onError={() => setFailedAvatarUrl(visibleAvatarUrl)}
             style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
           />
         ) : (

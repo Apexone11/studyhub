@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { FONT, tableHeadStyle, tableCell, tableCellStrong } from './adminConstants'
 import { showToast } from '../../lib/toast'
 import { API } from '../../config'
+import { resolveImageUrl } from '../../lib/imageUrls'
 
 function DomainCell({ school, apiJson, onUpdate }) {
   const [editing, setEditing] = useState(false)
@@ -238,91 +239,99 @@ export default function SchoolsTab({ apiJson }) {
             </tr>
           </thead>
           <tbody>
-            {schools.map((school) => (
-              <tr key={school.id} style={{ borderBottom: '1px solid var(--sh-border)' }}>
-                {/* Logo */}
-                <td style={{ ...tableCell, width: 64 }}>
-                  <div
-                    style={{
-                      width: 48,
-                      height: 48,
-                      borderRadius: 12,
-                      background: 'var(--sh-soft)',
-                      border: '1px solid var(--sh-border)',
-                      display: 'grid',
-                      placeItems: 'center',
-                      overflow: 'hidden',
-                    }}
-                  >
-                    {school.logoUrl ? (
-                      <img
-                        src={`${API}${school.logoUrl}`}
-                        alt={`${school.short} logo`}
-                        loading="lazy"
-                        style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 6 }}
-                        onError={(e) => {
-                          e.target.style.display = 'none'
-                        }}
-                      />
-                    ) : (
-                      <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--sh-brand)' }}>
-                        {(school.short || '??').slice(0, 4)}
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td style={tableCellStrong}>{school.name}</td>
-                <td style={tableCell}>{school.short}</td>
-                <DomainCell school={school} apiJson={apiJson} onUpdate={handleDomainUpdate} />
-                <td style={tableCell}>
-                  {school.city}
-                  {school.state ? `, ${school.state}` : ''}
-                </td>
-                <td style={tableCell}>{school._count?.courses || 0}</td>
-                <td style={tableCell}>
-                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      onClick={() => startUpload(school.id)}
-                      disabled={uploadingId === school.id}
+            {schools.map((school) => {
+              const logoUrl = resolveImageUrl(school.logoUrl)
+              return (
+                <tr key={school.id} style={{ borderBottom: '1px solid var(--sh-border)' }}>
+                  {/* Logo */}
+                  <td style={{ ...tableCell, width: 64 }}>
+                    <div
                       style={{
-                        padding: '5px 10px',
-                        borderRadius: 8,
-                        fontSize: 11,
-                        fontWeight: 700,
-                        border: '1px solid var(--sh-brand)',
-                        background: 'transparent',
-                        color: 'var(--sh-brand)',
-                        cursor: 'pointer',
-                        fontFamily: FONT,
+                        width: 48,
+                        height: 48,
+                        borderRadius: 12,
+                        background: 'var(--sh-soft)',
+                        border: '1px solid var(--sh-border)',
+                        display: 'grid',
+                        placeItems: 'center',
+                        overflow: 'hidden',
                       }}
                     >
-                      {uploadingId === school.id ? '...' : school.logoUrl ? 'Replace' : 'Upload'}
-                    </button>
-                    {school.logoUrl && (
+                      {logoUrl ? (
+                        <img
+                          src={logoUrl}
+                          alt={`${school.short} logo`}
+                          loading="lazy"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'contain',
+                            padding: 6,
+                          }}
+                          onError={(e) => {
+                            e.target.style.display = 'none'
+                          }}
+                        />
+                      ) : (
+                        <span style={{ fontSize: 11, fontWeight: 800, color: 'var(--sh-brand)' }}>
+                          {(school.short || '??').slice(0, 4)}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td style={tableCellStrong}>{school.name}</td>
+                  <td style={tableCell}>{school.short}</td>
+                  <DomainCell school={school} apiJson={apiJson} onUpdate={handleDomainUpdate} />
+                  <td style={tableCell}>
+                    {school.city}
+                    {school.state ? `, ${school.state}` : ''}
+                  </td>
+                  <td style={tableCell}>{school._count?.courses || 0}</td>
+                  <td style={tableCell}>
+                    <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
                       <button
                         type="button"
-                        onClick={() => removeLogo(school.id)}
+                        onClick={() => startUpload(school.id)}
                         disabled={uploadingId === school.id}
                         style={{
                           padding: '5px 10px',
                           borderRadius: 8,
                           fontSize: 11,
                           fontWeight: 700,
-                          border: '1px solid var(--sh-danger-border)',
+                          border: '1px solid var(--sh-brand)',
                           background: 'transparent',
-                          color: 'var(--sh-danger)',
+                          color: 'var(--sh-brand)',
                           cursor: 'pointer',
                           fontFamily: FONT,
                         }}
                       >
-                        Remove
+                        {uploadingId === school.id ? '...' : school.logoUrl ? 'Replace' : 'Upload'}
                       </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+                      {school.logoUrl && (
+                        <button
+                          type="button"
+                          onClick={() => removeLogo(school.id)}
+                          disabled={uploadingId === school.id}
+                          style={{
+                            padding: '5px 10px',
+                            borderRadius: 8,
+                            fontSize: 11,
+                            fontWeight: 700,
+                            border: '1px solid var(--sh-danger-border)',
+                            background: 'transparent',
+                            color: 'var(--sh-danger)',
+                            cursor: 'pointer',
+                            fontFamily: FONT,
+                          }}
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

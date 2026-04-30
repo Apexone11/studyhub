@@ -239,7 +239,7 @@ router.post('/posts/:id/comments', requireAuth, commentLimiter, async (req, res)
   }
 })
 
-router.post('/posts/:id/react', reactLimiter, async (req, res) => {
+router.post('/posts/:id/react', requireAuth, reactLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(postId)) return res.status(400).json({ error: 'Invalid post id.' })
   const { type } = req.body || {}
@@ -359,7 +359,7 @@ router.post(
   },
 )
 
-router.delete('/posts/:id/comments/:commentId', feedWriteLimiter, async (req, res) => {
+router.delete('/posts/:id/comments/:commentId', requireAuth, feedWriteLimiter, async (req, res) => {
   const commentId = Number.parseInt(req.params.commentId, 10)
   if (!Number.isInteger(commentId)) return res.status(400).json({ error: 'Invalid comment id.' })
 

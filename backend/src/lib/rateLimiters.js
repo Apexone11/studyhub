@@ -1068,6 +1068,35 @@ const aiSuggestionsDismissLimiter = rateLimit({
   message: { error: 'Too many dismissals. Please slow down.' },
 })
 
+// ── CATEGORY: Creator Audit Module ───────────────────────────────────────
+
+const creatorAuditRunLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `creator-audit-run-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many audit requests. Please slow down.' },
+})
+
+const creatorAuditConsentLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `creator-audit-consent-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many consent changes. Please try again later.' },
+})
+
+const creatorAuditConsentReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `creator-audit-consent-read-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many requests. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -1212,4 +1241,9 @@ module.exports = {
   aiSuggestionsReadLimiter,
   aiSuggestionsRefreshLimiter,
   aiSuggestionsDismissLimiter,
+
+  // Creator Audit module
+  creatorAuditRunLimiter,
+  creatorAuditConsentLimiter,
+  creatorAuditConsentReadLimiter,
 }

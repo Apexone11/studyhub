@@ -3,6 +3,7 @@ import AvatarCropModal from '../../components/AvatarCropModal'
 import CoverCropModal from '../../components/CoverCropModal'
 import { API } from '../../config'
 import { readJsonSafely } from '../../lib/http'
+import { resolveImageUrl } from '../../lib/imageUrls'
 import { Button, FormField, Input, Message, SectionCard, Select } from './settingsShared'
 
 const DEFAULT_VISIBILITY = {
@@ -85,11 +86,22 @@ export default function ProfileTab({
   const [message, setMessage] = useState(null)
   const avatarUrl = user?.avatarUrl || sessionUser?.avatarUrl
   const coverUrl = user?.coverImageUrl || sessionUser?.coverImageUrl
+  const avatarImageUrl = resolveImageUrl(avatarUrl)
+  const coverImageUrl = resolveImageUrl(coverUrl)
+  const hasCoverUrl = Boolean(String(coverUrl || '').trim())
   const initials = (user?.username || '??').slice(0, 2).toUpperCase()
 
   useEffect(() => {
     setForm(buildFormState(user))
   }, [user])
+
+  useEffect(() => {
+    setImgError(false)
+  }, [avatarUrl])
+
+  useEffect(() => {
+    setCoverImgError(false)
+  }, [coverUrl])
 
   async function handleRemoveCover() {
     setRemovingCover(true)
@@ -200,9 +212,9 @@ export default function ProfileTab({
             marginBottom: 14,
           }}
         >
-          {coverUrl && !coverImgError ? (
+          {coverImageUrl && !coverImgError ? (
             <img
-              src={coverUrl.startsWith('http') ? coverUrl : `${API}${coverUrl}`}
+              src={coverImageUrl}
               alt="Profile cover"
               loading="lazy"
               onError={() => setCoverImgError(true)}
@@ -241,9 +253,9 @@ export default function ProfileTab({
               fontFamily: 'inherit',
             }}
           >
-            {coverUrl ? 'Change cover' : 'Upload cover'}
+            {hasCoverUrl ? 'Change cover' : 'Upload cover'}
           </button>
-          {coverUrl && (
+          {hasCoverUrl && (
             <button
               type="button"
               disabled={removingCover}
@@ -290,9 +302,9 @@ export default function ProfileTab({
               border: '2px solid var(--sh-border)',
             }}
           >
-            {avatarUrl && !imgError ? (
+            {avatarImageUrl && !imgError ? (
               <img
-                src={avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`}
+                src={avatarImageUrl}
                 alt={user?.username || ''}
                 loading="lazy"
                 onError={() => setImgError(true)}

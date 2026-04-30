@@ -40,6 +40,11 @@ const SOCKET_EVENTS = {
 
   // Account events (cross-device propagation)
   USER_ROLE_CHANGED: 'user:roleChanged',
+
+  // Notification events (per-user push delivery)
+  NOTIFICATION_NEW: 'notification:new',
+  NOTIFICATION_READ: 'notification:read',
+  NOTIFICATION_CLEAR: 'notification:clear',
 }
 
 module.exports = SOCKET_EVENTS

@@ -28,7 +28,7 @@ function tierToScanStatus(tier) {
 function normalizeFindings(classifierResult, avResult) {
   const findings = []
 
-  for (const finding of classifierResult.findings) {
+  for (const finding of classifierResult.findings || []) {
     findings.push({
       source: finding.category || 'policy',
       category: finding.category || 'policy',
@@ -58,6 +58,24 @@ function normalizeFindings(classifierResult, avResult) {
   return findings
 }
 
+async function scanHtmlContentForPersistence(html) {
+  const htmlToScan = String(html || '')
+  const classifierResult = classifyHtmlRisk(htmlToScan)
+  let { tier } = classifierResult
+  const avResult = await scanBufferWithClamAv(Buffer.from(htmlToScan, 'utf8'))
+
+  if (avResult && avResult.status === 'infected') {
+    tier = RISK_TIER.QUARANTINED
+  }
+
+  return {
+    htmlScanStatus: tierToScanStatus(tier),
+    htmlRiskTier: tier,
+    htmlScanFindings: normalizeFindings(classifierResult, avResult),
+    htmlScanUpdatedAt: new Date(),
+  }
+}
+
 async function runHtmlScanNow(prisma, { sheetId }) {
   const sheet = await prisma.studySheet.findUnique({
     where: { id: sheetId },
@@ -85,7 +103,7 @@ async function runHtmlScanNow(prisma, { sheetId }) {
 
   // Phase 1: classify risk tier
   const classifierResult = classifyHtmlRisk(htmlToScan)
-  let tier = classifierResult.tier
+  let { tier } = classifierResult
 
   // Phase 2: always run ClamAV (regardless of classifier result)
   const avResult = await scanBufferWithClamAv(Buffer.from(htmlToScan, 'utf8'))
@@ -181,6 +199,7 @@ function scheduleHtmlScan(prisma, { sheetId, delayMs = 450 }) {
 
 module.exports = {
   normalizeFindings,
+  scanHtmlContentForPersistence,
   runHtmlScanNow,
   scheduleHtmlScan,
 }

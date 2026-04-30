@@ -54,6 +54,26 @@ const SHIPPED_DESIGN_V2_FLAGS = [
   // toggle, previewText preview cards, cross-school search toggle,
   // filter pill selected state.
   'design_v2_sheets_grid',
+  // Creator Audit — shipped 2026-04-30. Frontend consent modal +
+  // /api/creator-audit + 5 audit primitives + soft-delete revocation
+  // + acceptanceMethod provenance.
+  //
+  // PROD DEPLOY ORDER (non-negotiable; skipping step 3 surfaces the
+  // consent modal to every existing user on their next publish):
+  //   1. Deploy code with this list in place.
+  //   2. `npx prisma migrate deploy` — applies the consent migrations
+  //      including 20260430000001_add_consent_provenance_and_soft_delete.
+  //   3. `npm --prefix backend run backfill:creator-consent -- --prod-confirm`
+  //      — writes `acceptanceMethod='backfill'` rows for every
+  //      existing user. Idempotent + re-runnable.
+  //   4. `npm --prefix backend run seed:flags` — creates the
+  //      FeatureFlag row that turns the gate on.
+  //
+  // If you forget step 3, the existing user base just sees the
+  // consent modal on their next publish — disruptive, not
+  // destructive. Run the backfill AFTER and they unblock on next
+  // page load.
+  'design_v2_creator_audit',
 ]
 
 async function seedFeatureFlags(prisma) {

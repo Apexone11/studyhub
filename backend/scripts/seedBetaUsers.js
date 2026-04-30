@@ -495,6 +495,45 @@ async function seedSheetsGridFixture(studentUsers) {
 }
 
 /**
+ * Seed creator-audit consent rows for beta users so the consent modal does NOT
+ * fire on first publish during local smoke testing (CLAUDE.md rule #11). The
+ * consent is recorded against the current responsibility doc version. To
+ * exercise the modal locally, delete the row manually:
+ *   DELETE FROM "CreatorAuditConsent" WHERE "userId" = (SELECT id FROM "User" WHERE username = 'beta_student1');
+ */
+async function seedCreatorAuditConsent(users) {
+  const docVersion = '2026.04'
+  for (const user of users) {
+    if (user.role !== 'student') continue
+    try {
+      await prisma.creatorAuditConsent.upsert({
+        where: { userId: user.id },
+        update: {
+          docVersion,
+          acceptedAt: new Date(),
+          revokedAt: null,
+          acceptanceMethod: 'seed',
+        },
+        create: {
+          userId: user.id,
+          docVersion,
+          acceptedAt: new Date(),
+          acceptanceMethod: 'seed',
+          ipAddress: null,
+          userAgent: 'seed:beta',
+        },
+      })
+    } catch (err) {
+      // Table may not exist yet on a fresh checkout that hasn't run migrations.
+      // The seed should still succeed for other fixtures.
+      if (!/CreatorAuditConsent/i.test(String(err?.message || err))) throw err
+      console.warn('Creator Audit consent seed: table missing, skipping.')
+      return
+    }
+  }
+}
+
+/**
  * IN_FLIGHT_DESIGN_V2_FLAGS — DOCUMENTATION ONLY as of decision #20
  * (2026-04-24, CLAUDE.md §12).
  *
@@ -549,6 +588,7 @@ async function main() {
   await seedUpcomingExams(studentUsers)
   await seedAiSuggestions(studentUsers)
   await seedSheetsGridFixture(studentUsers)
+  await seedCreatorAuditConsent(users)
   await seedFeatureFlags(prisma)
 
   console.log('Local beta users are ready:')

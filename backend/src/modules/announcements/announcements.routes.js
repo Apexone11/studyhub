@@ -1,11 +1,16 @@
 const express = require('express')
 const multer = require('multer')
+const path = require('node:path')
 const { readLimiter } = require('../../lib/rateLimiters')
 const { sendForbidden } = require('../../lib/accessControl')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const r2 = require('../../lib/r2Storage')
+const {
+  signatureMatchesExpectedFromBuffer,
+  validateMagicBytesFromBuffer,
+} = require('../../lib/fileSignatures')
 
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
@@ -18,13 +23,15 @@ const MAX_TITLE_LENGTH = 200
 const MAX_IMAGES = 5
 const MAX_IMAGE_SIZE = 10 * 1024 * 1024 // 10 MB per image
 const ALLOWED_IMAGE_MIMES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp'])
+const ALLOWED_IMAGE_EXTENSIONS = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp'])
 
 // Multer for announcement image uploads (memory storage -> R2)
 const imageUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_IMAGE_SIZE, files: MAX_IMAGES },
   fileFilter(_req, file, cb) {
-    if (ALLOWED_IMAGE_MIMES.has(file.mimetype)) cb(null, true)
+    const ext = path.extname(file.originalname).toLowerCase()
+    if (ALLOWED_IMAGE_MIMES.has(file.mimetype) && ALLOWED_IMAGE_EXTENSIONS.has(ext)) cb(null, true)
     else cb(new Error('Only JPEG, PNG, GIF, and WebP images are allowed.'))
   },
 })
@@ -189,6 +196,24 @@ router.post(
 
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
+
+        if (!signatureMatchesExpectedFromBuffer(file.buffer, Array.from(ALLOWED_IMAGE_MIMES)).ok) {
+          return sendError(
+            res,
+            400,
+            'Image contents do not match a supported image format.',
+            ERROR_CODES.BAD_REQUEST,
+          )
+        }
+        const magic = validateMagicBytesFromBuffer(file.buffer, file.mimetype)
+        if (!magic.valid) {
+          return sendError(
+            res,
+            400,
+            'Image file signature does not match its declared type.',
+            ERROR_CODES.BAD_REQUEST,
+          )
+        }
 
         // Upload to R2
         if (!r2.isR2Configured()) {

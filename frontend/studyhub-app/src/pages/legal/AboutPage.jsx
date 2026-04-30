@@ -3,23 +3,27 @@ import Navbar from '../../components/navbar/Navbar'
 import { Link } from 'react-router-dom'
 import { API } from '../../config'
 
-const ROADMAP_V20 = [
+const ROADMAP_V22 = [
   'Hub AI assistant with streaming chat and context awareness',
   'Video uploads with chunked upload to R2',
   'Stripe subscriptions and donations',
   'Real-time messaging (DMs and group chats)',
   'Study groups with sessions and discussions',
-  'Comment reactions and nested replies',
   'Fork, contribute, and merge workflow',
   'Block and mute system for user safety',
+  'Real-time notifications with full /notifications page',
+  'Creator Audit consent + 5-check publish gate',
+  'Plagiarism detection that respects fork lineage',
 ]
 
 const ROADMAP_V25 = [
   'Flashcard mode -- auto-generate from study sheets',
   'Study session timer with Pomodoro integration',
   'Sheet templates library for common formats',
-  'Push notifications for web',
+  'Push notifications for web (browser native)',
+  'Notification grouping ("Alice and 5 others starred your sheet")',
   'Advanced search filters (date, rating, type)',
+  'Cloud import from Google Drive and OneDrive',
 ]
 
 const ROADMAP_V30 = [
@@ -29,6 +33,7 @@ const ROADMAP_V30 = [
   'LMS integration (Canvas, Blackboard)',
   'Mobile PWA enhancements with offline reading',
   'Campus ambassador program and cross-campus discovery',
+  'Scholar tier — academic paper library + citation grounding',
 ]
 
 const HOW_STEPS = [
@@ -312,14 +317,14 @@ export default function AboutPage() {
           <h2 style={s.sectionH2}>Roadmap</h2>
           <div style={{ textAlign: 'center', marginBottom: 8 }}>
             <span style={{ fontSize: 13, color: 'var(--sh-muted)', fontWeight: 'bold' }}>
-              Current Release: V2.0.0
+              Current Release: V2.2.0
             </span>
           </div>
           <div style={{ ...s.roadmapGrid, gridTemplateColumns: 'repeat(3, 1fr)' }}>
             <RoadmapColumn
-              title="V2.0.0 — Current"
+              title="V2.2.0 — Current"
               color={ROADMAP_TONES.current}
-              items={ROADMAP_V20}
+              items={ROADMAP_V22}
             />
             <RoadmapColumn title="V2.5 — Next Up" color={ROADMAP_TONES.next} items={ROADMAP_V25} />
             <RoadmapColumn title="V3.0 — Future" color={ROADMAP_TONES.future} items={ROADMAP_V30} />

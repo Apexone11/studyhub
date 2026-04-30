@@ -48,6 +48,7 @@ const TestTakerPage = lazy(() => import('./pages/tests/TestTakerPage'))
 const NotesPage = lazy(() => import('./pages/notes/NotesPage'))
 const NoteViewerPage = lazy(() => import('./pages/notes/NoteViewerPage'))
 const AnnouncementsPage = lazy(() => import('./pages/announcements/AnnouncementsPage'))
+const NotificationsPage = lazy(() => import('./pages/notifications/NotificationsPage'))
 const SubmitPage = lazy(() => import('./pages/submit/SubmitPage'))
 const MyCoursesPage = lazy(() => import('./pages/courses/MyCoursesPage'))
 const SheetLabPage = lazy(() => import('./pages/sheets/lab/SheetLabPage'))
@@ -124,6 +125,7 @@ const ROUTE_TITLES = {
   '/ai': 'Hub AI',
   '/sheets/new/lab': 'Publish AI Sheet',
   '/announcements': 'Announcements',
+  '/notifications': 'Notifications',
   '/submit': 'Submit Request',
   '/my-courses': 'My Courses',
   '/admin': 'Admin',
@@ -604,6 +606,14 @@ function AppRoutes() {
                     element={
                       <PrivateRoute>
                         <AnnouncementsPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/notifications"
+                    element={
+                      <PrivateRoute>
+                        <NotificationsPage />
                       </PrivateRoute>
                     }
                   />

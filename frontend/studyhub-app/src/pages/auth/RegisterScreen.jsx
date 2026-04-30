@@ -16,6 +16,7 @@ import { validateAccountFields, getSteps } from './registerConstants'
 import useRegisterFlow from './useRegisterFlow'
 import { StepIndicator, AccountStep, VerifyStep } from './RegisterStepFields'
 import { API } from '../../config'
+import { resolveImageUrl } from '../../lib/imageUrls'
 import './RegisterScreen.css'
 
 export default function RegisterScreen() {
@@ -28,6 +29,7 @@ export default function RegisterScreen() {
 
   /* ── Resolve referral code to inviter info ─────────────────────── */
   const [inviter, setInviter] = useState(null)
+  const inviterAvatarUrl = resolveImageUrl(inviter?.inviterAvatarUrl)
 
   useEffect(() => {
     if (!ref) return
@@ -83,9 +85,9 @@ export default function RegisterScreen() {
                 marginBottom: 14,
               }}
             >
-              {inviter.inviterAvatarUrl ? (
+              {inviterAvatarUrl ? (
                 <img
-                  src={inviter.inviterAvatarUrl}
+                  src={inviterAvatarUrl}
                   alt=""
                   style={{
                     width: 28,

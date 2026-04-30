@@ -10,7 +10,10 @@
 import Navbar from '../../../components/navbar/Navbar'
 import SafeJoyride from '../../../components/SafeJoyride'
 import ConfirmDialog from '../../../components/ConfirmDialog'
+import CreatorAuditConsentModal from '../../../components/creatorAudit/CreatorAuditConsentModal'
 import { pageShell } from '../../../lib/ui'
+import { useDesignV2Flags } from '../../../lib/designV2Flags'
+import { useCreatorConsent } from '../../../lib/useCreatorConsent'
 import { FONT } from './uploadSheetConstants'
 import {
   InfoFields,
@@ -27,11 +30,28 @@ import { TutorialModal, HtmlReviewNoticeModal, HtmlScanModal } from '../lab/Html
 import UploadNavActions from './UploadNavActions'
 import DraftsPickerModal from './DraftsPickerModal'
 import useUploadSheet from './useUploadSheet'
-import { useState } from 'react'
+import { useCallback, useState } from 'react'
 
 export default function UploadSheetPage() {
   const hook = useUploadSheet()
   const [showDraftsPicker, setShowDraftsPicker] = useState(false)
+
+  /* Creator Audit publish gate (flag-gated, fail-closed). When the flag is on
+   * and the user has not yet acknowledged the responsibility doc, the modal
+   * intercepts publish and re-runs handleSubmit only after consent is recorded. */
+  const flags = useDesignV2Flags()
+  const consent = useCreatorConsent({ enabled: flags.creatorAudit === true })
+
+  const handleGatedSubmit = useCallback(
+    (...args) => {
+      if (flags.creatorAudit && !consent.accepted && !consent.loading) {
+        consent.requireConsent(() => hook.handleSubmit(...args))
+        return
+      }
+      hook.handleSubmit(...args)
+    },
+    [flags.creatorAudit, consent, hook],
+  )
 
   const navActions = (
     <UploadNavActions
@@ -45,7 +65,7 @@ export default function UploadSheetPage() {
       scanTier={hook.scanState.tier}
       onSaveDraft={hook.saveDraftNow}
       onOpenPreview={hook.openHtmlPreview}
-      onSubmit={hook.handleSubmit}
+      onSubmit={handleGatedSubmit}
       onOpenDrafts={() => setShowDraftsPicker(true)}
     />
   )
@@ -199,6 +219,14 @@ export default function UploadSheetPage() {
         // have to push the in-flight content out ourselves to prevent
         // losing what the user just typed.
         onBeforeNavigate={hook.saveDraftNow}
+      />
+
+      <CreatorAuditConsentModal
+        open={consent.showModal}
+        docVersion={consent.currentDocVersion}
+        loading={consent.loading}
+        onConfirm={consent.confirmAccept}
+        onDismiss={consent.dismissModal}
       />
     </div>
   )

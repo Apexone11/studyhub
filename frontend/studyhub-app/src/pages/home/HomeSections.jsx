@@ -12,6 +12,7 @@ import {
   TESTIMONIALS,
 } from './homeConstants'
 import { API } from '../../config'
+import { resolveImageUrl } from '../../lib/imageUrls'
 
 /* ------------------------------------------------------------------ */
 /*  Features                                                           */
@@ -317,6 +318,7 @@ function TestimonialCard({ t, index }) {
   const starCount = isDynamic ? t.stars || 5 : 5
   const text = isDynamic ? t.text : t.text
   const avatarUrl = isDynamic ? t.user.avatarUrl : null
+  const resolvedAvatarUrl = resolveImageUrl(avatarUrl)
 
   return (
     <article className="home-testimonial-card">
@@ -337,9 +339,9 @@ function TestimonialCard({ t, index }) {
       </div>
       <p className="home-testimonial-text">"{text}"</p>
       <div className="home-testimonial-author">
-        {avatarUrl ? (
+        {resolvedAvatarUrl ? (
           <img
-            src={avatarUrl.startsWith('http') ? avatarUrl : `${API}${avatarUrl}`}
+            src={resolvedAvatarUrl}
             alt=""
             loading="lazy"
             style={{

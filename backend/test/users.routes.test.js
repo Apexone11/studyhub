@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => {
   const prisma = {
     user: {
       findUnique: vi.fn(),
+      findMany: vi.fn(),
     },
     userFollow: {
       findUnique: vi.fn(),
@@ -63,6 +64,9 @@ const mocks = vi.hoisted(() => {
       getProfileAccessDecision: vi.fn().mockResolvedValue({ allowed: true, visibility: 'public' }),
       PROFILE_VISIBILITY: { PUBLIC: 'public', ENROLLED: 'enrolled', PRIVATE: 'private' },
     },
+    piiVault: {
+      getUserPII: vi.fn().mockResolvedValue(null),
+    },
     userBadges: {
       enrichUserWithBadges: vi.fn((user) =>
         Promise.resolve({ ...user, plan: 'free', isDonor: false, donorLevel: null }),
@@ -92,6 +96,7 @@ const mockTargets = new Map([
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/notify'), mocks.notify],
   [require.resolve('../src/lib/profileVisibility'), mocks.profileVisibility],
+  [require.resolve('../src/lib/piiVault'), mocks.piiVault],
   [require.resolve('../src/lib/userBadges'), mocks.userBadges],
   [require.resolve('../src/lib/badges'), mocks.badges],
   [require.resolve('../src/lib/streaks'), mocks.streaks],
@@ -142,17 +147,63 @@ beforeEach(() => {
   mocks.prisma.enrollment.findMany.mockResolvedValue([])
   mocks.prisma.userFollow.findUnique.mockResolvedValue(null)
   mocks.prisma.userFollow.count.mockResolvedValue(0)
+  mocks.prisma.user.findMany.mockResolvedValue([])
   mocks.notify.createNotification.mockResolvedValue({})
   mocks.profileVisibility.getProfileAccessDecision.mockResolvedValue({
     allowed: true,
     visibility: 'public',
   })
+  mocks.piiVault.getUserPII.mockResolvedValue(null)
   mocks.userBadges.enrichUserWithBadges.mockImplementation((user) =>
     Promise.resolve({ ...user, plan: 'free', isDonor: false, donorLevel: null }),
   )
 })
 
 describe('users routes', () => {
+  describe('GET /me', () => {
+    it('returns all enrolled schools while preserving legacy first-school fields', async () => {
+      mocks.prisma.user.findUnique.mockResolvedValue({
+        id: 42,
+        username: 'test_user',
+        displayName: null,
+        email: 'test@example.com',
+        accountType: 'student',
+        avatarUrl: null,
+        role: 'student',
+        emailVerified: true,
+        isStaffVerified: false,
+        bio: null,
+        profileLinks: [],
+        isPrivate: false,
+        createdAt: new Date('2026-01-01'),
+        preferences: { profileFieldVisibility: null },
+        enrollments: [
+          { id: 1, course: { id: 20, school: { id: 200, name: 'South Campus' } } },
+          { id: 2, course: { id: 10, school: { id: 100, name: 'North Campus' } } },
+        ],
+        _count: { studySheets: 0, followers: 0, following: 0, notes: 0 },
+      })
+
+      const response = await request(app).get('/me')
+
+      expect(response.status).toBe(200)
+      expect(mocks.prisma.user.findUnique).toHaveBeenCalledWith(
+        expect.objectContaining({
+          select: expect.objectContaining({
+            enrollments: { include: { course: { include: { school: true } } } },
+          }),
+        }),
+      )
+      expect(response.body.schoolId).toBe(100)
+      expect(response.body.schoolIds).toEqual([100, 200])
+      expect(response.body.schools).toEqual([
+        { id: 100, name: 'North Campus' },
+        { id: 200, name: 'South Campus' },
+      ])
+      expect(response.body.enrollments).toHaveLength(2)
+    })
+  })
+
   describe('GET /:username', () => {
     it('returns user profile with sheets, notes, and starred', async () => {
       mocks.prisma.user.findUnique.mockResolvedValue({
@@ -416,6 +467,45 @@ describe('users routes', () => {
 
       expect(response.status).toBe(404)
       expect(response.body).toMatchObject({ error: 'User not found.' })
+    })
+  })
+
+  describe('GET /me/follow-suggestions', () => {
+    it('ranks suggestions by any shared school and returns all school IDs', async () => {
+      mocks.prisma.userFollow.findMany.mockResolvedValue([])
+      mocks.prisma.user.findUnique.mockResolvedValue({
+        enrollments: [{ course: { school: { id: 20 } } }, { course: { school: { id: 10 } } }],
+      })
+      mocks.prisma.user.findMany.mockResolvedValue([
+        {
+          id: 101,
+          username: 'off_campus',
+          displayName: 'Off Campus',
+          avatarUrl: null,
+          bio: null,
+          enrollments: [{ course: { school: { id: 99 } } }],
+          _count: { studySheets: 0, followers: 99 },
+        },
+        {
+          id: 102,
+          username: 'dual_match',
+          displayName: 'Dual Match',
+          avatarUrl: null,
+          bio: null,
+          enrollments: [{ course: { school: { id: 20 } } }, { course: { school: { id: 10 } } }],
+          _count: { studySheets: 0, followers: 1 },
+        },
+      ])
+
+      const res = await request(app).get('/me/follow-suggestions')
+
+      expect(res.status).toBe(200)
+      expect(res.body[0]).toMatchObject({
+        username: 'dual_match',
+        schoolId: 10,
+        schoolIds: [10, 20],
+      })
+      expect(res.body[1]).toMatchObject({ username: 'off_campus', schoolIds: [99] })
     })
   })
 })
