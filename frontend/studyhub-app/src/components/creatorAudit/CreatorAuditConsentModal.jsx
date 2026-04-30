@@ -97,7 +97,11 @@ export default function CreatorAuditConsentModal({
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
       }}
       onClick={(e) => {
-        if (e.target === e.currentTarget && !submitting) onDismiss?.()
+        // Block accidental backdrop dismissal while an error banner is
+        // visible. The user might miss why the publish action is still
+        // gated if the modal silently disappears after they read "could
+        // not record consent". Force them to use the Cancel button.
+        if (e.target === e.currentTarget && !submitting && !error) onDismiss?.()
       }}
     >
       <div

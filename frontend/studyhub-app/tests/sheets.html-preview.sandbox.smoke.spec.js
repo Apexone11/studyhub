@@ -24,10 +24,11 @@ test('html preview keeps iframe sandbox isolation @smoke', async ({ page }) => {
   await expect(iframe).toBeVisible()
 
   const sandboxValue = (await iframe.getAttribute('sandbox')) || ''
-  expect(sandboxValue).toBe('')
-  expect(sandboxValue).not.toContain('allow-same-origin')
+  expect(sandboxValue).toBe('allow-same-origin')
   expect(sandboxValue).not.toContain('allow-top-navigation')
   expect(sandboxValue).not.toContain('allow-top-navigation-by-user-activation')
+  expect(sandboxValue).not.toContain('allow-scripts')
+  expect(sandboxValue).not.toContain('allow-forms')
 })
 
 test('html preview shows blocked security verdicts @smoke', async ({ page }) => {

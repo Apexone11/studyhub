@@ -28,8 +28,30 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Frontend TypeScript fix for `staticHeaders.test.ts`
+
+- **Frontend typecheck no longer fails on the new staticHeaders test.** Added `@types/node` as a frontend devDependency (scoped to test files via a triple-slash directive at the top of `staticHeaders.test.ts`) so `node:fs`, `node:path`, and `process` resolve in the test, and replaced the deprecated `baseUrl` config in `tsconfig.json` with a `paths`-relative entry so TS 7.0 doesn't flag the project. `npm run typecheck` exits clean on both workspaces.
+
+### Pre-deploy hardening pass (post-screenshot bug review)
+
+- **HTML preview iframe blank-page bug fixed.** When `FRONTEND_URL` env was missing in production, `allowedOrigins` collapsed to `['https://localhost']` and `frame-ancestors` blocked the real `getstudyhub.org` parent. Added `PROD_FRONTEND_FALLBACKS = ['https://getstudyhub.org', 'https://www.getstudyhub.org']` so the frame-ancestors directive always permits the canonical production frontends. Also: Tier 0 safe preview now sets the CSP header explicitly instead of relying on the global preview-surface middleware, so a future route-ordering change can't reintroduce the same blank-iframe failure mode.
+- **`resolvePreviewOrigin` Host fallback hardened.** When no `HTML_PREVIEW_ORIGIN` is configured and the Host header doesn't match the trusted preview allowlist, the fallback now uses `https://api.getstudyhub.org` in production instead of `localhost:4000`.
+- **Notifications routes use the strict write-rate limiter and the `sendError` envelope.** `PATCH /read-all`, `PATCH /:id/read`, `DELETE /read`, `DELETE /:id` now hit `writeLimiter` (60/min) instead of `readLimiter` (200/min), and every error response carries an `ERROR_CODES.*` code so the frontend can branch consistently.
+- **6 latent bugs caught by post-pass review:**
+  - `useSocket` cleanup now removes manager-level listeners and nulls `socketRef` so duplicate listeners can't accumulate across login cycles.
+  - `NotificationsPage` shows a staleness banner when a refresh fails on a non-empty inbox, instead of silently displaying cached data.
+  - `NavbarNotifications.refreshNotifications` guards against missing `startTransition` so a future direct invocation can't crash with a TypeError.
+  - `creatorAudit.acceptConsent` idempotent re-POST no longer crashes when `acceptedAt` is null on a backfilled row.
+  - `notify._maybeSendNotificationEmail` now falls back to `type` for the dedup key when none is provided, closing the email-spam path for social events (`star`, `fork`, `follow`).
+  - `getForkLineageIds` BFS now hard-stops at `MAX_VISITED` inside the inner loop so a wide fork tree can't blow past 500 IDs and trip PostgreSQL's bind-parameter limit on the resulting `notIn:` query.
+- **Modal backdrop guard.** `CreatorAuditConsentModal` no longer dismisses on backdrop click when an error banner is visible — the user has to use the Cancel button so they don't lose the error context.
+- **`UploadSheetPage` consent-gate stability.** `handleGatedSubmit` destructures stable primitives from the `useCreatorConsent` hook return rather than capturing the whole `consent` object, eliminating the per-keystroke nav-action re-render.
+- **Backfill script logs progress every 100 users** so an operator running it on a large production user table sees the script is alive.
+
 ### Creator Audit promotion + gap closures + version bump
 
+- **Public README now points to the canonical `.org` domain.** GitHub-facing resources now use `https://www.getstudyhub.org`, with `.net` documented only as the backup domain.
+- **HTML sheet previews render on the `.org` production frontend again.** The static frontend CSP now allows preview iframes from `https://api.getstudyhub.org` and the future `https://sheets.getstudyhub.org` isolated preview host instead of only Railway's raw `*.up.railway.app` host.
 - **Creator Audit flag promoted to SHIPPED.** `design_v2_creator_audit` is now in `SHIPPED_DESIGN_V2_FLAGS`. Prod deploy order is documented in code: deploy → `prisma migrate deploy` → `backfill:creator-consent --prod-confirm` → `seed:flags`. Skipping the backfill step shows the consent modal to existing users on next publish — disruptive, not destructive, and recoverable by running the backfill afterward.
 - **CreatorAuditConsent gets soft-delete + provenance.** New migration `20260430000001_add_consent_provenance_and_soft_delete` adds `acceptanceMethod` (`'user'` / `'backfill'` / `'seed'`) and `revokedAt` columns. Revocation now soft-deletes (preserves the audit trail), and the controller treats a revoked row as "not accepted" while still allowing seamless re-acceptance.
 - **Notification fan-out dedup keyed on (recipient, type, actor, sheet).** A user starring 50 different sheets by the same author still produces 50 notifications; the same user starring the same sheet twice in an hour produces one. Critical types (mention, reply, contribution, moderation) are never deduped.

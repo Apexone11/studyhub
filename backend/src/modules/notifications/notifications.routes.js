@@ -1,18 +1,20 @@
 const express = require('express')
-const { readLimiter } = require('../../lib/rateLimiters')
+const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const prisma = require('../../lib/prisma')
 
 const router = express.Router()
 
-// All notification routes require auth
+// All notification routes require auth. Reads use the generous read limiter;
+// every mutation hits the stricter write limiter so a compromised session
+// can't burn through 200 mark-all-read calls per minute.
 router.use(requireAuth)
-router.use(readLimiter)
 
 // ── GET /api/notifications ─────────────────────────────────────
-router.get('/', async (req, res) => {
+router.get('/', readLimiter, async (req, res) => {
   const limit = Math.min(parseInt(req.query.limit || '20', 10) || 20, 50)
   const offset = parseInt(req.query.offset || '0', 10) || 0
   try {
@@ -30,12 +32,12 @@ router.get('/', async (req, res) => {
     res.json({ notifications, total, unreadCount, limit, offset })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
 // ── PATCH /api/notifications/read-all ─────────────────────────
-router.patch('/read-all', async (req, res) => {
+router.patch('/read-all', writeLimiter, async (req, res) => {
   try {
     const result = await prisma.notification.updateMany({
       where: { userId: req.user.userId, read: false },
@@ -44,16 +46,16 @@ router.patch('/read-all', async (req, res) => {
     res.json({ updated: result.count })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
 // ── PATCH /api/notifications/:id/read ─────────────────────────
-router.patch('/:id/read', async (req, res) => {
+router.patch('/:id/read', writeLimiter, async (req, res) => {
   const notifId = parseInt(req.params.id, 10)
   try {
     const notif = await prisma.notification.findUnique({ where: { id: notifId } })
-    if (!notif) return res.status(404).json({ error: 'Notification not found.' })
+    if (!notif) return sendError(res, 404, 'Notification not found.', ERROR_CODES.NOT_FOUND)
     if (
       !assertOwnerOrAdmin({
         res,
@@ -73,13 +75,13 @@ router.patch('/:id/read', async (req, res) => {
     res.json(updated)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
 // ── DELETE /api/notifications/read ────────────────────────────
 // Deletes all read notifications for the current user (clear inbox).
-router.delete('/read', async (req, res) => {
+router.delete('/read', writeLimiter, async (req, res) => {
   try {
     const result = await prisma.notification.deleteMany({
       where: { userId: req.user.userId, read: true },
@@ -87,16 +89,16 @@ router.delete('/read', async (req, res) => {
     res.json({ deleted: result.count })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 
 // ── DELETE /api/notifications/:id ─────────────────────────────
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', writeLimiter, async (req, res) => {
   const notifId = parseInt(req.params.id, 10)
   try {
     const notif = await prisma.notification.findUnique({ where: { id: notifId } })
-    if (!notif) return res.status(404).json({ error: 'Notification not found.' })
+    if (!notif) return sendError(res, 404, 'Notification not found.', ERROR_CODES.NOT_FOUND)
     if (
       !assertOwnerOrAdmin({
         res,
@@ -113,7 +115,7 @@ router.delete('/:id', async (req, res) => {
     res.json({ message: 'Notification deleted.' })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

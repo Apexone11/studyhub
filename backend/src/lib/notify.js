@@ -392,14 +392,20 @@ async function _maybeSendNotificationEmail(
 ) {
   if (performerUserId && performerUserId === userId) return
 
+  // Effective dedup key: callers that don't pass an explicit dedupKey
+  // (most social events: star / fork / follow) still need rate limiting,
+  // otherwise every event sends an email unconditionally. Falling back to
+  // `type` gives one-email-per-(recipient,type)-per-window protection.
+  const effectiveDedupKey = dedupKey || type
+
   if (priority !== 'high') {
-    if (dedupKey && _isDuplicate(userId, type, dedupKey)) return
-    if (dedupKey) _recordSent(userId, type, dedupKey)
+    if (_isDuplicate(userId, type, effectiveDedupKey)) return
+    _recordSent(userId, type, effectiveDedupKey)
     await sendNotificationEmail(prisma, { userId, type, message, linkPath, priority })
     return
   }
 
-  if (dedupKey && _isDuplicate(userId, type, dedupKey)) return
+  if (_isDuplicate(userId, type, effectiveDedupKey)) return
 
   const now = Date.now()
   let queue = _burstQueues.get(userId)
@@ -416,11 +422,11 @@ async function _maybeSendNotificationEmail(
     if (!queue.timer) {
       queue.timer = setTimeout(() => _flushBurstDigest(prisma, userId), BURST_FLUSH_DELAY_MS)
     }
-    if (dedupKey) _recordSent(userId, type, dedupKey)
+    _recordSent(userId, type, effectiveDedupKey)
     return
   }
 
-  if (dedupKey) _recordSent(userId, type, dedupKey)
+  _recordSent(userId, type, effectiveDedupKey)
   await sendNotificationEmail(prisma, {
     userId,
     type,

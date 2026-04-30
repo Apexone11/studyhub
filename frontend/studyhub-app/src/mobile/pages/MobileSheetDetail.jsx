@@ -291,7 +291,7 @@ export default function MobileSheetDetail() {
                 src={previewUrl}
                 title="Sheet preview"
                 className="mob-sheet-iframe"
-                sandbox=""
+                sandbox="allow-same-origin"
                 referrerPolicy="no-referrer"
               />
             )}

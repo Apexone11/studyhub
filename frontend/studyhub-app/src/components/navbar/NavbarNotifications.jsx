@@ -34,7 +34,11 @@ export default function NavbarNotifications() {
     const data = await response.json()
     const nowMs = Date.now()
 
-    startTransition(() => {
+    // Guard against direct invocations that don't pass startTransition.
+    // useLivePolling always provides it, but this also runs the function
+    // safely under tests / future direct callers.
+    const apply = (fn) => (typeof startTransition === 'function' ? startTransition(fn) : fn())
+    apply(() => {
       setNotifications(
         (data.notifications || []).map((notif) => ({
           ...notif,

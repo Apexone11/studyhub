@@ -107,8 +107,26 @@ process.on('unhandledRejection', (reason) => {
 
 // Dynamic CORS: dev allows Vite dev/preview servers; production allows primary and alternate frontend URLs.
 const isProd = process.env.NODE_ENV === 'production'
+// Production hard-coded fallbacks. If FRONTEND_URL / FRONTEND_URL_ALT are not
+// set in the environment, we still want CORS + frame-ancestors to permit the
+// canonical production frontend instead of silently blocking it. This is the
+// root cause of the blank-iframe HTML preview bug observed 2026-04-30: when
+// the env vars were missing, allowedOrigins collapsed to ['https://localhost']
+// and frame-ancestors blocked the real getstudyhub.org parent page.
+//
+// We deliberately do NOT include the Railway preview hostname (e.g.
+// studyhub-frontend.up.railway.app) here. Railway preview subdomains can be
+// recycled to other tenants, so hard-coding one would over-allow CORS in
+// perpetuity. If you need to allow a Railway subdomain, set FRONTEND_URL_ALT
+// in env vars for that environment.
+const PROD_FRONTEND_FALLBACKS = ['https://getstudyhub.org', 'https://www.getstudyhub.org']
 const allowedOrigins = isProd
-  ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_ALT, 'https://localhost'].filter(Boolean)
+  ? [
+      process.env.FRONTEND_URL,
+      process.env.FRONTEND_URL_ALT,
+      ...PROD_FRONTEND_FALLBACKS,
+      'https://localhost',
+    ].filter(Boolean)
   : ['http://localhost:5173', 'http://localhost:4173', 'https://localhost']
 
 // In production, also allow www / non-www variants of each origin automatically.

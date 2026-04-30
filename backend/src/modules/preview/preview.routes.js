@@ -169,17 +169,21 @@ router.get('/html', async (req, res) => {
       return res.status(200).send(outputHtml)
     }
 
-    // Tier 0 (clean): current behavior
+    // Tier 0 (clean): explicitly set CSP for both safe and runtime previews
+    // so the route is not relying on the global preview-surface middleware
+    // value silently flowing through. Safer against future route-ordering
+    // refactors that could leave Tier 0 safe previews with frame-ancestors
+    // 'none' and produce the blank-iframe failure mode reported 2026-04-30.
     const outputHtml = isRuntime
       ? buildInteractiveDocument({ title: sheet.title, html: sheet.content })
       : buildPreviewDocument({ title: sheet.title, html: sheet.content })
 
     res.setHeader('Cache-Control', 'private, no-store, max-age=0')
     res.setHeader('Content-Type', 'text/html; charset=utf-8')
-
-    if (isRuntime) {
-      res.setHeader('Content-Security-Policy', buildPreviewCsp(RUNTIME_DIRECTIVES, res))
-    }
+    res.setHeader(
+      'Content-Security-Policy',
+      buildPreviewCsp(isRuntime ? RUNTIME_DIRECTIVES : SAFE_PREVIEW_DIRECTIVES, res),
+    )
 
     return res.status(200).send(outputHtml)
   } catch (error) {
