@@ -1726,6 +1726,7 @@ model AiMessage {
   flaggedReason    String?
   flaggedById      Int?
   flaggedNote      String?   @db.Text
+  createdAt        DateTime  @default(now())
 
   conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User?          @relation("AiMessageUser", fields: [userId], references: [id], onDelete: Cascade)

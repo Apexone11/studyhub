@@ -133,4 +133,4 @@ V3.0 focuses on **smarter studying**, **deeper collaboration**, and **campus exp
 
 ## Contributing to the Roadmap
 
-Have an idea? Open a GitHub Issue with the `enhancement` label. See [CONTRIBUTING.md] for details.
+Have an idea? Open a GitHub Issue with the `enhancement` label. See [CONTRIBUTING.md](CONTRIBUTING.md) for details.

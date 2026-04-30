@@ -148,7 +148,7 @@ const BADGE_CATALOG = [
     criteria: { type: 'count', source: 'sheets_published', threshold: 100 },
   },
   {
-    slug: 'quality-A',
+    slug: 'quality-a',
     name: 'Quality Bar',
     description: 'Earn an A or A+ grade on a published sheet via Creator Audit.',
     category: 'authoring',

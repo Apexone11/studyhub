@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 
 /**
@@ -19,6 +20,37 @@ import { createPortal } from 'react-dom'
  *                triggering the actual file fetch / anchor click.
  */
 export default function HtmlDownloadWarningModal({ open, tier = 0, onCancel, onConfirm }) {
+  const cancelButtonRef = useRef(null)
+
+  // Escape-key dismissal — keyboard users expect this on every modal.
+  // Bound at the document level so the listener fires even when focus
+  // is on the page background (the user opened the modal but hasn't
+  // tabbed into it yet).
+  useEffect(() => {
+    if (!open) return undefined
+    const handler = (event) => {
+      if (event.key === 'Escape') {
+        event.stopPropagation()
+        onCancel?.()
+      }
+    }
+    document.addEventListener('keydown', handler)
+    return () => document.removeEventListener('keydown', handler)
+  }, [open, onCancel])
+
+  // Move focus to the safe default ("Cancel") on open so a stray Enter
+  // press doesn't accidentally confirm a download. Cancel is the
+  // conservative choice for tier-0/1; tier-2/3 wording already warns
+  // users explicitly. requestAnimationFrame waits one frame so the
+  // ref is attached before we focus it.
+  useEffect(() => {
+    if (!open) return undefined
+    const id = window.requestAnimationFrame(() => {
+      cancelButtonRef.current?.focus()
+    })
+    return () => window.cancelAnimationFrame(id)
+  }, [open])
+
   if (!open) return null
 
   const tierCopy = describeTier(tier)
@@ -92,6 +124,7 @@ export default function HtmlDownloadWarningModal({ open, tier = 0, onCancel, onC
         >
           <button
             type="button"
+            ref={cancelButtonRef}
             onClick={onCancel}
             style={{
               padding: '10px 16px',

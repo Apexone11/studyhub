@@ -22,7 +22,12 @@ export default function AchievementDetailPage() {
 
   const [pinning, setPinning] = useState(false)
   const [pinErr, setPinErr] = useState('')
-  const [pinned, setPinned] = useState(false)
+  // Local override that wins over the server snapshot. `null` = no
+  // override yet, fall through to data.pinned. Boolean = user toggled
+  // and we trust the local value until the next refetch. The earlier
+  // `data.pinned || pinned` form couldn't represent "server said
+  // pinned, user just unpinned" because data.pinned stayed true.
+  const [pinnedOverride, setPinnedOverride] = useState(null)
 
   if (loading) {
     return <Loading />
@@ -31,7 +36,7 @@ export default function AchievementDetailPage() {
     return <Navigate to="/achievements" replace />
   }
 
-  const isPinned = data.pinned || pinned
+  const isPinned = pinnedOverride === null ? Boolean(data.pinned) : pinnedOverride
   const holderPercent =
     data.totalUsers > 0 ? Math.round((data.holderCount / data.totalUsers) * 1000) / 10 : 0
 
@@ -42,10 +47,10 @@ export default function AchievementDetailPage() {
     try {
       if (isPinned) {
         await unpinAchievement(slug)
-        setPinned(false)
+        setPinnedOverride(false)
       } else {
         await pinAchievement(slug)
-        setPinned(true)
+        setPinnedOverride(true)
       }
     } catch (e) {
       setPinErr(e.message || 'Failed to update pin.')

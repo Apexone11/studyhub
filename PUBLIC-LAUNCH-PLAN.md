@@ -492,5 +492,5 @@ When the user comes back to take screenshots, the dev environment should already
 
 ---
 
-End of plan. Email this to yourself, open it on the main computer,
+End of plan. Email this to yourself, open it on the main computer, and work through it top to bottom.
 ```

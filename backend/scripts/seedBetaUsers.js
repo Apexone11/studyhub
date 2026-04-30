@@ -611,15 +611,21 @@ async function seedAchievementsV2(users) {
       const badge = bySlug.get(slug)
       if (!badge) continue
       const pinned = pinSet.has(slug)
+      // Compute the pin order ONCE per pinned badge — reading and
+      // incrementing in both the update and create paths (the
+      // earlier `pinOrder++` in each branch) caused gaps and
+      // mis-ordered the pinned strip when upsert hit either path.
+      const orderForThisBadge = pinned ? pinOrder : null
+      if (pinned) pinOrder += 1
       try {
         await prisma.userBadge.upsert({
           where: { userId_badgeId: { userId, badgeId: badge.id } },
-          update: pinned ? { pinned: true, pinOrder: pinOrder++ } : {},
+          update: pinned ? { pinned: true, pinOrder: orderForThisBadge } : {},
           create: {
             userId,
             badgeId: badge.id,
             pinned,
-            pinOrder: pinned ? pinOrder++ : null,
+            pinOrder: orderForThisBadge,
           },
         })
       } catch {

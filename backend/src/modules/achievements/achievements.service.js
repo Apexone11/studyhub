@@ -44,6 +44,20 @@ async function getUserAchievements({ targetUserId, viewerId: _viewerId, isOwner 
     .map((b) => serializeBadge(b, heldMap.get(b.id) || null, { ownerView: isOwner }))
 }
 
+// Tier ordering used to compute `highestTier` from held badges. Mirrors
+// the catalog's tier set; if a tier is added there, add it here.
+const TIER_RANK = { bronze: 0, silver: 1, gold: 2, platinum: 3, diamond: 4, secret: 5 }
+
+function highestTierFromHeld(held) {
+  let best = null
+  for (const ub of held) {
+    const tier = ub.badge?.tier
+    if (!tier || !(tier in TIER_RANK)) continue
+    if (best === null || TIER_RANK[tier] > TIER_RANK[best]) best = tier
+  }
+  return best || 'bronze'
+}
+
 async function getUserStats(userId) {
   if (!userId) return null
   let stats = await prisma.userAchievementStats.findUnique({ where: { userId } })
@@ -59,7 +73,11 @@ async function getUserStats(userId) {
       totalXp,
       level: progress.currentLevel,
       unlockedCount: held.length,
-      highestTier: 'bronze',
+      // Compute from actual held badges so the LevelChip and any tier-
+      // based UI render correctly before the denormalized stats row
+      // exists. The earlier hardcoded 'bronze' miscolored anyone who
+      // unlocked higher-tier badges before recompute ran.
+      highestTier: highestTierFromHeld(held),
       achievementsHidden: false,
       currentLevelMinXp: progress.currentLevelMinXp,
       nextLevel: progress.nextLevel,

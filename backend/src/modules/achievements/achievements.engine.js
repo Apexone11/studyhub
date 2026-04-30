@@ -313,10 +313,13 @@ async function computeStat(prisma, userId, source) {
     case 'followers':
       return prisma.userFollow.count({ where: { followingId: userId } })
     case 'ai_messages':
-      // AiMessage table tracks every message; engine counts ones authored by user.
-      // If the table is missing (older deployment), degrade to 0.
+      // AiMessage table tracks every message; engine counts ones authored by
+      // the user. The sender column is `userId` (not `authorId`) — the
+      // earlier `authorId` query silently caught + returned 0, so AI badges
+      // (`ai-curious`, `ai-power-user`) never unlocked. If the table is
+      // missing (older deployment), degrade to 0.
       try {
-        return await prisma.aiMessage.count({ where: { authorId: userId, role: 'user' } })
+        return await prisma.aiMessage.count({ where: { userId, role: 'user' } })
       } catch {
         return 0
       }
