@@ -1,3 +1,31 @@
 {
-  "java.configuration.updateBuildConfiguration": "automatic"
+  "java.autobuild.enabled": false,
+  "java.configuration.updateBuildConfiguration": "disabled",
+  "java.import.gradle.enabled": false,
+  "java.import.exclusions": ["**/node_modules/**", "**/.gradle/**", "**/build/**", "**/dist/**"],
+  "java.project.resourceFilters": ["node_modules", ".gradle", "build", "dist"],
+  "problems.exclude": {
+    "**/node_modules/**": true,
+    "**/.gradle/**": true,
+    "**/build/**": true,
+    "**/dist/**": true
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.gradle/**": true,
+    "**/build/**": true,
+    "**/dist/**": true
+  },
+  "search.exclude": {
+    "**/node_modules/**": true,
+    "**/.gradle/**": true,
+    "**/build/**": true,
+    "**/dist/**": true
+  },
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/.gradle": true,
+    "**/build": true,
+    "**/dist": true
+  }
 }
