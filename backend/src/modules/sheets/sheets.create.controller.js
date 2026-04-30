@@ -99,6 +99,33 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
         ? allowDownloads
         : await getUserDefaultDownloads(req.user.userId)
 
+    /* If a forkOf parent is claimed, verify it refers to a real published sheet.
+     * Without this check, an attacker could claim any sheet ID as their parent,
+     * which would silently exclude that lineage from the plagiarism scanner —
+     * effectively whitelisting their content against the most-similar real
+     * source. This complements the validation already done by /sheets/:id/fork.
+     * Forks of own sheets are allowed. */
+    let validatedForkOf = null
+    if (forkOf) {
+      const candidate = Number.parseInt(forkOf, 10)
+      if (!Number.isInteger(candidate) || candidate <= 0) {
+        return sendError(res, 400, 'Invalid fork source.', ERROR_CODES.BAD_REQUEST)
+      }
+      const source = await prisma.studySheet.findUnique({
+        where: { id: candidate },
+        select: { id: true, status: true },
+      })
+      if (!source || source.status !== SHEET_STATUS.PUBLISHED) {
+        return sendError(
+          res,
+          400,
+          'Fork source must be an existing published sheet.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
+      validatedForkOf = candidate
+    }
+
     const trimmedContent = content.trim()
     const sheet = await prisma.studySheet.create({
       data: {
@@ -113,7 +140,7 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
             : nextStatus,
         courseId: Number.parseInt(courseId, 10),
         userId: req.user.userId,
-        forkOf: forkOf ? Number.parseInt(forkOf, 10) : null,
+        forkOf: validatedForkOf,
         allowDownloads: resolvedAllowDownloads,
         ...(htmlScanFields || {}),
       },

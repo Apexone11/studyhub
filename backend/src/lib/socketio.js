@@ -38,16 +38,26 @@ function isSocketRateLimited(socketId, event, maxPerMinute = 30) {
   return false
 }
 
-// Clean up stale rate limit entries every 5 minutes
-setInterval(
-  () => {
-    const now = Date.now()
-    for (const [key, entry] of socketRateLimits) {
-      if (now > entry.resetAt) socketRateLimits.delete(key)
-    }
-  },
-  5 * 60 * 1000,
-)
+// Clean up stale rate limit entries every 5 minutes. The interval is started
+// lazily inside initSocketIO so simply requiring this module (e.g. notify.js
+// lazy-requires it for emit) does not keep the Node event loop alive in tests
+// or short-lived scripts.
+let _rateLimitSweepHandle = null
+function startRateLimitSweep() {
+  if (_rateLimitSweepHandle) return
+  _rateLimitSweepHandle = setInterval(
+    () => {
+      const now = Date.now()
+      for (const [key, entry] of socketRateLimits) {
+        if (now > entry.resetAt) socketRateLimits.delete(key)
+      }
+    },
+    5 * 60 * 1000,
+  )
+  // Allow the process to exit even if this interval is the only thing pending
+  // (e.g. graceful shutdown, tests).
+  if (typeof _rateLimitSweepHandle.unref === 'function') _rateLimitSweepHandle.unref()
+}
 
 /**
  * Authenticate a Socket.io handshake. Exported so it can be unit-tested in
@@ -112,6 +122,7 @@ function authenticateSocketHandshake(socket, next) {
 }
 
 function initSocketIO(httpServer) {
+  startRateLimitSweep()
   const isProd = process.env.NODE_ENV === 'production'
   const allowedOrigins = isProd
     ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_ALT, 'https://localhost'].filter(Boolean)

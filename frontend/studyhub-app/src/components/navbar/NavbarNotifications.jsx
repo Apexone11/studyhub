@@ -6,6 +6,9 @@ import { useNavigate } from 'react-router-dom'
 import { IconBell } from '../Icons'
 import { useSession } from '../../lib/session-context'
 import { useLivePolling } from '../../lib/useLivePolling'
+import { useSocket } from '../../lib/useSocket'
+import { SOCKET_EVENTS } from '../../lib/socketEvents'
+import { getNotificationIcon, getNotificationTone } from '../../lib/notificationIcons'
 import { API } from '../../config'
 import { S, handleIconHover, formatRelativeTime } from './navbarConstants'
 
@@ -46,6 +49,31 @@ export default function NavbarNotifications() {
     enabled: Boolean(user),
     intervalMs: 30000,
   })
+
+  /* Real-time push: listen for `notification:new` on the user's personal socket
+   * room. Polling stays as a 30s fallback so missed events still surface. The
+   * subscription is silently a no-op if the socket isn't connected yet. */
+  const { socket } = useSocket()
+  useEffect(() => {
+    if (!socket || !user) return
+    const eventName = SOCKET_EVENTS.NOTIFICATION_NEW
+    const onNew = (incoming) => {
+      if (!incoming || typeof incoming !== 'object') return
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === incoming.id)) return prev
+        const enriched = {
+          ...incoming,
+          timeAgoLabel: formatRelativeTime(incoming.createdAt || new Date(), Date.now()),
+        }
+        return [enriched, ...prev].slice(0, 30)
+      })
+      if (!incoming.read) setUnreadCount((c) => c + 1)
+    }
+    socket.on(eventName, onNew)
+    return () => {
+      socket.off(eventName, onNew)
+    }
+  }, [socket, user])
 
   // close dropdown on outside click or Escape key
   useEffect(() => {
@@ -111,9 +139,16 @@ export default function NavbarNotifications() {
       setUnreadCount((c) => Math.max(0, c - 1))
     }
     setShowBell(false)
-    if (notif.linkPath) navigate(notif.linkPath)
-    else if (notif.sheetId) navigate(`/sheets/${notif.sheetId}`)
-    else if (notif.actor?.username) navigate(`/users/${notif.actor.username}`)
+    /* Validate before navigate — linkPath comes from the socket payload and
+     * must be a same-origin app path. A malformed value (absolute URL or
+     * scheme) is silently ignored rather than handed to navigate(). */
+    if (typeof notif.linkPath === 'string' && notif.linkPath.startsWith('/')) {
+      navigate(notif.linkPath)
+    } else if (notif.sheetId && Number.isInteger(notif.sheetId)) {
+      navigate(`/sheets/${notif.sheetId}`)
+    } else if (notif.actor?.username && /^[A-Za-z0-9_.-]+$/.test(notif.actor.username)) {
+      navigate(`/users/${notif.actor.username}`)
+    }
   }
 
   if (!user) return null
@@ -228,7 +263,7 @@ export default function NavbarNotifications() {
           </div>
 
           {/* list */}
-          <div style={{ maxHeight: 340, overflowY: 'auto' }}>
+          <div style={{ maxHeight: 340, overflowY: 'auto' }} role="list">
             {notifications.length === 0 ? (
               <div
                 style={{
@@ -290,28 +325,49 @@ export default function NavbarNotifications() {
                 >
                   <div
                     style={{
-                      fontSize: 13,
-                      color: 'var(--sh-text)',
-                      lineHeight: 1.4,
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: 10,
                       marginBottom: 4,
                     }}
                   >
-                    {notif.priority === 'high' && (
-                      <span
+                    {(() => {
+                      const tone = getNotificationTone(notif.type, notif.priority)
+                      return (
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            flex: '0 0 auto',
+                            width: 28,
+                            height: 28,
+                            borderRadius: 8,
+                            background: tone.bg,
+                            color: tone.fg,
+                            display: 'inline-flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            fontSize: 13,
+                            marginTop: 1,
+                          }}
+                        >
+                          <i className={getNotificationIcon(notif.type)}></i>
+                        </span>
+                      )
+                    })()}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div
                         style={{
-                          color: 'var(--sh-danger)',
-                          fontWeight: 700,
-                          fontSize: 11,
-                          marginRight: 4,
+                          fontSize: 13,
+                          color: 'var(--sh-text)',
+                          lineHeight: 1.4,
                         }}
                       >
-                        !
-                      </span>
-                    )}
-                    <strong>{notif.actor?.username || 'Someone'}</strong> {notif.message}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
-                    {notif.timeAgoLabel || 'just now'}
+                        <strong>{notif.actor?.username || 'Someone'}</strong> {notif.message}
+                      </div>
+                      <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 2 }}>
+                        {notif.timeAgoLabel || 'just now'}
+                      </div>
+                    </div>
                   </div>
                   {/* X delete button */}
                   <button
@@ -349,6 +405,30 @@ export default function NavbarNotifications() {
               ))
             )}
           </div>
+
+          {/* footer link to full notifications page */}
+          <button
+            onClick={() => {
+              setShowBell(false)
+              navigate('/notifications')
+            }}
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'center',
+              padding: '10px 16px',
+              fontSize: 12,
+              fontWeight: 600,
+              color: 'var(--sh-link)',
+              background: 'var(--sh-soft)',
+              border: 'none',
+              borderTop: '1px solid var(--sh-dropdown-divider)',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            View all notifications
+          </button>
         </div>
       )}
     </div>

@@ -45,18 +45,32 @@ function clientIp(req) {
   return candidates.find((candidate) => net.isIP(String(candidate || '').trim())) || ''
 }
 
-function isEuRequest(req) {
-  const country = String(req.get?.('cf-ipcountry') || req.get?.('x-vercel-ip-country') || '')
+function geoCountry(req) {
+  return String(req.get?.('cf-ipcountry') || req.get?.('x-vercel-ip-country') || '')
     .trim()
     .toUpperCase()
-  return EU_COUNTRY_CODES.has(country)
 }
 
 function persistedIp(req) {
   const ip = clientIp(req)
   if (!ip) return null
-  if (!isEuRequest(req)) return ip.slice(0, 64)
-  return crypto.createHash('sha256').update(ip).digest('hex')
+
+  // Fail-closed for privacy: if a trusted edge (Cloudflare or Vercel) did
+  // NOT label this request with a country code, we don't know whether the
+  // visitor is EU and we treat the IP as if it were. Storing a hash
+  // instead of plaintext is a strict superset of GDPR-safe behavior.
+  // This catches: direct-to-Railway requests, staging without an edge,
+  // local dev, future infra changes that drop the geo header, and any
+  // header-spoofing attempt that supplies an UNKNOWN country value.
+  const country = geoCountry(req)
+  const isProduction = process.env.NODE_ENV === 'production'
+  const trustedEdgeStamp = country.length === 2
+  const shouldHash = EU_COUNTRY_CODES.has(country) || (isProduction && !trustedEdgeStamp)
+
+  if (shouldHash) {
+    return crypto.createHash('sha256').update(ip).digest('hex')
+  }
+  return ip.slice(0, 64)
 }
 
 function persistedUserAgent(req) {
@@ -201,12 +215,19 @@ async function getConsent(req, res) {
   try {
     const consent = await prisma.creatorAuditConsent.findUnique({
       where: { userId: req.user.userId },
-      select: { docVersion: true, acceptedAt: true },
+      select: { docVersion: true, acceptedAt: true, revokedAt: true },
     })
+    // Active consent = not revoked AND on the current doc version. A revoked
+    // row is preserved for the audit trail but reads as "not accepted".
+    const isActive =
+      Boolean(consent) &&
+      !consent.revokedAt &&
+      consent.docVersion === CURRENT_CREATOR_RESPONSIBILITY_DOC_VERSION
     return res.json({
-      accepted: consent?.docVersion === CURRENT_CREATOR_RESPONSIBILITY_DOC_VERSION,
+      accepted: isActive,
       docVersion: consent?.docVersion || null,
       acceptedAt: consent?.acceptedAt?.toISOString() || null,
+      revokedAt: consent?.revokedAt?.toISOString() || null,
       currentDocVersion: CURRENT_CREATOR_RESPONSIBILITY_DOC_VERSION,
     })
   } catch (error) {
@@ -229,10 +250,11 @@ async function acceptConsent(req, res) {
 
     const existingConsent = await prisma.creatorAuditConsent.findUnique({
       where: { userId: req.user.userId },
-      select: { docVersion: true, acceptedAt: true },
+      select: { docVersion: true, acceptedAt: true, revokedAt: true },
     })
 
-    if (existingConsent?.docVersion === docVersion) {
+    // Already-active consent on this version: idempotent no-op.
+    if (existingConsent?.docVersion === docVersion && !existingConsent.revokedAt) {
       return res.json({
         accepted: true,
         docVersion: existingConsent.docVersion,
@@ -240,17 +262,30 @@ async function acceptConsent(req, res) {
       })
     }
 
+    // Re-acceptance after revocation OR new doc version: upsert clears
+    // revokedAt so the row reads as active again, and stamps a fresh
+    // acceptedAt + provenance metadata.
+    //
+    // NOTE: this overwrites the prior acceptedAt and ipAddress. The
+    // CreatorAuditConsent table is a CURRENT-STATE record, not an
+    // append-only event log. If GDPR / legal review later requires the
+    // full acceptance history (every version a user ever accepted, with
+    // timestamps and IPs), introduce a separate `ConsentEvent` table
+    // and write one row per acceptConsent / revokeConsent call.
     const consent = await prisma.creatorAuditConsent.upsert({
       where: { userId: req.user.userId },
       create: {
         userId: req.user.userId,
         docVersion,
+        acceptanceMethod: 'user',
         ipAddress: persistedIp(req),
         userAgent: persistedUserAgent(req),
       },
       update: {
         docVersion,
         acceptedAt: new Date(),
+        revokedAt: null,
+        acceptanceMethod: 'user',
         ipAddress: persistedIp(req),
         userAgent: persistedUserAgent(req),
       },
@@ -270,8 +305,18 @@ async function acceptConsent(req, res) {
 
 async function revokeConsent(req, res) {
   try {
-    await prisma.creatorAuditConsent.deleteMany({ where: { userId: req.user.userId } })
-    return res.json({ accepted: false, docVersion: null, acceptedAt: null })
+    // Soft-delete: preserve the row so a future legal review can verify the
+    // user did once accept the doc. Active reads filter on revokedAt IS NULL.
+    const result = await prisma.creatorAuditConsent.updateMany({
+      where: { userId: req.user.userId, revokedAt: null },
+      data: { revokedAt: new Date() },
+    })
+    return res.json({
+      accepted: false,
+      docVersion: null,
+      acceptedAt: null,
+      revoked: result.count > 0,
+    })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
     return sendError(res, 500, 'Failed to revoke creator audit consent.', ERROR_CODES.INTERNAL)

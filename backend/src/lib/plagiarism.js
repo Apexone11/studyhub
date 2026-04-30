@@ -53,6 +53,63 @@ function calculateSimilarity(distance) {
 }
 
 /**
+ * Walk a sheet's fork lineage (ancestors + descendants + siblings) and return
+ * the set of related sheet IDs. Forks are expected to share content with their
+ * source, so plagiarism comparisons must exclude the entire fork tree to avoid
+ * false-positive notifications when a user makes a small edit on a fork.
+ *
+ * Walks ancestors via forkOf chain, then BFS-expands descendants from every
+ * ancestor (which yields siblings/cousins). Cycle-safe and depth-bounded.
+ *
+ * @param {object} db - Prisma client
+ * @param {number} sheetId
+ * @returns {Promise<Set<number>>} set of sheet IDs in the same fork lineage (includes sheetId)
+ */
+async function getForkLineageIds(db, sheetId) {
+  const lineage = new Set([sheetId])
+  if (!sheetId || !Number.isFinite(sheetId)) return lineage
+
+  try {
+    /* Walk ancestor chain (target -> parent -> grandparent -> ...) */
+    const MAX_ANCESTOR_DEPTH = 50
+    let cursor = sheetId
+    for (let i = 0; i < MAX_ANCESTOR_DEPTH; i++) {
+      const node = await db.studySheet.findUnique({
+        where: { id: cursor },
+        select: { id: true, forkOf: true },
+      })
+      if (!node || !node.forkOf || lineage.has(node.forkOf)) break
+      lineage.add(node.forkOf)
+      cursor = node.forkOf
+    }
+
+    /* BFS-expand descendants from every node currently in lineage. This catches
+     * direct children, siblings (children of an ancestor), and cousins. Caps
+     * total visited at 500 to bound cost on pathological fork trees. */
+    const MAX_VISITED = 500
+    const queue = [...lineage]
+    while (queue.length > 0 && lineage.size < MAX_VISITED) {
+      const batch = queue.splice(0, Math.min(queue.length, 25))
+      const children = await db.studySheet.findMany({
+        where: { forkOf: { in: batch } },
+        select: { id: true },
+        take: MAX_VISITED,
+      })
+      for (const child of children) {
+        if (!lineage.has(child.id)) {
+          lineage.add(child.id)
+          queue.push(child.id)
+        }
+      }
+    }
+  } catch (err) {
+    captureError(err, { context: 'fork-lineage', sheetId })
+  }
+
+  return lineage
+}
+
+/**
  * Find sheets with similar content to a given sheet.
  * Uses simhash comparison with configurable threshold.
  *
@@ -72,6 +129,7 @@ async function findSimilarSheets(sheetId, threshold = 10) {
         userId: true,
         contentSimhash: true,
         status: true,
+        forkOf: true,
       },
     })
 
@@ -79,11 +137,17 @@ async function findSimilarSheets(sheetId, threshold = 10) {
       return []
     }
 
+    /* Compute fork lineage so we exclude the parent, ancestors, descendants, and
+     * siblings — forks are intentionally similar and should never be flagged as
+     * plagiarism of each other. */
+    const lineageIds = await getForkLineageIds(prisma, sheetId)
+    const excludedIds = Array.from(lineageIds)
+
     /* Fetch all other published sheets with non-null contentSimhash */
     const allSheets = await prisma.studySheet.findMany({
       where: {
         AND: [
-          { NOT: { id: sheetId } },
+          { id: { notIn: excludedIds } },
           { status: 'published' },
           { NOT: [{ contentSimhash: null }] },
         ],
@@ -93,6 +157,7 @@ async function findSimilarSheets(sheetId, threshold = 10) {
         title: true,
         userId: true,
         contentSimhash: true,
+        forkOf: true,
         author: { select: { id: true, username: true } },
       },
     })
@@ -255,4 +320,5 @@ module.exports = {
   calculateSimilarity,
   findSimilarSheets,
   runPlagiarismScan,
+  getForkLineageIds,
 }

@@ -19,6 +19,11 @@ export function useSocket() {
     if (!isAuthenticated) {
       if (socketRef.current) {
         socketRef.current.disconnect()
+        // Null the ref so the next login (e.g. user-switch on a shared
+        // browser) re-creates a fresh socket from scratch instead of
+        // reconnecting the old socket — which would briefly carry the
+        // previous user's room subscriptions until the server-side
+        // disconnect propagates.
         socketRef.current = null
         setConnected(false)
         setConnectionError(null)

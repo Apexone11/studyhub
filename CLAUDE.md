@@ -102,7 +102,7 @@ Live files inside `pages/dashboard/` (KEEP — imported by UserProfilePage):
 
 ### Authentication and Sessions
 
-- As of the current v1.5.0-beta behavior, login issues a session directly. Login is no longer gated on email verification or 2FA during the login flow.
+- As of the current v2.2.0 behavior, login issues a session directly. Login is no longer gated on email verification or 2FA during the login flow.
 - JWT auth is stored in HTTP-only cookies (cookie name: `studyhub_session`).
 - All authenticated API calls must include `credentials: 'include'` in fetch options.
 - The `authHeaders()` helper from `pages/shared/pageUtils` provides the correct headers for authenticated requests.
@@ -472,4 +472,53 @@ Every phase handoff must include the relevant track's required-before-build chec
 ### Plan maintenance
 
 Both docs have a §10 covering how to update them as work progresses. When a phase closes, mark it complete in the roadmap. When a new feature request arrives, it gets the same treatment (roadmap brainstorm → security pass → founder approval → promotion). See roadmap §10 for the exact flow.
+
+## TypeScript Conventions (added 2026-04-30, founder-approved)
+
+StudyHub is migrating to TypeScript across both backend and frontend. The migration is **incremental, not big-bang**: tooling lives alongside existing JavaScript and converts files one module at a time.
+
+### Tooling baseline (already wired)
+
+- `backend/tsconfig.json` — Node 20, ES2022, strict null checks, `allowJs: true`, `checkJs: false`, `noEmit: true` (TypeScript is for static analysis only — runtime continues to use the existing CJS/JS files).
+- `frontend/studyhub-app/tsconfig.json` — same posture, plus `jsx: react-jsx` and `paths: { "@/*": ["src/*"] }`. Vite already understands TS out of the box; no plugin needed.
+- `shared/types/` — single source of truth for API request/response shapes shared between backend and frontend. **Pure type declarations only — no runtime code, no Prisma imports, no React imports.** Both projects reach this folder via relative paths; no package install needed.
+- `npm run typecheck` exists in both workspaces and runs `tsc --noEmit`. Both currently pass clean and **must stay clean on every PR**.
+
+### Hard rules for new code
+
+1. **All new files must be `.ts` or `.tsx`.** Never create new `.js` or `.jsx` files. This is non-negotiable from 2026-04-30 forward.
+2. **All function return types are explicit** for exported functions. `function foo(): Promise<Sheet[]>` not `function foo()`.
+3. **Never use `any`.** Use `unknown` and narrow with type guards. `any` is treated as a lint-blocking smell.
+4. **Use `type`, not `interface`,** for object shapes — except for object shapes that consumers may extend. The existing codebase mixes both; we standardize on `type` going forward to be consistent with React's recommended patterns.
+5. **Branded ID types** for primary keys when ambiguity matters: `type SheetId = number & { __sheet: never }`. Prevents accidental swapping of two number IDs.
+6. **Do NOT modify `package-lock.json` by hand.** TypeScript was added as a devDependency on 2026-04-30 with founder approval; future TS-related dep additions follow the v2.1 dependency exception above.
+
+### Migration strategy
+
+- **High-leverage first:** populate `shared/types/` with the API shapes that have already burned us (notifications, sheets, search response, messaging). Once a shape lives there, both ends import it instead of redeclaring.
+- **Touch a file → migrate it.** Any backend module or frontend page you edit for unrelated work can be renamed `.js → .ts` (or `.jsx → .tsx`) in the same PR. No PR is required to convert a file solely for migration purposes.
+- **Tests follow modules.** When you migrate a module, migrate its `*.test.js` to `*.test.ts` in the same change. Vitest understands both.
+- **Strictness ramp:** `noImplicitAny: false` today so `.js` files coexist quietly. Once 80%+ of a workspace is `.ts`, flip `noImplicitAny: true` for that workspace.
+
+### What this prevents (and why we're paying for it)
+
+The CLAUDE.md "Common Bugs and Pitfalls" list is full of issues TypeScript would have caught at the keyboard:
+
+- Pitfall #2 (search response shape mismatch — `data.results.users` vs `data.users`) — gone, once both ends import the same `SearchResponse` type from `shared/types/`.
+- Pitfall #4 (Socket.io event name typos like `message:edited` vs `message:edit`) — gone, since event names live in `socketEvents.js` constants, type-narrowed.
+- Pitfall #7 (`createdAt` vs `timestamp` field naming) — gone, since the shared `MessageDTO` declares `createdAt: string` and any code expecting `timestamp` fails at compile time.
+- Pitfall #10 (rate limiter export name mismatches) — gone, since named exports are type-checked.
+
+### Validation surface
+
+Add to your local pre-PR checklist alongside lint and tests:
+
+- `cd backend && npm run typecheck`
+- `cd frontend/studyhub-app && npm run typecheck`
+
+Both must exit 0 or the PR is not mergeable. CI must run these (TODO: wire into `.github/workflows/ci.yml` if not already there).
+
+### Working agreement update
+
+Rule #12 (rolling): every feature that adds or modifies API request/response shapes **also** updates `shared/types/<domain>.ts` in the same change. The shape lives there once; both ends import it. Skipping this re-introduces the drift TypeScript was added to prevent.
                                                                                                                                                                                                                                                                                   

@@ -17,6 +17,7 @@
 const { captureError } = require('../monitoring/sentry')
 const prisma = require('./prisma')
 const { fingerprint, similarity } = require('./contentFingerprint')
+const { getForkLineageIds } = require('./plagiarism')
 
 const SIMILARITY_THRESHOLD = 0.7
 const LIKELY_COPY_THRESHOLD = 0.85
@@ -93,6 +94,12 @@ async function findSimilarContent({ contentType, contentId, limit = 10 }) {
 
     if (!reported || !reported.content) return []
 
+    /* For sheet comparisons, compute fork lineage so we exclude the parent,
+     * ancestors, descendants, and siblings — forks are intentionally similar
+     * and should never be reported as plagiarism of each other. */
+    const lineageIds =
+      contentType === 'sheet' ? await getForkLineageIds(prisma, contentId) : new Set()
+
     /* Ensure fingerprint is computed */
     let reportedHash = reported.contentHash
     let reportedSimhash = reported.contentSimhash
@@ -108,11 +115,13 @@ async function findSimilarContent({ contentType, contentId, limit = 10 }) {
     const matches = []
 
     /* Phase 1: Exact hash matches across sheets and notes */
+    const sheetExclusions =
+      contentType === 'sheet' ? { id: { notIn: Array.from(lineageIds) } } : undefined
     const [exactSheets, exactNotes] = await Promise.all([
       prisma.studySheet.findMany({
         where: {
           contentHash: reportedHash,
-          NOT: contentType === 'sheet' ? { id: contentId } : undefined,
+          ...(sheetExclusions || {}),
         },
         select: {
           id: true,
@@ -174,7 +183,7 @@ async function findSimilarContent({ contentType, contentId, limit = 10 }) {
       prisma.studySheet.findMany({
         where: {
           AND: [
-            ...(contentType === 'sheet' ? [{ NOT: { id: contentId } }] : []),
+            ...(contentType === 'sheet' ? [{ id: { notIn: Array.from(lineageIds) } }] : []),
             { status: 'published' },
             { NOT: [{ contentSimhash: null }] },
           ],

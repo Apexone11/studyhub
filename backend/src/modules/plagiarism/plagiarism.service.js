@@ -18,6 +18,7 @@ const {
   similarity,
   normalizeText,
 } = require('../../lib/contentFingerprint')
+const { getForkLineageIds } = require('../../lib/plagiarism')
 
 const SIMILARITY_THRESHOLD = 0.7
 const LIKELY_COPY_THRESHOLD = 0.85
@@ -121,11 +122,17 @@ async function runPlagiarismScan(sheetId, content, authorId) {
       })
       .catch(() => {})
 
+    // Compute fork lineage so we exclude the parent, ancestors, descendants,
+    // and siblings — forks are intentionally similar and must never be flagged
+    // as plagiarism of one another.
+    const lineageIds = await getForkLineageIds(prisma, sheetId)
+    const lineageArray = Array.from(lineageIds)
+
     // Fetch all published sheets with simhash (full corpus, batched)
     const candidates = await prisma.studySheet.findMany({
       where: {
         status: 'published',
-        id: { not: sheetId },
+        id: { notIn: lineageArray },
         NOT: [{ contentSimhash: null }],
       },
       select: {
@@ -147,8 +154,6 @@ async function runPlagiarismScan(sheetId, content, authorId) {
     for (const candidate of candidates) {
       // Skip own content
       if (candidate.userId === authorId) continue
-      // Skip forks (expected to be similar)
-      if (candidate.forkOf === sheetId || candidate.id === candidate.forkOf) continue
 
       // Quick check: SimHash similarity
       const simScore = similarity(fp.simhash, candidate.contentSimhash)
@@ -258,7 +263,9 @@ async function runPlagiarismScan(sheetId, content, authorId) {
       }
     }
 
-    // Notify the author
+    // Notify the author. Lineage was already excluded from candidates above,
+    // so any match here is between unrelated sheets — making the message safe
+    // to keep informational rather than accusatory.
     const topMatch = finalMatches[0]
     const severity = topMatch.similarityScore >= LIKELY_COPY_THRESHOLD ? 'high' : 'medium'
     try {
@@ -267,8 +274,8 @@ async function runPlagiarismScan(sheetId, content, authorId) {
         type: 'plagiarism_flagged',
         message:
           severity === 'high'
-            ? `Your sheet may contain content that closely matches "${topMatch.matchedTitle}". Please review the plagiarism report.`
-            : `Your sheet has similarities with existing content. Review the plagiarism report for details.`,
+            ? `Heads up: parts of your sheet closely match "${topMatch.matchedTitle}" by another author. Open the similarity report to add a citation, fork the original, or contest the match.`
+            : `Your sheet has some overlap with existing content. Open the similarity report to review — if this is intentional reuse, you can add a citation or fork the original instead.`,
         linkPath: `/sheets/${sheetId}/plagiarism`,
         priority: severity,
         sheetId,

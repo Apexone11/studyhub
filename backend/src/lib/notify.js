@@ -47,6 +47,13 @@ const ESSENTIAL_NOTIFICATION_TYPES = new Set([
   'payment_failed',
   'video_copy_detected',
 ])
+
+// Notification types that suffer viral fan-out (one popular post → many
+// rows from many actors). For these, we dedup against (recipient, type,
+// actor) within an hour. Critical types (mention, reply, contribution,
+// moderation) are NEVER deduped here.
+const FAN_OUT_DEDUP_TYPES = new Set(['star', 'fork', 'follow', 'follow_request'])
+const FAN_OUT_DEDUP_WINDOW_MS = 60 * 60 * 1000 // 1 hour
 const OPTIONAL_EMAIL_PREFERENCE_BY_TYPE = Object.freeze({
   mention: 'emailMentions',
   contribution: 'emailContributions',
@@ -217,6 +224,52 @@ async function createNotification(
     return null
   }
 
+  // Block-aware gate: if either party has blocked the other, silently drop
+  // the notification. Without this, a blocked user can still passively spam
+  // the recipient's inbox via star/follow/fork churn. Block-table queries
+  // can fail (table missing during migration); on error we fail open and let
+  // the notification through, matching the policy used elsewhere in the
+  // module per CLAUDE.md "Block/Mute System".
+  if (actorId && actorId !== userId) {
+    try {
+      const { isBlockedEitherWay } = require('./social/blockFilter')
+      const blocked = await isBlockedEitherWay(prisma, userId, actorId)
+      if (blocked) return null
+    } catch {
+      // Fail open — block tables may be temporarily unavailable.
+    }
+  }
+
+  // Viral fan-out guard: a sheet that suddenly receives 1000 stars from
+  // 1000 different users would otherwise produce 1000 DB rows + 1000
+  // socket emits + 1000 dropdown rows. For low-signal social events we
+  // dedup against the same (recipient, type, actor, sheet) within an
+  // hour — the first event lands, repeats from the same actor on the
+  // SAME sheet are dropped. Different sheets from the same actor still
+  // notify, so a fan who stars five of your sheets in a session still
+  // produces five separate notifications (the genuine engagement signal).
+  // For follow events that have no sheetId, the dedup degrades to
+  // (recipient, type, actor) which catches the rapid follow / unfollow
+  // / re-follow harassment pattern.
+  if (FAN_OUT_DEDUP_TYPES.has(type) && actorId && actorId !== userId) {
+    try {
+      const since = new Date(Date.now() - FAN_OUT_DEDUP_WINDOW_MS)
+      const recent = await prisma.notification.findFirst({
+        where: {
+          userId,
+          type,
+          actorId,
+          ...(sheetId ? { sheetId } : {}),
+          createdAt: { gte: since },
+        },
+        select: { id: true },
+      })
+      if (recent) return null
+    } catch {
+      // Read failure shouldn't block the notification.
+    }
+  }
+
   // Role-aware gate (docs/internal/roles-and-permissions-plan.md §10.1). Callers can
   // opt into the filter by passing { schoolId, courseId, hashtagId } in
   // eventContext plus a scoped `type` (e.g. 'school.announcement.created').
@@ -272,6 +325,32 @@ async function createNotification(
         linkPath: linkPath || null,
       },
     })
+
+    // Real-time push: emit to the user's personal socket room so any open tab
+    // surfaces the notification immediately instead of waiting up to 30s for
+    // the next polling cycle. Lazy-required to avoid a circular dependency
+    // between notify.js and socketio.js, AND skipped in tests where loading
+    // socketio.js would pull in the real Prisma client and stall.
+    if (process.env.NODE_ENV !== 'test') {
+      try {
+        const { emitToUser } = require('./socketio')
+        const SOCKET_EVENTS = require('./socketEvents')
+        const eventName = SOCKET_EVENTS?.NOTIFICATION_NEW || 'notification:new'
+        emitToUser(userId, eventName, {
+          id: notif.id,
+          type,
+          message,
+          priority: safePriority,
+          linkPath: linkPath || null,
+          sheetId: sheetId || null,
+          actorId: actorId || null,
+          createdAt: notif.createdAt,
+          read: false,
+        })
+      } catch {
+        // Socket.io optional — never block notification persistence on emit failure.
+      }
+    }
 
     if (_shouldSendEmailNotification(preferences, type, safePriority)) {
       void _maybeSendNotificationEmail(prisma, {

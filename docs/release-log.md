@@ -26,7 +26,36 @@ internal log into this file when they describe user-visible behavior.
 
 ---
 
+## v2.2.0 — public launch ship (2026-04-30)
+
+### Creator Audit promotion + gap closures + version bump
+
+- **Creator Audit flag promoted to SHIPPED.** `design_v2_creator_audit` is now in `SHIPPED_DESIGN_V2_FLAGS`. Prod deploy order is documented in code: deploy → `prisma migrate deploy` → `backfill:creator-consent --prod-confirm` → `seed:flags`. Skipping the backfill step shows the consent modal to existing users on next publish — disruptive, not destructive, and recoverable by running the backfill afterward.
+- **CreatorAuditConsent gets soft-delete + provenance.** New migration `20260430000001_add_consent_provenance_and_soft_delete` adds `acceptanceMethod` (`'user'` / `'backfill'` / `'seed'`) and `revokedAt` columns. Revocation now soft-deletes (preserves the audit trail), and the controller treats a revoked row as "not accepted" while still allowing seamless re-acceptance.
+- **Notification fan-out dedup keyed on (recipient, type, actor, sheet).** A user starring 50 different sheets by the same author still produces 50 notifications; the same user starring the same sheet twice in an hour produces one. Critical types (mention, reply, contribution, moderation) are never deduped.
+- **EU IP-detection is fail-closed.** When a request reaches the backend without a trusted geo header (Cloudflare or Vercel) in production, `persistedIp` now hashes the IP rather than storing plaintext — protects against direct-to-Railway requests, edge changes, and header spoofing without the right country code.
+- **Backfill script gets a `--prod-confirm` guard.** Running `backfill:creator-consent` against a production-shaped `DATABASE_URL` without the explicit flag now refuses, preventing accidental writes when a developer has the wrong env exported.
+- **Versions bumped to 2.2.0** across `backend/package.json`, `frontend/studyhub-app/package.json`, the in-app About page Roadmap section, and CLAUDE.md auth note. AboutPage replaces V2.0.0 with V2.2.0 + the new "what's shipped since V2.0.0" features.
+- **ROADMAP.md** refreshed with the V2.2.0 feature summary, V2.5 next-up (browser push, notification grouping, cloud import, Creator Audit follow-ups), and V3.0 future (Scholar tier).
+- **PUBLIC-LAUNCH-PLAN.md** added at the repo root with the actual current state of the codebase (LICENSE/CONTRIBUTING/CODE_OF_CONDUCT/SECURITY/PRIVACY all already present, TypeScript wired, OWASP headers in place) so the next session doesn't redo work.
+- **payments.test.js** assertion updated from `aiMessagesPerDay: 10` to `30` (with `aiMessagesPerDayVerified: 60`) — the test was drifting behind the pricing-page change shipped earlier in the cycle. **Backend test suite now: 1985/1985 passing.**
+- **RUNBOOK_SWEEPERS.md** added to `docs/internal/security/` documenting how to enable orphan-video and inactive-session sweepers via Railway Cron (not always-on, to avoid thundering herd across replicas).
+- **Master plan §4.2 refreshed** to document that Phase 1 actually shipped against `FeedPage.jsx` + `UserProfilePage.jsx`, not the deleted `DashboardPage.jsx` referenced in earlier drafts.
+
 ## v2.0.0-beta — in progress
+
+### Public-launch prep + TypeScript adoption + Creator Audit ship
+
+- **Plagiarism on legitimate forks is fixed.** A user forking a sheet and making a small edit no longer trips the plagiarism notification. A shared `getForkLineageIds` helper walks the entire fork tree (ancestors + descendants + siblings) and excludes those IDs from every similarity scan path (`findSimilarSheets`, `findSimilarContent`, the deep AI scan). The notification copy is also softer: instead of "your sheet may contain plagiarism," users now get an actionable "review the report — if this is intentional reuse, add a citation or fork the original."
+- **Notifications now push in real time.** A new `notification:new` Socket.io event is emitted from `notify.js` when a notification is persisted, and `NavbarNotifications` listens on the user's personal socket room so the bell updates without waiting for the 30s polling cycle. Polling stays as a fallback. Notification rows now render a type-coloured icon (light/dark token-driven) instead of a flat plus-mark, and a new full-screen `/notifications` page adds filter chips (Social, Content, Groups, System) and bulk actions.
+- **TypeScript is now the project language going forward.** Both workspaces have `tsconfig.json` with `allowJs: true`, a `typecheck` script, and the `shared/types/` directory holds API request/response shapes for cross-workspace import. `CLAUDE.md` §13 documents the conventions: all new files are `.ts`/`.tsx`, no new `.js`/`.jsx`, never `any`, explicit return types on exports. Existing JavaScript continues to work; migration is incremental.
+- **Creator Audit is shipped.** The backend foundation already merged in a prior cycle; this cycle adds the frontend consent modal (`CreatorAuditConsentModal` + `useCreatorConsent`), wires it into `UploadSheetPage` so publish is gated behind consent when the flag is on, seeds beta-user consent rows so `seed:beta` produces a usable local state, adds a `backfill:creator-consent` script for production migration, and promotes `design_v2_creator_audit` from in-flight to shipped in `seedFeatureFlags.js`.
+- **Security gap closures.** `FIELD_ENCRYPTION_KEY` is now hard-required at production startup (a missing key would previously have caused PII columns to silently store plaintext). A new `ssrfGuard.js` allowlist + private-IP block is in place ahead of Scholar tier and Hub AI v2 citation fetching (decision #15). Frontend `.env.example` now documents every `VITE_*` variable used in the codebase. New public `PRIVACY.md` at the repo root.
+- **Quality-control sweep.** Explicit `requireAuth` on the feed `POST /posts/:id/react` route closes the inheritance gap flagged by code review.
+
+### Dependency changes
+
+- **Added** `typescript@~5.6.3`, `@types/node`, `@types/express`, `@types/cors`, `@types/jsonwebtoken`, `@types/multer`, `@types/sanitize-html`, `@types/compression`, `@types/bcryptjs` (backend `devDependencies`); `typescript@~5.6.3`, `@types/react@~19.2.0`, `@types/react-dom@~19.2.0` (frontend `devDependencies`). Reason: project-wide TypeScript adoption per the public-launch plan; founder-approved 2026-04-30. No existing dep solves the need (we cannot statically check JavaScript without a TypeScript compiler). Rollback plan: remove devDependencies and the two `tsconfig.json` files; nothing in production runtime depends on them.
 
 ### Subscription-tier alignment fixes (post-merge audit pass)
 
