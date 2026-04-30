@@ -52,4 +52,24 @@ describe('resolvePreviewOrigin', () => {
       'http://api.getstudyhub.org',
     )
   })
+
+  it('allows Railway preview hosts when no explicit preview origin is configured', () => {
+    expect(
+      resolvePreviewOrigin(
+        mockReq({ host: 'studyhub-backend.up.railway.app', forwardedProto: 'https' }),
+      ),
+    ).toBe('https://studyhub-backend.up.railway.app')
+  })
+
+  it('does not reflect untrusted Host headers into preview URLs', () => {
+    expect(
+      resolvePreviewOrigin(mockReq({ host: 'attacker.example', forwardedProto: 'https' })),
+    ).toBe('https://localhost:4000')
+  })
+
+  it('does not reflect malformed Host headers into preview URLs', () => {
+    expect(resolvePreviewOrigin(mockReq({ host: 'api.getstudyhub.org@attacker.example' }))).toBe(
+      'http://localhost:4000',
+    )
+  })
 })

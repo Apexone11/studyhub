@@ -41,6 +41,7 @@ internal log into this file when they describe user-visible behavior.
 - **payments.test.js** assertion updated from `aiMessagesPerDay: 10` to `30` (with `aiMessagesPerDayVerified: 60`) — the test was drifting behind the pricing-page change shipped earlier in the cycle. **Backend test suite now: 1985/1985 passing.**
 - **RUNBOOK_SWEEPERS.md** added to `docs/internal/security/` documenting how to enable orphan-video and inactive-session sweepers via Railway Cron (not always-on, to avoid thundering herd across replicas).
 - **Master plan §4.2 refreshed** to document that Phase 1 actually shipped against `FeedPage.jsx` + `UserProfilePage.jsx`, not the deleted `DashboardPage.jsx` referenced in earlier drafts.
+- **AI streaming + HTML preview origin hardening.** Hub AI now streams safe redacted deltas again, and preview URLs reject untrusted Host-header fallbacks unless `HTML_PREVIEW_ORIGIN` is configured.
 
 ## v2.0.0-beta — in progress
 

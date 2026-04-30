@@ -278,6 +278,30 @@ function generateTitle(firstMessage) {
   return cleaned.slice(0, 57).replace(/\s+\S*$/, '') + '...'
 }
 
+const PII_STREAM_HOLD_BACK_CHARS = 128
+
+function findSafeStreamCutoff(text) {
+  if (text.length <= PII_STREAM_HOLD_BACK_CHARS) return 0
+
+  const target = text.length - PII_STREAM_HOLD_BACK_CHARS
+  for (let i = target; i >= 0; i -= 1) {
+    if (/\s/.test(text[i])) return i + 1
+  }
+
+  return 0
+}
+
+function emitRedactedDelta(res, nextSafeResponse, previousSafeResponse) {
+  if (!nextSafeResponse.startsWith(previousSafeResponse)) return previousSafeResponse
+
+  const delta = nextSafeResponse.slice(previousSafeResponse.length)
+  if (delta) {
+    sendSSE(res, { type: 'delta', text: delta })
+  }
+
+  return nextSafeResponse
+}
+
 // ── Core: send message + stream response ───────────────────────────
 
 /**
@@ -424,6 +448,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   // 6. Stream from Claude.
   let fullResponse = ''
   let safeResponse = ''
+  let streamedRawLength = 0
   let totalInputTokens = 0
   let totalOutputTokens = 0
   let wasTruncated = false
@@ -459,6 +484,15 @@ async function streamMessage({ user, conversationId, content, currentPage, image
           ttftMs = Math.round(performance.now() - ttftStart)
         }
         fullResponse += event.delta.text
+        const safeRawLength = findSafeStreamCutoff(fullResponse)
+        if (safeRawLength > streamedRawLength) {
+          safeResponse = emitRedactedDelta(
+            res,
+            redactPII(fullResponse.slice(0, safeRawLength)),
+            safeResponse,
+          )
+          streamedRawLength = safeRawLength
+        }
       }
     }
 
@@ -492,9 +526,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     }
 
     safeResponse = redactPII(fullResponse)
-    if (safeResponse) {
-      sendSSE(res, { type: 'delta', text: safeResponse })
-    }
+    emitRedactedDelta(res, safeResponse, redactPII(fullResponse.slice(0, streamedRawLength)))
   } catch (err) {
     // Abort errors from client disconnect are expected; don't report them.
     if (signal?.aborted) return

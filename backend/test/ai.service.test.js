@@ -466,6 +466,116 @@ describe('streamMessage', () => {
     expect(doneEvent.tokenCount).toBe(150)
   })
 
+  it('streams redacted response deltas incrementally instead of buffering the whole response', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue(null)
+    mocks.prisma.studySheet.findMany.mockResolvedValue([])
+    mocks.prisma.note.findMany.mockResolvedValue([])
+
+    mocks.prisma.aiConversation.findFirst.mockResolvedValue({
+      id: 1,
+      userId: 1,
+      title: 'Existing chat',
+      model: null,
+    })
+    mocks.prisma.aiUsageLog.upsert.mockResolvedValue({ userId: 1, messageCount: 0, tokenCount: 0 })
+    mocks.prisma.aiMessage.create.mockResolvedValue({ id: 100 })
+    mocks.prisma.aiMessage.count.mockResolvedValue(2)
+    mocks.prisma.aiMessage.findMany.mockResolvedValue([{ role: 'user', content: 'Explain cells' }])
+
+    const streamEvents = [
+      { type: 'content_block_delta', delta: { text: `${'Cells convert energy '.repeat(12)} ` } },
+      {
+        type: 'content_block_delta',
+        delta: { text: `${'Organelles coordinate work '.repeat(12)} ` },
+      },
+      { type: 'content_block_delta', delta: { text: 'Final sentence.' } },
+    ]
+    let idx = 0
+    mocks.mockStream._iteratorFn = () => ({
+      next: () => {
+        if (idx < streamEvents.length) {
+          return Promise.resolve({ value: streamEvents[idx++], done: false })
+        }
+        return Promise.resolve({ done: true })
+      },
+    })
+    mocks.mockStream._finalMessageFn = () =>
+      Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
+
+    const res = makeMockRes()
+
+    await aiService.streamMessage({
+      user: baseUser,
+      conversationId: 1,
+      content: 'Explain cells',
+      res,
+    })
+
+    const events = res.getEvents()
+    const deltas = events.filter((e) => e.type === 'delta')
+    expect(deltas.length).toBeGreaterThan(1)
+    expect(events.findIndex((e) => e.type === 'delta')).toBeLessThan(
+      events.findIndex((e) => e.type === 'done'),
+    )
+    expect(deltas.map((event) => event.text).join('')).toBe(
+      streamEvents.map((event) => event.delta.text).join(''),
+    )
+  })
+
+  it('does not stream partial PII when redaction targets span chunks', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue(null)
+    mocks.prisma.studySheet.findMany.mockResolvedValue([])
+    mocks.prisma.note.findMany.mockResolvedValue([])
+
+    mocks.prisma.aiConversation.findFirst.mockResolvedValue({
+      id: 1,
+      userId: 1,
+      title: 'Existing chat',
+      model: null,
+    })
+    mocks.prisma.aiUsageLog.upsert.mockResolvedValue({ userId: 1, messageCount: 0, tokenCount: 0 })
+    mocks.prisma.aiMessage.create.mockResolvedValue({ id: 100 })
+    mocks.prisma.aiMessage.count.mockResolvedValue(2)
+    mocks.prisma.aiMessage.findMany.mockResolvedValue([{ role: 'user', content: 'Explain cells' }])
+
+    const safePrefix = 'Safe biology context '.repeat(12)
+    const streamEvents = [
+      { type: 'content_block_delta', delta: { text: safePrefix } },
+      { type: 'content_block_delta', delta: { text: 'Email mentor@school' } },
+      { type: 'content_block_delta', delta: { text: '.edu or call 123-' } },
+      { type: 'content_block_delta', delta: { text: '456-7890 after details.' } },
+    ]
+    let idx = 0
+    mocks.mockStream._iteratorFn = () => ({
+      next: () => {
+        if (idx < streamEvents.length) {
+          return Promise.resolve({ value: streamEvents[idx++], done: false })
+        }
+        return Promise.resolve({ done: true })
+      },
+    })
+    mocks.mockStream._finalMessageFn = () =>
+      Promise.resolve({ usage: { input_tokens: 10, output_tokens: 5 } })
+
+    const res = makeMockRes()
+
+    await aiService.streamMessage({
+      user: baseUser,
+      conversationId: 1,
+      content: 'Explain cells',
+      res,
+    })
+
+    const deltas = res.getEvents().filter((e) => e.type === 'delta')
+    for (const delta of deltas) {
+      expect(delta.text).not.toContain('mentor@school')
+      expect(delta.text).not.toContain('123-456-7890')
+    }
+    expect(deltas.map((event) => event.text).join('')).toBe(
+      `${safePrefix}Email [redacted-email] or call [redacted-phone] after details.`,
+    )
+  })
+
   it('truncates long titles to ~60 characters', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue(null)
     mocks.prisma.studySheet.findMany.mockResolvedValue([])
@@ -682,7 +792,10 @@ describe('streamMessage', () => {
     expect(modelPayload).toContain('[redacted-phone]')
 
     const events = res.getEvents()
-    const deltaText = events.find((e) => e.type === 'delta')?.text || ''
+    const deltaText = events
+      .filter((e) => e.type === 'delta')
+      .map((e) => e.text)
+      .join('')
     expect(deltaText).toBe('Email [redacted-email] or call [redacted-phone].')
     expect(deltaText).not.toContain('mentor@school.edu')
     expect(deltaText).not.toContain('123-456-7890')

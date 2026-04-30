@@ -83,6 +83,29 @@ function isLocalPreviewHost(hostname) {
   return normalized === 'localhost' || normalized === '127.0.0.1' || normalized === '[::1]'
 }
 
+function isTrustedPreviewHost(hostname) {
+  const normalized = String(hostname || '').toLowerCase()
+  return (
+    isLocalPreviewHost(normalized) ||
+    normalized === 'api.getstudyhub.org' ||
+    normalized === 'sheets.getstudyhub.org' ||
+    normalized.endsWith('.up.railway.app')
+  )
+}
+
+function normalizePreviewHost(value) {
+  const host = firstHeaderValue(value).toLowerCase()
+  if (!host || host.length > 255 || /[\s/@\\?#]/.test(host)) return ''
+
+  try {
+    const parsed = new URL(`http://${host}`)
+    if (!parsed.hostname || !isTrustedPreviewHost(parsed.hostname)) return ''
+    return parsed.host
+  } catch {
+    return ''
+  }
+}
+
 function publicHttpsOrigin(origin, incomingProtocol = '') {
   const parsed = new URL(origin)
   if (
@@ -108,7 +131,7 @@ function resolvePreviewOrigin(req) {
     }
   }
 
-  const host = firstHeaderValue(req?.get?.('host')) || 'localhost:4000'
+  const host = normalizePreviewHost(req?.get?.('host')) || 'localhost:4000'
   return `${incomingProtocol}://${host}`
 }
 
