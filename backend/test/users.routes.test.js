@@ -178,8 +178,8 @@ describe('users routes', () => {
         createdAt: new Date('2026-01-01'),
         preferences: { profileFieldVisibility: null },
         enrollments: [
-          { id: 1, course: { id: 10, school: { id: 100, name: 'North Campus' } } },
-          { id: 2, course: { id: 20, school: { id: 200, name: 'South Campus' } } },
+          { id: 1, course: { id: 20, school: { id: 200, name: 'South Campus' } } },
+          { id: 2, course: { id: 10, school: { id: 100, name: 'North Campus' } } },
         ],
         _count: { studySheets: 0, followers: 0, following: 0, notes: 0 },
       })
@@ -474,7 +474,7 @@ describe('users routes', () => {
     it('ranks suggestions by any shared school and returns all school IDs', async () => {
       mocks.prisma.userFollow.findMany.mockResolvedValue([])
       mocks.prisma.user.findUnique.mockResolvedValue({
-        enrollments: [{ course: { school: { id: 10 } } }, { course: { school: { id: 20 } } }],
+        enrollments: [{ course: { school: { id: 20 } } }, { course: { school: { id: 10 } } }],
       })
       mocks.prisma.user.findMany.mockResolvedValue([
         {
@@ -492,7 +492,7 @@ describe('users routes', () => {
           displayName: 'Dual Match',
           avatarUrl: null,
           bio: null,
-          enrollments: [{ course: { school: { id: 20 } } }],
+          enrollments: [{ course: { school: { id: 20 } } }, { course: { school: { id: 10 } } }],
           _count: { studySheets: 0, followers: 1 },
         },
       ])
@@ -500,7 +500,11 @@ describe('users routes', () => {
       const res = await request(app).get('/me/follow-suggestions')
 
       expect(res.status).toBe(200)
-      expect(res.body[0]).toMatchObject({ username: 'dual_match', schoolIds: [20] })
+      expect(res.body[0]).toMatchObject({
+        username: 'dual_match',
+        schoolId: 10,
+        schoolIds: [10, 20],
+      })
       expect(res.body[1]).toMatchObject({ username: 'off_campus', schoolIds: [99] })
     })
   })

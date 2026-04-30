@@ -36,7 +36,7 @@ export default defineConfig(async ({ mode }) => {
       css: false,
       restoreMocks: true,
       clearMocks: true,
-      include: ['src/**/*.test.{js,jsx}'],
+      include: ['src/**/*.test.{js,jsx,ts,tsx}'],
       exclude: ['tests/**'],
       server: {
         deps: {

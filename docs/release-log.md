@@ -42,6 +42,7 @@ internal log into this file when they describe user-visible behavior.
 - **RUNBOOK_SWEEPERS.md** added to `docs/internal/security/` documenting how to enable orphan-video and inactive-session sweepers via Railway Cron (not always-on, to avoid thundering herd across replicas).
 - **Master plan §4.2 refreshed** to document that Phase 1 actually shipped against `FeedPage.jsx` + `UserProfilePage.jsx`, not the deleted `DashboardPage.jsx` referenced in earlier drafts.
 - **AI streaming + HTML preview origin hardening.** Hub AI now streams safe redacted deltas again, and preview URLs reject untrusted Host-header fallbacks unless `HTML_PREVIEW_ORIGIN` is configured.
+- **Review follow-ups for Creator Audit, notifications, and multi-school profiles.** Creator Consent requests now send auth headers correctly, socket notification pushes include actor data immediately, notification fan-out dedup has a matching DB index, and `/api/users/me` chooses stable sorted school fields for dual-enrolled users.
 
 ## v2.0.0-beta — in progress
 
@@ -66,7 +67,7 @@ internal log into this file when they describe user-visible behavior.
 
 ### Expanded security hardening sweep
 
-- **A deeper 10-loop security sweep closed privacy, upload, HTML, socket, and enrollment edge cases.** Hub AI now redacts PII before and after model calls, socket leave events only broadcast for rooms the caller actually joined, multi-school users keep their full enrollment set in `/api/users/me`, video uploads honor the locked 10-minute cap, uploads validate magic bytes instead of MIME alone, direct HTML sheet create/update paths persist risk-tier scans and quarantine Tier 3 content, and note HTML word counts now use inert parsing instead of an `innerHTML` sink.
+- **A deeper 10-loop security sweep closed privacy, upload, HTML, socket, and enrollment edge cases.** Hub AI now redacts PII before and after model calls, socket leave events only broadcast for rooms the caller actually joined, multi-school users keep their full enrollment set in `/api/users/me`, video uploads honor the tiered plan caps from `PLANS`, uploads validate magic bytes instead of MIME alone, direct HTML sheet create/update paths persist risk-tier scans and quarantine Tier 3 content, and note HTML word counts now use inert parsing instead of an `innerHTML` sink.
 
 ### Creator Audit backend foundation
 

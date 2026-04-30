@@ -624,6 +624,7 @@ model Notification {
   actor     User?    @relation("NotifActor", fields: [actorId], references: [id], onDelete: SetNull)
 
   @@index([userId, read, createdAt(sort: Desc)])
+  @@index([userId, type, actorId, sheetId, createdAt(sort: Desc)], map: "Notification_fanout_dedup_idx")
 }
 
 model UserFollow {

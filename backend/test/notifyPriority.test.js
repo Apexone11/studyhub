@@ -92,6 +92,11 @@ describe('createNotification priority', () => {
 
     expect(mockPrisma.notification.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ priority: 'high' }),
+      include: {
+        actor: {
+          select: { id: true, username: true, avatarUrl: true },
+        },
+      },
     })
   })
 
@@ -105,6 +110,11 @@ describe('createNotification priority', () => {
 
     expect(mockPrisma.notification.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ priority: 'medium' }),
+      include: {
+        actor: {
+          select: { id: true, username: true, avatarUrl: true },
+        },
+      },
     })
   })
 
@@ -117,6 +127,11 @@ describe('createNotification priority', () => {
 
     expect(mockPrisma.notification.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ priority: 'medium' }),
+      include: {
+        actor: {
+          select: { id: true, username: true, avatarUrl: true },
+        },
+      },
     })
   })
 

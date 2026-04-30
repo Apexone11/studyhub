@@ -324,6 +324,11 @@ async function createNotification(
         sheetId: sheetId || null,
         linkPath: linkPath || null,
       },
+      include: {
+        actor: {
+          select: { id: true, username: true, avatarUrl: true },
+        },
+      },
     })
 
     // Real-time push: emit to the user's personal socket room so any open tab
@@ -344,6 +349,7 @@ async function createNotification(
           linkPath: linkPath || null,
           sheetId: sheetId || null,
           actorId: actorId || null,
+          actor: notif.actor || null,
           createdAt: notif.createdAt,
           read: false,
         })

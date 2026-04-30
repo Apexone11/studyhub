@@ -23,7 +23,18 @@ function getEnrollmentSchoolIds(enrollments = []) {
         .map((enrollment) => enrollment?.course?.school?.id)
         .filter((id) => Number.isInteger(id)),
     ),
-  )
+  ).sort((left, right) => left - right)
+}
+
+function getEnrollmentSchools(enrollments = []) {
+  const schoolsById = new Map()
+  for (const enrollment of enrollments || []) {
+    const school = enrollment?.course?.school
+    if (school && Number.isInteger(school.id) && !schoolsById.has(school.id)) {
+      schoolsById.set(school.id, school)
+    }
+  }
+  return Array.from(schoolsById.values()).sort((left, right) => left.id - right.id)
 }
 
 function sharesAnySchool(leftSchoolIds = [], rightSchoolIds = []) {
@@ -712,15 +723,8 @@ const getMe = async (req, res) => {
       profileFieldVisibility: user.preferences?.profileFieldVisibility,
       isOwner: true,
     })
-    const school = user.enrollments?.[0]?.course?.school || null
-    const schools = Array.from(
-      new Map(
-        (user.enrollments || [])
-          .map((enrollment) => enrollment?.course?.school)
-          .filter(Boolean)
-          .map((enrollmentSchool) => [enrollmentSchool.id, enrollmentSchool]),
-      ).values(),
-    )
+    const schools = getEnrollmentSchools(user.enrollments)
+    const school = schools[0] || null
 
     res.json({
       id: user.id,

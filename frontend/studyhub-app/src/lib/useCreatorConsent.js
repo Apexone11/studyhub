@@ -17,7 +17,7 @@ const CONSENT_PATH = '/api/creator-audit/consent'
 async function fetchConsent({ signal } = {}) {
   try {
     const res = await fetch(`${API}${CONSENT_PATH}`, {
-      ...authHeaders(),
+      headers: authHeaders(),
       credentials: 'include',
       signal,
     })
@@ -32,7 +32,7 @@ async function fetchConsent({ signal } = {}) {
 async function acceptConsentRequest(docVersion) {
   const res = await fetch(`${API}${CONSENT_PATH}`, {
     method: 'POST',
-    ...authHeaders(),
+    headers: authHeaders(),
     credentials: 'include',
     body: JSON.stringify({ docVersion }),
   })

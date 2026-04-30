@@ -4,6 +4,8 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vites
 const require = createRequire(import.meta.url)
 const notifyModulePath = require.resolve('../src/lib/notify')
 const emailTransportPath = require.resolve('../src/lib/email/emailTransport')
+const socketioPath = require.resolve('../src/lib/socketio')
+const socketEventsPath = require.resolve('../src/lib/socketEvents')
 
 const mocks = vi.hoisted(() => ({
   emailTransport: {
@@ -11,6 +13,12 @@ const mocks = vi.hoisted(() => ({
     getFromAddress: vi.fn(() => 'noreply@studyhub.test'),
     getPublicAppUrl: vi.fn(() => 'https://studyhub.test'),
     escapeHtml: vi.fn((value) => String(value)),
+  },
+  socketio: {
+    emitToUser: vi.fn(),
+  },
+  socketEvents: {
+    NOTIFICATION_NEW: 'notification:new',
   },
 }))
 
@@ -21,7 +29,14 @@ let notify
 function createPrismaMock() {
   return {
     notification: {
-      create: vi.fn(async ({ data }) => ({ id: 1, ...data })),
+      create: vi.fn(async ({ data, include }) => ({
+        id: 1,
+        ...data,
+        actor: include?.actor
+          ? { id: data.actorId, username: 'actor_user', avatarUrl: null }
+          : undefined,
+      })),
+      findFirst: vi.fn(),
     },
     userPreferences: {
       findUnique: vi.fn(),
@@ -42,6 +57,14 @@ beforeAll(() => {
 
     if (resolvedRequest === emailTransportPath) {
       return mocks.emailTransport
+    }
+
+    if (resolvedRequest === socketioPath) {
+      return mocks.socketio
+    }
+
+    if (resolvedRequest === socketEventsPath) {
+      return mocks.socketEvents
     }
 
     return originalModuleLoad.apply(this, arguments)
@@ -104,13 +127,50 @@ describe('notify.createNotification', () => {
       expect(mocks.emailTransport.deliverMail).toHaveBeenCalledTimes(1)
     })
 
-    expect(prisma.notification.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({
-        userId: 42,
-        type: 'moderation',
-        priority: 'high',
+    expect(prisma.notification.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          userId: 42,
+          type: 'moderation',
+          priority: 'high',
+        }),
+        include: {
+          actor: {
+            select: { id: true, username: true, avatarUrl: true },
+          },
+        },
       }),
-    })
+    )
+  })
+
+  it('pushes socket notifications with the actor shape used by polling', async () => {
+    const previousNodeEnv = process.env.NODE_ENV
+    process.env.NODE_ENV = 'development'
+    const prisma = createPrismaMock()
+
+    try {
+      await notify.createNotification(prisma, {
+        userId: 42,
+        type: 'mention',
+        message: 'actor_user mentioned you.',
+        actorId: 10,
+      })
+    } finally {
+      if (previousNodeEnv === undefined) {
+        delete process.env.NODE_ENV
+      } else {
+        process.env.NODE_ENV = previousNodeEnv
+      }
+    }
+
+    expect(mocks.socketio.emitToUser).toHaveBeenCalledWith(
+      42,
+      'notification:new',
+      expect.objectContaining({
+        actorId: 10,
+        actor: { id: 10, username: 'actor_user', avatarUrl: null },
+      }),
+    )
   })
 
   it('sends opted-in emails for medium-priority mention notifications', async () => {
