@@ -4,6 +4,7 @@ import { API } from '../../config'
 import { Button, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
 import { FONT } from './settingsState'
 import RoleTile from './RoleTile'
+import SetPasswordModal from './SetPasswordModal'
 
 const DELETION_REASONS = [
   { value: 'better_platform', label: 'Found a better platform' },
@@ -43,6 +44,12 @@ export default function AccountTab({
 
   const [emailMsg, setEmailMsg] = useState(null)
   const [deleteMsg, setDeleteMsg] = useState(null)
+
+  // Google-signup users who never chose a password get a 409 +
+  // PASSWORD_NOT_SET from delete-account / patch-email / patch-
+  // password. We pop SetPasswordModal so they can choose one inline,
+  // then retry the original op without re-typing.
+  const [setPasswordCtx, setSetPasswordCtx] = useState(null)
 
   const [clockNowMs, setClockNowMs] = useState(() => Date.now())
 
@@ -125,10 +132,16 @@ export default function AccountTab({
     }
   }
 
-  async function handleDeleteAccount(event) {
-    event.preventDefault()
-    if (!deleteForm.reason || !deleteForm.password) {
-      setDeleteMsg({ type: 'error', text: 'Choose a reason and confirm with your password.' })
+  // Pulled out so we can call it from both the form submit and the
+  // SetPasswordModal success handler (Google users who set a password
+  // mid-flow should land here automatically with the new password).
+  async function submitDeleteAccount(form) {
+    if (!form.reason) {
+      setDeleteMsg({ type: 'error', text: 'Choose a reason for leaving.' })
+      return
+    }
+    if (!form.password) {
+      setDeleteMsg({ type: 'error', text: 'Confirm with your password.' })
       return
     }
 
@@ -140,11 +153,26 @@ export default function AccountTab({
         method: 'DELETE',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(deleteForm),
+        body: JSON.stringify(form),
       })
-      const data = await response.json()
+      const data = await response.json().catch(() => ({}))
 
       if (!response.ok) {
+        if (data?.code === 'PASSWORD_NOT_SET') {
+          // Pop the set-password modal; on success retry the delete
+          // with the password the user just chose.
+          setSetPasswordCtx({
+            reason:
+              'You signed up with Google, so you don’t have a password set yet. Choose one to confirm account deletion (you’ll also be able to use it to sign in with email).',
+            onSuccess: (newPassword) => {
+              setSetPasswordCtx(null)
+              const nextForm = { ...form, password: newPassword }
+              setDeleteForm(nextForm)
+              void submitDeleteAccount(nextForm)
+            },
+          })
+          return
+        }
         setDeleteMsg({ type: 'error', text: data.error || 'Could not delete your account.' })
         return
       }
@@ -156,6 +184,11 @@ export default function AccountTab({
     } finally {
       setBusyKey('')
     }
+  }
+
+  async function handleDeleteAccount(event) {
+    event.preventDefault()
+    await submitDeleteAccount(deleteForm)
   }
 
   return (
@@ -363,6 +396,19 @@ export default function AccountTab({
           </Button>
         </form>
       </SectionCard>
+
+      <SetPasswordModal
+        open={Boolean(setPasswordCtx)}
+        reason={setPasswordCtx?.reason}
+        onClose={() => setSetPasswordCtx(null)}
+        onSuccess={(newPassword) => {
+          // Defer to the caller-supplied success handler so the gated
+          // op (delete account / change email / etc.) can retry with
+          // the freshly-set password.
+          if (setPasswordCtx?.onSuccess) setPasswordCtx.onSuccess(newPassword)
+          else setSetPasswordCtx(null)
+        }}
+      />
     </>
   )
 }
