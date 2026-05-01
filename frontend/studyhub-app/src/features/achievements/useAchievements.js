@@ -1,13 +1,24 @@
 /**
  * useAchievements — read hooks for the gallery, detail page, and stats.
+ *
+ * GET requests deliberately omit the `Content-Type: application/json`
+ * header. With the split-origin deploy
+ * (`getstudyhub.org → api.getstudyhub.org`) any non-simple request
+ * triggers a CORS preflight; sending a Content-Type on a body-less GET
+ * doubled the round-trip cost on every catalog/gallery/stats fetch
+ * (Copilot review 2026-05-01). POSTs / DELETEs that carry JSON bodies
+ * still set Content-Type explicitly via `jsonHeaders()`.
+ *
+ * Cookies carry the session — `credentials: 'include'` is the only
+ * thing every request actually needs.
  */
 import { useCallback, useEffect, useState } from 'react'
 import { API } from '../../config'
 
-// Inline auth header helper — matches the per-page pattern used elsewhere
-// (feedConstants.js, adminConstants.js, profileConstants.js). Cookies carry
-// the session; we just send Content-Type.
-function authHeaders() {
+// Headers for write requests that send a JSON body. GETs / DELETEs
+// without a body should NOT use this — keep them as simple requests
+// to avoid the CORS preflight tax.
+function jsonHeaders() {
   return { 'Content-Type': 'application/json' }
 }
 
@@ -29,7 +40,6 @@ export function useUserAchievements(username) {
         : `${API}/api/achievements`
       const r = await fetch(url, {
         credentials: 'include',
-        headers: authHeaders(),
       })
       if (!r.ok) {
         throw new Error(`Failed (${r.status})`)
@@ -63,7 +73,6 @@ export function useMyStats() {
       try {
         const r = await fetch(`${API}/api/achievements/stats`, {
           credentials: 'include',
-          headers: authHeaders(),
         })
         if (!r.ok) return
         const body = await r.json()
@@ -100,7 +109,7 @@ export function usePinnedAchievements(username) {
     try {
       const r = await fetch(
         `${API}/api/achievements/users/${encodeURIComponent(username)}/pinned`,
-        { credentials: 'include', headers: authHeaders() },
+        { credentials: 'include' },
       )
       if (!r.ok) {
         setItems([])
@@ -139,7 +148,6 @@ export function useAchievementDetail(slug) {
       try {
         const r = await fetch(`${API}/api/achievements/${encodeURIComponent(slug)}`, {
           credentials: 'include',
-          headers: authHeaders(),
         })
         if (!r.ok) throw new Error(`Failed (${r.status})`)
         const body = await r.json()
@@ -160,13 +168,14 @@ export function useAchievementDetail(slug) {
 }
 
 /**
- * Pin / unpin an achievement. Returns a toggle function.
+ * Pin an achievement. POST carries a JSON body, so Content-Type is
+ * required.
  */
 export async function pinAchievement(slug) {
   const r = await fetch(`${API}/api/achievements/pin`, {
     method: 'POST',
     credentials: 'include',
-    headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+    headers: jsonHeaders(),
     body: JSON.stringify({ slug }),
   })
   if (!r.ok) {
@@ -176,11 +185,15 @@ export async function pinAchievement(slug) {
   return true
 }
 
+/**
+ * Unpin an achievement. DELETE without a body — no Content-Type
+ * needed; keeps the request "simple" so the browser sends it directly
+ * without a preflight on cross-origin deploys.
+ */
 export async function unpinAchievement(slug) {
   const r = await fetch(`${API}/api/achievements/pin/${encodeURIComponent(slug)}`, {
     method: 'DELETE',
     credentials: 'include',
-    headers: authHeaders(),
   })
   if (!r.ok) {
     const body = await r.json().catch(() => ({}))

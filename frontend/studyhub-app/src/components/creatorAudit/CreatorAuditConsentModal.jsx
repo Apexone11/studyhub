@@ -58,18 +58,11 @@ export default function CreatorAuditConsentModal({
   }, [open])
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  useEffect(() => {
-    if (!open) return
-    function onKey(e) {
-      // Escape mirrors the backdrop rule: while an error banner is up, the
-      // user has to read it and explicitly Cancel. Without this they can
-      // hit Escape after a failed accept and lose the only feedback they
-      // had about why publishing is still gated.
-      if (e.key === 'Escape' && !submitting && !error) onDismiss?.()
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, submitting, error, onDismiss])
+  // Escape handling lives in FocusTrappedDialog (escapeDeactivates =
+  // dismissable). The "while submitting OR error banner is up, user
+  // must explicitly Cancel" rule is enforced by passing
+  // escapeDeactivates={dismissable} below — keeping a second manual
+  // listener here would fire onDismiss twice on Escape.
 
   if (!open) return null
 

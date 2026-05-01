@@ -9,6 +9,7 @@ import { getAuthenticatedHomePath } from './lib/authNavigation'
 import { SessionProvider, useSession } from './lib/session-context'
 import { GOOGLE_CLIENT_ID } from './config'
 import { isNativePlatform } from './lib/mobile/detectMobile'
+import useAchievementUnlockListener from './features/achievements/useAchievementUnlockListener'
 
 const AppMobile = lazy(() => import('./mobile/App.mobile'))
 
@@ -68,7 +69,6 @@ const PlagiarismReportPage = lazy(() => import('./pages/plagiarism/PlagiarismRep
 const AchievementsPage = lazy(() => import('./features/achievements/AchievementsPage'))
 const AchievementDetailPage = lazy(() => import('./features/achievements/AchievementDetailPage'))
 const AchievementUnlockModal = lazy(() => import('./features/achievements/AchievementUnlockModal'))
-import useAchievementUnlockListener from './features/achievements/useAchievementUnlockListener'
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 // Dev-only test harness for the Playwright focus-trap smoke spec.
 // Vite's `import.meta.env.DEV` is statically true in `npm run dev` and

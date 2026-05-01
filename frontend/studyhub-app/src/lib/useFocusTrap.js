@@ -71,12 +71,27 @@ export function useFocusTrap({
       body.__focusTrapScrollLockCount += 1
     }
 
+    // Tracks whether the active deactivation was user-driven (Escape /
+    // outside-click intercept) vs programmatic (parent set open=false
+    // and the cleanup function ran trap.deactivate()). focus-trap
+    // calls onDeactivate in BOTH cases — without this guard, onClose
+    // would fire twice on Escape, and once again during unmount, with
+    // every duplicate triggering the parent's state setter.
+    let userDrivenDeactivation = false
     const trap = createFocusTrap(container, {
       // Escape — when escapeCloses is true, fire onClose AND let the
       // trap deactivate. When false, ignore the key.
-      escapeDeactivates: escapeCloses,
+      escapeDeactivates: (event) => {
+        if (!escapeCloses) return false
+        // Only mark user-driven when this is actually an Escape press.
+        // Other deactivation paths (programmatic, outside-click) leave
+        // the flag false so onDeactivate stays silent.
+        if (event && event.key === 'Escape') userDrivenDeactivation = true
+        return true
+      },
       onDeactivate: () => {
-        if (escapeCloses && typeof onClose === 'function') onClose()
+        if (userDrivenDeactivation && typeof onClose === 'function') onClose()
+        userDrivenDeactivation = false
       },
       // Initial focus: explicit ref → first focusable inside container
       // → container itself (with tabIndex=-1) as a last resort.

@@ -13,8 +13,12 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { captureError } = require('../../monitoring/sentry')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { readLimiter, writeLimiter, createAiMessageLimiter } = require('../../lib/rateLimiters')
+
+const requireTrustedOrigin = originAllowlist()
 const aiService = require('./ai.service')
 const {
   MAX_MESSAGE_LENGTH,
@@ -252,57 +256,75 @@ router.get('/usage', requireAuth, readLimiter, async (req, res) => {
  */
 const ALLOWED_FLAG_REASONS = new Set(['harmful', 'inaccurate', 'biased', 'illegal', 'other'])
 
-router.post('/messages/:id/flag', requireAuth, writeLimiter, async (req, res) => {
-  try {
-    const prisma = require('../../lib/prisma')
-    const messageId = Number.parseInt(req.params.id, 10)
-    if (!Number.isInteger(messageId) || messageId <= 0) {
-      return res.status(400).json({ error: 'Invalid message id.' })
-    }
-    const reason = String(req.body?.reason || '')
-      .trim()
-      .toLowerCase()
-    if (!ALLOWED_FLAG_REASONS.has(reason)) {
-      return res.status(400).json({ error: 'Invalid reason.' })
-    }
-    const note =
-      String(req.body?.note || '')
+router.post(
+  '/messages/:id/flag',
+  requireAuth,
+  requireTrustedOrigin,
+  writeLimiter,
+  async (req, res) => {
+    try {
+      const prisma = require('../../lib/prisma')
+      const messageId = Number.parseInt(req.params.id, 10)
+      if (!Number.isInteger(messageId) || messageId <= 0) {
+        return sendError(res, 400, 'Invalid message id.', ERROR_CODES.BAD_REQUEST)
+      }
+      const reason = String(req.body?.reason || '')
         .trim()
-        .slice(0, 1000) || null
+        .toLowerCase()
+      if (!ALLOWED_FLAG_REASONS.has(reason)) {
+        return sendError(res, 400, 'Invalid reason.', ERROR_CODES.VALIDATION)
+      }
+      const note =
+        String(req.body?.note || '')
+          .trim()
+          .slice(0, 1000) || null
 
-    const message = await prisma.aiMessage.findUnique({
-      where: { id: messageId },
-      select: {
-        id: true,
-        role: true,
-        conversation: { select: { userId: true } },
-      },
-    })
-    if (!message) return res.status(404).json({ error: 'Message not found.' })
-    // Only the conversation owner can flag — assistant messages only
-    // (no point flagging your own user input).
-    if (message.conversation.userId !== req.user.userId) {
-      return res.status(403).json({ error: 'You can only flag your own AI conversations.' })
+      const message = await prisma.aiMessage.findUnique({
+        where: { id: messageId },
+        select: {
+          id: true,
+          role: true,
+          conversation: { select: { userId: true } },
+        },
+      })
+      if (!message) {
+        return sendError(res, 404, 'Message not found.', ERROR_CODES.NOT_FOUND)
+      }
+      // Only the conversation owner can flag — assistant messages only
+      // (no point flagging your own user input).
+      if (message.conversation.userId !== req.user.userId) {
+        return sendError(
+          res,
+          403,
+          'You can only flag your own AI conversations.',
+          ERROR_CODES.FORBIDDEN,
+        )
+      }
+      if (message.role !== 'assistant') {
+        return sendError(
+          res,
+          400,
+          'Only assistant messages can be flagged.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
+
+      await prisma.aiMessage.update({
+        where: { id: messageId },
+        data: {
+          flaggedAt: new Date(),
+          flaggedReason: reason,
+          flaggedById: req.user.userId,
+          flaggedNote: note,
+        },
+      })
+
+      res.json({ ok: true })
+    } catch (err) {
+      captureError(err, { tags: { module: 'ai', action: 'flagMessage' } })
+      sendError(res, 500, 'Failed to flag message.', ERROR_CODES.INTERNAL)
     }
-    if (message.role !== 'assistant') {
-      return res.status(400).json({ error: 'Only assistant messages can be flagged.' })
-    }
-
-    await prisma.aiMessage.update({
-      where: { id: messageId },
-      data: {
-        flaggedAt: new Date(),
-        flaggedReason: reason,
-        flaggedById: req.user.userId,
-        flaggedNote: note,
-      },
-    })
-
-    res.json({ ok: true })
-  } catch (err) {
-    captureError(err, { tags: { module: 'ai', action: 'flagMessage' } })
-    res.status(500).json({ error: 'Failed to flag message.' })
-  }
-})
+  },
+)
 
 module.exports = router

@@ -180,18 +180,28 @@ export default function RolePickerPage() {
         />
         <span>
           I&rsquo;ve reviewed and agree to the{' '}
-          <a href="/terms" target="_blank" rel="noreferrer" style={{ color: 'var(--sh-link)' }}>
+          <a
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--sh-link)' }}
+          >
             Terms of Use
           </a>
           ,{' '}
-          <a href="/privacy" target="_blank" rel="noreferrer" style={{ color: 'var(--sh-link)' }}>
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--sh-link)' }}
+          >
             Privacy Policy
           </a>
           , and{' '}
           <a
             href="/guidelines"
             target="_blank"
-            rel="noreferrer"
+            rel="noopener noreferrer"
             style={{ color: 'var(--sh-link)' }}
           >
             Community Guidelines
