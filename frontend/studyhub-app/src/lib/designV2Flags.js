@@ -21,6 +21,11 @@ import { API } from '../config'
  * and runs via `npm --prefix backend run seed:flags`. Local dev
  * inherits it through `seed:beta`.
  *
+ * Only flag names with a live consumer ship in this enum. Phases 5-8
+ * (auth_split / onboarding / feed_polish / home_hero) were reserved
+ * but never built — re-add them here when their UI lands so the same
+ * name lookup pattern continues to work for new components.
+ *
  * Flags covered:
  *   - design_v2_phase1_dashboard   — Phase 1: welcome hero, sectioned sidebar,
  *                                    top contributors mini-widget. SHIPPED 2026-04-23.
@@ -28,11 +33,13 @@ import { API } from '../config'
  *                                    SHIPPED 2026-04-24.
  *   - design_v2_ai_card            — Phase 3: Inline Hub AI suggestion card.
  *   - design_v2_sheets_grid        — Phase 4: Sheets Grid/List toggle + preview.
- *   - design_v2_auth_split         — Phase 5: Auth split layout + referral banner.
- *   - design_v2_onboarding         — Phase 6: Onboarding polish (skips + tour).
- *   - design_v2_feed_polish        — Phase 7: Feed density + swipe gestures.
- *   - design_v2_home_hero          — Phase 8: Public home hero + for-role cards.
- *   - design_v2_creator_audit      — Path A: Creator Audit consent + audit UI.
+ *   - design_v2_teach_materials    — W2: TeachMaterials index page.
+ *   - design_v2_docs_public        — W2: public docs surface.
+ *   - design_v2_groups_polish      — W2: study-groups polish.
+ *   - design_v2_role_checklist     — W2: role-aware checklist on profile.
+ *   - design_v2_weekly_focus       — W2: weekly focus widget.
+ *   - design_v2_teach_sections     — W3: section-aware publishing.
+ *   - design_v2_creator_audit      — W5: Creator Audit consent + audit UI.
  */
 
 const FLAG_NAMES = {
@@ -40,10 +47,6 @@ const FLAG_NAMES = {
   upcomingExams: 'design_v2_upcoming_exams',
   aiCard: 'design_v2_ai_card',
   sheetsGrid: 'design_v2_sheets_grid',
-  authSplit: 'design_v2_auth_split',
-  onboarding: 'design_v2_onboarding',
-  feedPolish: 'design_v2_feed_polish',
-  homeHero: 'design_v2_home_hero',
   // Week 2 of v2 refresh — see
   // docs/internal/design-refresh-v2-week2-to-week5-execution.md
   teachMaterials: 'design_v2_teach_materials',
@@ -97,10 +100,6 @@ const DEFAULTS = {
   upcomingExams: false,
   aiCard: false,
   sheetsGrid: false,
-  authSplit: false,
-  onboarding: false,
-  feedPolish: false,
-  homeHero: false,
   teachMaterials: false,
   docsPublic: false,
   groupsPolish: false,
@@ -121,10 +120,6 @@ export function useDesignV2Flags() {
       fetchFlag(FLAG_NAMES.upcomingExams),
       fetchFlag(FLAG_NAMES.aiCard),
       fetchFlag(FLAG_NAMES.sheetsGrid),
-      fetchFlag(FLAG_NAMES.authSplit),
-      fetchFlag(FLAG_NAMES.onboarding),
-      fetchFlag(FLAG_NAMES.feedPolish),
-      fetchFlag(FLAG_NAMES.homeHero),
       fetchFlag(FLAG_NAMES.teachMaterials),
       fetchFlag(FLAG_NAMES.docsPublic),
       fetchFlag(FLAG_NAMES.groupsPolish),
@@ -139,10 +134,6 @@ export function useDesignV2Flags() {
           upcomingExams,
           aiCard,
           sheetsGrid,
-          authSplit,
-          onboarding,
-          feedPolish,
-          homeHero,
           teachMaterials,
           docsPublic,
           groupsPolish,
@@ -157,10 +148,6 @@ export function useDesignV2Flags() {
             upcomingExams,
             aiCard,
             sheetsGrid,
-            authSplit,
-            onboarding,
-            feedPolish,
-            homeHero,
             teachMaterials,
             docsPublic,
             groupsPolish,

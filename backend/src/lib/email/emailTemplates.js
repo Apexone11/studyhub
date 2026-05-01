@@ -623,6 +623,91 @@ async function sendLoginChallengeCode(toEmail, username, code, details = {}) {
   )
 }
 
+/**
+ * Send a Data Subject Access Request (DSAR) submission to the admin
+ * inbox. Used by POST /api/legal/data-request when a user submits the
+ * native Data Request form on /data-request.
+ *
+ * Routes to the env var LEGAL_CONTACT_EMAIL when set; otherwise falls
+ * back to the standard admin inbox via getAdminEmail(). Reply-To is
+ * set to the requester's contact email so the admin can respond
+ * directly without copy/pasting.
+ *
+ * @param {object} params
+ * @param {string} params.requesterName
+ * @param {string} params.requesterEmail
+ * @param {string} params.requestType         e.g. 'access' | 'correction' | 'deletion' | 'other'
+ * @param {string} params.law                 'CCPA' | 'GDPR' | 'Both' | 'Other'
+ * @param {string | null} params.message
+ * @param {string} params.submittedAtIso
+ * @param {string | null} params.requesterIp  Forwarded IP for audit context.
+ */
+async function sendDataRequest({
+  requesterName,
+  requesterEmail,
+  requestType,
+  law,
+  message,
+  submittedAtIso,
+  requesterIp,
+}) {
+  const recipient = (process.env.LEGAL_CONTACT_EMAIL || getAdminEmail() || '').trim()
+  if (!recipient) {
+    throw new Error('No legal contact email configured (LEGAL_CONTACT_EMAIL or ADMIN_EMAIL).')
+  }
+
+  const subject = `StudyHub data request: ${requestType} (${law})`
+
+  const messageHtml = message
+    ? `<p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Message:</strong></p>
+       <p style="margin:0 0 10px;color:#334155;font-size:14px;white-space:pre-wrap;">${escapeHtml(message)}</p>`
+    : '<p style="margin:0 0 10px;color:#9ca3af;font-size:14px;">No additional message provided.</p>'
+
+  const body = `
+    <h2 style="margin:0 0 8px;color:#1e3a5f;font-size:22px;">Data Request Submitted</h2>
+    <p style="margin:0 0 24px;color:#6b7280;font-size:15px;">
+      A user submitted a Data Subject Access Request via /data-request.
+    </p>
+    <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;margin:0 0 24px;">
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Name:</strong> ${escapeHtml(requesterName)}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Email:</strong> ${escapeHtml(requesterEmail)}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Type:</strong> ${escapeHtml(requestType)}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Law:</strong> ${escapeHtml(law)}</p>
+      <p style="margin:0 0 10px;color:#334155;font-size:14px;"><strong>Submitted:</strong> ${escapeHtml(submittedAtIso)}</p>
+      <p style="margin:0;color:#334155;font-size:14px;"><strong>Source IP:</strong> ${escapeHtml(requesterIp || 'unknown')}</p>
+    </div>
+    <div style="background:#ffffff;border:1px solid #e5e7eb;border-radius:12px;padding:18px 20px;margin:0 0 24px;">
+      ${messageHtml}
+    </div>
+    <p style="margin:0;color:#9ca3af;font-size:13px;">
+      Reply directly to this email to respond. You have 24 hours to acknowledge under the privacy notice.
+    </p>
+  `
+
+  const mailOptions = {
+    from: `"StudyHub" <${getFromAddress()}>`,
+    to: recipient,
+    replyTo: requesterEmail,
+    subject,
+    text: [
+      'A user submitted a Data Subject Access Request.',
+      '',
+      `Name: ${requesterName}`,
+      `Email: ${requesterEmail}`,
+      `Type: ${requestType}`,
+      `Law: ${law}`,
+      `Submitted: ${submittedAtIso}`,
+      `Source IP: ${requesterIp || 'unknown'}`,
+      '',
+      'Message:',
+      message || '(none)',
+    ].join('\n'),
+    html: htmlWrap('StudyHub Data Request', body),
+  }
+
+  await deliverMail(mailOptions, 'data-request')
+}
+
 module.exports = {
   sendEmailSmoke,
   sendPasswordReset,
@@ -635,4 +720,5 @@ module.exports = {
   sendReferralInvite,
   sendNewLoginLocation,
   sendLoginChallengeCode,
+  sendDataRequest,
 }

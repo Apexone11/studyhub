@@ -1,0 +1,85 @@
+# Dependabot — automated dependency update PRs.
+# Docs: https://docs.github.com/en/code-security/dependabot/dependabot-version-updates/configuration-options-for-the-dependabot.yml-file
+
+version: 2
+updates:
+  # Backend (Node.js / npm) — dependencies live in backend/package.json
+  - package-ecosystem: "npm"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "backend"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    # Group patch + minor updates into one PR per ecosystem so the queue
+    # stays manageable. Major bumps still come through as their own PRs
+    # because they may carry breaking changes.
+    groups:
+      backend-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      # Major bumps to these libraries require coordinated migration
+      # work — keep them on the manual track per CLAUDE.md §"v2.1
+      # dependency exception".
+      - dependency-name: "express"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "prisma"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@prisma/client"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "socket.io"
+        update-types: ["version-update:semver-major"]
+
+  # Frontend (Node.js / npm) — dependencies live in frontend/studyhub-app/package.json
+  - package-ecosystem: "npm"
+    directory: "/frontend/studyhub-app"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:30"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "frontend"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    groups:
+      frontend-minor-patch:
+        update-types:
+          - "minor"
+          - "patch"
+    ignore:
+      - dependency-name: "react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "react-router-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "vite"
+        update-types: ["version-update:semver-major"]
+
+  # GitHub Actions — keep CI workflows on the latest action versions.
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    labels:
+      - "dependencies"
+      - "ci"
+    commit-message:
+      prefix: "chore(ci)"

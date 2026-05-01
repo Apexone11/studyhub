@@ -90,10 +90,53 @@ router.post('/login', loginLimiter, async (req, res) => {
      * the trusted-device flow. See trustedDevice.service.js for the
      * current verification path. */
 
+    // Admin MFA enforcement (L2.14). When the flag is on AND this user
+    // has `mfaRequired = true`, force the path through 2FA on every
+    // login regardless of risk band. Admins with mfaRequired but no
+    // 2FA configured get a 403 telling the frontend to route to
+    // /settings/security/setup-2fa first. Fail-CLOSED: any error
+    // reading the flag treats enforcement as OFF (matches the rest of
+    // the auth flow's "never lock out the founder" stance — admin MFA
+    // can be relaxed via the flag while we investigate).
+    let adminMfaEnforced = false
+    try {
+      const flag = await prisma.featureFlag.findUnique({
+        where: { name: 'flag_admin_mfa_required' },
+        select: { enabled: true },
+      })
+      adminMfaEnforced = Boolean(flag && flag.enabled === true)
+    } catch {
+      adminMfaEnforced = false
+    }
+    // Path A: enforced admin without 2FA configured — block session,
+    // tell the frontend to send the user to setup.
+    if (adminMfaEnforced && user.role === 'admin' && user.mfaRequired && !user.twoFaEnabled) {
+      return sendError(
+        res,
+        403,
+        'Admin accounts require 2FA. Set it up in Settings → Security to continue.',
+        ERROR_CODES.FORBIDDEN,
+        { code: 'MFA_SETUP_REQUIRED', setupPath: '/settings/security/setup-2fa' },
+      )
+    }
+    // Path B (handled below): enforced admin WITH 2FA configured — the
+    // risk evaluation runs normally, then we force the challenge band
+    // so the OTP / recovery flow runs even when risk would have allowed
+    // a session. The handleChallengeBand call short-circuits with a 401
+    // carrying the challengeId; the user completes the challenge via
+    // /api/auth/login/challenge or /api/auth/login/recovery-code.
+
     // Evaluate device + geo + risk BEFORE issuing a session. Lets us route
     // high-risk attempts (band=challenge, score >= 60) through an email
     // step-up code rather than silently handing out a cookie.
     const risk = await evaluateLoginRisk(user.id, req, res)
+
+    // Admin MFA force-challenge: override the risk band when admin MFA
+    // is enforced (computed above). Done after evaluateLoginRisk so the
+    // same risk + device context flows into the challenge.
+    if (adminMfaEnforced && user.role === 'admin' && user.mfaRequired && user.twoFaEnabled) {
+      risk.riskResult.band = 'challenge'
+    }
 
     if (risk.riskResult.band === 'challenge') {
       const handled = await handleChallengeBand(res, user, risk)

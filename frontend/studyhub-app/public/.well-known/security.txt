@@ -1,0 +1,5 @@
+Contact: mailto:legal@getstudyhub.org
+Expires: 2027-04-30T23:59:59Z
+Preferred-Languages: en
+Canonical: https://getstudyhub.org/.well-known/security.txt
+Policy: https://getstudyhub.org/data-request

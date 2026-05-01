@@ -13,8 +13,12 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { captureError } = require('../../monitoring/sentry')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { readLimiter, writeLimiter, createAiMessageLimiter } = require('../../lib/rateLimiters')
+
+const requireTrustedOrigin = originAllowlist()
 const aiService = require('./ai.service')
 const {
   MAX_MESSAGE_LENGTH,
@@ -236,5 +240,91 @@ router.get('/usage', requireAuth, readLimiter, async (req, res) => {
     res.status(500).json({ error: 'Failed to load usage stats.' })
   }
 })
+
+/**
+ * POST /api/ai/messages/:id/flag
+ *
+ * User-facing report flow for assistant messages. Lets a user flag a
+ * specific AI response for admin review. Industry-standard ("report
+ * this response" pattern from Anthropic console, ChatGPT, Gemini).
+ *
+ * Body: { reason: 'harmful' | 'inaccurate' | 'biased' | 'illegal' | 'other', note?: string }
+ *
+ * Idempotent on the (messageId, flaggedById) tuple: re-flagging the
+ * same message updates `flaggedReason` + `flaggedNote` rather than
+ * creating duplicate rows.
+ */
+const ALLOWED_FLAG_REASONS = new Set(['harmful', 'inaccurate', 'biased', 'illegal', 'other'])
+
+router.post(
+  '/messages/:id/flag',
+  requireAuth,
+  requireTrustedOrigin,
+  writeLimiter,
+  async (req, res) => {
+    try {
+      const prisma = require('../../lib/prisma')
+      const messageId = Number.parseInt(req.params.id, 10)
+      if (!Number.isInteger(messageId) || messageId <= 0) {
+        return sendError(res, 400, 'Invalid message id.', ERROR_CODES.BAD_REQUEST)
+      }
+      const reason = String(req.body?.reason || '')
+        .trim()
+        .toLowerCase()
+      if (!ALLOWED_FLAG_REASONS.has(reason)) {
+        return sendError(res, 400, 'Invalid reason.', ERROR_CODES.VALIDATION)
+      }
+      const note =
+        String(req.body?.note || '')
+          .trim()
+          .slice(0, 1000) || null
+
+      const message = await prisma.aiMessage.findUnique({
+        where: { id: messageId },
+        select: {
+          id: true,
+          role: true,
+          conversation: { select: { userId: true } },
+        },
+      })
+      if (!message) {
+        return sendError(res, 404, 'Message not found.', ERROR_CODES.NOT_FOUND)
+      }
+      // Only the conversation owner can flag — assistant messages only
+      // (no point flagging your own user input).
+      if (message.conversation.userId !== req.user.userId) {
+        return sendError(
+          res,
+          403,
+          'You can only flag your own AI conversations.',
+          ERROR_CODES.FORBIDDEN,
+        )
+      }
+      if (message.role !== 'assistant') {
+        return sendError(
+          res,
+          400,
+          'Only assistant messages can be flagged.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
+
+      await prisma.aiMessage.update({
+        where: { id: messageId },
+        data: {
+          flaggedAt: new Date(),
+          flaggedReason: reason,
+          flaggedById: req.user.userId,
+          flaggedNote: note,
+        },
+      })
+
+      res.json({ ok: true })
+    } catch (err) {
+      captureError(err, { tags: { module: 'ai', action: 'flagMessage' } })
+      sendError(res, 500, 'Failed to flag message.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 module.exports = router

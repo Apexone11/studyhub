@@ -94,9 +94,6 @@ async function mockProfileRoutes(page, profileUser) {
   await page.route(`**/api/users/${profileUser.username}/activity*`, async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
-  await page.route(`**/api/users/${profileUser.username}/badges`, async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
-  })
   await page.route('**/api/users/me/follow-suggestions', async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })

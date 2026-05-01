@@ -1,27 +1,38 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * useFocusTrap.js — Accessible focus trapping hook for modals and panels
  *
- * Features:
- *   - Traps Tab/Shift+Tab focus within the container
- *   - Closes on Escape key (optional)
- *   - Auto-focuses the first focusable element (or a specified initialFocusRef)
- *   - Restores focus to the previously focused element on close
- *   - Locks body scroll while active
+ * As of 2026-05-01 this hook is a thin adapter over the
+ * `focus-trap` library (the same engine that powers
+ * `components/Modal/FocusTrappedDialog`). Both APIs ship in this repo
+ * to cover two ergonomics:
  *
- * Usage:
+ *   - `useFocusTrap({ active })`  → return a ref you attach to a div
+ *     you already render. Used by chat panels and pre-built modals
+ *     (SearchModal, ConfirmDialog, ReportModal, ChatPanel,
+ *     LegalAcceptanceEnforcementModal).
+ *   - `<FocusTrappedDialog open ariaLabelledBy="…" />` → the primitive
+ *     wraps everything for you (overlay + panel + portal + ARIA).
+ *     Used for the 9 modals migrated 2026-05-01.
+ *
+ * Both share a single battle-tested engine — no more bespoke
+ * `addEventListener('keydown', …)` Tab-cycling logic, no more
+ * accidental focus escape, no more divergence between the two
+ * implementations.
+ *
+ * Features (unchanged from the original API contract):
+ *   - Traps Tab/Shift+Tab focus within the container.
+ *   - Closes on Escape key (optional, default true).
+ *   - Auto-focuses the first focusable element (or `initialFocusRef`).
+ *   - Restores focus to the previously focused element on close.
+ *   - Locks body scroll while active (counted across concurrent
+ *     traps so nested modals don't unlock prematurely).
+ *
+ * Usage (unchanged):
  *   const trapRef = useFocusTrap({ active: isOpen, onClose: handleClose })
- *   <div ref={trapRef} role="dialog" aria-modal="true">...</div>
+ *   <div ref={trapRef} role="dialog" aria-modal="true">…</div>
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useEffect, useRef, useCallback } from 'react'
-
-const FOCUSABLE_SELECTOR = [
-  'a[href]',
-  'button:not([disabled])',
-  'input:not([disabled]):not([type="hidden"])',
-  'textarea:not([disabled])',
-  'select:not([disabled])',
-  '[tabindex]:not([tabindex="-1"])',
-].join(', ')
+import { useEffect, useRef } from 'react'
+import { createFocusTrap } from 'focus-trap'
 
 /**
  * @param {object}  options
@@ -40,65 +51,16 @@ export function useFocusTrap({
   initialFocusRef,
 } = {}) {
   const containerRef = useRef(null)
-  const previousFocusRef = useRef(null)
-
-  const handleKeyDown = useCallback(
-    (e) => {
-      if (!containerRef.current) return
-
-      // Escape key
-      if (e.key === 'Escape' && escapeCloses && onClose) {
-        e.preventDefault()
-        e.stopPropagation()
-        onClose()
-        return
-      }
-
-      // Tab trapping
-      if (e.key === 'Tab') {
-        const focusable = containerRef.current.querySelectorAll(FOCUSABLE_SELECTOR)
-        if (focusable.length === 0) {
-          e.preventDefault()
-          return
-        }
-
-        const first = focusable[0]
-        const last = focusable[focusable.length - 1]
-
-        if (e.shiftKey) {
-          // Shift+Tab: if on first element, wrap to last
-          if (
-            document.activeElement === first ||
-            !containerRef.current.contains(document.activeElement)
-          ) {
-            e.preventDefault()
-            last.focus()
-          }
-        } else {
-          // Tab: if on last element, wrap to first
-          if (
-            document.activeElement === last ||
-            !containerRef.current.contains(document.activeElement)
-          ) {
-            e.preventDefault()
-            first.focus()
-          }
-        }
-      }
-    },
-    [escapeCloses, onClose],
-  )
 
   useEffect(() => {
-    if (!active) return
+    if (!active) return undefined
+    const container = containerRef.current
+    if (!container) return undefined
 
-    // Save current focus to restore later
-    previousFocusRef.current = document.activeElement
-
-    // Lock body scroll using a shared counter so concurrent focus traps
-    // do not restore scroll prematurely when one unmounts while others remain.
+    // Body-scroll lock — counted so concurrent traps don't restore
+    // overflow until the last one unmounts.
     if (lockScroll && typeof document !== 'undefined') {
-      const body = document.body
+      const { body } = document
       if (body.__focusTrapScrollLockCount == null) {
         body.__focusTrapScrollLockCount = 0
       }
@@ -109,26 +71,62 @@ export function useFocusTrap({
       body.__focusTrapScrollLockCount += 1
     }
 
-    // Focus initial element after a tick (allows portal rendering)
-    const focusTimer = setTimeout(() => {
-      if (initialFocusRef?.current) {
-        initialFocusRef.current.focus()
-      } else if (containerRef.current) {
-        const first = containerRef.current.querySelector(FOCUSABLE_SELECTOR)
-        if (first) first.focus()
-      }
-    }, 50)
+    // Tracks whether the active deactivation was user-driven (Escape /
+    // outside-click intercept) vs programmatic (parent set open=false
+    // and the cleanup function ran trap.deactivate()). focus-trap
+    // calls onDeactivate in BOTH cases — without this guard, onClose
+    // would fire twice on Escape, and once again during unmount, with
+    // every duplicate triggering the parent's state setter.
+    let userDrivenDeactivation = false
+    const trap = createFocusTrap(container, {
+      // Escape — when escapeCloses is true, fire onClose AND let the
+      // trap deactivate. When false, ignore the key.
+      escapeDeactivates: (event) => {
+        if (!escapeCloses) return false
+        // Only mark user-driven when this is actually an Escape press.
+        // Other deactivation paths (programmatic, outside-click) leave
+        // the flag false so onDeactivate stays silent.
+        if (event && event.key === 'Escape') userDrivenDeactivation = true
+        return true
+      },
+      onDeactivate: () => {
+        if (userDrivenDeactivation && typeof onClose === 'function') onClose()
+        userDrivenDeactivation = false
+      },
+      // Initial focus: explicit ref → first focusable inside container
+      // → container itself (with tabIndex=-1) as a last resort.
+      initialFocus: () => initialFocusRef?.current || undefined,
+      // Don't fight the existing scroll-lock; the hook owns body
+      // overflow.
+      preventScroll: false,
+      // Restore focus to whatever was focused before activation.
+      returnFocusOnDeactivate: true,
+      // Allow clicks outside the trapped region without auto-
+      // deactivating. Consumers control closeOnOverlayClick at their
+      // own JSX level.
+      clickOutsideDeactivates: false,
+      allowOutsideClick: true,
+      // If the container has no focusable children, focus the
+      // container itself rather than throwing.
+      fallbackFocus: container,
+    })
 
-    // Attach keydown listener
-    document.addEventListener('keydown', handleKeyDown)
+    try {
+      trap.activate()
+    } catch {
+      // focus-trap throws if the container has nothing focusable AND
+      // no fallbackFocus — guarded above, but stay defensive.
+    }
 
     return () => {
-      clearTimeout(focusTimer)
-      document.removeEventListener('keydown', handleKeyDown)
+      try {
+        trap.deactivate()
+      } catch {
+        /* trap may already be torn down */
+      }
 
-      // Restore body scroll only when the last active focus trap unmounts
       if (lockScroll && typeof document !== 'undefined') {
-        const body = document.body
+        const { body } = document
         if (body.__focusTrapScrollLockCount != null && body.__focusTrapScrollLockCount > 0) {
           body.__focusTrapScrollLockCount -= 1
           if (body.__focusTrapScrollLockCount === 0) {
@@ -138,13 +136,8 @@ export function useFocusTrap({
           }
         }
       }
-
-      // Restore previous focus
-      if (previousFocusRef.current && typeof previousFocusRef.current.focus === 'function') {
-        previousFocusRef.current.focus()
-      }
     }
-  }, [active, handleKeyDown, lockScroll, initialFocusRef])
+  }, [active, escapeCloses, lockScroll, onClose, initialFocusRef])
 
   return containerRef
 }

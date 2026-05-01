@@ -112,7 +112,15 @@ function CommentReactions({ commentId, reactionCounts = {}, userReaction = null,
 
   return (
     <>
-      <button type="button" onClick={() => onReact(commentId, 'like')} style={btnStyle('like')}>
+      <button
+        type="button"
+        onClick={() => onReact(commentId, 'like')}
+        style={btnStyle('like')}
+        aria-pressed={userReaction === 'like'}
+        aria-label={
+          userReaction === 'like' ? 'Remove your like on this comment' : 'Like this comment'
+        }
+      >
         Like{likes > 0 ? ` (${likes})` : ''}
       </button>
       <span style={{ color: 'var(--sh-border)' }}>|</span>
@@ -120,6 +128,12 @@ function CommentReactions({ commentId, reactionCounts = {}, userReaction = null,
         type="button"
         onClick={() => onReact(commentId, 'dislike')}
         style={btnStyle('dislike')}
+        aria-pressed={userReaction === 'dislike'}
+        aria-label={
+          userReaction === 'dislike'
+            ? 'Remove your dislike on this comment'
+            : 'Dislike this comment'
+        }
       >
         Dislike{dislikes > 0 ? ` (${dislikes})` : ''}
       </button>

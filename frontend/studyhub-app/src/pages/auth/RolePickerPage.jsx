@@ -30,6 +30,7 @@ export default function RolePickerPage() {
   const { completeAuthentication } = useSession()
   const [pending] = useState(() => readPending())
   const [accountType, setAccountType] = useState('')
+  const [legalAck, setLegalAck] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -48,6 +49,10 @@ export default function RolePickerPage() {
   async function handleSubmit() {
     if (!accountType) {
       setError('Pick a role to continue.')
+      return
+    }
+    if (!legalAck) {
+      setError('Please review and accept the legal documents to continue.')
       return
     }
     setSubmitting(true)
@@ -152,6 +157,59 @@ export default function RolePickerPage() {
         ))}
       </fieldset>
 
+      {/* Legal acknowledgement — explicit, with links to each doc so the user
+       * can read what they're agreeing to before clicking Continue. Without
+       * this checkbox the OAuth completion endpoint silently rejects the
+       * submit, leaving the user staring at a generic error and an account
+       * that was never persisted. */}
+      <label
+        style={{
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 10,
+          fontSize: 13,
+          color: 'var(--sh-text)',
+          lineHeight: 1.55,
+        }}
+      >
+        <input
+          type="checkbox"
+          checked={legalAck}
+          onChange={(e) => setLegalAck(e.target.checked)}
+          style={{ marginTop: 3 }}
+        />
+        <span>
+          I&rsquo;ve reviewed and agree to the{' '}
+          <a
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--sh-link)' }}
+          >
+            Terms of Use
+          </a>
+          ,{' '}
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--sh-link)' }}
+          >
+            Privacy Policy
+          </a>
+          , and{' '}
+          <a
+            href="/guidelines"
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{ color: 'var(--sh-link)' }}
+          >
+            Community Guidelines
+          </a>
+          .
+        </span>
+      </label>
+
       {error ? (
         <div
           role="alert"
@@ -183,7 +241,7 @@ export default function RolePickerPage() {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={submitting || !accountType}
+          disabled={submitting || !accountType || !legalAck}
           className="sh-button sh-button--primary"
         >
           {submitting ? 'Finishing…' : 'Continue'}

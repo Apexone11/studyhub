@@ -20,11 +20,8 @@ router.get('/me/activity', requireAuth, usersController.getMyActivity)
 // ── GET /api/users/:username/activity (public) ───────────────
 router.get('/:username/activity', optionalAuth, usersController.getActivityByUsername)
 
-// ── GET /api/users/me/badges ─────────────────────────────────
-router.get('/me/badges', requireAuth, usersController.getMyBadges)
-
-// ── GET /api/users/:username/badges (public) ─────────────────
-router.get('/:username/badges', optionalAuth, usersController.getBadgesByUsername)
+// V1 badges routes removed 2026-05-01 — replaced by /api/achievements/*.
+// See users.controller.js for the migration note.
 
 // ── GET /api/users/me/pinned-sheets ──────────────────────────
 router.get('/me/pinned-sheets', requireAuth, usersController.getMyPinnedSheets)

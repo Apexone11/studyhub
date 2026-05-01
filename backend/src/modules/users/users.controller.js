@@ -6,7 +6,7 @@ const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../../lib/prof
 const { getUserPII } = require('../../lib/piiVault')
 const { buildProfilePresentation, getProfileFieldVisibility } = require('../../lib/profileMetadata')
 const prisma = require('../../lib/prisma')
-const { checkAndAwardBadges } = require('../../lib/badges')
+const { checkAndAwardBadgesLegacy: checkAndAwardBadges } = require('../achievements')
 const { getUserStreak, getWeeklyActivity } = require('../../lib/streaks')
 const { enrichUserWithBadges } = require('../../lib/userBadges')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
@@ -98,65 +98,15 @@ const getActivityByUsername = async (req, res) => {
   }
 }
 
-// ── GET /api/users/me/badges ─────────────────────────────────
-const getMyBadges = async (req, res) => {
-  try {
-    const badges = await prisma.userBadge.findMany({
-      where: { userId: req.user.userId },
-      orderBy: { unlockedAt: 'desc' },
-      select: {
-        unlockedAt: true,
-        badge: {
-          select: {
-            slug: true,
-            name: true,
-            description: true,
-            category: true,
-            tier: true,
-            iconUrl: true,
-          },
-        },
-      },
-    })
-    res.json(badges.map((ub) => ({ ...ub.badge, unlockedAt: ub.unlockedAt })))
-  } catch (err) {
-    captureError(err, { route: req.originalUrl })
-    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
-  }
-}
-
-// ── GET /api/users/:username/badges (public) ─────────────────
-const getBadgesByUsername = async (req, res) => {
-  try {
-    const user = await prisma.user.findUnique({
-      where: { username: req.params.username },
-      select: { id: true },
-    })
-    if (!user) return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
-
-    const badges = await prisma.userBadge.findMany({
-      where: { userId: user.id },
-      orderBy: { unlockedAt: 'desc' },
-      select: {
-        unlockedAt: true,
-        badge: {
-          select: {
-            slug: true,
-            name: true,
-            description: true,
-            category: true,
-            tier: true,
-            iconUrl: true,
-          },
-        },
-      },
-    })
-    res.json(badges.map((ub) => ({ ...ub.badge, unlockedAt: ub.unlockedAt })))
-  } catch (err) {
-    captureError(err, { route: req.originalUrl })
-    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
-  }
-}
+// V1 badges endpoints removed 2026-05-01. Both `GET /api/users/me/badges`
+// and `GET /api/users/:username/badges` returned the legacy coin-format
+// payload that BadgeDisplay.jsx consumed. After the BadgeDisplay →
+// PinnedBadgesCard migration, every frontend consumer reads from
+// `/api/achievements/users/:username` (catalog state) or
+// `/api/achievements/users/:username/pinned` (the 6 featured hexagons)
+// instead. The legacy endpoints also referenced a `iconUrl` Badge column
+// that no longer exists in v2 — keeping them around would just throw on
+// any caller that reached them. Removed cleanly.
 
 // ── GET /api/users/me/pinned-sheets ──────────────────────────
 const getMyPinnedSheets = async (req, res) => {
@@ -1185,8 +1135,6 @@ const acceptTerms = async (req, res) => {
 module.exports = {
   getMyActivity,
   getActivityByUsername,
-  getMyBadges,
-  getBadgesByUsername,
   getMyPinnedSheets,
   addPinnedSheet,
   deletePinnedSheet,

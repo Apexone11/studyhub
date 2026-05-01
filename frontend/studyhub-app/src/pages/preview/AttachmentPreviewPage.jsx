@@ -2,9 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { IconArrowLeft, IconDownload, IconEye } from '../../components/Icons'
+import HtmlDownloadWarningModal from '../../components/HtmlDownloadWarningModal'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { pageShell } from '../../lib/ui'
+
+const HTML_EXTENSIONS = new Set(['html', 'htm', 'xhtml', 'svg'])
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 const IMAGE_EXTENSIONS = new Set(['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'avif'])
@@ -126,6 +129,7 @@ function primaryLinkButton() {
 export default function AttachmentPreviewPage() {
   const { scope, id } = useParams()
   const [state, setState] = useState({ loading: true, error: '', detail: null })
+  const [downloadWarning, setDownloadWarning] = useState({ open: false, tier: 0, url: '' })
   const numericId = Number.parseInt(id, 10)
 
   const config = useMemo(() => {
@@ -221,12 +225,40 @@ export default function AttachmentPreviewPage() {
                     <IconArrowLeft size={14} />
                     Back
                   </Link>
-                  {state.detail?.allowDownloads !== false ? (
-                    <a href={config.downloadUrl} style={primaryLinkButton()}>
-                      <IconDownload size={14} />
-                      Download original
-                    </a>
-                  ) : null}
+                  {state.detail?.allowDownloads !== false
+                    ? (() => {
+                        const ext = attachmentExtension(state.detail?.attachmentName)
+                        const isHtml = HTML_EXTENSIONS.has(ext)
+                        if (!isHtml) {
+                          return (
+                            <a href={config.downloadUrl} style={primaryLinkButton()}>
+                              <IconDownload size={14} />
+                              Download original
+                            </a>
+                          )
+                        }
+                        // HTML attachments route through the warning modal so
+                        // the user sees the threat-model copy before the
+                        // download triggers. Tier comes from the server-side
+                        // scan classification when present; defaults to 0
+                        // (clean) for legacy attachments without a tier.
+                        const tier = Number.isInteger(state.detail?.riskTier)
+                          ? state.detail.riskTier
+                          : 0
+                        return (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              setDownloadWarning({ open: true, tier, url: config.downloadUrl })
+                            }
+                            style={{ ...primaryLinkButton(), border: 'none', cursor: 'pointer' }}
+                          >
+                            <IconDownload size={14} />
+                            Download original
+                          </button>
+                        )
+                      })()
+                    : null}
                 </div>
               </div>
             </section>
@@ -290,6 +322,20 @@ export default function AttachmentPreviewPage() {
           </main>
         </div>
       </div>
+      <HtmlDownloadWarningModal
+        open={downloadWarning.open}
+        tier={downloadWarning.tier}
+        onCancel={() => setDownloadWarning({ open: false, tier: 0, url: '' })}
+        onConfirm={() => {
+          // Hand off to the browser by triggering a same-tab navigation;
+          // the server response sets Content-Disposition: attachment so
+          // the file downloads instead of rendering.
+          if (downloadWarning.url) {
+            window.location.href = downloadWarning.url
+          }
+          setDownloadWarning({ open: false, tier: 0, url: '' })
+        }}
+      />
     </>
   )
 }

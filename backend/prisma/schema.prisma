@@ -32,6 +32,22 @@ model User {
   twoFaEnabled            Boolean   @default(false)
   twoFaCode               String?
   twoFaExpiry             DateTime?
+  // 2FA recovery codes — array of bcrypt hashes of single-use 10-char
+  // codes (xxxxx-xxxxx hex). Generated at user request; consumed one
+  // at a time on login when the user can't receive the email OTP.
+  // Industry-standard alternative-factor pattern (NIST 800-63B AAL2,
+  // GitHub, Cloudflare). See `lib/auth/recoveryCodes.js`.
+  twoFaRecoveryHashes     String[]  @default([])
+  twoFaRecoveryGeneratedAt DateTime?
+  twoFaRecoveryUsedCount  Int       @default(0)
+  // Admin MFA enforcement (L2.14) — when true, the login flow blocks
+  // the session cookie until the user completes 2FA setup. Set on the
+  // founder seat by default; promoted admins inherit via the role-
+  // grant hook. Behind `flag_admin_mfa_required` (fail-CLOSED) so
+  // flipping the flag off rolls everyone back to email OTP without a
+  // migration.
+  mfaRequired             Boolean   @default(false)
+  mfaEnforcedAt           DateTime?
   googleId                String?   @unique
   authProvider            String    @default("local")
   accountType             String    @default("student")
@@ -86,6 +102,8 @@ model User {
   pinnedSheets               UserPinnedSheet[]
   dailyActivity              UserDailyActivity[]
   badges                     UserBadge[]
+  achievementEvents          AchievementEvent[]
+  achievementStats           UserAchievementStats?
   sensitiveData              UserSensitive?
   blockedUsers               UserBlock[]               @relation("BlockedByUser")
   blockedByUsers             UserBlock[]               @relation("BlockedUser")
@@ -137,6 +155,7 @@ model User {
   noteCommentReactions       NoteCommentReaction[]
   noteReactions              NoteReaction[]
   legalAcceptances           LegalAcceptance[]
+  legalRequestsResolved      LegalRequest[]            @relation("LegalRequestResolver")
   referralCodes              ReferralCode[]
   referralRedemptions        ReferralRedemption[]
   giftsSent                  GiftSubscription[]        @relation("GiftsSent")
@@ -1050,30 +1069,87 @@ model UserDailyActivity {
   @@index([userId, date(sort: Desc)])
 }
 
-// ── Achievements: badge catalog & unlocks ───────────────────
+// ── Achievements V2: badge catalog & unlocks ───────────────
+//
+// V2 (2026-04-30) extends the original schema with:
+// - Badge.xp / isSecret / displayOrder / iconSlug / criteria / updatedAt
+// - UserBadge.pinned / pinOrder / sharedAt
+// - AchievementEvent (per-event log for time-windowed criteria)
+// - UserAchievementStats (denormalized XP / level cache)
+//
+// Migration: backend/prisma/migrations/20260501000001_achievements_v2/
+// Plan:      docs/internal/audits/2026-04-30-achievements-v2-plan.md
+//
+// All new columns have defaults so the migration is additive-only and
+// safe to redeploy. The legacy `iconUrl` column is preserved for any
+// historical badge that used a remote URL; new badges populate
+// `iconSlug` instead, which references an inline SVG component on the
+// frontend (no remote fetch, smaller bundle).
 model Badge {
-  id          Int         @id @default(autoincrement())
-  slug        String      @unique
-  name        String
-  description String
-  category    String
-  tier        String      @default("bronze")
-  iconUrl     String?
-  threshold   Int         @default(1)
-  createdAt   DateTime    @default(now())
-  unlocks     UserBadge[]
+  id           Int         @id @default(autoincrement())
+  slug         String      @unique
+  name         String
+  description  String
+  category     String
+  tier         String      @default("bronze")
+  iconUrl      String?
+  iconSlug     String?
+  threshold    Int         @default(1)
+  xp           Int         @default(25)
+  isSecret     Boolean     @default(false)
+  displayOrder Int         @default(0)
+  criteria     Json?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @default(now()) @updatedAt
+  unlocks      UserBadge[]
+
+  @@index([category, displayOrder])
+  @@index([isSecret])
 }
 
 model UserBadge {
-  id         Int      @id @default(autoincrement())
+  id         Int       @id @default(autoincrement())
   userId     Int
   badgeId    Int
-  unlockedAt DateTime @default(now())
-  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  badge      Badge    @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  unlockedAt DateTime  @default(now())
+  pinned     Boolean   @default(false)
+  pinOrder   Int?
+  sharedAt   DateTime?
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  badge      Badge     @relation(fields: [badgeId], references: [id], onDelete: Cascade)
 
   @@unique([userId, badgeId])
   @@index([userId, unlockedAt(sort: Desc)])
+  @@index([userId, pinned, pinOrder])
+}
+
+// AchievementEvent — per-event log for criteria that need time/context
+// (e.g. early-bird requires `hour` metadata, polyglot requires `lang`).
+// Most events skip writing here; only those with metadata-relevant criteria
+// persist. Never stores PII.
+model AchievementEvent {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  kind       String
+  metadata   Json?
+  occurredAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind, occurredAt])
+  @@index([occurredAt])
+}
+
+// UserAchievementStats — denormalized XP / level cache for fast profile renders.
+// Recomputed inside the same transaction as every UserBadge insert.
+model UserAchievementStats {
+  userId        Int      @id
+  totalXp       Int      @default(0)
+  level         Int      @default(1)
+  unlockedCount Int      @default(0)
+  highestTier   String   @default("bronze")
+  achievementsHidden Boolean @default(false)
+  updatedAt     DateTime @default(now()) @updatedAt
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 // ── Feature flags ───────────────────────────────────────────
@@ -1658,13 +1734,22 @@ model AiMessage {
   tokenCount       Int?
   model            String?
   metadata         Json?
-  createdAt        DateTime @default(now())
+  // User-reported abuse flag. Set when a user clicks "report this
+  // response" on an assistant message. Admin reviews via the AI
+  // moderation queue. Reason is one of: 'harmful', 'inaccurate',
+  // 'biased', 'illegal', 'other'.
+  flaggedAt        DateTime?
+  flaggedReason    String?
+  flaggedById      Int?
+  flaggedNote      String?   @db.Text
+  createdAt        DateTime  @default(now())
 
   conversation AiConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   user         User?          @relation("AiMessageUser", fields: [userId], references: [id], onDelete: Cascade)
   userId       Int?
 
   @@index([conversationId, createdAt])
+  @@index([flaggedAt])
 }
 
 model AiUsageLog {
@@ -2612,4 +2697,37 @@ model MaterialAssignment {
 
   @@unique([materialId, sectionId])
   @@index([sectionId, dueAt])
+}
+
+// LegalRequest — Data Subject Access Requests (CCPA / GDPR). Persisted
+// BEFORE the email send so a transient SMTP / Resend outage cannot
+// silently lose a compliance request. Admin reads from this table to
+// triage; the email is the convenience signal, the row is truth.
+//
+// PII: requesterName, requesterEmail, message — user input.
+// Retention: 24 months then deleted via sweeper (statute of
+// limitations covers most CCPA/GDPR claims; longer is just liability).
+// IP and User-Agent are logged for fraud / impersonation detection.
+model LegalRequest {
+  id             Int       @id @default(autoincrement())
+  requesterName  String
+  requesterEmail String
+  requestType    String // access | correction | deletion | portability | other
+  law            String // CCPA | GDPR | Both | Other
+  message        String?   @db.Text
+  ipAddress      String?
+  userAgent      String?   @db.Text
+  emailSent      Boolean   @default(false)
+  emailError     String?   @db.Text
+  resolvedAt     DateTime?
+  resolvedById   Int?
+  resolutionNote String?   @db.Text
+  createdAt      DateTime  @default(now())
+
+  resolvedBy User? @relation("LegalRequestResolver", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  @@index([createdAt])
+  @@index([requestType])
+  @@index([resolvedAt])
+  @@index([requesterEmail])
 }

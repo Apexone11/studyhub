@@ -43,23 +43,20 @@ router.get(
  * GET /api/public/health
  * Lightweight health check for uptime monitoring.
  * Returns 200 if database is reachable, 503 otherwise.
+ *
+ * Public endpoint — return ONLY a status field. Uptime + memory used
+ * to be exposed; both are minor info-disclosure to anonymous attackers
+ * (process fingerprinting, exhaustion-pattern detection). Authenticated
+ * `/api/admin/health` covers the detailed view internally.
  */
 router.get('/health', async (_req, res) => {
-  const checks = {}
-
-  // Database connectivity
+  let healthy = true
   try {
     await prisma.$queryRawUnsafe('SELECT 1')
-    checks.database = 'ok'
   } catch {
-    checks.database = 'error'
+    healthy = false
   }
-
-  checks.uptime = Math.floor(process.uptime())
-  checks.memory = Math.floor(process.memoryUsage().heapUsed / 1024 / 1024)
-
-  const healthy = checks.database === 'ok'
-  res.status(healthy ? 200 : 503).json(checks)
+  res.status(healthy ? 200 : 503).json({ status: healthy ? 'ok' : 'error' })
 })
 
 module.exports = router

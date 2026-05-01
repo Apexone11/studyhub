@@ -4,7 +4,7 @@ const { repairRuntimeSchema } = require('./bootstrapSchema')
 const { ensureSchools } = require('./bootstrapSchools')
 const { ensureCourses } = require('./bootstrapCourses')
 const { DEFAULT_ADMIN_EMAIL, ensureAdminUser } = require('./bootstrapAdmin')
-const { seedBadgeCatalog } = require('../badges')
+const { seedBadgeCatalog } = require('../../modules/achievements')
 const { ensureLegalDocumentsSeeded } = require('../../modules/legal/legal.service')
 const log = require('../logger')
 

@@ -1097,6 +1097,51 @@ const creatorAuditConsentReadLimiter = rateLimit({
   message: { error: 'Too many requests. Please slow down.' },
 })
 
+// ── CATEGORY: Legal Module ─────────────────────────────────────────────────
+
+/**
+ * Data Subject Access Request (DSAR) submissions — 3 per hour per IP.
+ * Tight ceiling because submissions email the admin inbox. Honeypot +
+ * payload validation handle bots; this limit caps abuse from a single
+ * IP looping a real form. POST /api/legal/data-request only.
+ */
+const legalDataRequestLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many data requests. Please try again in an hour.' },
+})
+
+/**
+ * Legal-acceptance write — 10 per hour per authenticated user. Caps replay
+ * abuse on the audit table while leaving headroom for legitimate retry
+ * scenarios (network blip during signup → user clicks again).
+ */
+const legalAcceptLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `legal-accept-${req.user?.userId || req.ip}`,
+  message: { error: 'Too many acceptance attempts. Please try again later.' },
+})
+
+/**
+ * Achievement share-to-feed — 5 per 24 hours per user. Per the
+ * achievements-v2 plan §Phase-2: share creates a real FeedPost, so
+ * rate must be tight enough to stop spam-feed pollution from anyone
+ * who unlocks several badges in a session.
+ */
+const achievementShareLimiter = rateLimit({
+  windowMs: WINDOW_1_DAY,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `achievement-share-${req.user?.userId || req.ip}`,
+  message: { error: 'Daily share limit reached. Try again tomorrow.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -1246,4 +1291,11 @@ module.exports = {
   creatorAuditRunLimiter,
   creatorAuditConsentLimiter,
   creatorAuditConsentReadLimiter,
+
+  // Legal module
+  legalDataRequestLimiter,
+  legalAcceptLimiter,
+
+  // Achievements V2
+  achievementShareLimiter,
 }

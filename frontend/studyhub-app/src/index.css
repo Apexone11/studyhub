@@ -147,6 +147,43 @@
   --sh-warning-border: #fde68a;
   --sh-warning-text: #92400e;
 
+  /* ── Achievement tier tokens (Achievements V2) ─────────────────── */
+  /* Documented exception per CLAUDE.md "unique per-tier badge palette".
+     Each tier has frame, soft background, and contrast text variants so
+     <AchievementHexagon /> can render every state from the same tokens
+     without inline hex. Diamond uses a gradient frame; secret uses a dark
+     ink frame with shimmer. */
+  --sh-bronze: #b8702c;
+  --sh-bronze-bg: #fdf6ec;
+  --sh-bronze-text: #5c3614;
+  --sh-bronze-glow: rgba(184, 112, 44, 0.25);
+  --sh-silver: #94a3b8;
+  --sh-silver-bg: #f1f5f9;
+  --sh-silver-text: #1e293b;
+  --sh-silver-glow: rgba(148, 163, 184, 0.25);
+  --sh-gold: #d4a017;
+  --sh-gold-bg: #fffaeb;
+  --sh-gold-text: #5c4500;
+  --sh-gold-glow: rgba(212, 160, 23, 0.32);
+  --sh-platinum: #4a90e2;
+  --sh-platinum-bg: #eef5fc;
+  --sh-platinum-text: #1d3a5c;
+  --sh-platinum-glow: rgba(74, 144, 226, 0.32);
+  --sh-diamond-grad: linear-gradient(135deg, #4a90e2 0%, #b75dff 50%, #ff6b9d 100%);
+  --sh-diamond-stop-1: #4a90e2;
+  --sh-diamond-stop-2: #b75dff;
+  --sh-diamond-stop-3: #ff6b9d;
+  --sh-diamond-bg: #f5f0fb;
+  --sh-diamond-text: #4a1a6b;
+  --sh-diamond-glow: rgba(183, 93, 255, 0.4);
+  --sh-secret: #1f1235;
+  --sh-secret-bg: #2a1d4a;
+  --sh-secret-text: #e8e0fa;
+  --sh-secret-glow: rgba(183, 93, 255, 0.4);
+  --sh-locked: #cbd5e1;
+  --sh-locked-bg: #f1f5f9;
+  --sh-locked-text: #64748b;
+
   /* ── Shared dark hero / glass surfaces ─────────────────────────── */
   --sh-hero-gradient-primary: linear-gradient(160deg, #0f172a 0%, #1e3a5f 55%, #1e40af 100%);
   --sh-hero-gradient-success: linear-gradient(160deg, #0f172a 0%, #123c35 55%, #0f766e 100%);
@@ -440,6 +477,38 @@
   --sh-warning-bg: #2a2010;
   --sh-warning-border: #78350f;
   --sh-warning-text: #fde68a;
+
+  /* ── Achievement tier tokens (dark) ──────────────────────────────── */
+  --sh-bronze: #d18b4a;
+  --sh-bronze-bg: #2a1d10;
+  --sh-bronze-text: #f4d4ad;
+  --sh-bronze-glow: rgba(209, 139, 74, 0.3);
+  --sh-silver: #cbd5e1;
+  --sh-silver-bg: #1e2530;
+  --sh-silver-text: #f1f5f9;
+  --sh-silver-glow: rgba(203, 213, 225, 0.25);
+  --sh-gold: #f4c842;
+  --sh-gold-bg: #2a2410;
+  --sh-gold-text: #fce98a;
+  --sh-gold-glow: rgba(244, 200, 66, 0.32);
+  --sh-platinum: #7ab5f0;
+  --sh-platinum-bg: #15243a;
+  --sh-platinum-text: #cce0f7;
+  --sh-platinum-glow: rgba(122, 181, 240, 0.32);
+  --sh-diamond-grad: linear-gradient(135deg, #7ab5f0 0%, #c486ff 50%, #ff8aaf 100%);
+  --sh-diamond-stop-1: #7ab5f0;
+  --sh-diamond-stop-2: #c486ff;
+  --sh-diamond-stop-3: #ff8aaf;
+  --sh-diamond-bg: #261b35;
+  --sh-diamond-text: #f0e5fd;
+  --sh-diamond-glow: rgba(196, 134, 255, 0.4);
+  --sh-secret: #2a1d4a;
+  --sh-secret-bg: #1a0f2e;
+  --sh-secret-text: #d6c9f5;
+  --sh-secret-glow: rgba(196, 134, 255, 0.45);
+  --sh-locked: #475569;
+  --sh-locked-bg: #1c1c1c;
+  --sh-locked-text: #94a3b8;
 
   --sh-link: #60a5fa;
   --sh-focus-ring: 0 0 0 3px rgba(96, 165, 250, 0.25);

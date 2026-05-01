@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { API } from '../../config'
 import { roleLabel, ACCOUNT_TYPE_OPTIONS } from '../../lib/roleLabel'
 import { showToast } from '../../lib/toast'
 import { useRolesV2Flags } from '../../lib/rolesV2Flags'
+import FocusTrappedDialog from '../../components/Modal/FocusTrappedDialog'
 import { Button, Message, SectionCard } from './settingsShared'
 import { FONT } from './settingsState'
 
@@ -20,46 +20,30 @@ function formatRelative(msFromNow) {
   return `${hours} hour${hours === 1 ? '' : 's'}`
 }
 
+// Local Modal wrapper kept for backwards compat with the rest of the
+// RoleTile JSX. Routes through the shared FocusTrappedDialog so Tab
+// cycling, Escape close, and focus restore are handled uniformly with
+// the rest of the app's modals. clickOutsideDeactivates=false because
+// the role-change modal carries unsaved selection state — a stray
+// backdrop click should not silently discard it.
 function Modal({ open, title, children, onClose }) {
-  if (!open) return null
-  return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15, 23, 42, 0.5)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 20,
-      }}
+  const titleId = useId()
+  return (
+    <FocusTrappedDialog
+      open={open}
+      onClose={onClose}
+      ariaLabelledBy={titleId}
+      clickOutsideDeactivates={false}
+      panelStyle={{ maxWidth: 440, padding: 22, fontFamily: FONT, gap: 14 }}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--sh-surface)',
-          borderRadius: 14,
-          padding: 22,
-          maxWidth: 440,
-          width: '100%',
-          fontFamily: FONT,
-          display: 'grid',
-          gap: 14,
-          boxShadow: '0 10px 40px rgba(15, 23, 42, 0.25)',
-        }}
+      <h3
+        id={titleId}
+        style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--sh-heading)' }}
       >
-        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--sh-heading)' }}>
-          {title}
-        </h3>
-        {children}
-      </div>
-    </div>,
-    document.body,
+        {title}
+      </h3>
+      {children}
+    </FocusTrappedDialog>
   )
 }
 
@@ -175,13 +159,26 @@ export default function RoleTile({ user }) {
     )
   }
   if (!revertFlagEnabled) {
-    // Flag-gated: fall back to a read-only tile so the label is still visible.
+    // Flag-gated: compact read-only tile so the label is still visible.
     const currentLabel = roleLabel(status?.accountType || user?.accountType)
     return (
-      <SectionCard title="Your role" subtitle={`You are a ${currentLabel}.`}>
-        <p style={{ margin: 0, fontSize: 13, color: 'var(--sh-muted)' }}>
-          Role changes are temporarily unavailable. Contact support if you need to update this.
-        </p>
+      <SectionCard title="Your role">
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ fontSize: 13, color: 'var(--sh-text)' }}>
+            Currently: <strong>{currentLabel}</strong>
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+            Role changes are temporarily unavailable.
+          </div>
+        </div>
       </SectionCard>
     )
   }
@@ -198,15 +195,13 @@ export default function RoleTile({ user }) {
   const remainingBudget = Math.max(0, Number(status.changesRemainingLast30Days ?? 0))
 
   return (
-    <SectionCard title="Your role" subtitle={`You are a ${currentLabel}.`}>
+    <SectionCard title="Your role" subtitle={inRevertWindow ? `You are a ${currentLabel}.` : null}>
       {inRevertWindow ? (
         <>
           <Message tone="warning">
             You have <strong>{remainingText}</strong> to revert to <strong>{previousLabel}</strong>{' '}
             at no cost.
           </Message>
-          {/* S1: right-aligned action row so the buttons sit at the card
-              edge instead of stretching across the full card width. */}
           <div
             style={{
               display: 'flex',
@@ -223,17 +218,27 @@ export default function RoleTile({ user }) {
           </div>
         </>
       ) : (
-        <>
-          <p style={{ margin: 0, fontSize: 13, color: 'var(--sh-subtext)' }}>
-            Role can be changed {remainingBudget} more time{remainingBudget === 1 ? '' : 's'} in the
-            next 30 days. You get a 2-day window to revert for free.
-          </p>
-          {/* S1: right-aligned single action so it doesn't read as
-              full-width inside the card. */}
-          <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}>
-            <Button onClick={() => setChangeOpen(true)}>Change role</Button>
+        // Compact treatment: status + action collapse to a single row.
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            gap: 12,
+            flexWrap: 'wrap',
+          }}
+        >
+          <div style={{ display: 'grid', gap: 2, minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sh-text)' }}>
+              Currently: <strong>{currentLabel}</strong>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+              {remainingBudget} change{remainingBudget === 1 ? '' : 's'} remaining in the next 30
+              days · 2-day free revert
+            </div>
           </div>
-        </>
+          <Button onClick={() => setChangeOpen(true)}>Change role</Button>
+        </div>
       )}
 
       <Modal

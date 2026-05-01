@@ -45,6 +45,11 @@ const SOCKET_EVENTS = {
   NOTIFICATION_NEW: 'notification:new',
   NOTIFICATION_READ: 'notification:read',
   NOTIFICATION_CLEAR: 'notification:clear',
+
+  // Achievements V2 — dedicated unlock channel so the celebration modal
+  // can listen for badge payloads without parsing the generic
+  // notification stream. Personal-room delivery only.
+  ACHIEVEMENT_UNLOCK: 'achievement:unlock',
 }
 
 module.exports = SOCKET_EVENTS

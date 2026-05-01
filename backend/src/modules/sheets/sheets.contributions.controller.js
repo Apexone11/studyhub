@@ -19,7 +19,7 @@ const {
 const { serializeContribution } = require('./sheets.serializer')
 const { computeChecksum } = require('../sheetLab/sheetLab.constants')
 const { trackActivity } = require('../../lib/activityTracker')
-const { checkAndAwardBadges } = require('../../lib/badges')
+const { checkAndAwardBadgesLegacy: checkAndAwardBadges } = require('../achievements')
 const { withPreviewText } = require('../../lib/sheets/applyContentUpdate')
 
 const router = express.Router()

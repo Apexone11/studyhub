@@ -76,6 +76,29 @@ const SHIPPED_DESIGN_V2_FLAGS = [
   'design_v2_creator_audit',
 ]
 
+/**
+ * Auth-flow feature flags. SHIPPED with `enabled: false` by default —
+ * the backend already gates each flag with fail-CLOSED semantics, so a
+ * non-existent row would also disable the feature, but we seed
+ * explicit `enabled: false` rows here so the operator can flip them on
+ * via the admin UI / Prisma Studio without first guessing the flag
+ * name. Founder approval required to flip either to true.
+ *
+ *   flag_2fa_recovery_codes — exposes the regenerate / status / login-
+ *     recovery endpoints + the Settings UI tab. Disabled by default;
+ *     flip on in production once the founder has tested the flow on a
+ *     non-admin account.
+ *   flag_admin_mfa_required — when on, admins with `mfaRequired = true`
+ *     are forced through 2FA on every login. Set the founder seat's
+ *     mfaRequired column to true ONLY after this flag is on AND
+ *     2FA has been verified working for the founder, otherwise the
+ *     gate locks them out.
+ */
+const SHIPPED_AUTH_FLAGS_DISABLED_BY_DEFAULT = [
+  'flag_2fa_recovery_codes',
+  'flag_admin_mfa_required',
+]
+
 async function seedFeatureFlags(prisma) {
   const results = []
   for (const name of SHIPPED_DESIGN_V2_FLAGS) {
@@ -95,6 +118,28 @@ async function seedFeatureFlags(prisma) {
       },
     })
     results.push({ name, existed: Boolean(existing), enabled: existing ? existing.enabled : true })
+  }
+  // Auth flags ship `enabled: false` by default (founder flips via
+  // admin UI when ready). The same upsert-update-empty pattern means
+  // this seed never overwrites a manual flip-on.
+  for (const name of SHIPPED_AUTH_FLAGS_DISABLED_BY_DEFAULT) {
+    const existing = await prisma.featureFlag.findUnique({ where: { name } })
+    await prisma.featureFlag.upsert({
+      where: { name },
+      update: {},
+      create: {
+        name,
+        description:
+          'Auth feature flag — SHIPPED but DISABLED by default. Founder flips via admin UI when ready.',
+        enabled: false,
+        rolloutPercentage: 0,
+      },
+    })
+    results.push({
+      name,
+      existed: Boolean(existing),
+      enabled: existing ? existing.enabled : false,
+    })
   }
   return results
 }

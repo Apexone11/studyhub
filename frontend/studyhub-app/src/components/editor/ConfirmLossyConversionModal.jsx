@@ -13,37 +13,23 @@
  *   onConfirm  — user accepts the destructive conversion
  *   onCancel   — user bails out and stays in HTML/Code mode
  */
-import { useEffect } from 'react'
-import { createPortal } from 'react-dom'
+import FocusTrappedDialog from '../Modal/FocusTrappedDialog'
 
 export default function ConfirmLossyConversionModal({ open, report, onConfirm, onCancel }) {
-  // Escape closes the modal (treated as cancel).
-  useEffect(() => {
-    if (!open) return
-    const handler = (event) => {
-      if (event.key === 'Escape') onCancel?.()
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [open, onCancel])
-
-  if (!open || !report) return null
+  if (!report) return null
 
   const hasTags = report.strippedTags.length > 0
   const hasAttrs = report.strippedAttributes.length > 0
 
-  const modal = (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="lossy-modal-title"
-      style={overlayStyle}
-      onClick={(event) => {
-        // Backdrop click closes.
-        if (event.target === event.currentTarget) onCancel?.()
-      }}
+  return (
+    <FocusTrappedDialog
+      open={open}
+      onClose={onCancel}
+      ariaLabelledBy="lossy-modal-title"
+      overlayStyle={overlayStyle}
+      panelStyle={dialogStyle}
     >
-      <div style={dialogStyle}>
+      <div style={{ display: 'contents' }}>
         <h2 id="lossy-modal-title" style={titleStyle}>
           Switching to Rich Text will strip some HTML
         </h2>
@@ -86,10 +72,8 @@ export default function ConfirmLossyConversionModal({ open, report, onConfirm, o
           </button>
         </div>
       </div>
-    </div>
+    </FocusTrappedDialog>
   )
-
-  return createPortal(modal, document.body)
 }
 
 const overlayStyle = {

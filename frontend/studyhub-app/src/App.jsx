@@ -9,6 +9,7 @@ import { getAuthenticatedHomePath } from './lib/authNavigation'
 import { SessionProvider, useSession } from './lib/session-context'
 import { GOOGLE_CLIENT_ID } from './config'
 import { isNativePlatform } from './lib/mobile/detectMobile'
+import useAchievementUnlockListener from './features/achievements/useAchievementUnlockListener'
 
 const AppMobile = lazy(() => import('./mobile/App.mobile'))
 
@@ -36,6 +37,7 @@ const AttachmentPreviewPage = lazy(() => import('./pages/preview/AttachmentPrevi
 const SheetHtmlPreviewPage = lazy(() => import('./pages/preview/SheetHtmlPreviewPage'))
 const UploadSheetPage = lazy(() => import('./pages/sheets/upload/UploadSheetPage'))
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'))
+const Setup2FAPage = lazy(() => import('./pages/settings/Setup2FAPage'))
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'))
 const AboutPage = lazy(() => import('./pages/legal/AboutPage'))
 const PricingPage = lazy(() => import('./pages/pricing/PricingPage'))
@@ -64,7 +66,17 @@ const ReviewPage = lazy(() => import('./pages/review/ReviewPage'))
 const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'))
 const InvitePage = lazy(() => import('./pages/invite/InvitePage'))
 const PlagiarismReportPage = lazy(() => import('./pages/plagiarism/PlagiarismReportPage'))
+const AchievementsPage = lazy(() => import('./features/achievements/AchievementsPage'))
+const AchievementDetailPage = lazy(() => import('./features/achievements/AchievementDetailPage'))
+const AchievementUnlockModal = lazy(() => import('./features/achievements/AchievementUnlockModal'))
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+// Dev-only test harness for the Playwright focus-trap smoke spec.
+// Vite's `import.meta.env.DEV` is statically true in `npm run dev` and
+// statically false in `npm run build`, so the lazy() import is dead-
+// code-eliminated from production bundles.
+const FocusTrapHarnessPage = import.meta.env.DEV
+  ? lazy(() => import('./pages/dev/FocusTrapHarnessPage'))
+  : null
 
 import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
@@ -81,6 +93,15 @@ const AiChatProviderModule = lazy(() =>
 )
 
 const PerfOverlay = import.meta.env?.DEV ? lazy(() => import('./components/PerfOverlay')) : null
+
+// Achievements V2 — empty component that hosts the
+// useAchievementUnlockListener hook. Lives inside the
+// ChatPanelProvider/AuthenticatedAiProvider scope so the socket and
+// session contexts are available; renders nothing.
+function AchievementUnlockListenerBridge() {
+  useAchievementUnlockListener()
+  return null
+}
 
 function PublicRoute({ children }) {
   const { user, isBootstrapping, isAuthenticated } = useSession()
@@ -126,6 +147,7 @@ const ROUTE_TITLES = {
   '/sheets/new/lab': 'Publish AI Sheet',
   '/announcements': 'Announcements',
   '/notifications': 'Notifications',
+  '/achievements': 'Achievements',
   '/submit': 'Submit Request',
   '/my-courses': 'My Courses',
   '/admin': 'Admin',
@@ -439,7 +461,17 @@ function AppRoutes() {
                     }
                   />
                   {/* Teacher workspace — v2 design refresh Week 2. Non-
-                     teachers are redirected inside the component to /sheets. */}
+                     teachers are redirected inside the component to /sheets.
+                     Bare `/teach` redirects to the materials index so a
+                     direct URL or a sidebar shortcut without the segment
+                     doesn't 404. */}
+                  <Route path="/teach" element={<Navigate to="/teach/materials" replace />} />
+                  {/* Bare `/signup` is a common URL the OAuth role picker
+                     and external links land on. Without this redirect, the
+                     Cancel button on the role picker (which navigates to
+                     `/signup`) 404s instead of returning the user to the
+                     register form. */}
+                  <Route path="/signup" element={<Navigate to="/register" replace />} />
                   <Route
                     path="/teach/materials"
                     element={
@@ -617,6 +649,23 @@ function AppRoutes() {
                       </PrivateRoute>
                     }
                   />
+                  {/* Achievements V2 (2026-04-30) — full gallery + detail page. */}
+                  <Route
+                    path="/achievements"
+                    element={
+                      <PrivateRoute>
+                        <AchievementsPage />
+                      </PrivateRoute>
+                    }
+                  />
+                  <Route
+                    path="/achievements/:slug"
+                    element={
+                      <PrivateRoute>
+                        <AchievementDetailPage />
+                      </PrivateRoute>
+                    }
+                  />
                   <Route
                     path="/submit"
                     element={
@@ -673,6 +722,17 @@ function AppRoutes() {
                       </PrivateRoute>
                     }
                   />
+                  {/* Admin MFA enforcement gate landing page. The login
+                      flow returns 403 MFA_SETUP_REQUIRED with this path
+                      when an admin needs to enable 2FA. */}
+                  <Route
+                    path="/settings/security/setup-2fa"
+                    element={
+                      <PrivateRoute>
+                        <Setup2FAPage />
+                      </PrivateRoute>
+                    }
+                  />
 
                   <Route
                     path="/onboarding"
@@ -686,6 +746,13 @@ function AppRoutes() {
                   {/* ── public user profiles ─────────────────────────────── */}
                   <Route path="/users/:username" element={<UserProfilePage />} />
 
+                  {/* Dev-only Playwright focus-trap harness. The route +
+                      element are tree-shaken from prod bundles via the
+                      import.meta.env.DEV gate above. */}
+                  {FocusTrapHarnessPage && (
+                    <Route path="/__a11y/dialog" element={<FocusTrapHarnessPage />} />
+                  )}
+
                   {/* ── catch-all ────────────────────────────────────────── */}
                   <Route path="*" element={<NotFoundPage />} />
                 </Routes>
@@ -693,6 +760,15 @@ function AppRoutes() {
               <ScrollToTop />
               <ToastContainer />
               <OfflineIndicator />
+              {/* Achievements V2 — celebration modal for ?celebrate=:slug
+                  fires globally so unlocks anywhere in the app surface a
+                  visible moment without per-page mounting. The listener
+                  bridges the dedicated `achievement:unlock` Socket.io
+                  event into the same URL-param flow. */}
+              <AchievementUnlockListenerBridge />
+              <Suspense fallback={null}>
+                <AchievementUnlockModal />
+              </Suspense>
               <AuthenticatedBubble />
             </ChatPanelProvider>
           </AuthenticatedAiProvider>

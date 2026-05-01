@@ -7,6 +7,7 @@ const preferencesController = require('./settings.preferences.controller')
 const googleController = require('./settings.google.controller')
 const exportController = require('./settings.export.controller')
 const auditController = require('./settings.audit.controller')
+const recoveryCodesController = require('./settings.recoveryCodes.controller')
 
 const router = express.Router()
 
@@ -18,5 +19,6 @@ router.use('/', preferencesController)
 router.use('/', googleController)
 router.use('/', exportController)
 router.use('/', auditController)
+router.use('/', recoveryCodesController)
 
 module.exports = router

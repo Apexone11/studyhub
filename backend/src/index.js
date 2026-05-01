@@ -1,10 +1,13 @@
+// Load env vars FIRST — every other require below may read process.env
+// at import time. Centralized in lib/loadEnv so scripts and tests use
+// the same path-resolution logic and the dotenv call doesn't drift.
+require('./lib/loadEnv')
+
 const express = require('express')
 const compression = require('compression')
 const cors = require('cors')
 const helmet = require('helmet')
 const http = require('http')
-const path = require('node:path')
-require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
 const { initSentry, captureError } = require('./monitoring/sentry')
 const { validateSecrets: validateStartupSecrets } = require('./lib/secretValidator')
 const { bootstrapRuntime } = require('./lib/bootstrap/bootstrap')
@@ -82,6 +85,7 @@ const hashtagsRoutes = require('./modules/hashtags')
 const sectionsRoutes = require('./modules/sections')
 const materialsRoutes = require('./modules/materials')
 const creatorAuditRoutes = require('./modules/creatorAudit')
+const achievementsRoutes = require('./modules/achievements')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -161,7 +165,21 @@ const trustedOrigins = new Set(
   allowedOrigins.map((origin) => normalizeOrigin(origin)).filter(Boolean),
 )
 
-const appSurfaceCsp = [
+// CSP violation reporting endpoint — when present, browsers POST a JSON
+// report any time a directive blocks something. Set CSP_REPORT_URI to
+// e.g. a Sentry CSP intake URL (`https://o<org>.ingest.sentry.io/api/<id>/security/?sentry_key=<dsn-public-key>`)
+// or any internal endpoint that accepts `application/csp-report`. Empty
+// string disables reporting (no `report-uri` directive emitted).
+const cspReportUri = (process.env.CSP_REPORT_URI || '').trim()
+const cspReportDirective = cspReportUri ? `report-uri ${cspReportUri}` : null
+
+function buildCsp(directives) {
+  const filtered = directives.filter(Boolean)
+  if (cspReportDirective) filtered.push(cspReportDirective)
+  return filtered.join('; ')
+}
+
+const appSurfaceCsp = buildCsp([
   "default-src 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'",
@@ -173,10 +191,15 @@ const appSurfaceCsp = [
   "object-src 'none'",
   "script-src 'none'",
   "style-src 'none'",
-].join('; ')
+  // Belt-and-suspenders for HSTS preload: tell the browser to upgrade
+  // any stray http:// resource to https://. Catches mixed-content from
+  // user-pasted URLs that slip past `resolveImageUrl`. CSP3 directive,
+  // supported by every modern browser.
+  'upgrade-insecure-requests',
+])
 
 const previewFrameAncestors = Array.from(trustedOrigins)
-const previewSurfaceCsp = [
+const previewSurfaceCsp = buildCsp([
   "default-src 'none'",
   "base-uri 'none'",
   `frame-ancestors ${previewFrameAncestors.length > 0 ? previewFrameAncestors.join(' ') : "'none'"}`,
@@ -189,7 +212,7 @@ const previewSurfaceCsp = [
   "script-src 'none'",
   "style-src 'unsafe-inline' https://fonts.googleapis.com",
   "style-src-elem 'unsafe-inline' https://fonts.googleapis.com",
-].join('; ')
+])
 
 app.disable('x-powered-by')
 
@@ -240,7 +263,12 @@ app.use(
   helmet({
     crossOriginEmbedderPolicy: false,
     crossOriginResourcePolicy: false,
-    hsts: isProd,
+    // HSTS preload: 1 year max-age + includeSubDomains + preload, only
+    // in prod. Submit the apex domain to https://hstspreload.org once
+    // every subdomain confirmed serves HTTPS — getting on the preload
+    // list bakes HSTS into Chrome/Firefox/Safari ship builds so a MITM
+    // can't strip it on the user's first visit.
+    hsts: isProd ? { maxAge: 31536000, includeSubDomains: true, preload: true } : false,
     referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
   }),
 )
@@ -335,6 +363,35 @@ const { globalLimiter } = require('./lib/rateLimiters')
 
 app.use(globalLimiter)
 
+// Default headers on every /api response. Mounted as a top-level
+// middleware (with an explicit path check) BEFORE any /api/* router so
+// it runs even on routes that end the response without calling next()
+// — webhook handlers, the Stripe webhook wrapper, the video chunk
+// handler, etc. Mount-ordering this after webhook routes (the earlier
+// 2026-04-30 placement) defeated the no-store + X-Robots-Tag
+// guarantees because some webhook handlers terminate the response.
+//
+//  - `Cache-Control: no-store`: auth-bearing endpoints
+//    (e.g. `/api/users/me`) must NEVER be cached. A misconfigured CDN
+//    keying only on URL would otherwise serve user A's session payload
+//    to user B. Routes that benefit from caching (public schools list,
+//    platform-stats, popular courses) override via the existing
+//    `cacheControl()` middleware.
+//  - `X-Robots-Tag: noindex, nofollow, noarchive`: industry standard
+//    for JSON APIs (Stripe, Twilio, GitHub). Defends against accidental
+//    indexing if a JSON endpoint ever returns HTML, and against CDN
+//    misconfig that proxies api.* responses to a crawl-allowed
+//    hostname.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path === '/api') {
+    if (!res.getHeader('Cache-Control')) {
+      res.setHeader('Cache-Control', 'no-store')
+    }
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive')
+  }
+  next()
+})
+
 // Webhook routes must stay ahead of JSON parsing/CSRF middleware because
 // signature verification depends on the raw request body.
 app.use('/api/webhooks', webhookRoutes)
@@ -378,7 +435,13 @@ app.post(
 // Without this, the express default 100KB cap rejected any legitimate
 // HTML import or AI sheet save with PayloadTooLargeError before the
 // route ever ran.
-app.use(express.json({ limit: '5mb' }))
+// Strict content-type: only accept `application/json`. Without this,
+// Express defaults match `application/*+json` and treat missing
+// Content-Type as JSON, which lets attackers slip
+// `application/x-www-form-urlencoded` past JSON-shaped validation.
+// Routes that legitimately need urlencoded must opt in explicitly via
+// their own `express.urlencoded()` middleware.
+app.use(express.json({ limit: '5mb', type: 'application/json' }))
 
 // Phase 5: reject payloads with null bytes, control chars, excessive
 // nesting/length, or duplicate query params before they reach routes.
@@ -527,6 +590,11 @@ app.use('/api/dashboard', dashboardRoutes)
 // Frontend is flag-gated by `design_v2_upcoming_exams`; server keeps endpoints
 // available to authenticated users so the flag flip is one-sided.
 app.use('/api/exams', examRoutes)
+
+// Achievements V2 (2026-04-30) — gallery, detail page, pinned strip, stats.
+// Catalog endpoints are public (optionalAuth); pin / visibility writes require auth.
+// Plan: docs/internal/audits/2026-04-30-achievements-v2-plan.md
+app.use('/api/achievements', achievementsRoutes)
 
 // Mount Creator Audit foundation endpoints. Frontend rollout remains flag-gated;
 // the server keeps the owner-checked audit and consent primitives available.

@@ -222,7 +222,30 @@ export function useNoteComments(noteId) {
           credentials: 'include',
           body: JSON.stringify({ type }),
         })
-        if (!res.ok) {
+        if (res.ok) {
+          // Reconcile against server truth so a slow optimistic update can't
+          // drift if another tab toggled the same comment in parallel.
+          const data = await res.json().catch(() => null)
+          if (data && data.reactionCounts) {
+            setComments((prev) =>
+              prev.map((c) => {
+                const reconcile = (comment) => {
+                  if (comment.id !== commentId) return comment
+                  return {
+                    ...comment,
+                    reactionCounts: data.reactionCounts,
+                    userReaction: data.userReaction ?? null,
+                  }
+                }
+                const updated = reconcile(c)
+                return {
+                  ...updated,
+                  replies: (updated.replies || []).map(reconcile),
+                }
+              }),
+            )
+          }
+        } else {
           loadedRef.current = false
           await loadComments()
         }

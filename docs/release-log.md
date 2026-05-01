@@ -28,9 +28,43 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
-### Frontend TypeScript fix for `staticHeaders.test.ts`
+### 2FA recovery codes + Admin MFA enforcement scaffolding (2026-05-01)
 
-- **Frontend typecheck no longer fails on the new staticHeaders test.** Added `@types/node` as a frontend devDependency (scoped to test files via a triple-slash directive at the top of `staticHeaders.test.ts`) so `node:fs`, `node:path`, and `process` resolve in the test, and replaced the deprecated `baseUrl` config in `tsconfig.json` with a `paths`-relative entry so TS 7.0 doesn't flag the project. `npm run typecheck` exits clean on both workspaces.
+- **2FA recovery codes** (NIST 800-63B AAL2 alt-factor pattern). Generates 10 single-use 64-bit codes (`xxxxx-xxxxx` hex), stores bcrypt hashes, exposes plaintext once at generation. Endpoints: `POST /api/settings/2fa/recovery-codes/regenerate`, `GET /api/settings/2fa/recovery-codes/status`, `POST /api/auth/login/recovery-code`. Behind `flag_2fa_recovery_codes` (ships disabled, founder flips on after testing).
+- **Admin MFA enforcement (L2.14).** `User.mfaRequired` column + login flow gate. When `flag_admin_mfa_required` is on AND user is admin with mfaRequired: forces challenge band on every login. Fail-CLOSED on flag-read errors so the founder cannot self-lock.
+- **Migrations:** `20260501000004_add_2fa_recovery_codes`, `20260501000005_add_admin_mfa`. Both use `IF NOT EXISTS` for redeploy safety.
+- **Copilot review fixes** from PR #289: `/api/*` `Cache-Control` + `X-Robots-Tag` middleware moved before webhook mounts (now applies to every API response); DSAR audit log redacted (no requesterName/Email/IP — 8-char SHA-256 prefix only); `LegalRequest` + `AiMessage flag` migrations made idempotent; `loadEnv.js` adopted by `index.js`.
+- **`lib/useFocusTrap.js` consolidated** to use the same `focus-trap` engine as `FocusTrappedDialog`. One trap engine across the app instead of two.
+
+### Modal focus traps + accessible dialog primitive (2026-05-01)
+
+- **`components/Modal/FocusTrappedDialog.jsx`** — single accessible dialog primitive that wraps `focus-trap-react`. Tab/Shift+Tab cycle stays inside, Escape closes (configurable), backdrop click closes (configurable), focus restores to the trigger on close, body siblings receive `inert` + `aria-hidden` while open. Industry-standard implementation per W3C ARIA Authoring Practices §3.9 (Modal Dialog Pattern).
+- **9 modals migrated:** `HtmlDownloadWarningModal`, `RoleTile` Modal, `LegalAcceptanceModal` (signup blocker), `CreatorAuditConsentModal` (publish-flow), `KeyboardShortcuts`, `ConfirmLossyConversionModal`, `AvatarCropModal`, `CoverCropModal`, `VideoThumbnailEditor`, `AchievementUnlockModal`.
+- **Dependency add:** `focus-trap-react@^11.0.6` (~3 KB gzipped) under v2.1 dependency exception. Founder-approved.
+- **New Playwright smoke test:** `tests/modal-focus-trap.smoke.spec.js` verifies Tab focus stays inside the dialog through 5 forward + 5 backward Tab presses on the legal-acceptance modal.
+
+### TypeScript adoption reverted (founder-locked)
+
+- **TypeScript removed from the project.** The brief TS adoption shipped earlier on 2026-04-30 was reverted the same day. Backend has no transpiler step (runtime is plain Node 20 CommonJS via `nodemon src/index.js`), so `.ts` files cannot run in production without adding ts-node or a build step neither of which the founder approved. Removed: `typescript` + `@types/*` devDependencies from both workspaces, `tsconfig.json` files (truncated to 0 bytes, safe to delete locally), `npm run typecheck` scripts, `--ext .ts` flag on backend lint script, `shared/types/` references in docs. The repo is JavaScript-only going forward; new files are `.js` / `.jsx`. JSDoc carries the type-hint role. CLAUDE.md "Language policy" section is the canonical rule.
+
+### Achievements V2 — full system overhaul
+
+- **54-badge catalog across 10 categories.** Authoring, Forking & Contribution, Reviewing, Notes, Study Groups, Social, Hub AI, Streaks & Consistency, Special (secret), and Founder/Community. Five visible rarity tiers (bronze / silver / gold / platinum / diamond) plus a secret tier hidden until earned.
+- **XP + Level system** layered over the catalog. Each tier carries a fixed XP value (25 / 75 / 200 / 500 / 1500); user level is a function of total XP. New `LevelChip` component renders the user's level next to their username with a colour matching their highest-tier badge.
+- **Hexagon SVG visual** replaces the legacy circular FontAwesome coins. New `AchievementHexagon` component supports 4 states (unlocked, locked-progress, locked-secret, recent) with reduced-motion-aware glow animation. All tier colours come from new `--sh-bronze/silver/gold/platinum/diamond/secret` tokens in `index.css` (light + dark mode).
+- **Event-driven award engine.** New `backend/src/modules/achievements/` module: `achievements.engine.js` exports `emitAchievementEvent(prisma, userId, kind, metadata)` which routes events to typed criteria evaluators (count, sum, distinct_count, streak, event_match, timed, plan_active, created_before). Replaces the v1 polling check; engine is fire-and-forget, never throws back to the caller. Legacy `lib/badges.js` is now a thin shim that delegates to the new engine for back-compat with the 5 existing trigger sites.
+- **Full read API.** `GET /api/achievements` (catalog), `GET /api/achievements/stats` (own level/xp), `GET /api/achievements/users/:username` (user gallery, block-aware), `GET /api/achievements/users/:username/pinned` (compact strip), `GET /api/achievements/:slug` (detail page with global stats + recent unlockers). All public endpoints use optionalAuth.
+- **Pin / unpin / privacy writes.** `POST /api/achievements/pin`, `DELETE /api/achievements/pin/:slug` (max-6 enforced server-side), `PATCH /api/achievements/visibility` (toggles `achievementsHidden` flag). All require auth + originAllowlist + writeLimiter.
+- **Profile integration.** `UserProfilePage` Achievements tab rebuilt with the new `AchievementGallery` (filter chips per category, sort dropdown, full locked + unlocked + secret rendering, owner pin controls). New `PinnedBadgesCard` shows the user's pinned-6 strip on the Overview tab for both own and other profiles.
+- **Dedicated `/achievements` and `/achievements/:slug` routes.** Full-page own gallery and a public detail page (badge art, criteria, holderCount + percent of users, top-10 most-recent unlockers with block-filter, pin/unpin CTA when held).
+- **Unlock celebration modal** mounted globally at the App root. Driven by `?celebrate=:slug` query param; localStorage tracks already-celebrated slugs to suppress duplicates. Hexagon scale-in animation respects `prefers-reduced-motion`.
+- **Schema migration `20260501000001_achievements_v2`.** Additive only (`IF NOT EXISTS`-guarded). Extends `Badge` with xp / isSecret / displayOrder / iconSlug / criteria / updatedAt; extends `UserBadge` with pinned / pinOrder / sharedAt; adds `AchievementEvent` (per-event log for time-windowed criteria) and `UserAchievementStats` (denormalized XP cache). Two new indexes on Badge, one on UserBadge.
+- **Trigger sites wired across the product.** `sheets.create.controller` now emits `sheet.publish` with `{hour, courseId}` so early-bird / night-owl / multi-course criteria match. New `note.create`, `group.create`, `group.join`, `ai.message` triggers in their respective controllers. Existing 5 trigger sites continue to work via the back-compat shim.
+- **Seed updates.** `seedBetaUsers.js` now seeds the full 54-badge catalog and unlocks ~15 badges (including 3 secrets, 6 pinned) on `beta_student1` so a fresh `npm run seed:beta` produces a usable demo state per CLAUDE.md §11.
+
+### Static-headers test path-anchored
+
+- **`staticHeaders.test.js` now resolves its file paths from `import.meta.url` instead of `process.cwd()`** so the test passes regardless of where vitest is launched from (root, workspace dir, monorepo runner). Renamed from `.ts` to `.js` to match the JavaScript-only language policy adopted on 2026-04-30.
 
 ### Pre-deploy hardening pass (post-screenshot bug review)
 
@@ -453,25 +487,4 @@ historical context. Full v1 detail lives in the internal log.
 
 ### Hub AI assistant
 
-- Streaming Claude integration at `/ai` with full-page chat plus a
-  floating bubble on every authenticated route. Per-plan daily message
-  quotas (regular / verified / pro / admin) tracked in `AiUsageLog`.
-- Sheet generation produces full HTML documents that flow through the
-  same security scan tier-system as user-uploaded HTML.
-
-### Payments
-
-- Stripe Checkout for monthly / yearly Pro subscriptions plus variable
-  donations. Customer Portal for self-service plan management. Public
-  `/supporters` leaderboard. Admin Revenue tab.
-
-### Notes
-
-- `MyNotes` system with pinning, tags, stars, and `NoteVersion` history
-  for revert / compare flows.
-
-### Trust & safety
-
-- Plagiarism detection on study sheet uploads, admin moderation
-  dashboard, approval queue UI, weekly AI usage caps, and waitlist
-  onboarding for new schools.
+- Streaming Claude integration

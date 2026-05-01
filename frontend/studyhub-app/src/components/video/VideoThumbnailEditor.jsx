@@ -17,7 +17,7 @@
  * (mirrors the modal pattern used elsewhere in StudyHub).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import FocusTrappedDialog from '../Modal/FocusTrappedDialog'
 import { API } from '../../config'
 
 const MAX_THUMBNAIL_BYTES = 2 * 1024 * 1024
@@ -155,15 +155,18 @@ export default function VideoThumbnailEditor({ video, streamUrl, onClose, onSave
     opacity: busy ? 0.6 : 1,
   })
 
-  return createPortal(
-    <div style={overlayStyle} onClick={onClose} role="presentation">
-      <div
-        style={dialogStyle}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Edit video thumbnail"
-      >
+  return (
+    <FocusTrappedDialog
+      open
+      onClose={busy ? () => {} : onClose}
+      ariaLabel="Edit video thumbnail"
+      // Don't let backdrop / Escape kill an in-flight upload.
+      escapeDeactivates={!busy}
+      clickOutsideDeactivates={!busy}
+      overlayStyle={overlayStyle}
+      panelStyle={dialogStyle}
+    >
+      <div style={{ display: 'contents' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ margin: 0, fontSize: 'var(--type-lg)', color: 'var(--sh-heading)' }}>
             Edit thumbnail
@@ -319,7 +322,6 @@ export default function VideoThumbnailEditor({ video, streamUrl, onClose, onSave
           </button>
         </div>
       </div>
-    </div>,
-    document.body,
+    </FocusTrappedDialog>
   )
 }

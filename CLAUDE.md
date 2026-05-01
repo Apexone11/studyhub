@@ -179,6 +179,21 @@ Live files inside `pages/dashboard/` (KEEP — imported by UserProfilePage):
 - Streaming: POST `/api/ai/messages` returns SSE stream. Events: `delta` (token), `title` (auto-title), `done` (completion), `error`.
 - Sidebar nav link uses `IconSpark` icon. Bubble hidden on `/ai`, `/login`, `/register` pages.
 
+### Achievements V2 (2026-04-30 — DO NOT REVERT)
+
+- Backend module: `backend/src/modules/achievements/` (constants, engine, service, routes, controller, index). Mounted at `/api/achievements` in `index.js`. Public reads use `optionalAuth`; pin / unpin / visibility writes require auth + originAllowlist + writeLimiter.
+- Catalog: 54 badges across 10 categories (`authoring`, `forking`, `reviewing`, `notes`, `groups`, `social`, `ai`, `streaks`, `special`, `community`). Tiers are bronze / silver / gold / platinum / diamond + `secret`. Secret badges are hidden from non-holders in all listings.
+- XP per tier: 25 / 75 / 200 / 500 / 1500 (secret = variable). Levels derive from total XP via `LEVEL_BRACKETS` in `achievements.constants.js` — keep frontend `levelMath.js` brackets in sync if edited.
+- Award engine: `emitAchievementEvent(prisma, userId, kind, metadata)`. Fire-and-forget. Criteria types: `count`, `sum`, `distinct_count`, `streak`, `event_match`, `timed`, `plan_active`, `created_before`, `max_forks_per_sheet`, `max_members_in_owned_group`, `admin_grant`. New trigger sites must use `EVENT_KINDS.*` constants — never raw strings.
+- Legacy `lib/badges.js` is now a thin shim that re-exports `checkAndAwardBadges` from the new engine. The 5 original v1 trigger sites (sheet create, fork, contribution submit, sheetLab commit, follow) keep working unchanged. New triggers live in `notes.controller.js`, `studyGroups.controller.js`, `ai.service.js`.
+- Schema: `Badge` extended with `xp / isSecret / displayOrder / iconSlug / criteria / updatedAt`. `UserBadge` extended with `pinned / pinOrder / sharedAt`. New tables `AchievementEvent` (event log for time-windowed criteria) and `UserAchievementStats` (denormalized XP cache, also stores `achievementsHidden` privacy flag). Migration `20260501000001_achievements_v2` is additive-only and `IF NOT EXISTS`-guarded.
+- Frontend: `frontend/studyhub-app/src/features/achievements/` — `AchievementHexagon`, `AchievementCard`, `AchievementGallery`, `PinnedBadgesStrip`, `LevelChip`, `AchievementUnlockModal`, `AchievementsPage` (route `/achievements`), `AchievementDetailPage` (route `/achievements/:slug`). Tier styles use `--sh-bronze/silver/gold/platinum/diamond/secret` tokens defined in `index.css` for both light and dark mode.
+- The `AchievementUnlockModal` is mounted globally at `App.jsx` root and fires when `?celebrate=:slug` appears in the URL. localStorage key `studyhub.achievements.celebrated` records every fired slug so refresh / share-link cannot re-fire. The modal reads the slug directly from the URL each render and strips the param on dismiss — no setState-in-effect.
+- Profile integration: `UserProfilePage` Achievements tab uses the new `AchievementGallery`. Both Overview tabs (own + other) render `PinnedBadgesCard` near the top.
+- Block / privacy: `/api/achievements/users/:username` honours `isBlockedEitherWay` (try-catch wrapped) and `UserAchievementStats.achievementsHidden` (returns 404 to non-owner viewers). Detail page recent-unlockers list filters via `getBlockedUserIds`.
+- Seed: `seedBetaUsers.js` calls `seedAchievementsV2` which seeds the 54-badge catalog and unlocks ~15 badges (3 secrets, 6 pinned) for `beta_student1`. Required for CLAUDE.md §11 — `seed:beta` must produce a visible-end-to-end demo state.
+- Plan + decisions: `docs/internal/audits/2026-04-30-achievements-v2-plan.md`. Founder-locked decisions A1–A8 documented there.
+
 ### Performance Infrastructure
 
 - `useFetch` hook (`frontend/studyhub-app/src/lib/useFetch.js`) supports opt-in SWR caching via `swr` option (ms). Cached data is returned instantly while a background revalidation fetch runs. Cache is a module-level `Map` exported as `cache`.
@@ -237,6 +252,68 @@ Tables with migrations (safe to query):
 - NoteStar, NoteVersion (migration: `20260331000003_add_note_star_and_note_version`)
 - AiConversation, AiMessage, AiUsageLog (migration: `20260331000004_add_ai_assistant_tables`)
 - Subscription, Payment, Donation (migration: `20260403000001_add_payment_tables`)
+
+## Internal Documentation Layout (added 2026-04-30)
+
+All internal planning, security, and runbook docs live under `docs/internal/` and are gitignored. Find a doc by its purpose, not by guessing the filename:
+
+```text
+docs/internal/
+├── README.md                                  Index — start here
+├── api-reference.md                           Backend API contract
+├── audit-routines.md                          Sweepers and recurring jobs
+├── beta-v2.0.0-release-log.md                 Private cycle log (gitignored)
+├── figma-design-guide.md                      Design tokens / component kit
+├── hub-ai-v2-plan.md                          AI assistant master plan
+├── mobile-archive.md                          Mobile companion plan + dev-testing (paused)
+├── playground-v1-plan.md                      Playground feature plan
+├── railway-deployment-guide-v2.0.md           Production deploy reference
+├── roles-and-permissions-plan.md              Role model + OAuth picker
+├── web-master-plan.md                         8-phase web refresh + roles + Creator Audit
+│
+├── audits/                                    ACTIVE plans + reports only
+│   ├── README.md                              What's active and why
+│   ├── 2026-04-24-feature-expansion-roadmap.md       Multi-week roadmap (active)
+│   ├── 2026-04-24-feature-expansion-security-addendum.md  Per-track security checklists (active)
+│   ├── 2026-04-30-final-report.md             Loops 1-10 outcome + Railway checklist
+│   ├── 2026-04-30-deferred-plans.md           Admin MFA + modal focus traps plans
+│   ├── 2026-04-30-2fa-recovery-codes-plan.md  Deferred — needs founder approval
+│   └── 2026-04-30-achievements-v2-plan.md     Parallel agent's active work
+│
+├── archive/                                   COMPLETED / superseded — historical context
+│   ├── README.md
+│   ├── audits/
+│   │   ├── 2026-04/                           Closed handoffs from April 2026
+│   │   └── 2026-04-30-loops/                  Working notes superseded by final-report
+│   └── superpowers/                           Older planning docs
+│
+├── logs/                                      Activity logs (gitignored)
+│
+└── security/                                  Runbooks and security playbooks
+    ├── CONTACTS.md                            Who to call for what
+    ├── INCIDENT_PLAYBOOK.md                   Incident response steps
+    ├── RUNBOOK_DB_RESTORE.md                  Database backup / restore + monthly verification
+    ├── RUNBOOK_OUTAGE.md                      Outage response
+    ├── RUNBOOK_SECRETS_ROTATION.md            Rotating JWT, OAuth, API keys
+    ├── RUNBOOK_SECURITY.md                    General security runbook
+    ├── RUNBOOK_SWEEPERS.md                    Background sweeper operations
+    ├── html-finding-categories.md             HTML scanner finding glossary
+    ├── html-moderation-playbook.md            Tier 0-3 admin review flow
+    └── security-overview.md                   Threat model summary
+```
+
+**Rules for finding the right doc:**
+
+- Latest session report is always the most recent `audits/YYYY-MM-DD-final-report.md` (or `*-handoff.md` for older cycles). Read this first to understand what's in flight.
+- A plan that's been shipped or superseded moves to `archive/audits/<bucket>/`. The active `audits/` folder stays lean.
+- Operational runbooks (incident, outage, restore, rotation) NEVER move to archive — they're load-bearing for ops.
+- The `security/` folder is the canonical home for anything an on-call would grep for during an incident.
+
+**When you finish work:**
+
+1. If a doc described that work, move it to the appropriate `archive/audits/<bucket>/` subfolder.
+2. Update `audits/README.md` to reflect what's still active.
+3. Update CLAUDE.md only if the path-pattern itself changed (e.g. new top-level subfolder created).
 
 ## Repo Workflow Conventions
 
@@ -473,52 +550,125 @@ Every phase handoff must include the relevant track's required-before-build chec
 
 Both docs have a §10 covering how to update them as work progresses. When a phase closes, mark it complete in the roadmap. When a new feature request arrives, it gets the same treatment (roadmap brainstorm → security pass → founder approval → promotion). See roadmap §10 for the exact flow.
 
-## TypeScript Conventions (added 2026-04-30, founder-approved)
+## Language policy (2026-04-30, founder-locked)
 
-StudyHub is migrating to TypeScript across both backend and frontend. The migration is **incremental, not big-bang**: tooling lives alongside existing JavaScript and converts files one module at a time.
+StudyHub is JavaScript-only. The brief TypeScript adoption from earlier in 2026-04-30 was reverted the same day:
 
-### Tooling baseline (already wired)
+- Backend runtime is CommonJS Node 20, executed via `nodemon src/index.js` / `node scripts/start.js`. There is no transpiler step.
+- Frontend is React 19 + Vite 8. Vite handles `.ts` natively but the codebase ships `.js` / `.jsx` only.
+- All new files are `.js` (backend) or `.jsx` (frontend). Never create `.ts` / `.tsx` / `.d.ts` files in this repo.
+- No `tsconfig.json`, no `typescript` devDependency, no `npm run typecheck` script, no `shared/types/` directory.
+- For type hints in editor / IDE, use JSDoc `@param` / `@returns` / `@typedef` comments. The repo's `jsconfig.json` already wires up VS Code IntelliSense without TypeScript.
 
-- `backend/tsconfig.json` — Node 20, ES2022, strict null checks, `allowJs: true`, `checkJs: false`, `noEmit: true` (TypeScript is for static analysis only — runtime continues to use the existing CJS/JS files).
-- `frontend/studyhub-app/tsconfig.json` — same posture, plus `jsx: react-jsx` and `paths: { "@/*": ["src/*"] }`. Vite already understands TS out of the box; no plugin needed.
-- `shared/types/` — single source of truth for API request/response shapes shared between backend and frontend. **Pure type declarations only — no runtime code, no Prisma imports, no React imports.** Both projects reach this folder via relative paths; no package install needed.
-- `npm run typecheck` exists in both workspaces and runs `tsc --noEmit`. Both currently pass clean and **must stay clean on every PR**.
+Anyone who proposes re-adding TypeScript: do not. The founder rejected the migration after seeing the runtime cost (no transpiler) outweighed the static-analysis benefit. Use JSDoc.
 
-### Hard rules for new code
+---
 
-1. **All new files must be `.ts` or `.tsx`.** Never create new `.js` or `.jsx` files. This is non-negotiable from 2026-04-30 forward.
-2. **All function return types are explicit** for exported functions. `function foo(): Promise<Sheet[]>` not `function foo()`.
-3. **Never use `any`.** Use `unknown` and narrow with type guards. `any` is treated as a lint-blocking smell.
-4. **Use `type`, not `interface`,** for object shapes — except for object shapes that consumers may extend. The existing codebase mixes both; we standardize on `type` going forward to be consistent with React's recommended patterns.
-5. **Branded ID types** for primary keys when ambiguity matters: `type SheetId = number & { __sheet: never }`. Prevents accidental swapping of two number IDs.
-6. **Do NOT modify `package-lock.json` by hand.** TypeScript was added as a devDependency on 2026-04-30 with founder approval; future TS-related dep additions follow the v2.1 dependency exception above.
+## Industry-Standard Practices We Follow (added 2026-04-30)
 
-### Migration strategy
+This section captures security and quality decisions audited and verified during the 2026-04-30 loop sweep. Future agents: read this before introducing patterns that conflict with what's already in place. If you discover a gap that isn't covered here, fix it AND add a new bullet so we don't re-audit the same thing twice.
 
-- **High-leverage first:** populate `shared/types/` with the API shapes that have already burned us (notifications, sheets, search response, messaging). Once a shape lives there, both ends import it instead of redeclaring.
-- **Touch a file → migrate it.** Any backend module or frontend page you edit for unrelated work can be renamed `.js → .ts` (or `.jsx → .tsx`) in the same PR. No PR is required to convert a file solely for migration purposes.
-- **Tests follow modules.** When you migrate a module, migrate its `*.test.js` to `*.test.ts` in the same change. Vitest understands both.
-- **Strictness ramp:** `noImplicitAny: false` today so `.js` files coexist quietly. Once 80%+ of a workspace is `.ts`, flip `noImplicitAny: true` for that workspace.
+### Authentication & sessions
 
-### What this prevents (and why we're paying for it)
+- **Cookies are httpOnly + secure-in-prod + SameSite=none-in-prod / lax-in-dev.** Wired in `backend/src/lib/authTokens.js`. Cross-origin frontend on a different domain requires `SameSite=none`; never relax `httpOnly`.
+- **Passwords hashed with bcrypt cost factor 12.** Used in register, login, password reset, Google OAuth, settings flows. Industry recommendation is 10-12 in 2024-2026; we picked 12.
+- **HIBP password breach check at register + reset.** `backend/src/lib/passwordSafety.js` uses the k-anonymity API — only the first 5 chars of SHA-1 leave the server. NIST 800-63B §5.1.1.2 explicitly recommends this. Fail-OPEN if HIBP is unreachable.
+- **Login challenge + email-OTP 2FA.** Login flow does not gate on email verification or 2FA in v2.2.0. 2FA recovery codes deferred — see `docs/internal/audits/2026-04-30-2fa-recovery-codes-plan.md`.
+- **Admin MFA enforcement is not yet active.** Documented plan at `docs/internal/audits/2026-04-30-deferred-plans.md` — DO NOT add admin MFA without that plan's review pass.
 
-The CLAUDE.md "Common Bugs and Pitfalls" list is full of issues TypeScript would have caught at the keyboard:
+### Rate limiting
 
-- Pitfall #2 (search response shape mismatch — `data.results.users` vs `data.users`) — gone, once both ends import the same `SearchResponse` type from `shared/types/`.
-- Pitfall #4 (Socket.io event name typos like `message:edited` vs `message:edit`) — gone, since event names live in `socketEvents.js` constants, type-narrowed.
-- Pitfall #7 (`createdAt` vs `timestamp` field naming) — gone, since the shared `MessageDTO` declares `createdAt: string` and any code expecting `timestamp` fails at compile time.
-- Pitfall #10 (rate limiter export name mismatches) — gone, since named exports are type-checked.
+- **All limiters live in `backend/src/lib/rateLimiters.js`.** Never define inline rate limiters in route files. New limiters use shared `WINDOW_*` constants from `lib/constants.js`.
+- **DSAR limiter (3/hr/IP), legal-accept limiter (10/hr/user) added 2026-04-30.** Pattern: stricter limit + `keyGenerator` keyed on `userId` for authenticated routes.
+- **Global limiter (1000 req / 15 min / IP)** is the floor; per-route limiters refine.
 
-### Validation surface
+### CSRF / Origin protection
 
-Add to your local pre-PR checklist alongside lint and tests:
+- **Global Origin / Referer check in `index.js`.** Every non-GET request without a trusted origin is 403'd. Empty Origin (curl, server-to-server) passes — relies on cookies' SameSite for those.
+- **`originAllowlist()` middleware applied per-route on sensitive writes.** Defense in depth on top of the global check. Apply on: payments, exams, legal, creator audit, AI suggestions, and any new write endpoint that touches PII or auth state.
 
-- `cd backend && npm run typecheck`
-- `cd frontend/studyhub-app && npm run typecheck`
+### Content security headers
 
-Both must exit 0 or the PR is not mergeable. CI must run these (TODO: wire into `.github/workflows/ci.yml` if not already there).
+- **Helmet handles HSTS / X-Frame-Options / nosniff / XSS-Protection / referrer-policy.** Don't disable individual ones unless you understand why; the only intentional disables are `crossOriginEmbedderPolicy` and `crossOriginResourcePolicy` (would break public images).
+- **HSTS in prod: `max-age=31536000; includeSubDomains; preload`.** Submitted to [hstspreload.org](https://hstspreload.org) on 2026-04-30. Removing the `preload` directive triggers slow removal eligibility — DO NOT regress this without understanding the multi-week reversal cost.
+- **CSP `frame-ancestors 'none'` on app surface, `'self' + trusted origins` on preview surface.** Two-profile split lives in `index.js`.
+- **CSP `upgrade-insecure-requests` on app surface.** Defense-in-depth for HSTS — auto-upgrades any stray `http://` to `https://`.
+- **CSP `report-uri` emitted when `CSP_REPORT_URI` env var is set.** Wire this to a Sentry CSP intake URL in prod for visibility into in-the-wild violations.
+- **Permissions-Policy** disables camera, microphone, geolocation, payment unless explicitly needed.
 
-### Working agreement update
+### XSS prevention
 
-Rule #12 (rolling): every feature that adds or modifies API request/response shapes **also** updates `shared/types/<domain>.ts` in the same change. The shape lives there once; both ends import it. Skipping this re-introduces the drift TypeScript was added to prevent.
-                                                                                                                                                                                                                                                                                  
+- **Every `dangerouslySetInnerHTML` call site is wrapped in `DOMPurify.sanitize(..., { USE_PROFILES: { html: true } })`.** Verified call sites: `notesComponents.jsx`, `BookDetailPage.jsx`, `SheetContentPanel.jsx`, `SheetLabPanels.jsx`, `ContributionInlineDiff.jsx`. The sheet preview iframe renders unsanitized but lives behind a sandboxed CSP profile (`previewSurfaceCsp`) that blocks scripts/connects.
+- **HTML scanner classifies risk in tiers 0-3** (`backend/src/lib/html/htmlSecurityScanner.js`). Tier-0/1 publishes; tier-2 admin review; tier-3 quarantines. Thresholds tuned 2026-04-30 (`String.fromCharCode` → 8 occurrences) to stop false-positives on legit quiz code.
+- **Multi-file HTML sheets MUST be served from `sheets.getstudyhub.org` subdomain** (decision #13). This is the primary XSS isolation boundary. Not yet built; non-negotiable before multi-file ships.
+
+### File uploads
+
+- **`multer` with `fileSize` limits + `fileFilter` allowlist on every upload route.** No raw `multer()` calls without both.
+- **ClamAV scan on video uploads with fail-CLOSED in production.** Set `CLAMAV_DISABLED=true` in dev only. Wired in `video.routes.js` after the 2026-04-30 sweep.
+- **R2 signed URLs default to 1h download / 10min upload TTL.** Don't extend without justification.
+
+### Compliance / privacy
+
+- **DSAR endpoint** (`POST /api/legal/data-request`) persists to `LegalRequest` BEFORE attempting email — DB write is the durability guarantee, not the email. Honeypot field + 3/hr/IP rate limit + origin allowlist.
+- **GDPR data export** at `GET /api/settings/export` — JSON dump of every personal-data row.
+- **Account deletion** in `lib/deleteUserAccount.js` — cascade-deletes user-owned content, soft-deletes shared content where appropriate.
+- **PII redacted from Sentry** via `redactObject` / `redactHeaders` (`monitoring/sentry.js`). Never bypass.
+- **Legal documents are self-hosted from `backend/src/modules/legal/content/*.txt`.** Termly removed 2026-04-30. NEVER re-introduce a third-party legal viewer; the bodyText path is the only path.
+
+### Observability
+
+- **Structured logging via `pino` (`backend/src/lib/logger.js`).** Use `log.info({ event, ...ctx }, message)` — never `console.log` (lint will reject it). The `event` field is the alert key.
+- **`pino-http` request-id correlation** via `x-request-id` header + `crypto.randomUUID()` fallback. Every log line carries the request id.
+- **Sentry captures everything 5xx** with redacted PII. 4xx is logged but not sent (noise-reduction).
+- **Background jobs should use `lib/jobs/heartbeat.js#runWithHeartbeat`** added 2026-04-30. Wraps a task with structured `job.start` / `job.success` / `job.failure` events + SLA breach warnings.
+
+### Database
+
+- **Prisma is the only ORM.** No raw SQL except in `bootstrapSchema.js` (idempotent ALTER TABLE bootstraps), health-check `SELECT 1`, and a few read-only analytics aggregations using template-literal `$queryRaw` (auto-parameterized).
+- **Every Prisma model needs a corresponding migration file.** No exceptions. CLAUDE.md §"Migration Rules (CRITICAL)" enforces this.
+- **`onDelete: SetNull`** on cross-resource references that must outlive a deleted user (audit logs, legal requests, moderation cases).
+- **Soft-delete (`deletedAt`)** on shared content where deletion would orphan others' references (messages, study groups, achievements).
+- **Backups verified monthly + DR drill quarterly** per `docs/internal/security/RUNBOOK_DB_RESTORE.md` §"Backup Verification Cadence".
+
+### Frontend
+
+- **`useFetch` hook with opt-in SWR caching** for repeated reads. `clearFetchCache()` on logout. Module-level cap of 50 entries / 10-minute TTL.
+- **Skeleton placeholders, not "Loading..."** for any list/page that takes >100ms.
+- **`prefers-reduced-motion`** respected in `index.css` + 6+ component CSS files. Animations gated on `(prefers-reduced-motion: no-preference)`.
+- **`react-error-boundary` wraps the route tree** at App.jsx — a render crash in one route doesn't blank the app.
+- **axe-core a11y smoke test** on public pages runs in CI (`tests/a11y.smoke.spec.js`). Blocks build on any new "serious" or "critical" WCAG 2.1 AA violation.
+
+### Supply chain
+
+- **Dependabot** weekly Mondays for backend / frontend / GitHub Actions. Major bumps to React/Prisma/Express/Socket.io/Vite ignored automatically.
+- **`npm audit` clean on both workspaces** (verified 2026-04-30).
+- **`@axe-core/playwright`** added 2026-04-30 with founder approval. Pattern documented in CHANGELOG + release log.
+- **No new runtime dep without founder approval.** Subresource Integrity (SRI) on the one static external resource (Font Awesome). Dynamic Clarity/gtag loads gated by CSP `script-src` allowlist instead of SRI (SDK URLs are moving targets).
+
+### Operations
+
+- **Trust proxy `1` in prod** (Railway is one hop). `req.ip` reflects real client.
+- **`Cache-Control: no-store` default on every `/api/*` response.** Routes that legitimately benefit from caching opt in via `cacheControl()` middleware.
+- **Strict `application/json` content-type** on `express.json()`. Routes that accept urlencoded must opt in explicitly.
+- **Health endpoint at `/api/public/health`** returns `{ status }` only. No uptime / memory leak.
+- **`security.txt` at `/.well-known/security.txt`** (RFC 9116). Update `Expires:` annually.
+
+### Don't do these (anti-patterns we've corrected)
+
+- **Don't hand-edit `package-lock.json`.** Always regenerate via `npm install`. Commit `package.json` + `package-lock.json` in the same commit.
+- **Don't add a new dep "while you're in there".** One problem → one dep. CLAUDE.md "v2.1 dependency exception" governs.
+- **Don't introduce a third-party iframe for legal docs / forms.** Termly removal taught us: third-party privacy widgets get blocked by privacy browsers (Brave, Safari ITP, Firefox strict mode), break trust, and create CSP exceptions. Self-host.
+- **Don't gate features on flag names with no consumers.** A flag without a UI consumer is dead weight; either build the consumer or delete the flag name. Phase-5/6/7/8 design_v2 flag names were deleted 2026-04-30 for this reason.
+- **Don't add raw `multer()` calls.** Always use `limits.fileSize` + `fileFilter`.
+- **Don't use `setInterval` without `lib/jobs/heartbeat.js`.** Silent hung jobs are invisible to the on-call.
+- **Don't use `console.log` in backend code.** Project lint rejects it. Use `log.info({event, ...ctx}, message)` from `lib/logger.js`. Only `console.error` and `console.warn` are allowed by the lint config and only for legacy paths.
+- **Don't add `.clean` backup files.** They're untracked, useless, and rot. Use git branches if you need a snapshot.
+
+### When you change something security-relevant
+
+1. **Audit the call sites.** Grep for the old pattern — don't trust your IDE's rename.
+2. **Add a regression test.** Vitest for unit, Playwright for E2E.
+3. **Update this section.** If you discover a new industry-standard gap and fix it, add a one-line bullet here so the next agent doesn't waste cycles re-discovering it.
+4. **Update CHANGELOG.md** under the "Security" subsection of `[Unreleased]`.
+5. **Update `docs/internal/security/RUNBOOK_*.md`** if the change affects incident response.
