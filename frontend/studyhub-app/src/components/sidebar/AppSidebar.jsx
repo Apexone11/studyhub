@@ -18,14 +18,47 @@ import { roleLabel } from '../../lib/roleLabel'
 import { useDesignV2Flags } from '../../lib/designV2Flags'
 import SidebarTopics from './SidebarTopics'
 
+// Hide-the-sidebar preference is persisted across pages so toggling
+// once doesn't reset on every navigation. localStorage instead of
+// sessionStorage so the preference survives a fresh window — most users
+// who want it hidden want it hidden everywhere.
+const SIDEBAR_HIDDEN_KEY = 'studyhub.sidebar.hidden'
+
+function readSidebarHidden() {
+  if (typeof window === 'undefined') return false
+  try {
+    return window.localStorage.getItem(SIDEBAR_HIDDEN_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+function writeSidebarHidden(value) {
+  if (typeof window === 'undefined') return
+  try {
+    window.localStorage.setItem(SIDEBAR_HIDDEN_KEY, value ? '1' : '0')
+  } catch {
+    /* private mode / quota — ignore */
+  }
+}
+
 export default function AppSidebar({ mode = 'fixed' }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const [drawerOpen, setDrawerOpen] = useState(false)
+  const [sidebarHidden, setSidebarHidden] = useState(readSidebarHidden)
   const triggerButtonRef = useRef(null)
   const drawerDialogRef = useRef(null)
   const closeButtonRef = useRef(null)
   const previouslyFocusedRef = useRef(null)
+
+  const toggleSidebarHidden = () => {
+    setSidebarHidden((prev) => {
+      const next = !prev
+      writeSidebarHidden(next)
+      return next
+    })
+  }
 
   const { user } = useSession()
 
@@ -72,6 +105,44 @@ export default function AppSidebar({ mode = 'fixed' }) {
 
   const shell = (
     <>
+      {/* Hide-sidebar control. Beta tester ask — they wanted a quick
+          way to clear the left rail for a wider reading view without
+          collapsing the layout entirely. The button toggles the
+          persisted localStorage flag; when hidden, a "Show sidebar"
+          pill in the top-left corner brings it back on click. */}
+      {mode === 'fixed' && (
+        <div
+          style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
+            marginBottom: 4,
+          }}
+        >
+          <button
+            type="button"
+            onClick={toggleSidebarHidden}
+            aria-label="Hide sidebar"
+            title="Hide sidebar"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 4,
+              padding: '4px 8px',
+              fontSize: 11,
+              fontWeight: 600,
+              color: 'var(--sh-muted)',
+              background: 'transparent',
+              border: '1px solid var(--sh-border)',
+              borderRadius: 8,
+              cursor: 'pointer',
+            }}
+          >
+            <span aria-hidden="true">‹‹</span>
+            Hide
+          </button>
+        </div>
+      )}
+
       {/* Profile summary — compact, no heavy card */}
       <div
         className="sh-sidebar-section"
@@ -439,6 +510,44 @@ export default function AppSidebar({ mode = 'fixed' }) {
             </div>
           </div>
         ) : null}
+      </aside>
+    )
+  }
+
+  // When hidden, render a slim "Show sidebar" pill instead of the
+  // full rail. The pill keeps the parent grid column populated so the
+  // main content layout doesn't shift — it just becomes a thin click
+  // target. This lets the user reclaim the rail width without us
+  // having to coordinate a layout reflow with every page.
+  if (sidebarHidden) {
+    return (
+      <aside
+        className="sh-sidebar-sticky"
+        style={{ width: 36, paddingRight: 0 }}
+        aria-label="Sidebar (hidden)"
+      >
+        <button
+          type="button"
+          onClick={toggleSidebarHidden}
+          aria-label="Show sidebar"
+          title="Show sidebar"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 28,
+            height: 28,
+            padding: 0,
+            fontSize: 14,
+            color: 'var(--sh-muted)',
+            background: 'var(--sh-surface)',
+            border: '1px solid var(--sh-border)',
+            borderRadius: 8,
+            cursor: 'pointer',
+          }}
+        >
+          <span aria-hidden="true">››</span>
+        </button>
       </aside>
     )
   }
