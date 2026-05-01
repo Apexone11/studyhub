@@ -50,7 +50,7 @@ function getEncryptionKey() {
   // rather than silently degrading the integrity guarantee.
   if (process.env.NODE_ENV === 'production') {
     throw new Error(
-      'PROVENANCE_SECRET is required in production. Generate with: node -e "console.log(crypto.randomBytes(32).toString(\'hex\'))"',
+      "PROVENANCE_SECRET is required in production. Generate with: node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\"",
     )
   }
 

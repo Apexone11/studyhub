@@ -158,6 +158,21 @@ Half the "let me build feature X" requests are for features that already exist. 
 
 "I think this is wired up" → either verify it (in <30 seconds with grep) or say "I haven't verified this." Never both. The user can handle "I don't know yet, let me check"; they cannot handle "yes" that turns out to be "no."
 
+### A21 — Vet every Copilot / external bot bug report before acting on it
+
+Bot reviewers (GitHub Copilot, Sourcery, Codex, Dependabot security advisories, anything that opens a PR comment unprompted) are NOT a source of truth. They have no project context, they don't know our coding conventions, and they hallucinate "issues" that are either non-existent or stylistically inconsistent with the rest of the codebase. Blindly applying their suggestions has, in this repo, _introduced_ bugs and _broken_ established naming/style consistency more than once.
+
+Before touching code in response to a bot finding:
+
+1. **Reproduce or refute it against the actual code.** Read the file at the cited line. Run the test that supposedly fails. Grep for the function/variable. If you can't reproduce the issue, the finding is wrong — close the comment with a one-line "verified, false positive" and move on. Do NOT change code to "make the bot happy."
+2. **Cross-check against an industry standard.** Is the suggestion an MDN-documented best practice, an OWASP rule, a NIST control, an established a11y pattern (W3C ARIA), a CLAUDE.md A-rule, or a published library convention (Express, Prisma, React)? If none of these, the bot is offering style preference, not a bug — and bot style preferences usually don't match this codebase's preferences.
+3. **Refute it if it conflicts with an existing CLAUDE.md A-rule.** If the bot says "use `parseInt` without a radix" and A12 says "always pass radix + `Number.isInteger` guard," CLAUDE.md wins. If the bot says "wrap this in try/catch" but the surrounding module trusts internal callers, the bot is wrong.
+4. **Refute it if it breaks our coding-style consistency.** If the bot suggests `snake_case` in a `camelCase` file, `function expr` in an `arrow fn` file, `console.error` instead of `log.error`, raw `res.status().json({error})` instead of `sendError()`, or any other variant of "different from how the rest of the file/module is written" — reject the suggestion. Consistency is a feature; bot-induced drift is a regression.
+5. **If the finding IS real, fix it in our existing style.** Don't copy the bot's snippet verbatim. Match the surrounding code's naming, error envelope, log shape, validation pattern, and import order. A genuine bug fix that breaks our style is still a regression.
+6. **One bot finding ≠ one commit.** Batch real findings into a single coherent commit with a clear message. Don't spam the history with "address copilot review #1, #2, #3" if the underlying changes are trivial — that's bot-driven noise.
+
+The goal: bot review is an _input_ to the developer's judgment, not a directive. Treat it like a junior reviewer's comment — sometimes useful, sometimes wrong, always requires verification before action.
+
 ---
 
 ## Project Overview

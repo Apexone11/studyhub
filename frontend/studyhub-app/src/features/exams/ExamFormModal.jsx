@@ -37,19 +37,17 @@ function toDateInputValue(d) {
 
 /**
  * Take a `YYYY-MM-DD` string back to a full ISO datetime the API
- * accepts. Constructs the date at LOCAL midnight (no `Z` suffix) so
- * the resulting UTC instant lines up with the calendar day the user
- * actually picked. Previously hardcoded `T14:00:00.000Z` (14:00 UTC)
- * which silently shifted the calendar day for users in positive UTC
- * offsets — e.g., a UTC+8 user picking 2026-05-20 ended up storing
- * 2026-05-19T14:00Z and seeing the exam appear a day early.
- * (Audit Loop 18 finding I3.)
+ * accepts. Anchored at 12:00 UTC so the resulting instant always
+ * falls inside the picked calendar day in every real-world timezone
+ * (UTC-11 .. UTC+12). Earlier iterations tried `T00:00:00` local
+ * (shifted the UTC day for positive offsets) and `T14:00:00.000Z`
+ * (shifted the UTC day for offsets ≥ +10). UTC noon is the only
+ * fixed instant that round-trips correctly through
+ * `toISOString().slice(0,10)` for every timezone we care about.
  */
 function toIsoDateTime(yyyyMmDd) {
   if (!yyyyMmDd) return null
-  // No `Z` → browser parses as local time → resulting toISOString() is
-  // the correct UTC instant for that local-midnight moment.
-  const d = new Date(`${yyyyMmDd}T00:00:00`)
+  const d = new Date(`${yyyyMmDd}T12:00:00.000Z`)
   if (Number.isNaN(d.getTime())) return null
   return d.toISOString()
 }

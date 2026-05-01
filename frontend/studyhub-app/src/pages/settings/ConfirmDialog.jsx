@@ -14,8 +14,10 @@ export function ConfirmDialog({
   onCancel,
   busy = false,
 }) {
-  // Trap Tab + Shift+Tab and handle Escape so keyboard users can't
-  // escape this confirmation dialog (audit Loop 13 finding C4).
+  // Trap Tab + Shift+Tab inside the dialog so keyboard focus can't
+  // wander to background controls. Escape still dismisses via
+  // onCancel (the standard dialog close path) — focus trap and
+  // dismissal are separate concerns. (Audit Loop 13 finding C4.)
   const trapRef = useFocusTrap({ active: open, onClose: onCancel })
 
   if (!open) return null

@@ -42,8 +42,13 @@ const REQUIRED_IN_PRODUCTION = [
     // key, which would silently downgrade integrity guarantees on
     // creator-audit-grade sheets. Promoted to REQUIRED_IN_PRODUCTION
     // alongside the prod-throw added in lib/provenance.js.
+    //
+    // 64 hex chars = 32 raw bytes. Pattern enforced so a short
+    // alphanumeric placeholder can't pass the boot check; mirrors the
+    // FIELD_ENCRYPTION_KEY validation directly above.
     key: 'PROVENANCE_SECRET',
-    minLength: 32,
+    minLength: 64,
+    pattern: /^[0-9a-fA-F]{64}$/,
     description:
       'Encryption key for creator-audit provenance manifests. 32-byte hex (64 hex chars).',
   },
