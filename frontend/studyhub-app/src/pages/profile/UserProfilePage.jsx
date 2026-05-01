@@ -53,7 +53,6 @@ import {
 import {
   ProfileAvatar,
   ProfileStatsRow,
-  BadgesSection,
   PinnedSheetsSection,
   RecentSheetsSection,
   SharedNotesSection,
@@ -145,7 +144,6 @@ export default function UserProfilePage() {
   const [followList, setFollowList] = useState([])
   const [followListLoading, setFollowListLoading] = useState(false)
   const [activityData, setActivityData] = useState([])
-  const [badges, setBadges] = useState([])
   const [showAvatarCrop, setShowAvatarCrop] = useState(false)
   const [coverImgError, setCoverImgError] = useState(false)
 
@@ -249,7 +247,10 @@ export default function UserProfilePage() {
       .finally(() => setLoading(false))
   }, [username])
 
-  /* ── Load activity + badges ────────────────────────────────────────── */
+  /* ── Load activity heatmap ──────────────────────────────────────────
+   * Achievements V2 (2026-04-30) replaced the legacy `/api/users/:username/badges`
+   * fetch with PinnedBadgesCard's own /api/achievements/users/:username/pinned
+   * call. Removing the second fetch here is a profile-load perf win. */
   useEffect(() => {
     if (!profile) return
     fetch(`${API}/api/users/${username}/activity?weeks=12`, {
@@ -259,13 +260,6 @@ export default function UserProfilePage() {
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
         if (Array.isArray(data)) setActivityData(data)
-      })
-      .catch(() => {})
-
-    fetch(`${API}/api/users/${username}/badges`, { headers: authHeaders(), credentials: 'include' })
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data) => {
-        if (Array.isArray(data)) setBadges(data)
       })
       .catch(() => {})
   }, [profile, username])
@@ -1125,7 +1119,6 @@ export default function UserProfilePage() {
                     profileStudyStatusMap={profileStudyStatusMap}
                     dashboardRecentSheets={dashboardRecentSheets}
                     activityData={activityData}
-                    badges={badges}
                     followers={followers}
                     loadFollowList={loadFollowList}
                     viewerAccountType={viewerAccountType}
@@ -1136,7 +1129,7 @@ export default function UserProfilePage() {
                     topContributorsLoading={topContributorsLoading}
                   />
                 ) : (
-                  <OtherOverviewTab profile={profile} activityData={activityData} badges={badges} />
+                  <OtherOverviewTab profile={profile} activityData={activityData} />
                 ))}
 
               {activeTab === 'learning' && isOwnProfile && (
@@ -1224,7 +1217,6 @@ function OwnOverviewTab({
   profileStudyStatusMap,
   dashboardRecentSheets,
   activityData,
-  badges,
   followers,
   loadFollowList,
   viewerAccountType,
@@ -1261,9 +1253,10 @@ function OwnOverviewTab({
             <ActivityHeatmap data={activityData} weeks={12} />
           </div>
         )}
-        {/* Achievements V2 — pinned-6 strip on own profile Overview. */}
+        {/* Achievements V2 — pinned-6 strip on own profile Overview.
+            Replaces the legacy BadgesSection coin-renderer (deleted
+            2026-05-01). Full gallery lives on the Achievements tab. */}
         <PinnedBadgesCard username={profile.username} ownerView />
-        <BadgesSection badges={badges} />
         {phase1On ? (
           <TopContributors
             contributors={topContributors}
@@ -1492,10 +1485,11 @@ function PinnedBadgesCard({ username, ownerView }) {
 
 /* ── Achievements tab (both modes) ───────────────────────────────────────── */
 //
-// Achievements V2: rebuilt to render the new full-state gallery (locked +
-// unlocked + secret) with level chip + XP header + filter chips. The legacy
-// `badges` prop is kept on the call signature so existing parents don't break;
-// the gallery fetches the canonical state from /api/achievements/users/:username.
+// Achievements V2: renders the full-state gallery (locked + unlocked +
+// secret) with level chip + XP header + filter chips. Fetches canonical
+// state from /api/achievements/users/:username. The legacy v1 `badges`
+// prop has been fully removed everywhere (BadgesSection + BadgeDisplay
+// deleted 2026-05-01).
 function AchievementsTab({ activityData, profile, isOwner }) {
   const username = profile?.username
   const { items, stats, loading, error, reload } = useUserAchievements(username)
@@ -1547,15 +1541,15 @@ function AchievementsTab({ activityData, profile, isOwner }) {
 }
 
 /* ── Other user Overview: "Showcase" ─────────────────────────────────────── */
-function OtherOverviewTab({ profile, activityData, badges }) {
+function OtherOverviewTab({ profile, activityData }) {
   return (
     <div className="profile-columns">
       <ProfileStatsWidget username={profile.username} />
-      {/* Achievements V2 — pinned-6 strip on other user's profile Overview. */}
+      {/* Achievements V2 — pinned-6 strip on other user's profile Overview.
+          Replaces the legacy BadgesSection coin-renderer (deleted 2026-05-01). */}
       <PinnedBadgesCard username={profile.username} ownerView={false} />
       <PinnedSheetsSection sheets={profile.pinnedSheets} />
       <SharedShelvesSection shelves={profile.sharedShelves} isOwnProfile={false} />
-      <BadgesSection badges={badges} />
       {activityData.length > 0 && (
         <div style={cardStyle}>
           <ActivityHeatmap data={activityData} weeks={12} />

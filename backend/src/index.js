@@ -427,6 +427,13 @@ app.use('/api', (_req, res, next) => {
   if (!res.getHeader('Cache-Control')) {
     res.setHeader('Cache-Control', 'no-store')
   }
+  // Industry standard for JSON APIs (Stripe, Twilio, GitHub): never
+  // let a crawler index the API surface. Defends against accidental
+  // indexing if a JSON endpoint ever returns HTML, and against CDN
+  // misconfig that proxies api.* responses to a crawl-allowed
+  // hostname. `X-Robots-Tag` is honoured by Google + Bing without
+  // needing robots.txt.
+  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive')
   next()
 })
 

@@ -6,7 +6,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { IconBook, IconSheets, IconStar } from '../../components/Icons'
-import BadgeDisplay from '../../components/BadgeDisplay'
 import StudyStatusChip from '../../components/StudyStatusChip'
 import UserAvatar from '../../components/UserAvatar'
 import { resolveImageUrl } from '../../lib/imageUrls'
@@ -247,20 +246,6 @@ export function ProfileActionButtons({
           </button>
         )
       )}
-    </div>
-  )
-}
-
-/* ── Badges section ────────────────────────────────────────────────────── */
-export function BadgesSection({ badges }) {
-  if (!badges || badges.length === 0) return null
-  return (
-    <div style={cardStyle}>
-      <h2 style={sectionHeadingStyle}>
-        <i className="fa-solid fa-trophy" style={{ color: '#f59e0b', fontSize: 14 }} />
-        Achievements
-      </h2>
-      <BadgeDisplay badges={badges} />
     </div>
   )
 }

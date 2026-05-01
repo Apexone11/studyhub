@@ -99,11 +99,8 @@ async function mockProfileRoutes(page, profileUser) {
       }),
     })
   })
-  // Activity grid + badges list: components expect arrays.
+  // Activity grid expects an array.
   await page.route(`**/api/users/${profileUser.username}/activity*`, async (route) => {
-    await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
-  })
-  await page.route(`**/api/users/${profileUser.username}/badges`, async (route) => {
     await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' })
   })
   // FollowSuggestions crashes on `{}` because it calls .slice() directly;

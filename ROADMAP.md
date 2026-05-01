@@ -10,13 +10,13 @@ V2.2.0 is the live production release. It carries forward everything from V2.0.0
 
 ### What's new in V2.2.0 (since V2.0.0)
 
-| Area            | Change                                                                                                                                                                                                                                                        |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Creator Audit   | Frontend consent modal + publish-flow gate, soft-delete revocation, `acceptanceMethod` provenance, server-side 5-check audit (HTML / asset origin / PII / accessibility / copyright).                                                                         |
-| Notifications   | Real-time Socket.io push (`notification:new`), full-page `/notifications` route with type filters and bulk actions, type-coloured icons, viral fan-out dedup so a sheet that gets 1000 stars no longer creates 1000 rows.                                     |
-| Plagiarism UX   | Fork lineage (ancestors + descendants + siblings) excluded from similarity scans — forks no longer trip the plagiarism flag. Notification copy is now actionable instead of accusatory.                                                                       |
-| Achievements V2 | 54 badges across 10 categories with 5 visible tiers + secret tier, XP / Level system, hexagon SVG visual, public profile gallery, pinned-6 strip on every Overview tab, dedicated `/achievements` and `/achievements/:slug` routes, unlock celebration modal. |
-| Privacy & docs  | New public `PRIVACY.md` at the repo root, `FIELD_ENCRYPTION_KEY` enforced at production startup, complete `.env.example` for the frontend, SSRF allowlist scaffold ready for Scholar tier.                                                                    |
+| Area            | Change                                                                                                                                                                                                                                                                                                  |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Creator Audit   | Frontend consent modal + publish-flow gate, soft-delete revocation, `acceptanceMethod` provenance, server-side 5-check audit (HTML / asset origin / PII / accessibility / copyright).                                                                                                                   |
+| Notifications   | Real-time Socket.io push (`notification:new`), full-page `/notifications` route with type filters and bulk actions, type-coloured icons, viral fan-out dedup so a sheet that gets 1000 stars no longer creates 1000 rows.                                                                               |
+| Plagiarism UX   | Fork lineage (ancestors + descendants + siblings) excluded from similarity scans — forks no longer trip the plagiarism flag. Notification copy is now actionable instead of accusatory.                                                                                                                 |
+| Achievements V2 | 54 badges across 10 categories with 5 visible tiers + secret tier, XP / Level system, hexagon SVG visual, public profile gallery, pinned-6 strip on every Overview tab, dedicated `/achievements` and `/achievements/:slug` routes, unlock celebration modal. Legacy `BadgeDisplay` retired 2026-05-01. |
+| Privacy & docs  | New public `PRIVACY.md` at the repo root, `FIELD_ENCRYPTION_KEY` enforced at production startup, complete `.env.example` for the frontend, SSRF allowlist scaffold ready for Scholar tier.                                                                                                              |
 
 ### V2.0.0 — V2.2.0 Feature Summary (cumulative)
 
@@ -45,6 +45,15 @@ V2.2.0 is the live production release. It carries forward everything from V2.0.0
 | Performance        | Code-split routes, Suspense boundaries, sidebar prefetch on hover, HTTP cache headers                                                                          |
 
 ---
+
+## In flight (next 1-2 weeks)
+
+These are queued and have detailed plan docs in `docs/internal/audits/`:
+
+- **2FA recovery codes** — schema + endpoints + UI gated behind `flag_2fa_recovery_codes`. Plan: `docs/internal/audits/2026-04-30-2fa-recovery-codes-plan.md`. Founder approval required (auth-flow change).
+- **Admin MFA enforcement (L2.14)** — step-up middleware + force-2FA-on-login for admins. Plan: `docs/internal/audits/2026-04-30-deferred-plans.md`. Founder approval required.
+- **Modal focus traps (L4.2)** — adopt `focus-trap-react` and migrate ~12 modal call sites. Plan: same doc as L2.14.
+- **README polish + demo media** — internal screenshots + 2 demo GIFs (Hub AI sheet generation, fork-and-improve flow) for the README and the in-app About page. The repo stays private until there's a team to support open-source contributions.
 
 ## V2.5 -- Next Release (Target: 2-3 months)
 
