@@ -8,6 +8,17 @@ For internal cycle-by-cycle release notes, see `docs/release-log.md` (tracked) a
 
 ## [Unreleased]
 
+### Added (2026-05-01 rev 2)
+
+- **Settings → Security → Recovery codes UI.** `RecoveryCodesSection.jsx` mounted in the existing SecurityTab. Generates 10 single-use codes via `POST /api/settings/2fa/recovery-codes/regenerate`, displays them in a forced-acknowledgement modal (Escape + backdrop disabled until the user confirms they've saved them), Copy + Download `.txt` actions. Section silently doesn't render if `flag_2fa_recovery_codes` is off (status endpoint 404).
+- **`/settings/security/setup-2fa` page** — landing page for the admin-MFA-enforcement gate. Reached when login returns 403 `MFA_SETUP_REQUIRED`. Shows current 2FA status + step-by-step instructions for turning on email 2FA. Pointers to the recovery-codes section once 2FA is on.
+- **Dev-only Playwright focus-trap harness** at `/__a11y/dialog`. Replaces the flaky `/login` localStorage approach. Tree-shaken from production bundles via `import.meta.env.DEV` gate. Spec now exercises ARIA attributes, initial focus, Tab + Shift+Tab cycling, and Escape-to-close deterministically.
+
+### Fixed (2026-05-01 rev 2)
+
+- **`FocusTrappedDialog` nested-modal aria-hidden leak.** The body-inert effect identified the active dialog via `document.body.querySelector('[data-focustrap-active="true"]')`, which returned the first open dialog when multiple were mounted. A second concurrent dialog ended up listed as a sibling and got `aria-hidden="true"` + `inert` applied to itself. Fixed by tracking the current overlay via a per-instance ref and skipping any sibling that is itself a focus-trapped dialog.
+- **Frontend `package-lock.json` synced** for `focus-trap-react` + `@axe-core/playwright`. CI's `cache-dependency-path` points at `frontend/studyhub-app/package-lock.json`, so `npm ci` was about to break with the unsynced lockfile.
+
 ### Security
 
 - **2FA recovery codes (NIST 800-63B AAL2 alt-factor pattern).** New `lib/auth/recoveryCodes.js` generates 10 single-use 64-bit codes (`xxxxx-xxxxx` hex) per user, stores bcrypt hashes (cost 12) in `User.twoFaRecoveryHashes`, and exposes them once at generation time. Endpoints: `POST /api/settings/2fa/recovery-codes/regenerate` (replaces all hashes, returns plaintext once), `GET /api/settings/2fa/recovery-codes/status`, `POST /api/auth/login/recovery-code` (alt to email OTP). All gated on `flag_2fa_recovery_codes` (fail-CLOSED, ships disabled). Constant-time-ish bcrypt loop avoids timing-leak about which hash matched.

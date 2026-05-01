@@ -6,6 +6,7 @@ import PasskeysSection from './PasskeysSection'
 import LoginActivitySection from './LoginActivitySection'
 import SecurityAlertsSection from './SecurityAlertsSection'
 import PanicSection from './PanicSection'
+import RecoveryCodesSection from './RecoveryCodesSection'
 import {
   googleLinkedBadgeStyle,
   googleOnlyHintStyle,
@@ -262,6 +263,8 @@ export default function SecurityTab({
         busyKey={busyKey}
         setBusyKey={setBusyKey}
       />
+
+      <RecoveryCodesSection user={user} />
 
       <SecurityAlertsSection />
 

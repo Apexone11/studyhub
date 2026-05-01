@@ -36,6 +36,7 @@ const AttachmentPreviewPage = lazy(() => import('./pages/preview/AttachmentPrevi
 const SheetHtmlPreviewPage = lazy(() => import('./pages/preview/SheetHtmlPreviewPage'))
 const UploadSheetPage = lazy(() => import('./pages/sheets/upload/UploadSheetPage'))
 const SettingsPage = lazy(() => import('./pages/settings/SettingsPage'))
+const Setup2FAPage = lazy(() => import('./pages/settings/Setup2FAPage'))
 const AdminPage = lazy(() => import('./pages/admin/AdminPage'))
 const AboutPage = lazy(() => import('./pages/legal/AboutPage'))
 const PricingPage = lazy(() => import('./pages/pricing/PricingPage'))
@@ -69,6 +70,13 @@ const AchievementDetailPage = lazy(() => import('./features/achievements/Achieve
 const AchievementUnlockModal = lazy(() => import('./features/achievements/AchievementUnlockModal'))
 import useAchievementUnlockListener from './features/achievements/useAchievementUnlockListener'
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
+// Dev-only test harness for the Playwright focus-trap smoke spec.
+// Vite's `import.meta.env.DEV` is statically true in `npm run dev` and
+// statically false in `npm run build`, so the lazy() import is dead-
+// code-eliminated from production bundles.
+const FocusTrapHarnessPage = import.meta.env.DEV
+  ? lazy(() => import('./pages/dev/FocusTrapHarnessPage'))
+  : null
 
 import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
@@ -714,6 +722,17 @@ function AppRoutes() {
                       </PrivateRoute>
                     }
                   />
+                  {/* Admin MFA enforcement gate landing page. The login
+                      flow returns 403 MFA_SETUP_REQUIRED with this path
+                      when an admin needs to enable 2FA. */}
+                  <Route
+                    path="/settings/security/setup-2fa"
+                    element={
+                      <PrivateRoute>
+                        <Setup2FAPage />
+                      </PrivateRoute>
+                    }
+                  />
 
                   <Route
                     path="/onboarding"
@@ -726,6 +745,13 @@ function AppRoutes() {
 
                   {/* ── public user profiles ─────────────────────────────── */}
                   <Route path="/users/:username" element={<UserProfilePage />} />
+
+                  {/* Dev-only Playwright focus-trap harness. The route +
+                      element are tree-shaken from prod bundles via the
+                      import.meta.env.DEV gate above. */}
+                  {FocusTrapHarnessPage && (
+                    <Route path="/__a11y/dialog" element={<FocusTrapHarnessPage />} />
+                  )}
 
                   {/* ── catch-all ────────────────────────────────────────── */}
                   <Route path="*" element={<NotFoundPage />} />

@@ -43,7 +43,7 @@
  *     …
  *   </FocusTrappedDialog>
  */
-import { useEffect, useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import FocusTrap from 'focus-trap-react'
 
@@ -84,14 +84,34 @@ export default function FocusTrappedDialog({
   panelClassName,
   children,
 }) {
+  // Per-instance ref so the inert effect can identify THIS dialog's
+  // overlay element by reference rather than a global query selector.
+  // Stops nested / concurrent dialogs from incorrectly inerting each
+  // other: the previous implementation used
+  // `document.body.querySelector('[data-focustrap-active="true"]')`
+  // which returned the FIRST active dialog, so a second dialog opened
+  // on top of the first ended up listed as a sibling and got
+  // aria-hidden + inert applied to itself.
+  const overlayRef = useRef(null)
+
   // Mark the rest of the body inert while the dialog is open so screen
-  // readers can't cross the modal boundary. Skips when `open === false`
-  // to avoid touching the DOM unnecessarily.
+  // readers can't cross the modal boundary. Only inerts elements that
+  // are direct children of <body> AND not this dialog's overlay AND
+  // not already inert (so a stack of nested dialogs cooperates without
+  // any of them inerting another). Skips when `open === false` to
+  // avoid touching the DOM unnecessarily.
   useEffect(() => {
     if (!open) return undefined
+    const overlay = overlayRef.current
+    if (!overlay) return undefined
     const root = document.body
-    const portal = root.querySelector('[data-focustrap-active="true"]')
-    const siblings = Array.from(root.children).filter((child) => child !== portal)
+    const siblings = Array.from(root.children).filter((child) => {
+      if (child === overlay) return false
+      // Don't double-inert another dialog's portal — it's already
+      // doing its own inerting against the rest of the tree.
+      if (child.getAttribute('data-focustrap-active') === 'true') return false
+      return true
+    })
     const previousAria = siblings.map((el) => el.getAttribute('aria-hidden'))
     const previousInert = siblings.map((el) => (el.hasAttribute('inert') ? '' : null))
     siblings.forEach((el) => {
@@ -155,6 +175,7 @@ export default function FocusTrappedDialog({
   return createPortal(
     <FocusTrap focusTrapOptions={focusTrapOptions}>
       <div
+        ref={overlayRef}
         role="dialog"
         aria-modal="true"
         {...dialogA11y}
