@@ -148,20 +148,34 @@ async function submitDataRequest(req, res) {
     })
   }
 
-  // Audit log so log-aggregator carries a parallel trail (defence in
-  // depth — if the DB is wiped the request is still recoverable from
-  // Railway logs).
+  // Audit log carries the row ID + non-PII metadata only. The original
+  // 2026-04-30 implementation logged requesterName + requesterEmail +
+  // requesterIp at warn level, which would have replicated PII across
+  // log aggregation and backups. The DB row holds the raw PII; access
+  // is gated by Postgres permissions and the admin-only triage route.
+  // Hashed-email-prefix for correlation across log lines without
+  // surfacing the address (8 hex chars of SHA-256 of the lower-cased
+  // email — enough to spot duplicate submissions, not enough to
+  // identify a person).
+  let emailHashPrefix = null
+  try {
+    emailHashPrefix = require('node:crypto')
+      .createHash('sha256')
+      .update(requesterEmail)
+      .digest('hex')
+      .slice(0, 8)
+  } catch {
+    /* hash unavailable — log without it */
+  }
   log.warn(
     {
       event: 'legal.data_request.submitted',
       legalRequestId: createdRow.id,
-      requesterName,
-      requesterEmail,
       requestType,
       law,
       hasMessage: Boolean(message),
       submittedAtIso,
-      requesterIp,
+      emailHashPrefix,
     },
     'DSAR submission received',
   )

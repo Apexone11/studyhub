@@ -28,6 +28,14 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### 2FA recovery codes + Admin MFA enforcement scaffolding (2026-05-01)
+
+- **2FA recovery codes** (NIST 800-63B AAL2 alt-factor pattern). Generates 10 single-use 64-bit codes (`xxxxx-xxxxx` hex), stores bcrypt hashes, exposes plaintext once at generation. Endpoints: `POST /api/settings/2fa/recovery-codes/regenerate`, `GET /api/settings/2fa/recovery-codes/status`, `POST /api/auth/login/recovery-code`. Behind `flag_2fa_recovery_codes` (ships disabled, founder flips on after testing).
+- **Admin MFA enforcement (L2.14).** `User.mfaRequired` column + login flow gate. When `flag_admin_mfa_required` is on AND user is admin with mfaRequired: forces challenge band on every login. Fail-CLOSED on flag-read errors so the founder cannot self-lock.
+- **Migrations:** `20260501000004_add_2fa_recovery_codes`, `20260501000005_add_admin_mfa`. Both use `IF NOT EXISTS` for redeploy safety.
+- **Copilot review fixes** from PR #289: `/api/*` `Cache-Control` + `X-Robots-Tag` middleware moved before webhook mounts (now applies to every API response); DSAR audit log redacted (no requesterName/Email/IP — 8-char SHA-256 prefix only); `LegalRequest` + `AiMessage flag` migrations made idempotent; `loadEnv.js` adopted by `index.js`.
+- **`lib/useFocusTrap.js` consolidated** to use the same `focus-trap` engine as `FocusTrappedDialog`. One trap engine across the app instead of two.
+
 ### Modal focus traps + accessible dialog primitive (2026-05-01)
 
 - **`components/Modal/FocusTrappedDialog.jsx`** — single accessible dialog primitive that wraps `focus-trap-react`. Tab/Shift+Tab cycle stays inside, Escape closes (configurable), backdrop click closes (configurable), focus restores to the trigger on close, body siblings receive `inert` + `aria-hidden` while open. Industry-standard implementation per W3C ARIA Authoring Practices §3.9 (Modal Dialog Pattern).

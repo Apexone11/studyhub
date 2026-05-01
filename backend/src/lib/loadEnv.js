@@ -24,4 +24,6 @@ const envPath = path.resolve(__dirname, '..', '..', '.env')
 
 require('dotenv').config({ path: envPath })
 
-module.exports = { envPath }
+// Intentionally no exports — the side effect (dotenv.config) IS the
+// API. Importing this module for its return value is a sign the caller
+// is trying to re-implement env loading on its own; don't do that.

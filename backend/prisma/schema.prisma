@@ -32,6 +32,22 @@ model User {
   twoFaEnabled            Boolean   @default(false)
   twoFaCode               String?
   twoFaExpiry             DateTime?
+  // 2FA recovery codes — array of bcrypt hashes of single-use 10-char
+  // codes (xxxxx-xxxxx hex). Generated at user request; consumed one
+  // at a time on login when the user can't receive the email OTP.
+  // Industry-standard alternative-factor pattern (NIST 800-63B AAL2,
+  // GitHub, Cloudflare). See `lib/auth/recoveryCodes.js`.
+  twoFaRecoveryHashes     String[]  @default([])
+  twoFaRecoveryGeneratedAt DateTime?
+  twoFaRecoveryUsedCount  Int       @default(0)
+  // Admin MFA enforcement (L2.14) — when true, the login flow blocks
+  // the session cookie until the user completes 2FA setup. Set on the
+  // founder seat by default; promoted admins inherit via the role-
+  // grant hook. Behind `flag_admin_mfa_required` (fail-CLOSED) so
+  // flipping the flag off rolls everyone back to email OTP without a
+  // migration.
+  mfaRequired             Boolean   @default(false)
+  mfaEnforcedAt           DateTime?
   googleId                String?   @unique
   authProvider            String    @default("local")
   accountType             String    @default("student")

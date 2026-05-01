@@ -1,10 +1,13 @@
+// Load env vars FIRST — every other require below may read process.env
+// at import time. Centralized in lib/loadEnv so scripts and tests use
+// the same path-resolution logic and the dotenv call doesn't drift.
+require('./lib/loadEnv')
+
 const express = require('express')
 const compression = require('compression')
 const cors = require('cors')
 const helmet = require('helmet')
 const http = require('http')
-const path = require('node:path')
-require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
 const { initSentry, captureError } = require('./monitoring/sentry')
 const { validateSecrets: validateStartupSecrets } = require('./lib/secretValidator')
 const { bootstrapRuntime } = require('./lib/bootstrap/bootstrap')
@@ -360,6 +363,35 @@ const { globalLimiter } = require('./lib/rateLimiters')
 
 app.use(globalLimiter)
 
+// Default headers on every /api response. Mounted as a top-level
+// middleware (with an explicit path check) BEFORE any /api/* router so
+// it runs even on routes that end the response without calling next()
+// — webhook handlers, the Stripe webhook wrapper, the video chunk
+// handler, etc. Mount-ordering this after webhook routes (the earlier
+// 2026-04-30 placement) defeated the no-store + X-Robots-Tag
+// guarantees because some webhook handlers terminate the response.
+//
+//  - `Cache-Control: no-store`: auth-bearing endpoints
+//    (e.g. `/api/users/me`) must NEVER be cached. A misconfigured CDN
+//    keying only on URL would otherwise serve user A's session payload
+//    to user B. Routes that benefit from caching (public schools list,
+//    platform-stats, popular courses) override via the existing
+//    `cacheControl()` middleware.
+//  - `X-Robots-Tag: noindex, nofollow, noarchive`: industry standard
+//    for JSON APIs (Stripe, Twilio, GitHub). Defends against accidental
+//    indexing if a JSON endpoint ever returns HTML, and against CDN
+//    misconfig that proxies api.* responses to a crawl-allowed
+//    hostname.
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/') || req.path === '/api') {
+    if (!res.getHeader('Cache-Control')) {
+      res.setHeader('Cache-Control', 'no-store')
+    }
+    res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive')
+  }
+  next()
+})
+
 // Webhook routes must stay ahead of JSON parsing/CSRF middleware because
 // signature verification depends on the raw request body.
 app.use('/api/webhooks', webhookRoutes)
@@ -415,27 +447,6 @@ app.use(express.json({ limit: '5mb', type: 'application/json' }))
 // nesting/length, or duplicate query params before they reach routes.
 const inputSanitizer = require('./middleware/inputSanitizer')
 app.use(inputSanitizer)
-
-// Default `Cache-Control: no-store` on every API response. Auth-bearing
-// endpoints (e.g. `/api/users/me`) must NEVER be cached — a misconfigured
-// CDN keying only on URL would otherwise serve user A's session payload
-// to user B. Routes that legitimately benefit from caching (public
-// schools list, platform-stats, popular courses) override via the
-// existing `cacheControl()` middleware. Only `/api/*` paths get the
-// default; static/preview surfaces opt in elsewhere.
-app.use('/api', (_req, res, next) => {
-  if (!res.getHeader('Cache-Control')) {
-    res.setHeader('Cache-Control', 'no-store')
-  }
-  // Industry standard for JSON APIs (Stripe, Twilio, GitHub): never
-  // let a crawler index the API surface. Defends against accidental
-  // indexing if a JSON endpoint ever returns HTML, and against CDN
-  // misconfig that proxies api.* responses to a crawl-allowed
-  // hostname. `X-Robots-Tag` is honoured by Google + Bing without
-  // needing robots.txt.
-  res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive')
-  next()
-})
 
 // Optional emergency write-guard for non-admin requests.
 app.use(guardedMode)

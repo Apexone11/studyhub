@@ -10,6 +10,14 @@ For internal cycle-by-cycle release notes, see `docs/release-log.md` (tracked) a
 
 ### Security
 
+- **2FA recovery codes (NIST 800-63B AAL2 alt-factor pattern).** New `lib/auth/recoveryCodes.js` generates 10 single-use 64-bit codes (`xxxxx-xxxxx` hex) per user, stores bcrypt hashes (cost 12) in `User.twoFaRecoveryHashes`, and exposes them once at generation time. Endpoints: `POST /api/settings/2fa/recovery-codes/regenerate` (replaces all hashes, returns plaintext once), `GET /api/settings/2fa/recovery-codes/status`, `POST /api/auth/login/recovery-code` (alt to email OTP). All gated on `flag_2fa_recovery_codes` (fail-CLOSED, ships disabled). Constant-time-ish bcrypt loop avoids timing-leak about which hash matched.
+- **Admin MFA enforcement (L2.14).** `User.mfaRequired` column + login flow gate. When `flag_admin_mfa_required` is on AND a user has `role=admin && mfaRequired=true`: (a) without 2FA configured → 403 `MFA_SETUP_REQUIRED` redirecting to `/settings/security/setup-2fa`; (b) with 2FA configured → forced challenge band on every login (overrides risk-based skip). Fail-CLOSED: any flag-read error treats enforcement as off so the founder can never lock themselves out by misconfiguring the flag. Both flag rows seed with `enabled: false` — operator flips on after testing.
+- **Idempotent migrations.** `LegalRequest` + `AiMessage flag` migrations now use `IF NOT EXISTS` guards (matches the achievements-v2 redeploy-safe pattern). Replays cleanly under partial-apply or re-run.
+- **DSAR audit log redacted.** The `legal.data_request.submitted` log line no longer carries `requesterName`, `requesterEmail`, or `requesterIp` — replaced with an 8-char SHA-256 prefix of the email for cross-line correlation. Raw PII stays in the `LegalRequest` row, gated by Postgres permissions.
+- **`Cache-Control: no-store` + `X-Robots-Tag` middleware moved BEFORE webhook + payments + video-chunk route mounts.** The earlier 2026-04-30 placement after those mounts could allow webhook handlers that terminate the response to skip the no-store guarantee.
+
+- **`lib/useFocusTrap.js` consolidated** — refactored to use the same `focus-trap` engine that powers `FocusTrappedDialog`. Eliminates the divergent in-house Tab-cycling logic. Same public API; same body-scroll-lock counter; battle-tested trap underneath.
+- **`lib/loadEnv.js` adopted from `index.js`.** The bootstrap now requires the centralized loader before any other imports. Side-effect-only API (no exports) — matches the documented contract.
 - DSAR (`POST /api/legal/data-request`) now requires a trusted origin and is rate-limited to 3 requests per IP per hour. Honeypot field added to deter automated spam.
 - `/api/legal/me/accept-current` rate-limited to 10 requests per user per hour.
 - `/api/public/health` no longer leaks process uptime or memory usage to anonymous callers.
