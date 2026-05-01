@@ -84,7 +84,7 @@ jobs:
       - run: npm run test:e2e:smoke
       - name: Upload Playwright Smoke Artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-smoke-artifacts
           path: |
@@ -110,7 +110,7 @@ jobs:
       - run: npm run test:e2e:a11y
       - name: Upload Playwright A11y Artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-a11y-artifacts
           path: |
