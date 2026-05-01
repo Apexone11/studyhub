@@ -10,7 +10,7 @@
  * ancestors per CLAUDE.md "CSS and Styling".
  */
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import FocusTrappedDialog from '../Modal/FocusTrappedDialog'
 
 const RESPONSIBILITY_BULLETS = [
   {
@@ -84,42 +84,42 @@ export default function CreatorAuditConsentModal({
     }
   }
 
-  const node = (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="cac-title"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15, 23, 42, 0.55)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+  // Block accidental dismissal while an error banner is visible OR a
+  // submission is in flight. The user might miss why the publish
+  // action is still gated if the modal silently disappears after
+  // they read "could not record consent" — force them to use the
+  // Cancel button instead.
+  const dismissable = !submitting && !error
+  return (
+    <FocusTrappedDialog
+      open
+      onClose={() => {
+        if (dismissable) onDismiss?.()
+      }}
+      ariaLabelledBy="cac-title"
+      escapeDeactivates={dismissable}
+      clickOutsideDeactivates={dismissable}
+      overlayStyle={{
+        background: 'var(--sh-modal-overlay)',
         padding: '24px',
-        zIndex: 1000,
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
       }}
-      onClick={(e) => {
-        // Block accidental backdrop dismissal while an error banner is
-        // visible. The user might miss why the publish action is still
-        // gated if the modal silently disappears after they read "could
-        // not record consent". Force them to use the Cancel button.
-        if (e.target === e.currentTarget && !submitting && !error) onDismiss?.()
+      panelStyle={{
+        width: 'min(640px, 100%)',
+        maxWidth: 'min(640px, 100%)',
+        maxHeight: 'calc(100vh - 48px)',
+        overflowY: 'auto',
+        padding: 0,
+        gap: 0,
+        borderRadius: 16,
+        border: '1px solid var(--sh-border)',
+        background: 'var(--sh-surface)',
+        boxShadow: 'var(--shadow-lg)',
+        color: 'var(--sh-text)',
+        display: 'block',
       }}
     >
-      <div
-        style={{
-          width: 'min(640px, 100%)',
-          maxHeight: 'calc(100vh - 48px)',
-          overflowY: 'auto',
-          background: 'var(--sh-surface)',
-          borderRadius: 16,
-          border: '1px solid var(--sh-border)',
-          boxShadow: '0 20px 50px rgba(15, 23, 42, 0.25)',
-          color: 'var(--sh-text)',
-        }}
-      >
+      <div style={{ display: 'contents' }}>
         {/* Header */}
         <div
           style={{
@@ -299,8 +299,6 @@ export default function CreatorAuditConsentModal({
           </button>
         </div>
       </div>
-    </div>
+    </FocusTrappedDialog>
   )
-
-  return createPortal(node, document.body)
 }

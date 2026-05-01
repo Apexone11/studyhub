@@ -5,6 +5,7 @@
  * grouped by category. Closes on Escape or backdrop click.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState } from 'react'
+import FocusTrappedDialog from './Modal/FocusTrappedDialog'
 
 const isMac = typeof navigator !== 'undefined' && navigator.platform?.includes('Mac')
 const mod = isMac ? '⌘' : 'Ctrl'
@@ -50,26 +51,21 @@ export default function KeyboardShortcuts() {
     return () => document.removeEventListener('keydown', onKey)
   }, [])
 
-  useEffect(() => {
-    if (!open) return
-    function onKey(e) {
-      if (e.key === 'Escape') setOpen(false)
-    }
-    document.addEventListener('keydown', onKey)
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open])
-
-  if (!open) return null
+  // Escape-key close + Tab focus-trap now provided by FocusTrappedDialog.
+  // The dedicated effect that listened for `Escape` and the manual
+  // overlay/modal divs were removed during the 2026-05-01 modal-focus-
+  // trap migration.
 
   return (
-    <div className="sh-shortcuts-overlay" onClick={() => setOpen(false)} role="presentation">
-      <div
-        className="sh-shortcuts-modal"
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-label="Keyboard shortcuts"
-      >
+    <FocusTrappedDialog
+      open={open}
+      onClose={() => setOpen(false)}
+      ariaLabel="Keyboard shortcuts"
+      panelClassName="sh-shortcuts-modal"
+      overlayStyle={{ background: 'var(--sh-modal-overlay)' }}
+      panelStyle={{ display: 'block', padding: 0 }}
+    >
+      <div className="sh-shortcuts-modal-inner">
         <h2>Keyboard Shortcuts</h2>
         {SHORTCUT_GROUPS.map((group) => (
           <div key={group.title} className="sh-shortcut-group">
@@ -121,6 +117,6 @@ export default function KeyboardShortcuts() {
           to close
         </div>
       </div>
-    </div>
+    </FocusTrappedDialog>
   )
 }

@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useCallback, useEffect, useId, useMemo, useState } from 'react'
 import { API } from '../../config'
 import { roleLabel, ACCOUNT_TYPE_OPTIONS } from '../../lib/roleLabel'
 import { showToast } from '../../lib/toast'
 import { useRolesV2Flags } from '../../lib/rolesV2Flags'
+import FocusTrappedDialog from '../../components/Modal/FocusTrappedDialog'
 import { Button, Message, SectionCard } from './settingsShared'
 import { FONT } from './settingsState'
 
@@ -20,46 +20,30 @@ function formatRelative(msFromNow) {
   return `${hours} hour${hours === 1 ? '' : 's'}`
 }
 
+// Local Modal wrapper kept for backwards compat with the rest of the
+// RoleTile JSX. Routes through the shared FocusTrappedDialog so Tab
+// cycling, Escape close, and focus restore are handled uniformly with
+// the rest of the app's modals. clickOutsideDeactivates=false because
+// the role-change modal carries unsaved selection state — a stray
+// backdrop click should not silently discard it.
 function Modal({ open, title, children, onClose }) {
-  if (!open) return null
-  return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(15, 23, 42, 0.5)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 20,
-      }}
+  const titleId = useId()
+  return (
+    <FocusTrappedDialog
+      open={open}
+      onClose={onClose}
+      ariaLabelledBy={titleId}
+      clickOutsideDeactivates={false}
+      panelStyle={{ maxWidth: 440, padding: 22, fontFamily: FONT, gap: 14 }}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--sh-surface)',
-          borderRadius: 14,
-          padding: 22,
-          maxWidth: 440,
-          width: '100%',
-          fontFamily: FONT,
-          display: 'grid',
-          gap: 14,
-          boxShadow: '0 10px 40px rgba(15, 23, 42, 0.25)',
-        }}
+      <h3
+        id={titleId}
+        style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--sh-heading)' }}
       >
-        <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: 'var(--sh-heading)' }}>
-          {title}
-        </h3>
-        {children}
-      </div>
-    </div>,
-    document.body,
+        {title}
+      </h3>
+      {children}
+    </FocusTrappedDialog>
   )
 }
 

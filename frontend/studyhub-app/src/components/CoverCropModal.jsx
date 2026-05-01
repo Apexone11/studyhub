@@ -6,6 +6,7 @@
  */
 import { useCallback, useState } from 'react'
 import Cropper from 'react-easy-crop'
+import FocusTrappedDialog from './Modal/FocusTrappedDialog'
 import { API } from '../config'
 import { readJsonSafely, getApiErrorMessage } from '../lib/http'
 
@@ -108,8 +109,15 @@ export default function CoverCropModal({ onClose, onUploaded }) {
   }
 
   return (
-    <div style={overlayStyle}>
-      <div style={modalStyle}>
+    <FocusTrappedDialog
+      open
+      onClose={onClose}
+      ariaLabelledBy="cover-crop-title"
+      clickOutsideDeactivates={false}
+      overlayStyle={overlayStyle}
+      panelStyle={modalStyle}
+    >
+      <div style={{ display: 'contents' }}>
         <div
           style={{
             display: 'flex',
@@ -119,6 +127,7 @@ export default function CoverCropModal({ onClose, onUploaded }) {
           }}
         >
           <h2
+            id="cover-crop-title"
             style={{
               margin: 0,
               fontSize: 18,
@@ -256,7 +265,7 @@ export default function CoverCropModal({ onClose, onUploaded }) {
           </div>
         )}
       </div>
-    </div>
+    </FocusTrappedDialog>
   )
 }
 

@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import FocusTrappedDialog from '../../components/Modal/FocusTrappedDialog'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import AchievementHexagon from './AchievementHexagon'
 import { TIER_LABEL } from './tierStyles'
@@ -91,47 +91,32 @@ function UnlockModalInner({ slug, onClose, onView }) {
     return () => clearTimeout(t)
   }, [])
 
-  useEffect(() => {
-    function onKey(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
-
-  const overlay = (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="sh-ach-unlock-title"
-      onClick={onClose}
-      style={{
-        position: 'fixed',
-        inset: 0,
+  // Escape close + Tab focus-trap now provided by FocusTrappedDialog.
+  return (
+    <FocusTrappedDialog
+      open
+      onClose={onClose}
+      ariaLabelledBy="sh-ach-unlock-title"
+      overlayStyle={{
         background: 'var(--sh-modal-overlay)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
         zIndex: 1100,
-        padding: 20,
+      }}
+      panelStyle={{
+        background: 'var(--sh-panel-bg)',
+        color: 'var(--sh-text)',
+        borderRadius: 22,
+        padding: '32px 28px',
+        maxWidth: 420,
+        width: '100%',
+        boxShadow: '0 30px 60px rgba(0,0,0,0.25)',
+        textAlign: 'center',
+        display: 'block',
+        transform: mounted ? 'scale(1)' : 'scale(0.7)',
+        opacity: mounted ? 1 : 0,
+        transition: 'transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease',
       }}
     >
-      <div
-        onClick={(e) => e.stopPropagation()}
-        style={{
-          background: 'var(--sh-panel-bg)',
-          color: 'var(--sh-text)',
-          borderRadius: 22,
-          padding: '32px 28px',
-          maxWidth: 420,
-          width: '100%',
-          boxShadow: '0 30px 60px rgba(0,0,0,0.25)',
-          textAlign: 'center',
-          transform: mounted ? 'scale(1)' : 'scale(0.7)',
-          opacity: mounted ? 1 : 0,
-          transition: 'transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1), opacity 200ms ease',
-        }}
-      >
+      <div style={{ display: 'contents' }}>
         <div
           style={{
             fontSize: 11,
@@ -150,10 +135,8 @@ function UnlockModalInner({ slug, onClose, onView }) {
           <UnlockModalBody data={data} onView={onView} onClose={onClose} />
         )}
       </div>
-    </div>
+    </FocusTrappedDialog>
   )
-
-  return createPortal(overlay, document.body)
 }
 
 function UnlockModalBody({ data, onView, onClose }) {

@@ -28,6 +28,13 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Modal focus traps + accessible dialog primitive (2026-05-01)
+
+- **`components/Modal/FocusTrappedDialog.jsx`** — single accessible dialog primitive that wraps `focus-trap-react`. Tab/Shift+Tab cycle stays inside, Escape closes (configurable), backdrop click closes (configurable), focus restores to the trigger on close, body siblings receive `inert` + `aria-hidden` while open. Industry-standard implementation per W3C ARIA Authoring Practices §3.9 (Modal Dialog Pattern).
+- **9 modals migrated:** `HtmlDownloadWarningModal`, `RoleTile` Modal, `LegalAcceptanceModal` (signup blocker), `CreatorAuditConsentModal` (publish-flow), `KeyboardShortcuts`, `ConfirmLossyConversionModal`, `AvatarCropModal`, `CoverCropModal`, `VideoThumbnailEditor`, `AchievementUnlockModal`.
+- **Dependency add:** `focus-trap-react@^11.0.6` (~3 KB gzipped) under v2.1 dependency exception. Founder-approved.
+- **New Playwright smoke test:** `tests/modal-focus-trap.smoke.spec.js` verifies Tab focus stays inside the dialog through 5 forward + 5 backward Tab presses on the legal-acceptance modal.
+
 ### TypeScript adoption reverted (founder-locked)
 
 - **TypeScript removed from the project.** The brief TS adoption shipped earlier on 2026-04-30 was reverted the same day. Backend has no transpiler step (runtime is plain Node 20 CommonJS via `nodemon src/index.js`), so `.ts` files cannot run in production without adding ts-node or a build step neither of which the founder approved. Removed: `typescript` + `@types/*` devDependencies from both workspaces, `tsconfig.json` files (truncated to 0 bytes, safe to delete locally), `npm run typecheck` scripts, `--ext .ts` flag on backend lint script, `shared/types/` references in docs. The repo is JavaScript-only going forward; new files are `.js` / `.jsx`. JSDoc carries the type-hint role. CLAUDE.md "Language policy" section is the canonical rule.

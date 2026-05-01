@@ -1,5 +1,4 @@
-import { useEffect, useRef } from 'react'
-import { createPortal } from 'react-dom'
+import FocusTrappedDialog from './Modal/FocusTrappedDialog'
 
 /**
  * Download warning shown before a user downloads an HTML file from
@@ -9,8 +8,15 @@ import { createPortal } from 'react-dom'
  * privileged browser context. This modal surfaces the threat model
  * explicitly so the user makes an informed click.
  *
- * Rendered through a portal so it works inside transformed/animated
- * containers (CLAUDE.md "Modals broken inside animated containers").
+ * Built on FocusTrappedDialog (`components/Modal/FocusTrappedDialog`)
+ * so Tab/Shift+Tab cycle stays inside, Escape closes, and focus
+ * restores to the trigger button on close — full W3C ARIA modal
+ * dialog pattern compliance.
+ *
+ * Initial focus lands on the Cancel button via the
+ * `data-autofocus` attribute. This is the conservative choice: a
+ * stray Enter press cancels rather than confirms a download, and
+ * tier-2/3 messages already warn the user explicitly.
  *
  * Props:
  *   open       — controls visibility.
@@ -20,145 +26,85 @@ import { createPortal } from 'react-dom'
  *                triggering the actual file fetch / anchor click.
  */
 export default function HtmlDownloadWarningModal({ open, tier = 0, onCancel, onConfirm }) {
-  const cancelButtonRef = useRef(null)
-
-  // Escape-key dismissal — keyboard users expect this on every modal.
-  // Bound at the document level so the listener fires even when focus
-  // is on the page background (the user opened the modal but hasn't
-  // tabbed into it yet).
-  useEffect(() => {
-    if (!open) return undefined
-    const handler = (event) => {
-      if (event.key === 'Escape') {
-        event.stopPropagation()
-        onCancel?.()
-      }
-    }
-    document.addEventListener('keydown', handler)
-    return () => document.removeEventListener('keydown', handler)
-  }, [open, onCancel])
-
-  // Move focus to the safe default ("Cancel") on open so a stray Enter
-  // press doesn't accidentally confirm a download. Cancel is the
-  // conservative choice for tier-0/1; tier-2/3 wording already warns
-  // users explicitly. requestAnimationFrame waits one frame so the
-  // ref is attached before we focus it.
-  useEffect(() => {
-    if (!open) return undefined
-    const id = window.requestAnimationFrame(() => {
-      cancelButtonRef.current?.focus()
-    })
-    return () => window.cancelAnimationFrame(id)
-  }, [open])
-
-  if (!open) return null
-
   const tierCopy = describeTier(tier)
 
-  return createPortal(
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="html-download-warning-title"
-      onClick={onCancel}
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'var(--sh-modal-overlay)',
-        zIndex: 1000,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 20,
-      }}
+  return (
+    <FocusTrappedDialog
+      open={open}
+      onClose={onCancel}
+      ariaLabelledBy="html-download-warning-title"
+      initialFocusSelector="[data-autofocus='html-download-warning']"
     >
-      <div
-        onClick={(event) => event.stopPropagation()}
+      <h3
+        id="html-download-warning-title"
         style={{
-          background: 'var(--sh-surface)',
-          borderRadius: 14,
-          padding: 24,
-          maxWidth: 480,
-          width: '100%',
-          display: 'grid',
-          gap: 16,
-          boxShadow: 'var(--shadow-lg)',
+          margin: 0,
+          fontSize: 18,
+          fontWeight: 800,
+          color: 'var(--sh-heading)',
         }}
       >
-        <h3
-          id="html-download-warning-title"
+        {tierCopy.title}
+      </h3>
+      <p style={{ margin: 0, fontSize: 14, color: 'var(--sh-text)', lineHeight: 1.6 }}>
+        {tierCopy.body}
+      </p>
+      <ul
+        style={{
+          margin: 0,
+          padding: '0 0 0 20px',
+          fontSize: 13,
+          color: 'var(--sh-subtext)',
+          lineHeight: 1.6,
+        }}
+      >
+        <li>HTML files can run scripts when opened locally.</li>
+        <li>StudyHub already scanned the file, but no scanner is perfect.</li>
+        <li>Open the file in a sandbox or virtual machine if you do not fully trust the author.</li>
+      </ul>
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'flex-end',
+          gap: 10,
+          flexWrap: 'wrap',
+        }}
+      >
+        <button
+          type="button"
+          data-autofocus="html-download-warning"
+          onClick={onCancel}
           style={{
-            margin: 0,
-            fontSize: 18,
-            fontWeight: 800,
-            color: 'var(--sh-heading)',
+            padding: '10px 16px',
+            borderRadius: 10,
+            border: '1px solid var(--sh-btn-secondary-border)',
+            background: 'var(--sh-btn-secondary-bg)',
+            color: 'var(--sh-btn-secondary-text)',
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: 'pointer',
           }}
         >
-          {tierCopy.title}
-        </h3>
-        <p style={{ margin: 0, fontSize: 14, color: 'var(--sh-text)', lineHeight: 1.6 }}>
-          {tierCopy.body}
-        </p>
-        <ul
+          Cancel
+        </button>
+        <button
+          type="button"
+          onClick={onConfirm}
           style={{
-            margin: 0,
-            padding: '0 0 0 20px',
-            fontSize: 13,
-            color: 'var(--sh-subtext)',
-            lineHeight: 1.6,
+            padding: '10px 16px',
+            borderRadius: 10,
+            border: 'none',
+            background: tier >= 2 ? 'var(--sh-danger)' : 'var(--sh-brand)',
+            color: 'var(--sh-btn-primary-text)',
+            fontSize: 14,
+            fontWeight: 700,
+            cursor: 'pointer',
           }}
         >
-          <li>HTML files can run scripts when opened locally.</li>
-          <li>StudyHub already scanned the file, but no scanner is perfect.</li>
-          <li>
-            Open the file in a sandbox or virtual machine if you do not fully trust the author.
-          </li>
-        </ul>
-        <div
-          style={{
-            display: 'flex',
-            justifyContent: 'flex-end',
-            gap: 10,
-            flexWrap: 'wrap',
-          }}
-        >
-          <button
-            type="button"
-            ref={cancelButtonRef}
-            onClick={onCancel}
-            style={{
-              padding: '10px 16px',
-              borderRadius: 10,
-              border: '1px solid var(--sh-btn-secondary-border)',
-              background: 'var(--sh-btn-secondary-bg)',
-              color: 'var(--sh-btn-secondary-text)',
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            style={{
-              padding: '10px 16px',
-              borderRadius: 10,
-              border: 'none',
-              background: tier >= 2 ? 'var(--sh-danger)' : 'var(--sh-brand)',
-              color: 'var(--sh-btn-primary-text)',
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: 'pointer',
-            }}
-          >
-            {tierCopy.confirmLabel}
-          </button>
-        </div>
+          {tierCopy.confirmLabel}
+        </button>
       </div>
-    </div>,
-    document.body,
+    </FocusTrappedDialog>
   )
 }
 

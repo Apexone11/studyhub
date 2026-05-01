@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
 import LegalDocumentText from '../../components/LegalDocumentText'
+import FocusTrappedDialog from '../../components/Modal/FocusTrappedDialog'
 import { LEGAL_DOCUMENT_LABELS, POLICY_URLS } from '../../lib/legalVersions'
 import { useCurrentLegalDocument } from '../../lib/legalService'
 
@@ -282,21 +282,28 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
   const allViewed = viewedTabs.size === 3
   const viewedCount = viewedTabs.size
 
-  if (!open) return null
-
-  const overlay = (
-    <div
-      style={styles.overlay}
-      onClick={() => {
-        // Backdrop click does nothing -- user must explicitly Accept or Decline
-      }}
+  return (
+    <FocusTrappedDialog
+      open={open}
+      onClose={onDecline}
+      ariaLabelledBy="legal-modal-title"
+      // Signup is a forced flow — backdrop click and Escape MUST NOT
+      // dismiss. The user has to make an explicit Accept / Decline
+      // choice. The matching `onClick={() => {}}` no-op on the overlay
+      // is now expressed declaratively here.
+      escapeDeactivates={false}
+      clickOutsideDeactivates={false}
+      overlayStyle={styles.overlay}
+      panelStyle={styles.modal}
     >
-      {/* Modal card */}
-      <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+      {/* Modal card body — overlay + panel chrome handled by FocusTrappedDialog */}
+      <div style={{ display: 'contents' }}>
         {/* Header */}
         <div style={styles.header}>
           <p style={styles.overline}>Required Before Signup</p>
-          <h2 style={styles.title}>Review Our Policies</h2>
+          <h2 id="legal-modal-title" style={styles.title}>
+            Review Our Policies
+          </h2>
           <p style={styles.subtitle}>
             Read each required document before creating your account. If the hosted Termly document
             is unavailable, StudyHub will show the current backup copy stored with the same legal
@@ -508,8 +515,6 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
           to   { opacity: 1; transform: translateY(0) scale(1); }
         }
       `}</style>
-    </div>
+    </FocusTrappedDialog>
   )
-
-  return createPortal(overlay, document.body)
 }

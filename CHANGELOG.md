@@ -25,6 +25,12 @@ For internal cycle-by-cycle release notes, see `docs/release-log.md` (tracked) a
 - `security.txt` at `/.well-known/security.txt` (RFC 9116) for vuln researcher contact.
 - Dependabot weekly update PRs for backend, frontend, and GitHub Actions.
 - `HtmlDownloadWarningModal` component with tier-aware copy, wired into `AttachmentPreviewPage` for HTML attachment downloads.
+- `components/Modal/FocusTrappedDialog.jsx` accessible-dialog primitive (W3C ARIA Authoring Practices §3.9 modal pattern). Wraps `focus-trap-react` with portal mounting, ARIA attributes, body inerting, and reduced-motion support. 9 modals migrated to it: `HtmlDownloadWarningModal`, `RoleTile` Modal, `LegalAcceptanceModal`, `CreatorAuditConsentModal`, `KeyboardShortcuts`, `ConfirmLossyConversionModal`, `AvatarCropModal`, `CoverCropModal`, `VideoThumbnailEditor`, `AchievementUnlockModal`. Tab/Shift+Tab cycling, Escape close, and trigger-focus restore now work uniformly.
+- `tests/modal-focus-trap.smoke.spec.js` — Playwright keyboard-navigation smoke test verifying Tab focus stays inside the dialog.
+
+### Dependency changes
+
+- Added `focus-trap-react@^11.0.6` (runtime). Founder-approved 2026-05-01 via the v2.1 dependency exception path. Brings transitive deps `tabbable@^6` and `focus-trap@^7`. Bundle cost: ~3 KB gzipped. No existing dep solved the need (the in-house `useFocusTrap` hook is good but ships separately and isn't W3C-pattern-complete). Rollback plan: replace `<FocusTrappedDialog>` usages back with hand-rolled `createPortal` modals + remove `focus-trap-react` from dependencies.
 
 ### Changed
 
