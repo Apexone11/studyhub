@@ -60,22 +60,33 @@ export default function SheetActionsMenu({
 
   const isOwner = user && sheet && (user.id === sheet.userId || user.role === 'admin')
 
+  // The toggle handlers below intentionally hydrate the local sheet state
+  // from the server's response rather than optimistically flipping the
+  // local boolean. This guarantees the visual switch state always reflects
+  // what's persisted — if the PATCH silently no-ops (e.g. the column is
+  // missing, or a future middleware drops the field), the toggle will
+  // not appear to move. Earlier versions used `!sheet.allowDownloads`
+  // optimistically, which masked persistence failures.
   const handleToggleDownloads = async () => {
     if (togglingDownloads || !sheet) return
+    const nextValue = !(sheet.allowDownloads !== false)
     setTogglingDownloads(true)
     try {
       const response = await fetch(`${API}/api/sheets/${sheet.id}`, {
         method: 'PATCH',
         headers: authHeaders(),
         credentials: 'include',
-        body: JSON.stringify({ allowDownloads: !sheet.allowDownloads }),
+        body: JSON.stringify({ allowDownloads: nextValue }),
       })
+      const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
         throw new Error(data.error || 'Could not update setting.')
       }
-      if (onSheetUpdate) onSheetUpdate({ allowDownloads: !sheet.allowDownloads })
-      showToast(sheet.allowDownloads ? 'Downloads disabled.' : 'Downloads enabled.', 'success')
+      // Hydrate from server — if the server didn't echo allowDownloads,
+      // fall back to the requested value so the optimistic UX still flips.
+      const persisted = typeof data.allowDownloads === 'boolean' ? data.allowDownloads : nextValue
+      if (onSheetUpdate) onSheetUpdate({ allowDownloads: persisted })
+      showToast(persisted ? 'Downloads enabled.' : 'Downloads disabled.', 'success')
     } catch (err) {
       showToast(err.message, 'error')
     } finally {
@@ -85,23 +96,22 @@ export default function SheetActionsMenu({
 
   const handleToggleEditing = async () => {
     if (togglingEditing || !sheet) return
+    const nextValue = !(sheet.allowEditing === true)
     setTogglingEditing(true)
     try {
       const response = await fetch(`${API}/api/sheets/${sheet.id}`, {
         method: 'PATCH',
         headers: authHeaders(),
         credentials: 'include',
-        body: JSON.stringify({ allowEditing: !sheet.allowEditing }),
+        body: JSON.stringify({ allowEditing: nextValue }),
       })
+      const data = await response.json().catch(() => ({}))
       if (!response.ok) {
-        const data = await response.json().catch(() => ({}))
         throw new Error(data.error || 'Could not update setting.')
       }
-      if (onSheetUpdate) onSheetUpdate({ allowEditing: !sheet.allowEditing })
-      showToast(
-        sheet.allowEditing ? 'Editing by others disabled.' : 'Editing by others enabled.',
-        'success',
-      )
+      const persisted = typeof data.allowEditing === 'boolean' ? data.allowEditing : nextValue
+      if (onSheetUpdate) onSheetUpdate({ allowEditing: persisted })
+      showToast(persisted ? 'Editing by others enabled.' : 'Editing by others disabled.', 'success')
     } catch (err) {
       showToast(err.message, 'error')
     } finally {

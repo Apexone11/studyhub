@@ -45,6 +45,19 @@ export function clearRolesV2FlagCache() {
   cache.clear()
 }
 
+/**
+ * Imperative flag check for code paths that fire before the React hook
+ * has had a chance to resolve (e.g. OAuth code-callback handlers in
+ * useRegisterFlow.js). Returns the same fail-CLOSED boolean as the
+ * hook, but awaits the in-flight fetch instead of reading a stale
+ * closure-captured value.
+ */
+export async function isRolesV2FlagEnabled(key) {
+  const name = FLAG_NAMES[key]
+  if (!name) return false
+  return fetchFlag(name)
+}
+
 const DEFAULTS = { core: false, oauthPicker: false, revertWindow: false, loading: true }
 
 export function useRolesV2Flags() {

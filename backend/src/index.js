@@ -773,17 +773,20 @@ async function startServer() {
       preloadPopularBooks,
       syncPopularBooksToDB,
     } = require('./modules/library/library.service')
+    const { runWithHeartbeat } = require('./lib/jobs/heartbeat')
     preloadPopularBooks().catch(() => {})
     // Always trigger a background sync on startup regardless of existing data.
     // The upsert logic is idempotent -- it just refreshes existing records.
-    syncPopularBooksToDB(16).catch(() => {})
+    runWithHeartbeat('library.sync_popular_books_boot', () => syncPopularBooksToDB(16))
     // Re-sync every 24 hours to keep the cache fresh across long-running deploys.
+    // .unref() so the interval doesn't hold the process open during graceful
+    // shutdown — the heartbeat wrapper still emits failure events to Sentry.
     setInterval(
       () => {
-        syncPopularBooksToDB(16).catch(() => {})
+        runWithHeartbeat('library.sync_popular_books', () => syncPopularBooksToDB(16))
       },
       24 * 60 * 60 * 1000,
-    )
+    ).unref()
     log.info({ port: PORT }, `Server running on http://localhost:${PORT}`)
   })
 

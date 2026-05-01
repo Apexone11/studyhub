@@ -71,6 +71,11 @@ const SCHEMA_REPAIR_STATEMENTS = [
   'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "attachmentType" TEXT',
   'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "attachmentName" TEXT',
   'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "allowDownloads" BOOLEAN NOT NULL DEFAULT true',
+  // Owner-controlled "allow other users to edit" toggle. Belt-and-
+  // suspenders alongside the dedicated migration so a fresh bootstrap
+  // can never end up with the column missing (which would silently
+  // break `sheets.update.controller.js` and the SheetActionsMenu UI).
+  'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "allowEditing" BOOLEAN NOT NULL DEFAULT false',
   'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "htmlScanStatus" TEXT NOT NULL DEFAULT \'queued\'',
   'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "htmlScanFindings" JSONB',
   'ALTER TABLE "StudySheet" ADD COLUMN IF NOT EXISTS "htmlScanUpdatedAt" TIMESTAMP(3)',

@@ -19,12 +19,15 @@ const express = require('express')
 const crypto = require('crypto')
 const prisma = require('../../lib/prisma')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { captureError } = require('../../monitoring/sentry')
 const log = require('../../lib/logger')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { PLANS } = require('./payments.constants')
 const service = require('./payments.service')
 const { paymentCheckoutLimiter, paymentReadLimiter } = require('../../lib/rateLimiters')
+
+const requireTrustedOrigin = originAllowlist()
 
 const router = express.Router()
 
@@ -50,66 +53,72 @@ function getReferralInactiveReason(referral, now = new Date()) {
 // ── REFERRAL CODES ──────────────────────────────────────────────────────
 
 // POST /referral/create — Create a referral code (any authenticated user)
-router.post('/referral/create', requireAuth, paymentCheckoutLimiter, async (req, res) => {
-  try {
-    const userId = req.user.userId
-    const now = new Date()
+router.post(
+  '/referral/create',
+  requireAuth,
+  requireTrustedOrigin,
+  paymentCheckoutLimiter,
+  async (req, res) => {
+    try {
+      const userId = req.user.userId
+      const now = new Date()
 
-    const existingCodes = await prisma.referralCode.findMany({
-      where: { ownerId: userId, active: true },
-      select: { id: true, active: true, expiresAt: true, maxUses: true, currentUses: true },
-    })
-
-    const staleCodeIds = existingCodes
-      .filter((code) => getReferralInactiveReason(code, now))
-      .map((code) => code.id)
-
-    if (staleCodeIds.length > 0) {
-      await prisma.referralCode.updateMany({
-        where: { id: { in: staleCodeIds } },
-        data: { active: false },
+      const existingCodes = await prisma.referralCode.findMany({
+        where: { ownerId: userId, active: true },
+        select: { id: true, active: true, expiresAt: true, maxUses: true, currentUses: true },
       })
+
+      const staleCodeIds = existingCodes
+        .filter((code) => getReferralInactiveReason(code, now))
+        .map((code) => code.id)
+
+      if (staleCodeIds.length > 0) {
+        await prisma.referralCode.updateMany({
+          where: { id: { in: staleCodeIds } },
+          data: { active: false },
+        })
+      }
+
+      const activeCount = existingCodes.length - staleCodeIds.length
+      if (activeCount >= 5) {
+        return sendError(
+          res,
+          400,
+          'You can have at most 5 active referral codes.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
+
+      const code = generateCode('SH')
+
+      const referral = await prisma.referralCode.create({
+        data: {
+          code,
+          ownerId: userId,
+          rewardType: 'trial_extension',
+          rewardValue: 7, // 7 extra days of trial
+          maxUses: 0, // unlimited
+        },
+      })
+
+      res.status(201).json({
+        id: referral.id,
+        code: referral.code,
+        rewardType: referral.rewardType,
+        rewardValue: referral.rewardValue,
+        currentUses: 0,
+        active: true,
+        isRedeemable: true,
+        inactiveReason: null,
+        createdAt: referral.createdAt,
+      })
+    } catch (error) {
+      captureError(error, { context: 'referral.create' })
+      log.error({ err: error }, 'Failed to create referral code')
+      sendError(res, 500, 'Failed to create referral code.', ERROR_CODES.INTERNAL)
     }
-
-    const activeCount = existingCodes.length - staleCodeIds.length
-    if (activeCount >= 5) {
-      return sendError(
-        res,
-        400,
-        'You can have at most 5 active referral codes.',
-        ERROR_CODES.BAD_REQUEST,
-      )
-    }
-
-    const code = generateCode('SH')
-
-    const referral = await prisma.referralCode.create({
-      data: {
-        code,
-        ownerId: userId,
-        rewardType: 'trial_extension',
-        rewardValue: 7, // 7 extra days of trial
-        maxUses: 0, // unlimited
-      },
-    })
-
-    res.status(201).json({
-      id: referral.id,
-      code: referral.code,
-      rewardType: referral.rewardType,
-      rewardValue: referral.rewardValue,
-      currentUses: 0,
-      active: true,
-      isRedeemable: true,
-      inactiveReason: null,
-      createdAt: referral.createdAt,
-    })
-  } catch (error) {
-    captureError(error, { context: 'referral.create' })
-    log.error({ err: error }, 'Failed to create referral code')
-    sendError(res, 500, 'Failed to create referral code.', ERROR_CODES.INTERNAL)
-  }
-})
+  },
+)
 
 // GET /referral/mine — Get current user's referral codes with stats
 router.get('/referral/mine', requireAuth, paymentReadLimiter, async (req, res) => {
@@ -171,106 +180,112 @@ router.get('/referral/mine', requireAuth, paymentReadLimiter, async (req, res) =
 })
 
 // POST /referral/redeem — Redeem a referral code
-router.post('/referral/redeem', requireAuth, paymentCheckoutLimiter, async (req, res) => {
-  try {
-    const { code } = req.body
-    const userId = req.user.userId
+router.post(
+  '/referral/redeem',
+  requireAuth,
+  requireTrustedOrigin,
+  paymentCheckoutLimiter,
+  async (req, res) => {
+    try {
+      const { code } = req.body
+      const userId = req.user.userId
 
-    if (!code || typeof code !== 'string') {
-      return sendError(res, 400, 'Referral code is required.', ERROR_CODES.VALIDATION)
-    }
+      if (!code || typeof code !== 'string') {
+        return sendError(res, 400, 'Referral code is required.', ERROR_CODES.VALIDATION)
+      }
 
-    const referral = await prisma.referralCode.findUnique({
-      where: { code: code.trim().toUpperCase() },
-    })
+      const referral = await prisma.referralCode.findUnique({
+        where: { code: code.trim().toUpperCase() },
+      })
 
-    if (!referral || !referral.active) {
-      return sendError(res, 404, 'Invalid or expired referral code.', ERROR_CODES.NOT_FOUND)
-    }
+      if (!referral || !referral.active) {
+        return sendError(res, 404, 'Invalid or expired referral code.', ERROR_CODES.NOT_FOUND)
+      }
 
-    if (referral.ownerId === userId) {
-      return sendError(
-        res,
-        400,
-        'You cannot redeem your own referral code.',
-        ERROR_CODES.BAD_REQUEST,
-      )
-    }
+      if (referral.ownerId === userId) {
+        return sendError(
+          res,
+          400,
+          'You cannot redeem your own referral code.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
 
-    if (referral.expiresAt && referral.expiresAt < new Date()) {
-      await prisma.referralCode
-        .update({
-          where: { id: referral.id },
-          data: { active: false },
-        })
-        .catch(() => {})
-      return sendError(res, 400, 'This referral code has expired.', ERROR_CODES.BAD_REQUEST)
-    }
+      if (referral.expiresAt && referral.expiresAt < new Date()) {
+        await prisma.referralCode
+          .update({
+            where: { id: referral.id },
+            data: { active: false },
+          })
+          .catch(() => {})
+        return sendError(res, 400, 'This referral code has expired.', ERROR_CODES.BAD_REQUEST)
+      }
 
-    if (referral.maxUses > 0 && referral.currentUses >= referral.maxUses) {
-      await prisma.referralCode
-        .update({
-          where: { id: referral.id },
-          data: { active: false },
-        })
-        .catch(() => {})
-      return sendError(
-        res,
-        400,
-        'This referral code has reached its maximum uses.',
-        ERROR_CODES.BAD_REQUEST,
-      )
-    }
+      if (referral.maxUses > 0 && referral.currentUses >= referral.maxUses) {
+        await prisma.referralCode
+          .update({
+            where: { id: referral.id },
+            data: { active: false },
+          })
+          .catch(() => {})
+        return sendError(
+          res,
+          400,
+          'This referral code has reached its maximum uses.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
 
-    // Check if already redeemed
-    const existing = await prisma.referralRedemption.findUnique({
-      where: {
-        referralCodeId_redeemedById: {
-          referralCodeId: referral.id,
-          redeemedById: userId,
+      // Check if already redeemed
+      const existing = await prisma.referralRedemption.findUnique({
+        where: {
+          referralCodeId_redeemedById: {
+            referralCodeId: referral.id,
+            redeemedById: userId,
+          },
         },
-      },
-    })
-    if (existing) {
-      return sendError(res, 400, 'You have already redeemed this code.', ERROR_CODES.CONFLICT)
+      })
+      if (existing) {
+        return sendError(res, 400, 'You have already redeemed this code.', ERROR_CODES.CONFLICT)
+      }
+
+      // Create redemption
+      await prisma.$transaction([
+        prisma.referralRedemption.create({
+          data: {
+            referralCodeId: referral.id,
+            redeemedById: userId,
+          },
+        }),
+        prisma.referralCode.update({
+          where: { id: referral.id },
+          data: { currentUses: { increment: 1 } },
+        }),
+      ])
+
+      log.info(
+        { userId, code: referral.code, rewardType: referral.rewardType },
+        'Referral code redeemed',
+      )
+
+      res.json({
+        message: `Referral code redeemed! You earned ${referral.rewardValue} ${referral.rewardType === 'trial_extension' ? 'extra trial days' : referral.rewardType === 'discount_percent' ? '% discount' : ' cents credit'}.`,
+        rewardType: referral.rewardType,
+        rewardValue: referral.rewardValue,
+      })
+    } catch (error) {
+      captureError(error, { context: 'referral.redeem' })
+      log.error({ err: error }, 'Failed to redeem referral code')
+      sendError(res, 500, 'Failed to redeem referral code.', ERROR_CODES.INTERNAL)
     }
-
-    // Create redemption
-    await prisma.$transaction([
-      prisma.referralRedemption.create({
-        data: {
-          referralCodeId: referral.id,
-          redeemedById: userId,
-        },
-      }),
-      prisma.referralCode.update({
-        where: { id: referral.id },
-        data: { currentUses: { increment: 1 } },
-      }),
-    ])
-
-    log.info(
-      { userId, code: referral.code, rewardType: referral.rewardType },
-      'Referral code redeemed',
-    )
-
-    res.json({
-      message: `Referral code redeemed! You earned ${referral.rewardValue} ${referral.rewardType === 'trial_extension' ? 'extra trial days' : referral.rewardType === 'discount_percent' ? '% discount' : ' cents credit'}.`,
-      rewardType: referral.rewardType,
-      rewardValue: referral.rewardValue,
-    })
-  } catch (error) {
-    captureError(error, { context: 'referral.redeem' })
-    log.error({ err: error }, 'Failed to redeem referral code')
-    sendError(res, 500, 'Failed to redeem referral code.', ERROR_CODES.INTERNAL)
-  }
-})
+  },
+)
 
 // DELETE /referral/:id — Deactivate a referral code
-router.delete('/referral/:id', requireAuth, async (req, res) => {
+router.delete('/referral/:id', requireAuth, requireTrustedOrigin, async (req, res) => {
   try {
-    const codeId = parseInt(req.params.id, 10)
-    if (!codeId || isNaN(codeId)) {
+    const codeId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(codeId) || codeId < 1) {
       return sendError(res, 400, 'Invalid code ID.', ERROR_CODES.VALIDATION)
     }
 
@@ -296,193 +311,210 @@ router.delete('/referral/:id', requireAuth, async (req, res) => {
 // ── GIFT SUBSCRIPTIONS ──────────────────────────────────────────────────
 
 // POST /gift/checkout — Purchase a gift subscription
-router.post('/gift/checkout', requireAuth, paymentCheckoutLimiter, async (req, res) => {
-  try {
-    const { recipientEmail, plan, durationMonths, message } = req.body
-    const userId = req.user.userId
+router.post(
+  '/gift/checkout',
+  requireAuth,
+  requireTrustedOrigin,
+  paymentCheckoutLimiter,
+  async (req, res) => {
+    try {
+      const { recipientEmail, plan, durationMonths, message } = req.body
+      const userId = req.user.userId
 
-    if (!recipientEmail || typeof recipientEmail !== 'string') {
-      return sendError(res, 400, 'Recipient email is required.', ERROR_CODES.VALIDATION)
-    }
+      if (!recipientEmail || typeof recipientEmail !== 'string') {
+        return sendError(res, 400, 'Recipient email is required.', ERROR_CODES.VALIDATION)
+      }
 
-    const normalizedEmail = recipientEmail.trim().toLowerCase()
+      const normalizedEmail = recipientEmail.trim().toLowerCase()
 
-    // Prevent gifting to yourself
-    const gifterUser = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true, username: true },
-    })
-    if (gifterUser?.email && gifterUser.email.toLowerCase() === normalizedEmail) {
-      return sendError(
-        res,
-        400,
-        'You cannot gift a subscription to yourself.',
-        ERROR_CODES.BAD_REQUEST,
-      )
-    }
+      // Prevent gifting to yourself
+      const gifterUser = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, username: true },
+      })
+      if (gifterUser?.email && gifterUser.email.toLowerCase() === normalizedEmail) {
+        return sendError(
+          res,
+          400,
+          'You cannot gift a subscription to yourself.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
 
-    // Limit gifts per day to prevent abuse (max 3 gifts per 24 hours)
-    const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-    const recentGiftCount = await prisma.giftSubscription.count({
-      where: { gifterId: userId, createdAt: { gte: oneDayAgo } },
-    })
-    if (recentGiftCount >= 3) {
-      return sendError(res, 429, 'You can send at most 3 gifts per day.', ERROR_CODES.RATE_LIMITED)
-    }
+      // Limit gifts per day to prevent abuse (max 3 gifts per 24 hours)
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      const recentGiftCount = await prisma.giftSubscription.count({
+        where: { gifterId: userId, createdAt: { gte: oneDayAgo } },
+      })
+      if (recentGiftCount >= 3) {
+        return sendError(
+          res,
+          429,
+          'You can send at most 3 gifts per day.',
+          ERROR_CODES.RATE_LIMITED,
+        )
+      }
 
-    const validPlans = ['pro_monthly', 'pro_yearly']
-    const giftPlan = validPlans.includes(plan) ? plan : 'pro_monthly'
-    const months = Math.min(12, Math.max(1, parseInt(durationMonths, 10) || 1))
+      const validPlans = ['pro_monthly', 'pro_yearly']
+      const giftPlan = validPlans.includes(plan) ? plan : 'pro_monthly'
+      const months = Math.min(12, Math.max(1, parseInt(durationMonths, 10) || 1))
 
-    const planDef = PLANS[giftPlan]
-    if (!planDef?.stripePriceId) {
-      return sendError(res, 400, 'Gift plan is not configured.', ERROR_CODES.BAD_REQUEST)
-    }
+      const planDef = PLANS[giftPlan]
+      if (!planDef?.stripePriceId) {
+        return sendError(res, 400, 'Gift plan is not configured.', ERROR_CODES.BAD_REQUEST)
+      }
 
-    const giftCode = generateCode('GIFT')
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+      const giftCode = generateCode('GIFT')
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
 
-    // Calculate amount: monthly price * duration months
-    const stripe = service.getStripe()
-    const price = await stripe.prices.retrieve(planDef.stripePriceId)
-    const unitAmount = price.unit_amount || 499
-    const totalAmount = unitAmount * months
+      // Calculate amount: monthly price * duration months
+      const stripe = service.getStripe()
+      const price = await stripe.prices.retrieve(planDef.stripePriceId)
+      const unitAmount = price.unit_amount || 499
+      const totalAmount = unitAmount * months
 
-    const session = await stripe.checkout.sessions.create({
-      customer: await service.getOrCreateCustomer({
-        id: userId,
-        email: gifterUser?.email || '',
-        username: gifterUser?.username || req.user.username,
-      }),
-      mode: 'payment',
-      payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'usd',
-            product_data: {
-              name: `StudyHub Pro Gift (${months} month${months > 1 ? 's' : ''})`,
-              description: `Gift subscription for ${recipientEmail}`,
+      const session = await stripe.checkout.sessions.create({
+        customer: await service.getOrCreateCustomer({
+          id: userId,
+          email: gifterUser?.email || '',
+          username: gifterUser?.username || req.user.username,
+        }),
+        mode: 'payment',
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price_data: {
+              currency: 'usd',
+              product_data: {
+                name: `StudyHub Pro Gift (${months} month${months > 1 ? 's' : ''})`,
+                description: `Gift subscription for ${recipientEmail}`,
+              },
+              unit_amount: totalAmount,
             },
-            unit_amount: totalAmount,
+            quantity: 1,
           },
-          quantity: 1,
+        ],
+        success_url: `${frontendUrl}/settings?tab=subscription&gift=success`,
+        cancel_url: `${frontendUrl}/settings?tab=subscription&gift=canceled`,
+        metadata: {
+          type: 'gift',
+          studyhub_user_id: String(userId),
+          gift_code: giftCode,
+          recipient_email: recipientEmail,
+          plan: giftPlan,
+          duration_months: String(months),
         },
-      ],
-      success_url: `${frontendUrl}/settings?tab=subscription&gift=success`,
-      cancel_url: `${frontendUrl}/settings?tab=subscription&gift=canceled`,
-      metadata: {
-        type: 'gift',
-        studyhub_user_id: String(userId),
-        gift_code: giftCode,
-        recipient_email: recipientEmail,
-        plan: giftPlan,
-        duration_months: String(months),
-      },
-    })
+      })
 
-    // Create pending gift record
-    await prisma.giftSubscription.create({
-      data: {
-        gifterId: userId,
-        recipientEmail: recipientEmail.trim().toLowerCase(),
-        plan: giftPlan,
-        durationMonths: months,
-        message: (message || '').slice(0, 500) || null,
-        stripeSessionId: session.id,
-        giftCode,
-        status: 'pending',
-        expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days to redeem
-      },
-    })
+      // Create pending gift record
+      await prisma.giftSubscription.create({
+        data: {
+          gifterId: userId,
+          recipientEmail: recipientEmail.trim().toLowerCase(),
+          plan: giftPlan,
+          durationMonths: months,
+          message: (message || '').slice(0, 500) || null,
+          stripeSessionId: session.id,
+          giftCode,
+          status: 'pending',
+          expiresAt: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000), // 90 days to redeem
+        },
+      })
 
-    res.json({ url: session.url, sessionId: session.id, giftCode })
-  } catch (error) {
-    captureError(error, { context: 'gift.checkout' })
-    log.error({ err: error }, 'Failed to create gift checkout')
-    sendError(res, 500, 'Failed to create gift checkout.', ERROR_CODES.INTERNAL)
-  }
-})
+      res.json({ url: session.url, sessionId: session.id, giftCode })
+    } catch (error) {
+      captureError(error, { context: 'gift.checkout' })
+      log.error({ err: error }, 'Failed to create gift checkout')
+      sendError(res, 500, 'Failed to create gift checkout.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 // POST /gift/redeem — Redeem a gift subscription code
-router.post('/gift/redeem', requireAuth, paymentCheckoutLimiter, async (req, res) => {
-  try {
-    const { code } = req.body
-    const userId = req.user.userId
+router.post(
+  '/gift/redeem',
+  requireAuth,
+  requireTrustedOrigin,
+  paymentCheckoutLimiter,
+  async (req, res) => {
+    try {
+      const { code } = req.body
+      const userId = req.user.userId
 
-    if (!code || typeof code !== 'string') {
-      return sendError(res, 400, 'Gift code is required.', ERROR_CODES.VALIDATION)
+      if (!code || typeof code !== 'string') {
+        return sendError(res, 400, 'Gift code is required.', ERROR_CODES.VALIDATION)
+      }
+
+      const gift = await prisma.giftSubscription.findUnique({
+        where: { giftCode: code.trim().toUpperCase() },
+      })
+
+      if (!gift || gift.status !== 'paid') {
+        return sendError(res, 404, 'Invalid or already redeemed gift code.', ERROR_CODES.NOT_FOUND)
+      }
+
+      // Prevent redeeming your own gift
+      if (gift.gifterId === userId) {
+        return sendError(
+          res,
+          400,
+          'You cannot redeem a gift you purchased yourself.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
+
+      if (gift.expiresAt && gift.expiresAt < new Date()) {
+        return sendError(res, 400, 'This gift code has expired.', ERROR_CODES.BAD_REQUEST)
+      }
+
+      // Activate subscription for the redeemer
+      const now = new Date()
+      const endDate = new Date(now.getTime() + gift.durationMonths * 30 * 24 * 60 * 60 * 1000)
+
+      await prisma.$transaction([
+        prisma.subscription.upsert({
+          where: { userId },
+          create: {
+            userId,
+            stripeCustomerId: 'gift_' + gift.giftCode,
+            stripeSubscriptionId: 'gift_sub_' + gift.giftCode,
+            stripePriceId: PLANS[gift.plan]?.stripePriceId || '',
+            plan: gift.plan,
+            status: 'active',
+            currentPeriodStart: now,
+            currentPeriodEnd: endDate,
+          },
+          update: {
+            plan: gift.plan,
+            status: 'active',
+            currentPeriodStart: now,
+            currentPeriodEnd: endDate,
+            canceledAt: null,
+          },
+        }),
+        prisma.giftSubscription.update({
+          where: { id: gift.id },
+          data: {
+            recipientId: userId,
+            status: 'redeemed',
+            redeemedAt: now,
+          },
+        }),
+      ])
+
+      log.info({ userId, giftCode: gift.giftCode, plan: gift.plan }, 'Gift subscription redeemed')
+      res.json({
+        message: `Gift redeemed! You now have ${gift.plan === 'pro_yearly' ? 'Pro Yearly' : 'Pro Monthly'} for ${gift.durationMonths} month${gift.durationMonths > 1 ? 's' : ''}.`,
+        plan: gift.plan,
+        expiresAt: endDate,
+      })
+    } catch (error) {
+      captureError(error, { context: 'gift.redeem' })
+      log.error({ err: error }, 'Failed to redeem gift')
+      sendError(res, 500, 'Failed to redeem gift subscription.', ERROR_CODES.INTERNAL)
     }
-
-    const gift = await prisma.giftSubscription.findUnique({
-      where: { giftCode: code.trim().toUpperCase() },
-    })
-
-    if (!gift || gift.status !== 'paid') {
-      return sendError(res, 404, 'Invalid or already redeemed gift code.', ERROR_CODES.NOT_FOUND)
-    }
-
-    // Prevent redeeming your own gift
-    if (gift.gifterId === userId) {
-      return sendError(
-        res,
-        400,
-        'You cannot redeem a gift you purchased yourself.',
-        ERROR_CODES.BAD_REQUEST,
-      )
-    }
-
-    if (gift.expiresAt && gift.expiresAt < new Date()) {
-      return sendError(res, 400, 'This gift code has expired.', ERROR_CODES.BAD_REQUEST)
-    }
-
-    // Activate subscription for the redeemer
-    const now = new Date()
-    const endDate = new Date(now.getTime() + gift.durationMonths * 30 * 24 * 60 * 60 * 1000)
-
-    await prisma.$transaction([
-      prisma.subscription.upsert({
-        where: { userId },
-        create: {
-          userId,
-          stripeCustomerId: 'gift_' + gift.giftCode,
-          stripeSubscriptionId: 'gift_sub_' + gift.giftCode,
-          stripePriceId: PLANS[gift.plan]?.stripePriceId || '',
-          plan: gift.plan,
-          status: 'active',
-          currentPeriodStart: now,
-          currentPeriodEnd: endDate,
-        },
-        update: {
-          plan: gift.plan,
-          status: 'active',
-          currentPeriodStart: now,
-          currentPeriodEnd: endDate,
-          canceledAt: null,
-        },
-      }),
-      prisma.giftSubscription.update({
-        where: { id: gift.id },
-        data: {
-          recipientId: userId,
-          status: 'redeemed',
-          redeemedAt: now,
-        },
-      }),
-    ])
-
-    log.info({ userId, giftCode: gift.giftCode, plan: gift.plan }, 'Gift subscription redeemed')
-    res.json({
-      message: `Gift redeemed! You now have ${gift.plan === 'pro_yearly' ? 'Pro Yearly' : 'Pro Monthly'} for ${gift.durationMonths} month${gift.durationMonths > 1 ? 's' : ''}.`,
-      plan: gift.plan,
-      expiresAt: endDate,
-    })
-  } catch (error) {
-    captureError(error, { context: 'gift.redeem' })
-    log.error({ err: error }, 'Failed to redeem gift')
-    sendError(res, 500, 'Failed to redeem gift subscription.', ERROR_CODES.INTERNAL)
-  }
-})
+  },
+)
 
 // GET /gift/mine — Get gifts sent by current user
 router.get('/gift/mine', requireAuth, paymentReadLimiter, async (req, res) => {
@@ -513,117 +545,129 @@ router.get('/gift/mine', requireAuth, paymentReadLimiter, async (req, res) => {
 // ── SUBSCRIPTION PAUSE ──────────────────────────────────────────────────
 
 // POST /subscription/pause — Pause subscription for up to 30 days
-router.post('/subscription/pause', requireAuth, async (req, res) => {
-  try {
-    const userId = req.user.userId
-    const { days, reason } = req.body
+router.post(
+  '/subscription/pause',
+  requireAuth,
+  requireTrustedOrigin,
+  paymentCheckoutLimiter,
+  async (req, res) => {
+    try {
+      const userId = req.user.userId
+      const { days, reason } = req.body
 
-    const pauseDays = Math.min(30, Math.max(1, parseInt(days, 10) || 14))
+      const pauseDays = Math.min(30, Math.max(1, parseInt(days, 10) || 14))
 
-    // Check user has an active subscription
-    const sub = await prisma.subscription.findUnique({
-      where: { userId },
-    })
-    if (!sub || sub.status !== 'active') {
-      return sendError(res, 400, 'No active subscription to pause.', ERROR_CODES.BAD_REQUEST)
-    }
+      // Check user has an active subscription
+      const sub = await prisma.subscription.findUnique({
+        where: { userId },
+      })
+      if (!sub || sub.status !== 'active') {
+        return sendError(res, 400, 'No active subscription to pause.', ERROR_CODES.BAD_REQUEST)
+      }
 
-    // Check for existing active pause
-    const existingPause = await prisma.subscriptionPause.findFirst({
-      where: { userId, status: 'active' },
-    })
-    if (existingPause) {
-      return sendError(
-        res,
-        400,
-        'You already have an active pause. Resume first before pausing again.',
-        ERROR_CODES.CONFLICT,
-      )
-    }
-
-    // Pause the Stripe subscription (if it's a real Stripe sub)
-    if (sub.stripeSubscriptionId && !sub.stripeSubscriptionId.startsWith('gift_')) {
-      try {
-        const stripe = service.getStripe()
-        await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-          pause_collection: {
-            behavior: 'void',
-            resumes_at: Math.floor(Date.now() / 1000) + pauseDays * 86400,
-          },
-        })
-      } catch (stripeErr) {
-        log.warn(
-          { err: stripeErr.message },
-          'Failed to pause Stripe subscription (continuing with local pause)',
+      // Check for existing active pause
+      const existingPause = await prisma.subscriptionPause.findFirst({
+        where: { userId, status: 'active' },
+      })
+      if (existingPause) {
+        return sendError(
+          res,
+          400,
+          'You already have an active pause. Resume first before pausing again.',
+          ERROR_CODES.CONFLICT,
         )
       }
+
+      // Pause the Stripe subscription (if it's a real Stripe sub)
+      if (sub.stripeSubscriptionId && !sub.stripeSubscriptionId.startsWith('gift_')) {
+        try {
+          const stripe = service.getStripe()
+          await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+            pause_collection: {
+              behavior: 'void',
+              resumes_at: Math.floor(Date.now() / 1000) + pauseDays * 86400,
+            },
+          })
+        } catch (stripeErr) {
+          log.warn(
+            { err: stripeErr.message },
+            'Failed to pause Stripe subscription (continuing with local pause)',
+          )
+        }
+      }
+
+      const resumeAt = new Date(Date.now() + pauseDays * 24 * 60 * 60 * 1000)
+
+      const pause = await prisma.subscriptionPause.create({
+        data: {
+          userId,
+          reason: (reason || '').slice(0, 500) || null,
+          resumeAt,
+          status: 'active',
+        },
+      })
+
+      log.info({ userId, pauseDays, resumeAt }, 'Subscription paused')
+      res.json({
+        message: `Subscription paused for ${pauseDays} days. It will resume on ${resumeAt.toLocaleDateString()}.`,
+        pause: {
+          id: pause.id,
+          pausedAt: pause.pausedAt,
+          resumeAt: pause.resumeAt,
+          status: pause.status,
+        },
+      })
+    } catch (error) {
+      captureError(error, { context: 'subscription.pause' })
+      log.error({ err: error }, 'Failed to pause subscription')
+      sendError(res, 500, 'Failed to pause subscription.', ERROR_CODES.INTERNAL)
     }
-
-    const resumeAt = new Date(Date.now() + pauseDays * 24 * 60 * 60 * 1000)
-
-    const pause = await prisma.subscriptionPause.create({
-      data: {
-        userId,
-        reason: (reason || '').slice(0, 500) || null,
-        resumeAt,
-        status: 'active',
-      },
-    })
-
-    log.info({ userId, pauseDays, resumeAt }, 'Subscription paused')
-    res.json({
-      message: `Subscription paused for ${pauseDays} days. It will resume on ${resumeAt.toLocaleDateString()}.`,
-      pause: {
-        id: pause.id,
-        pausedAt: pause.pausedAt,
-        resumeAt: pause.resumeAt,
-        status: pause.status,
-      },
-    })
-  } catch (error) {
-    captureError(error, { context: 'subscription.pause' })
-    log.error({ err: error }, 'Failed to pause subscription')
-    sendError(res, 500, 'Failed to pause subscription.', ERROR_CODES.INTERNAL)
-  }
-})
+  },
+)
 
 // POST /subscription/resume — Resume a paused subscription
-router.post('/subscription/resume', requireAuth, async (req, res) => {
-  try {
-    const userId = req.user.userId
+router.post(
+  '/subscription/resume',
+  requireAuth,
+  requireTrustedOrigin,
+  paymentCheckoutLimiter,
+  async (req, res) => {
+    try {
+      const userId = req.user.userId
 
-    const pause = await prisma.subscriptionPause.findFirst({
-      where: { userId, status: 'active' },
-    })
-    if (!pause) {
-      return sendError(res, 400, 'No active pause found.', ERROR_CODES.BAD_REQUEST)
-    }
-
-    // Resume Stripe subscription
-    const sub = await prisma.subscription.findUnique({ where: { userId } })
-    if (sub?.stripeSubscriptionId && !sub.stripeSubscriptionId.startsWith('gift_')) {
-      try {
-        const stripe = service.getStripe()
-        await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-          pause_collection: '',
-        })
-      } catch (stripeErr) {
-        log.warn({ err: stripeErr.message }, 'Failed to resume Stripe subscription')
+      const pause = await prisma.subscriptionPause.findFirst({
+        where: { userId, status: 'active' },
+      })
+      if (!pause) {
+        return sendError(res, 400, 'No active pause found.', ERROR_CODES.BAD_REQUEST)
       }
+
+      // Resume Stripe subscription
+      const sub = await prisma.subscription.findUnique({ where: { userId } })
+      if (sub?.stripeSubscriptionId && !sub.stripeSubscriptionId.startsWith('gift_')) {
+        try {
+          const stripe = service.getStripe()
+          await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+            pause_collection: '',
+          })
+        } catch (stripeErr) {
+          log.warn({ err: stripeErr.message }, 'Failed to resume Stripe subscription')
+        }
+      }
+
+      await prisma.subscriptionPause.update({
+        where: { id: pause.id },
+        data: { status: 'resumed', resumedAt: new Date() },
+      })
+
+      log.info({ userId }, 'Subscription resumed')
+      res.json({ message: 'Subscription resumed successfully.' })
+    } catch (error) {
+      captureError(error, { context: 'subscription.resume' })
+      sendError(res, 500, 'Failed to resume subscription.', ERROR_CODES.INTERNAL)
     }
-
-    await prisma.subscriptionPause.update({
-      where: { id: pause.id },
-      data: { status: 'resumed', resumedAt: new Date() },
-    })
-
-    log.info({ userId }, 'Subscription resumed')
-    res.json({ message: 'Subscription resumed successfully.' })
-  } catch (error) {
-    captureError(error, { context: 'subscription.resume' })
-    sendError(res, 500, 'Failed to resume subscription.', ERROR_CODES.INTERNAL)
-  }
-})
+  },
+)
 
 // GET /subscription/pause-status — Check current pause status
 router.get('/subscription/pause-status', requireAuth, async (req, res) => {
@@ -649,191 +693,203 @@ router.get('/subscription/pause-status', requireAuth, async (req, res) => {
 // ── FREE TRIAL ──────────────────────────────────────────────────────────
 
 // POST /checkout/trial — Start a 7-day free trial via Stripe
-router.post('/checkout/trial', requireAuth, async (req, res) => {
-  try {
-    const userId = req.user.userId
-
-    // Check if user already had a subscription (no repeat trials)
-    const existingSub = await prisma.subscription.findUnique({
-      where: { userId },
-    })
-    if (existingSub) {
-      return sendError(
-        res,
-        400,
-        'Free trial is only available for first-time subscribers.',
-        ERROR_CODES.BAD_REQUEST,
-      )
-    }
-
-    // Check if user redeemed a referral that extends trial
-    let trialDays = 7
+router.post(
+  '/checkout/trial',
+  requireAuth,
+  requireTrustedOrigin,
+  paymentCheckoutLimiter,
+  async (req, res) => {
     try {
-      const redemptions = await prisma.referralRedemption.findMany({
-        where: { redeemedById: userId },
-        include: { referralCode: { select: { rewardType: true, rewardValue: true } } },
+      const userId = req.user.userId
+
+      // Check if user already had a subscription (no repeat trials)
+      const existingSub = await prisma.subscription.findUnique({
+        where: { userId },
       })
-      for (const r of redemptions) {
-        if (r.referralCode.rewardType === 'trial_extension') {
-          trialDays += r.referralCode.rewardValue
-        }
+      if (existingSub) {
+        return sendError(
+          res,
+          400,
+          'Free trial is only available for first-time subscribers.',
+          ERROR_CODES.BAD_REQUEST,
+        )
       }
-    } catch {
-      // Referral table may not exist
-    }
 
-    // Fetch email from DB (middleware auth doesn't include email)
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true, username: true },
-    })
-    if (!user?.email) {
-      return sendError(
-        res,
-        400,
-        'Could not find your email. Please update your profile.',
-        ERROR_CODES.BAD_REQUEST,
-      )
-    }
+      // Check if user redeemed a referral that extends trial
+      let trialDays = 7
+      try {
+        const redemptions = await prisma.referralRedemption.findMany({
+          where: { redeemedById: userId },
+          include: { referralCode: { select: { rewardType: true, rewardValue: true } } },
+        })
+        for (const r of redemptions) {
+          if (r.referralCode.rewardType === 'trial_extension') {
+            trialDays += r.referralCode.rewardValue
+          }
+        }
+      } catch {
+        // Referral table may not exist
+      }
 
-    const stripe = service.getStripe()
-    const planDef = PLANS.pro_monthly
-    if (!planDef?.stripePriceId) {
-      return sendError(res, 500, 'Pro plan not configured.', ERROR_CODES.INTERNAL)
-    }
+      // Fetch email from DB (middleware auth doesn't include email)
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, username: true },
+      })
+      if (!user?.email) {
+        return sendError(
+          res,
+          400,
+          'Could not find your email. Please update your profile.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
 
-    const customerId = await service.getOrCreateCustomer({
-      id: userId,
-      email: user.email,
-      username: user.username || req.user.username,
-    })
+      const stripe = service.getStripe()
+      const planDef = PLANS.pro_monthly
+      if (!planDef?.stripePriceId) {
+        return sendError(res, 500, 'Pro plan not configured.', ERROR_CODES.INTERNAL)
+      }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+      const customerId = await service.getOrCreateCustomer({
+        id: userId,
+        email: user.email,
+        username: user.username || req.user.username,
+      })
 
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      line_items: [{ price: planDef.stripePriceId, quantity: 1 }],
-      subscription_data: {
-        trial_period_days: trialDays,
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: [{ price: planDef.stripePriceId, quantity: 1 }],
+        subscription_data: {
+          trial_period_days: trialDays,
+          metadata: {
+            studyhub_user_id: String(userId),
+            plan: 'pro_monthly',
+          },
+        },
+        success_url: `${frontendUrl}/settings?payment=success&trial=true`,
+        cancel_url: `${frontendUrl}/pricing?payment=canceled`,
         metadata: {
           studyhub_user_id: String(userId),
           plan: 'pro_monthly',
+          is_trial: 'true',
         },
-      },
-      success_url: `${frontendUrl}/settings?payment=success&trial=true`,
-      cancel_url: `${frontendUrl}/pricing?payment=canceled`,
-      metadata: {
-        studyhub_user_id: String(userId),
-        plan: 'pro_monthly',
-        is_trial: 'true',
-      },
-    })
+      })
 
-    res.json({ url: session.url, trialDays })
-  } catch (error) {
-    captureError(error, { context: 'checkout.trial' })
-    log.error({ err: error }, 'Failed to create trial checkout')
-    sendError(res, 500, 'Failed to start free trial.', ERROR_CODES.INTERNAL)
-  }
-})
+      res.json({ url: session.url, trialDays })
+    } catch (error) {
+      captureError(error, { context: 'checkout.trial' })
+      log.error({ err: error }, 'Failed to create trial checkout')
+      sendError(res, 500, 'Failed to start free trial.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 // ── STUDENT DISCOUNT ────────────────────────────────────────────────────
 
 // POST /checkout/student-discount — Apply .edu email discount (20% off)
-router.post('/checkout/student-discount', requireAuth, async (req, res) => {
-  try {
-    const userId = req.user.userId
-    const { plan } = req.body
-
-    // Verify user has a .edu email
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { email: true, emailVerified: true },
-    })
-
-    if (!user?.email || !user.emailVerified) {
-      return sendError(
-        res,
-        400,
-        'You must have a verified email to qualify for the student discount.',
-        ERROR_CODES.BAD_REQUEST,
-      )
-    }
-
-    const isEdu =
-      user.email.toLowerCase().endsWith('.edu') ||
-      user.email.toLowerCase().endsWith('.edu.au') ||
-      user.email.toLowerCase().endsWith('.ac.uk') ||
-      user.email.toLowerCase().endsWith('.edu.cn')
-
-    if (!isEdu) {
-      return sendError(
-        res,
-        400,
-        'Student discount requires a verified .edu email address.',
-        ERROR_CODES.BAD_REQUEST,
-      )
-    }
-
-    const validPlans = ['pro_monthly', 'pro_yearly']
-    const selectedPlan = validPlans.includes(plan) ? plan : 'pro_monthly'
-    const planDef = PLANS[selectedPlan]
-    if (!planDef?.stripePriceId) {
-      return sendError(res, 500, 'Plan not configured.', ERROR_CODES.INTERNAL)
-    }
-
-    const stripe = service.getStripe()
-
-    // Create a 20% off coupon (or find existing one)
-    let coupon
+router.post(
+  '/checkout/student-discount',
+  requireAuth,
+  requireTrustedOrigin,
+  paymentCheckoutLimiter,
+  async (req, res) => {
     try {
-      coupon = await stripe.coupons.retrieve('STUDENT20')
-    } catch {
-      coupon = await stripe.coupons.create({
-        id: 'STUDENT20',
-        percent_off: 20,
-        duration: 'forever',
-        name: 'Student Discount (20% off)',
+      const userId = req.user.userId
+      const { plan } = req.body
+
+      // Verify user has a .edu email
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { email: true, emailVerified: true },
       })
-    }
 
-    const customerId = await service.getOrCreateCustomer({
-      id: userId,
-      email: user.email,
-      username: req.user.username,
-    })
+      if (!user?.email || !user.emailVerified) {
+        return sendError(
+          res,
+          400,
+          'You must have a verified email to qualify for the student discount.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
 
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+      const isEdu =
+        user.email.toLowerCase().endsWith('.edu') ||
+        user.email.toLowerCase().endsWith('.edu.au') ||
+        user.email.toLowerCase().endsWith('.ac.uk') ||
+        user.email.toLowerCase().endsWith('.edu.cn')
 
-    const session = await stripe.checkout.sessions.create({
-      customer: customerId,
-      mode: 'subscription',
-      payment_method_types: ['card'],
-      line_items: [{ price: planDef.stripePriceId, quantity: 1 }],
-      discounts: [{ coupon: coupon.id }],
-      success_url: `${frontendUrl}/settings?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${frontendUrl}/pricing?payment=canceled`,
-      metadata: {
-        studyhub_user_id: String(userId),
-        plan: selectedPlan,
-        student_discount: 'true',
-      },
-      subscription_data: {
+      if (!isEdu) {
+        return sendError(
+          res,
+          400,
+          'Student discount requires a verified .edu email address.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
+
+      const validPlans = ['pro_monthly', 'pro_yearly']
+      const selectedPlan = validPlans.includes(plan) ? plan : 'pro_monthly'
+      const planDef = PLANS[selectedPlan]
+      if (!planDef?.stripePriceId) {
+        return sendError(res, 500, 'Plan not configured.', ERROR_CODES.INTERNAL)
+      }
+
+      const stripe = service.getStripe()
+
+      // Create a 20% off coupon (or find existing one)
+      let coupon
+      try {
+        coupon = await stripe.coupons.retrieve('STUDENT20')
+      } catch {
+        coupon = await stripe.coupons.create({
+          id: 'STUDENT20',
+          percent_off: 20,
+          duration: 'forever',
+          name: 'Student Discount (20% off)',
+        })
+      }
+
+      const customerId = await service.getOrCreateCustomer({
+        id: userId,
+        email: user.email,
+        username: req.user.username,
+      })
+
+      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customerId,
+        mode: 'subscription',
+        payment_method_types: ['card'],
+        line_items: [{ price: planDef.stripePriceId, quantity: 1 }],
+        discounts: [{ coupon: coupon.id }],
+        success_url: `${frontendUrl}/settings?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${frontendUrl}/pricing?payment=canceled`,
         metadata: {
           studyhub_user_id: String(userId),
           plan: selectedPlan,
+          student_discount: 'true',
         },
-      },
-    })
+        subscription_data: {
+          metadata: {
+            studyhub_user_id: String(userId),
+            plan: selectedPlan,
+          },
+        },
+      })
 
-    res.json({ url: session.url, discount: '20%' })
-  } catch (error) {
-    captureError(error, { context: 'checkout.studentDiscount' })
-    log.error({ err: error }, 'Failed to create student discount checkout')
-    sendError(res, 500, 'Failed to apply student discount.', ERROR_CODES.INTERNAL)
-  }
-})
+      res.json({ url: session.url, discount: '20%' })
+    } catch (error) {
+      captureError(error, { context: 'checkout.studentDiscount' })
+      log.error({ err: error }, 'Failed to create student discount checkout')
+      sendError(res, 500, 'Failed to apply student discount.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 module.exports = router

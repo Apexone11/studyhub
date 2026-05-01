@@ -91,7 +91,9 @@ router.post('/', writeLimiter, optionalAuth, async (req, res) => {
         },
         'waitlist-confirmation',
       ).catch((emailErr) => {
-        captureError(emailErr, { location: 'waitlist/confirmationEmail', email: entry.email })
+        // Don't ship raw email to Sentry — PII compliance. Log the
+        // entry id so we can join back to the row if we need to.
+        captureError(emailErr, { location: 'waitlist/confirmationEmail', entryId: entry.id })
       })
     } catch (emailSetupErr) {
       // Email infra missing or misconfigured — log but don't block signup

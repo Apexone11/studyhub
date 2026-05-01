@@ -1138,6 +1138,112 @@ export function LogoMark({ size = 24 }) {
   )
 }
 
+// ─── ANIMATED LOGO MARK ───────────────────────────────────────────
+// Same proportions as LogoMark but the tree branches and nodes cycle
+// through the brand palette (info → success → warning → brand) on
+// loop. Used on /login + the public landing hero so the brand mark
+// has a visible "alive" tell on the first surface a visitor sees.
+//
+// Keyframes + .sh-animated-logo class selectors live in index.css so
+// every mount of this component reuses one set of style rules instead
+// of injecting a duplicate <style> tag (audit Loop 18 finding I1).
+// prefers-reduced-motion is handled in the same CSS block.
+export function AnimatedLogoMark({ size = 64 }) {
+  return (
+    <>
+      <svg
+        className="sh-animated-logo"
+        width={size}
+        height={size}
+        viewBox="0 0 56 56"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+        role="img"
+        aria-label="StudyHub"
+      >
+        <circle cx="28" cy="28" r="26" fill="#0f172a" stroke="#1e3a5f" strokeWidth="1" />
+        <line
+          className="sh-trunk"
+          x1="28"
+          y1="46"
+          x2="28"
+          y2="32"
+          stroke="#3b82f6"
+          strokeWidth="2.8"
+          strokeLinecap="round"
+        />
+        <path
+          className="sh-arm"
+          d="M28 32 Q28 24 18 17"
+          stroke="#3b82f6"
+          strokeWidth="2.4"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          className="sh-arm"
+          d="M28 32 Q28 24 38 17"
+          stroke="#3b82f6"
+          strokeWidth="2.4"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          className="sh-twig"
+          d="M18 17 Q14 12 11 9"
+          stroke="#60a5fa"
+          strokeWidth="1.6"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          className="sh-twig"
+          d="M18 17 Q18 12 21 9"
+          stroke="#60a5fa"
+          strokeWidth="1.6"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          className="sh-twig"
+          d="M38 17 Q35 12 35 9"
+          stroke="#60a5fa"
+          strokeWidth="1.6"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <path
+          className="sh-twig"
+          d="M38 17 Q41 12 45 9"
+          stroke="#60a5fa"
+          strokeWidth="1.6"
+          fill="none"
+          strokeLinecap="round"
+        />
+        <circle
+          className="sh-node"
+          cx="28"
+          cy="46"
+          r="4"
+          fill="#1d4ed8"
+          stroke="#3b82f6"
+          strokeWidth="1.5"
+        />
+        <circle className="sh-node" cx="28" cy="32" r="3.2" fill="#3b82f6" />
+        <circle className="sh-node" cx="18" cy="17" r="3.2" fill="#3b82f6" />
+        <circle className="sh-node" cx="38" cy="17" r="3.2" fill="#3b82f6" />
+        <circle className="sh-leaf" cx="11" cy="9" r="2.2" fill="#60a5fa" />
+        <circle className="sh-leaf" cx="21" cy="9" r="2.2" fill="#60a5fa" />
+        <circle className="sh-leaf" cx="35" cy="9" r="2.2" fill="#60a5fa" />
+        <circle className="sh-leaf" cx="45" cy="9" r="2.2" fill="#60a5fa" />
+        <rect x="20" y="48.5" width="16" height="3" rx="1.5" fill="#f59e0b" />
+        <rect x="26.5" y="45.5" width="3" height="4" rx="1" fill="#f59e0b" />
+        <circle cx="28" cy="45" r="1.5" fill="#fbbf24" />
+      </svg>
+    </>
+  )
+}
+
 // ─── WORDMARK ─────────────────────────────────────────────────────
 // Full logo wordmark for dark backgrounds (like the nav)
 export function LogoWordmark({ height = 32 }) {

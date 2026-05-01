@@ -42,14 +42,23 @@ function isExamDateValid(date) {
 }
 
 // ── Serializer ────────────────────────────────────────────────────────────
+// CLAUDE.md A13 — even fields written exclusively by server-side
+// defaults are clamped to a known allowlist before serializing. If a
+// future migration or seed inadvertently writes an unexpected value to
+// the `visibility` column, the API will not surface it.
+const ALLOWED_EXAM_VISIBILITIES = new Set(['private'])
+
 function serializeExam(exam) {
   if (!exam) return null
+  const safeVisibility = ALLOWED_EXAM_VISIBILITIES.has(exam.visibility)
+    ? exam.visibility
+    : 'private'
   return {
     id: exam.id,
     title: exam.title,
     location: exam.location,
     examDate: exam.examDate.toISOString(),
-    visibility: exam.visibility,
+    visibility: safeVisibility,
     notes: exam.notes,
     // 0-100. DB-side CHECK constraint guarantees the range; we still
     // coalesce to 0 to survive a legacy row that somehow slipped
@@ -116,7 +125,15 @@ router.use(requireAuth)
 // ── GET /upcoming ─────────────────────────────────────────────────────────
 router.get('/upcoming', examReadLimiter, validate(upcomingQuerySchema), async (req, res) => {
   try {
-    const { limit } = req.query
+    // Defensive: Express 5 historically dropped coerced values from
+    // req.query before lib/validate.js was patched (2026-05-01 prod
+    // incident). If `limit` ever reaches us as a string again, parse
+    // it here rather than handing a string to Prisma's `take`.
+    const rawLimit = req.query.limit
+    const limit =
+      typeof rawLimit === 'number'
+        ? rawLimit
+        : Math.min(Math.max(Number.parseInt(rawLimit, 10) || 3, 1), 20)
     const exams = await prisma.courseExam.findMany({
       where: {
         userId: req.user.userId,

@@ -155,13 +155,16 @@ router.patch('/users/:id/role', async (req, res) => {
   if (!['admin', 'student'].includes(role)) {
     return res.status(400).json({ error: 'Role must be "admin" or "student".' })
   }
+  const targetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(targetId) || targetId < 1) {
+    return res.status(400).json({ error: 'Invalid user id.' })
+  }
   // Prevent removing your own admin role
-  if (parseInt(req.params.id) === req.user.userId) {
+  if (targetId === req.user.userId) {
     return res.status(400).json({ error: 'You cannot change your own role.' })
   }
   try {
     // Protect the super admin from being demoted by other admins
-    const targetId = parseInt(req.params.id)
     if (role !== 'admin' && (await isSuperAdmin(targetId))) {
       return res.status(403).json({
         error: 'The super admin account cannot be demoted.',
@@ -188,9 +191,9 @@ router.patch('/users/:id/trust-level', async (req, res) => {
   if (!['new', 'trusted', 'restricted'].includes(trustLevel)) {
     return res.status(400).json({ error: 'Trust level must be "new", "trusted", or "restricted".' })
   }
-  const targetId = parseInt(req.params.id)
-  if (!Number.isInteger(targetId)) {
-    return res.status(400).json({ error: 'User id must be an integer.' })
+  const targetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(targetId) || targetId < 1) {
+    return res.status(400).json({ error: 'User id must be a positive integer.' })
   }
 
   try {
@@ -230,9 +233,9 @@ router.patch('/users/:id/trust-level', async (req, res) => {
 
 // ── DELETE /api/admin/users/:id ──────────────────────────────
 router.delete('/users/:id', async (req, res) => {
-  const targetId = parseInt(req.params.id)
-  if (!Number.isInteger(targetId)) {
-    return res.status(400).json({ error: 'User id must be an integer.' })
+  const targetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(targetId) || targetId < 1) {
+    return res.status(400).json({ error: 'User id must be a positive integer.' })
   }
   if (targetId === req.user.userId) {
     return res

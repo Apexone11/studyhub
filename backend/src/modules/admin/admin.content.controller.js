@@ -55,7 +55,11 @@ router.post('/announcements', async (req, res) => {
 // ── PATCH /api/admin/announcements/:id/pin ───────────────────
 router.patch('/announcements/:id/pin', async (req, res) => {
   try {
-    const current = await prisma.announcement.findUnique({ where: { id: parseInt(req.params.id) } })
+    const id = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(id) || id < 1) {
+      return res.status(400).json({ error: 'Invalid announcement id.' })
+    }
+    const current = await prisma.announcement.findUnique({ where: { id } })
     if (!current) return res.status(404).json({ error: 'Announcement not found.' })
     const updated = await prisma.announcement.update({
       where: { id: current.id },
@@ -72,7 +76,11 @@ router.patch('/announcements/:id/pin', async (req, res) => {
 // ── DELETE /api/admin/announcements/:id ──────────────────────
 router.delete('/announcements/:id', async (req, res) => {
   try {
-    await prisma.announcement.delete({ where: { id: parseInt(req.params.id) } })
+    const id = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(id) || id < 1) {
+      return res.status(400).json({ error: 'Invalid announcement id.' })
+    }
+    await prisma.announcement.delete({ where: { id } })
     res.json({ message: 'Announcement deleted.' })
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Announcement not found.' })

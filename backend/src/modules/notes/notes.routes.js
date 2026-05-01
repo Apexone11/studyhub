@@ -93,8 +93,8 @@ router.post(
   requireAuth,
   commentReactLimiter,
   async (req, res) => {
-    const noteId = parseInt(req.params.id, 10)
-    const commentId = parseInt(req.params.commentId, 10)
+    const noteId = Number.parseInt(req.params.id, 10)
+    const commentId = Number.parseInt(req.params.commentId, 10)
     const { userId } = req.user
     const { type } = req.body || {}
 
@@ -301,7 +301,10 @@ router.post('/:id/images', requireAuth, mutateLimiter, requireVerifiedEmail, (re
 
 // ── POST /api/notes/:id/react — Like or dislike a note ──────────────────
 router.post('/:id/react', requireAuth, commentReactLimiter, async (req, res) => {
-  const noteId = parseInt(req.params.id, 10)
+  const noteId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) {
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
+  }
   const { userId } = req.user
   const { type } = req.body || {}
 
@@ -361,7 +364,10 @@ router.post('/:id/react', requireAuth, commentReactLimiter, async (req, res) => 
 
 // ── POST /api/notes/:id/download — Track a note download ────────────────
 router.post('/:id/download', optionalAuth, readLimiter, async (req, res) => {
-  const noteId = parseInt(req.params.id, 10)
+  const noteId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(noteId) || noteId < 1) {
+    return sendError(res, 400, 'Invalid note id.', ERROR_CODES.BAD_REQUEST)
+  }
   try {
     const note = await prisma.note.findUnique({
       where: { id: noteId },

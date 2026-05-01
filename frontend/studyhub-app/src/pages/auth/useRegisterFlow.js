@@ -18,7 +18,7 @@ import {
   apiGoogleAuth,
   apiCompleteRegistration,
 } from './registerConstants'
-import { useRolesV2Flags } from '../../lib/rolesV2Flags'
+import { useRolesV2Flags, isRolesV2FlagEnabled } from '../../lib/rolesV2Flags'
 
 export default function useRegisterFlow({ referralCode } = {}) {
   const navigate = useNavigate()
@@ -181,7 +181,13 @@ export default function useRegisterFlow({ referralCode } = {}) {
       }
 
       if (result.data.status === 'needs_role' && result.data.tempToken) {
-        if (!oauthPickerEnabled) {
+        // The roles-v2 hook is async; if the OAuth code round-trip
+        // resolves before the flag fetch returns, the closure-captured
+        // `oauthPickerEnabled` is still `false`. Read the flag via the
+        // imperative helper which awaits the in-flight fetch — that's
+        // the canonical answer regardless of render timing.
+        const oauthPickerLive = oauthPickerEnabled || (await isRolesV2FlagEnabled('oauthPicker'))
+        if (!oauthPickerLive) {
           setError('New Google signups are paused right now. Please sign up with email instead.')
           return
         }

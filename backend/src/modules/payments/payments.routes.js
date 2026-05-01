@@ -436,9 +436,13 @@ router.get('/admin/revenue', paymentReadLimiter, requireAuth, requireAdmin, asyn
 
 router.post(
   '/admin/sync-stripe',
-  paymentReadLimiter,
+  // Admin sync iterates up to 100 Stripe subscriptions and runs N
+  // Stripe API + DB writes per call. paymentCheckoutLimiter (10 / 15 min
+  // per user) caps the blast radius if an admin session loops the call.
+  paymentCheckoutLimiter,
   requireAuth,
   requireAdmin,
+  requireTrustedOrigin,
   async (_req, res) => {
     try {
       const stripe = service.getStripe()

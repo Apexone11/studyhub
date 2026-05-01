@@ -198,7 +198,7 @@ function SheetPreviewModal({ html, onClose }) {
         </div>
         <iframe
           src={iframeSrc}
-          sandbox="allow-same-origin"
+          sandbox=""
           title="Sheet Preview"
           style={{ flex: 1, border: 'none', width: '100%' }}
         />

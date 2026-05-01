@@ -748,7 +748,7 @@ const createAiMessageLimiter = (rpmLimit) =>
   rateLimit({
     windowMs: WINDOW_1_MIN,
     max: rpmLimit,
-    keyGenerator: (req) => `ai_${req.user.userId}`,
+    keyGenerator: (req) => `ai_${req.user?.userId || 'anon'}`,
     standardHeaders: true,
     legacyHeaders: false,
     message: { error: 'Too many AI requests. Please wait a moment.' },
@@ -1123,7 +1123,7 @@ const legalAcceptLimiter = rateLimit({
   max: 10,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `legal-accept-${req.user?.userId || req.ip}`,
+  keyGenerator: (req) => `legal-accept-${req.user?.userId || 'anon'}`,
   message: { error: 'Too many acceptance attempts. Please try again later.' },
 })
 
@@ -1138,7 +1138,7 @@ const achievementShareLimiter = rateLimit({
   max: 5,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `achievement-share-${req.user?.userId || req.ip}`,
+  keyGenerator: (req) => `achievement-share-${req.user?.userId || 'anon'}`,
   message: { error: 'Daily share limit reached. Try again tomorrow.' },
 })
 

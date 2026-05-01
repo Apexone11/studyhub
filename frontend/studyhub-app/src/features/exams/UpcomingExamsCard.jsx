@@ -16,7 +16,6 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useState } from 'react'
 import { API } from '../../config'
-import { authHeaders } from '../../pages/shared/pageUtils'
 import { Button, Card, CardBody, SkeletonCard } from '../../components/ui'
 import ExamFormModal from './ExamFormModal'
 import DeleteExamConfirm from './DeleteExamConfirm'
@@ -67,8 +66,11 @@ export default function UpcomingExamsCard({ limit = 3 }) {
   useEffect(() => {
     let cancelled = false
     const controller = new AbortController()
+    // Body-less GET — skip authHeaders() so we don't send a
+    // Content-Type and force a CORS preflight on the split-origin
+    // deploy (api.getstudyhub.org). Cookies come along via
+    // credentials: 'include'.
     fetch(`${API}/api/exams/upcoming?limit=${limit}`, {
-      headers: authHeaders(),
       credentials: 'include',
       signal: controller.signal,
     })

@@ -48,9 +48,9 @@ router.get('/email-suppressions', async (req, res) => {
 
 // ── PATCH /api/admin/email-suppressions/:id/unsuppress ───────────────────────
 router.patch('/email-suppressions/:id/unsuppress', async (req, res) => {
-  const suppressionId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(suppressionId)) {
-    return res.status(400).json({ error: 'Suppression id must be an integer.' })
+  const suppressionId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(suppressionId) || suppressionId < 1) {
+    return res.status(400).json({ error: 'Suppression id must be a positive integer.' })
   }
 
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : ''
@@ -116,9 +116,9 @@ router.patch('/email-suppressions/:id/unsuppress', async (req, res) => {
 
 // ── GET /api/admin/email-suppressions/:id/audit?page=1 ───────────────────────
 router.get('/email-suppressions/:id/audit', async (req, res) => {
-  const suppressionId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(suppressionId)) {
-    return res.status(400).json({ error: 'Suppression id must be an integer.' })
+  const suppressionId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(suppressionId) || suppressionId < 1) {
+    return res.status(400).json({ error: 'Suppression id must be a positive integer.' })
   }
 
   const page = parsePage(req.query.page)

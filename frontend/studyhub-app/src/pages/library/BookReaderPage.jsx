@@ -295,7 +295,7 @@ export default function BookReaderPage() {
               transition: 'opacity 0.3s ease',
             }}
             allow="fullscreen"
-            sandbox="allow-scripts allow-same-origin allow-popups allow-forms"
+            sandbox="allow-scripts allow-popups allow-forms"
             onLoad={handleIframeLoad}
             onError={handleIframeError}
           />

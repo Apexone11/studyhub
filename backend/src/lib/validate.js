@@ -45,10 +45,31 @@ function validate(schema) {
         params: req.params,
       })
 
-      // Replace raw values with parsed (trimmed, coerced, defaulted) values
-      if (result.body) req.body = result.body
-      if (result.query) req.query = result.query
-      if (result.params) req.params = result.params
+      // Replace raw values with parsed (trimmed, coerced, defaulted) values.
+      //
+      // Express 5 changed req.query to a non-writable getter, so a plain
+      // `req.query = result.query` assignment silently no-ops in strict
+      // mode — the original string-typed `?limit=3` survives and Prisma
+      // crashes with "Argument `take`: Expected Int, provided String."
+      // (Production incident, exams /upcoming + sheets /leaderboard,
+      // 2026-05-01.) Mutate keys in place so the coerced values stick
+      // for both Express 4 and Express 5.
+      if (result.body) {
+        if (req.body && typeof req.body === 'object') {
+          for (const key of Object.keys(req.body)) delete req.body[key]
+          Object.assign(req.body, result.body)
+        } else {
+          req.body = result.body
+        }
+      }
+      if (result.query && req.query && typeof req.query === 'object') {
+        for (const key of Object.keys(req.query)) delete req.query[key]
+        Object.assign(req.query, result.query)
+      }
+      if (result.params && req.params && typeof req.params === 'object') {
+        for (const key of Object.keys(req.params)) delete req.params[key]
+        Object.assign(req.params, result.params)
+      }
 
       next()
     } catch (err) {

@@ -4,6 +4,8 @@ const path = require('node:path')
 const { readLimiter } = require('../../lib/rateLimiters')
 const { sendForbidden } = require('../../lib/accessControl')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
+const requireTrustedOrigin = originAllowlist()
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const r2 = require('../../lib/r2Storage')
@@ -86,7 +88,7 @@ router.get('/', async (req, res) => {
 })
 
 // ── POST /api/announcements — admin only ──────────────────────
-router.post('/', requireAuth, async (req, res) => {
+router.post('/', requireAuth, requireTrustedOrigin, async (req, res) => {
   if (req.user.role !== 'admin') {
     return sendForbidden(res, 'Admin access required.')
   }
@@ -158,6 +160,7 @@ router.post('/', requireAuth, async (req, res) => {
 router.post(
   '/:id/images',
   requireAuth,
+  requireTrustedOrigin,
   (req, res, next) => {
     if (req.user.role !== 'admin') {
       return sendForbidden(res, 'Admin access required.')
@@ -250,7 +253,7 @@ router.post(
 )
 
 // ── DELETE /api/announcements/:id/media/:mediaId — remove a media item (admin) ─
-router.delete('/:id/media/:mediaId', requireAuth, async (req, res) => {
+router.delete('/:id/media/:mediaId', requireAuth, requireTrustedOrigin, async (req, res) => {
   if (req.user.role !== 'admin') {
     return sendForbidden(res, 'Admin access required.')
   }
@@ -289,7 +292,7 @@ router.delete('/:id/media/:mediaId', requireAuth, async (req, res) => {
 })
 
 // ── POST /api/announcements/:id/video — attach video (admin only) ─────
-router.post('/:id/video', requireAuth, async (req, res) => {
+router.post('/:id/video', requireAuth, requireTrustedOrigin, async (req, res) => {
   if (req.user.role !== 'admin') {
     return sendForbidden(res, 'Admin access required.')
   }
@@ -365,7 +368,7 @@ router.post('/:id/video', requireAuth, async (req, res) => {
 })
 
 // ── DELETE /api/announcements/:id — admin only ───────────────
-router.delete('/:id', requireAuth, async (req, res) => {
+router.delete('/:id', requireAuth, requireTrustedOrigin, async (req, res) => {
   if (req.user.role !== 'admin') {
     return sendForbidden(res, 'Admin access required.')
   }

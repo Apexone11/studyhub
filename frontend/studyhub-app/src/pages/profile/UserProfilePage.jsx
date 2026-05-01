@@ -698,7 +698,7 @@ export default function UserProfilePage() {
                         key={`${link.label}-${link.url}`}
                         href={link.url}
                         target="_blank"
-                        rel="noreferrer"
+                        rel="noopener noreferrer"
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
