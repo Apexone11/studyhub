@@ -39,7 +39,7 @@ For internal cycle-by-cycle release notes, see `docs/release-log.md` (tracked) a
 
 ### Removed
 
-- Termly embed dependency in `LegalAcceptanceModal.jsx` and `LegalDocumentPage.jsx`. The `useTermlyEmbed` hook is now dead code (kept on disk in case rollback is needed; safe to delete next cycle).
+- Termly embed dependency in `LegalAcceptanceModal.jsx` and `LegalDocumentPage.jsx`. The `useTermlyEmbed` hook was deleted from `frontend/studyhub-app/src/lib/` in the same release. `TERMLY_UUIDS` / `TERMLY_POLICY_BASE` / `TERMLY_DSAR_URL` constants also removed from `legalVersions.js`.
 
 ### Fixed
 

@@ -64,7 +64,7 @@ export default function HtmlDownloadWarningModal({ open, tier = 0, onCancel, onC
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(15, 23, 42, 0.5)',
+        background: 'var(--sh-modal-overlay)',
         zIndex: 1000,
         display: 'flex',
         alignItems: 'center',
@@ -82,7 +82,7 @@ export default function HtmlDownloadWarningModal({ open, tier = 0, onCancel, onC
           width: '100%',
           display: 'grid',
           gap: 16,
-          boxShadow: '0 10px 40px rgba(15, 23, 42, 0.25)',
+          boxShadow: 'var(--shadow-lg)',
         }}
       >
         <h3

@@ -65,7 +65,7 @@ export default function AchievementCard({
           ariaLabel={
             isSecret
               ? 'Secret achievement — locked'
-              : `${badge.name}, ${TIER_LABEL[badge.tier]} tier`
+              : `${badge.name}, ${TIER_LABEL[badge.tier] || 'Bronze'} tier`
           }
         />
       </Link>

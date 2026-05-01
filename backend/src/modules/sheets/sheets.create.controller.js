@@ -17,7 +17,11 @@ const { getUserTier } = require('../../lib/getUserPlan')
 const { PLANS } = require('../payments/payments.constants')
 const { trackActivity } = require('../../lib/activityTracker')
 const { runAbuseChecks } = require('../../lib/abuseDetection')
-const { checkAndAwardBadges, emitAchievementEvent, EVENT_KINDS } = require('../../lib/badges')
+const {
+  checkAndAwardBadgesLegacy: checkAndAwardBadges,
+  emitAchievementEvent,
+  EVENT_KINDS,
+} = require('../achievements')
 const {
   resolveNextSheetStatus,
   normalizeContentFormat,

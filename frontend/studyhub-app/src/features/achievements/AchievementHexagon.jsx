@@ -122,13 +122,15 @@ export default function AchievementHexagon({
           }}
         />
 
-        {/* Diamond gradient definition */}
+        {/* Diamond gradient definition — stops are CSS-token-driven so the
+            same component renders correctly in light AND dark mode without
+            hardcoded hex values (CLAUDE.md §"CSS and Styling"). */}
         {tier === 'diamond' && !isProgressLocked && !isSecretLocked && (
           <defs>
             <linearGradient id="sh-diamond" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#4a90e2" />
-              <stop offset="50%" stopColor="#b75dff" />
-              <stop offset="100%" stopColor="#ff6b9d" />
+              <stop offset="0%" style={{ stopColor: 'var(--sh-diamond-stop-1)' }} />
+              <stop offset="50%" style={{ stopColor: 'var(--sh-diamond-stop-2)' }} />
+              <stop offset="100%" style={{ stopColor: 'var(--sh-diamond-stop-3)' }} />
             </linearGradient>
           </defs>
         )}

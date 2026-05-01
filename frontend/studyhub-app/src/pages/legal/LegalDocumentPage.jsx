@@ -51,7 +51,7 @@ const styles = {
  * shows a generic error instead of falling through to Termly.
  */
 export default function LegalDocumentPage({
-  slug: _slug,
+  slug,
   tone,
   icon,
   fallbackTitle,
@@ -59,7 +59,7 @@ export default function LegalDocumentPage({
   fallbackIntro,
   fallbackUpdated,
 }) {
-  const { document: legalDocument, loading, error } = useCurrentLegalDocument(_slug)
+  const { document: legalDocument, loading, error } = useCurrentLegalDocument(slug)
 
   const title = legalDocument?.title || fallbackTitle
   const summary = legalDocument?.summary || fallbackSummary

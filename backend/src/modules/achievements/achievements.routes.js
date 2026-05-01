@@ -11,7 +11,7 @@ const optionalAuth = require('../../core/auth/optionalAuth')
 const originAllowlist = require('../../middleware/originAllowlist')
 const { captureError } = require('../../monitoring/sentry')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
-const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
+const { readLimiter, writeLimiter, achievementShareLimiter } = require('../../lib/rateLimiters')
 const service = require('./achievements.service')
 
 const router = express.Router()
@@ -207,5 +207,93 @@ router.patch('/visibility', requireAuth, requireTrustedOrigin, writeLimiter, asy
     sendError(res, 500, 'Failed to update visibility.', ERROR_CODES.INTERNAL)
   }
 })
+
+/**
+ * POST /api/achievements/:slug/share
+ *
+ * Shares an unlocked badge to the user's feed as a real `FeedPost`.
+ * Encodes the achievement reference in the post `content` with a
+ * structured prefix (`[achievement:slug]`) because FeedPost has no
+ * `kind` column today — the renderer detects the prefix and swaps in
+ * the dedicated card. This avoids a schema migration.
+ *
+ * Optional `caption` body field gets appended after the prefix. Hard
+ * 280-char cap on the user-supplied portion to keep the feed scannable.
+ *
+ * 5 shares per 24h per user (achievementShareLimiter). Owner must hold
+ * the badge before sharing — the engine never marks unowned badges as
+ * unlocked, so the lookup against UserBadge enforces ownership.
+ */
+const SHARE_PREFIX_RE = /^\[achievement:[a-z0-9][a-z0-9-]{0,63}\]/
+const MAX_SHARE_CAPTION_LEN = 280
+
+router.post(
+  '/:slug/share',
+  requireAuth,
+  requireTrustedOrigin,
+  achievementShareLimiter,
+  async (req, res) => {
+    try {
+      const slug = String(req.params.slug || '').trim()
+      if (!isValidSlug(slug)) {
+        return sendError(res, 400, 'Invalid slug.', ERROR_CODES.BAD_REQUEST)
+      }
+
+      const badge = await prisma.badge.findUnique({
+        where: { slug },
+        select: { id: true, slug: true, name: true, isSecret: true },
+      })
+      if (!badge) {
+        return sendError(res, 404, 'Achievement not found.', ERROR_CODES.NOT_FOUND)
+      }
+
+      const userBadge = await prisma.userBadge.findUnique({
+        where: { userId_badgeId: { userId: req.user.userId, badgeId: badge.id } },
+        select: { id: true },
+      })
+      if (!userBadge) {
+        return sendError(
+          res,
+          403,
+          'You can only share badges you have unlocked.',
+          ERROR_CODES.FORBIDDEN,
+        )
+      }
+
+      // Strip any user-supplied prefix that mimics the structured
+      // marker — only the server is allowed to write it.
+      const rawCaption = typeof req.body?.caption === 'string' ? req.body.caption.trim() : ''
+      const safeCaption = rawCaption.replace(SHARE_PREFIX_RE, '').slice(0, MAX_SHARE_CAPTION_LEN)
+      const content = safeCaption
+        ? `[achievement:${badge.slug}] ${safeCaption}`
+        : `[achievement:${badge.slug}]`
+
+      const post = await prisma.feedPost.create({
+        data: {
+          userId: req.user.userId,
+          content,
+        },
+        select: { id: true, createdAt: true },
+      })
+
+      // Stamp UserBadge.sharedAt so the gallery can show "shared" state
+      // and we can rate-limit re-shares of the same badge in a follow-up
+      // if abuse shows up.
+      await prisma.userBadge
+        .update({
+          where: { id: userBadge.id },
+          data: { sharedAt: new Date() },
+        })
+        .catch(() => {
+          /* sharedAt is a convenience timestamp; failure is non-fatal */
+        })
+
+      res.json({ ok: true, post })
+    } catch (error) {
+      captureError(error, { route: req.originalUrl })
+      sendError(res, 500, 'Failed to share achievement.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 module.exports = router

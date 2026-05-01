@@ -10,7 +10,7 @@ const {
   computeChecksum,
 } = require('./sheetLab.constants')
 const { trackActivity } = require('../../lib/activityTracker')
-const { checkAndAwardBadges } = require('../../lib/badges')
+const { checkAndAwardBadgesLegacy: checkAndAwardBadges } = require('../achievements')
 
 const router = express.Router()
 

@@ -1127,6 +1127,21 @@ const legalAcceptLimiter = rateLimit({
   message: { error: 'Too many acceptance attempts. Please try again later.' },
 })
 
+/**
+ * Achievement share-to-feed — 5 per 24 hours per user. Per the
+ * achievements-v2 plan §Phase-2: share creates a real FeedPost, so
+ * rate must be tight enough to stop spam-feed pollution from anyone
+ * who unlocks several badges in a session.
+ */
+const achievementShareLimiter = rateLimit({
+  windowMs: WINDOW_1_DAY,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `achievement-share-${req.user?.userId || req.ip}`,
+  message: { error: 'Daily share limit reached. Try again tomorrow.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -1280,4 +1295,7 @@ module.exports = {
   // Legal module
   legalDataRequestLimiter,
   legalAcceptLimiter,
+
+  // Achievements V2
+  achievementShareLimiter,
 }

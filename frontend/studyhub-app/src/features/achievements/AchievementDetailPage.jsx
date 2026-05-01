@@ -1,9 +1,15 @@
 /**
- * AchievementDetailPage.jsx — public detail view at /achievements/:slug.
+ * AchievementDetailPage.jsx — authenticated detail view at /achievements/:slug.
  *
- * Hexagon at large size, name + description, tier + xp, % of users who hold it,
- * top 10 most recent unlockers (block-aware), and a Pin / Unpin CTA when the
- * viewer holds the badge.
+ * Mounted under <PrivateRoute> in App.jsx, so an anonymous viewer never reaches
+ * this component. Renders hexagon at large size, name + description, tier + xp,
+ * % of users who hold it, top 10 most recent unlockers (block-aware), and a
+ * Pin / Unpin CTA when the viewer holds the badge.
+ *
+ * NOTE: the recent-unlockers list and global stats are reachable to any
+ * logged-in viewer, but the page is gated for authenticated users only. If a
+ * future product decision opens these to anonymous traffic, drop the
+ * PrivateRoute wrapper in App.jsx and update this header.
  */
 
 import { useParams, Link, Navigate } from 'react-router-dom'

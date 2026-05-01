@@ -268,7 +268,7 @@ async function createNote(req, res) {
     // Achievements V2 — emit note.create so first-note / note-taker / archivist
     // / organized criteria can match. Fire-and-forget.
     try {
-      const { emitAchievementEvent, EVENT_KINDS } = require('../../lib/badges')
+      const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
       void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.NOTE_CREATE, {
         noteId: note.id,
       })

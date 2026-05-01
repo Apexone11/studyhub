@@ -195,7 +195,7 @@ async function createGroup(req, res) {
 
     // Achievements V2 — group founder + group joiner (creator joins their own group).
     try {
-      const { emitAchievementEvent, EVENT_KINDS } = require('../../lib/badges')
+      const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
       void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.GROUP_CREATE, {
         groupId: group.id,
       })
@@ -588,7 +588,7 @@ async function joinGroup(req, res) {
     // Achievements V2 — group joiner unlock (only for active joins, not pending).
     if (status === 'active') {
       try {
-        const { emitAchievementEvent, EVENT_KINDS } = require('../../lib/badges')
+        const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
         void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.GROUP_JOIN, {
           groupId,
         })

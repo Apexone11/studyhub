@@ -47,9 +47,9 @@ internal log into this file when they describe user-visible behavior.
 - **Trigger sites wired across the product.** `sheets.create.controller` now emits `sheet.publish` with `{hour, courseId}` so early-bird / night-owl / multi-course criteria match. New `note.create`, `group.create`, `group.join`, `ai.message` triggers in their respective controllers. Existing 5 trigger sites continue to work via the back-compat shim.
 - **Seed updates.** `seedBetaUsers.js` now seeds the full 54-badge catalog and unlocks ~15 badges (including 3 secrets, 6 pinned) on `beta_student1` so a fresh `npm run seed:beta` produces a usable demo state per CLAUDE.md §11.
 
-### Frontend TypeScript fix for `staticHeaders.test.ts`
+### Static-headers test path-anchored
 
-- **Frontend typecheck no longer fails on the new staticHeaders test.** Added `@types/node` as a frontend devDependency (scoped to test files via a triple-slash directive at the top of `staticHeaders.test.ts`) so `node:fs`, `node:path`, and `process` resolve in the test, and replaced the deprecated `baseUrl` config in `tsconfig.json` with a `paths`-relative entry so TS 7.0 doesn't flag the project. `npm run typecheck` exits clean on both workspaces.
+- **`staticHeaders.test.js` now resolves its file paths from `import.meta.url` instead of `process.cwd()`** so the test passes regardless of where vitest is launched from (root, workspace dir, monorepo runner). Renamed from `.ts` to `.js` to match the JavaScript-only language policy adopted on 2026-04-30.
 
 ### Pre-deploy hardening pass (post-screenshot bug review)
 

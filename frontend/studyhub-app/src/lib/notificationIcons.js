@@ -42,7 +42,7 @@ const FA_BY_TYPE = {
   video_copy_detected: 'fas fa-circle-exclamation',
   plagiarism_flagged: 'fas fa-magnifying-glass',
   announcement: 'fas fa-bullhorn',
-  achievement_unlocked: 'fas fa-medal',
+  achievement_unlock: 'fas fa-medal',
 }
 
 const TONE_BY_TYPE = {
@@ -75,7 +75,7 @@ const TONE_BY_TYPE = {
   video_copy_detected: 'warn',
   plagiarism_flagged: 'warn',
   announcement: 'info',
-  achievement_unlocked: 'success',
+  achievement_unlock: 'success',
 }
 
 const TONE_TO_TOKEN = {
@@ -122,7 +122,7 @@ export const NOTIFICATION_TYPE_GROUPS = {
     'video_copy_detected',
     'plagiarism_flagged',
     'announcement',
-    'achievement_unlocked',
+    'achievement_unlock',
   ],
 }
 

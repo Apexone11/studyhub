@@ -406,9 +406,11 @@ async function _maybeSendNotificationEmail(
   // followed by an account-restriction email in the same enforcement flow
   // would otherwise be silently merged. High-priority events also bypass the
   // fallback so the burst digest can still queue legitimate distinct events.
-  const FAN_OUT_FALLBACK_TYPES = new Set(['star', 'fork', 'follow', 'follow_request'])
+  // Reuses the module-scope FAN_OUT_DEDUP_TYPES set (declared near the top of
+  // this file) — declaring a fresh Set per call burned allocations on a hot
+  // path with the same membership.
   const effectiveDedupKey =
-    dedupKey || (priority !== 'high' && FAN_OUT_FALLBACK_TYPES.has(type) ? type : null)
+    dedupKey || (priority !== 'high' && FAN_OUT_DEDUP_TYPES.has(type) ? type : null)
 
   if (priority !== 'high') {
     if (effectiveDedupKey && _isDuplicate(userId, type, effectiveDedupKey)) return

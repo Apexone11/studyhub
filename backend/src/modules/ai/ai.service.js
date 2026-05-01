@@ -393,7 +393,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   // can match. Fire-and-forget; failures never affect the streaming response.
   if (userId) {
     try {
-      const { emitAchievementEvent, EVENT_KINDS } = require('../../lib/badges')
+      const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
       void emitAchievementEvent(prisma, userId, EVENT_KINDS.AI_MESSAGE, { conversationId })
     } catch {
       /* best effort */

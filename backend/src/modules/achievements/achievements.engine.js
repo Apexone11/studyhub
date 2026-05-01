@@ -418,6 +418,30 @@ async function awardBadge(prisma, userId, badge) {
     } catch {
       // Notification creation is best-effort; badge award itself already succeeded.
     }
+    // Dedicated Socket.io event so the celebration modal can listen
+    // without parsing the generic notification stream. Personal-room
+    // delivery (`user_<id>`). Skipped in tests where socketio.js
+    // pulls in the real Prisma client and stalls. Best-effort —
+    // emit failure does NOT block the badge award.
+    try {
+      if (process.env.NODE_ENV !== 'test') {
+        const { emitToUser } = require('../../lib/socketio')
+        const SOCKET_EVENTS = require('../../lib/socketEvents')
+        emitToUser(userId, SOCKET_EVENTS.ACHIEVEMENT_UNLOCK, {
+          slug: badge.slug,
+          name: badge.name,
+          description: badge.description || null,
+          category: badge.category || null,
+          tier: badge.tier,
+          xp: badge.xp,
+          iconSlug: badge.iconSlug || null,
+          isSecret: Boolean(badge.isSecret),
+          unlockedAt: new Date().toISOString(),
+        })
+      }
+    } catch {
+      // Socket.io optional — never block the unlock on emit failure.
+    }
     return true
   } catch (error) {
     // P2002 = unique constraint failure: user already has this badge.

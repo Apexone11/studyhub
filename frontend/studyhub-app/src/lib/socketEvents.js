@@ -42,4 +42,7 @@ export const SOCKET_EVENTS = {
   NOTIFICATION_NEW: 'notification:new',
   NOTIFICATION_READ: 'notification:read',
   NOTIFICATION_CLEAR: 'notification:clear',
+
+  // Achievements V2 — dedicated unlock channel.
+  ACHIEVEMENT_UNLOCK: 'achievement:unlock',
 }

@@ -170,6 +170,9 @@
   --sh-platinum-text: #1d3a5c;
   --sh-platinum-glow: rgba(74, 144, 226, 0.32);
   --sh-diamond-grad: linear-gradient(135deg, #4a90e2 0%, #b75dff 50%, #ff6b9d 100%);
+  --sh-diamond-stop-1: #4a90e2;
+  --sh-diamond-stop-2: #b75dff;
+  --sh-diamond-stop-3: #ff6b9d;
   --sh-diamond-bg: #f5f0fb;
   --sh-diamond-text: #4a1a6b;
   --sh-diamond-glow: rgba(183, 93, 255, 0.4);
@@ -493,6 +496,9 @@
   --sh-platinum-text: #cce0f7;
   --sh-platinum-glow: rgba(122, 181, 240, 0.32);
   --sh-diamond-grad: linear-gradient(135deg, #7ab5f0 0%, #c486ff 50%, #ff8aaf 100%);
+  --sh-diamond-stop-1: #7ab5f0;
+  --sh-diamond-stop-2: #c486ff;
+  --sh-diamond-stop-3: #ff8aaf;
   --sh-diamond-bg: #261b35;
   --sh-diamond-text: #f0e5fd;
   --sh-diamond-glow: rgba(196, 134, 255, 0.4);

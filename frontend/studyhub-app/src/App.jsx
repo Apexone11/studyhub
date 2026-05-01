@@ -67,6 +67,7 @@ const PlagiarismReportPage = lazy(() => import('./pages/plagiarism/PlagiarismRep
 const AchievementsPage = lazy(() => import('./features/achievements/AchievementsPage'))
 const AchievementDetailPage = lazy(() => import('./features/achievements/AchievementDetailPage'))
 const AchievementUnlockModal = lazy(() => import('./features/achievements/AchievementUnlockModal'))
+import useAchievementUnlockListener from './features/achievements/useAchievementUnlockListener'
 const NotFoundPage = lazy(() => import('./pages/NotFoundPage'))
 
 import ScrollToTop from './components/ScrollToTop'
@@ -84,6 +85,15 @@ const AiChatProviderModule = lazy(() =>
 )
 
 const PerfOverlay = import.meta.env?.DEV ? lazy(() => import('./components/PerfOverlay')) : null
+
+// Achievements V2 — empty component that hosts the
+// useAchievementUnlockListener hook. Lives inside the
+// ChatPanelProvider/AuthenticatedAiProvider scope so the socket and
+// session contexts are available; renders nothing.
+function AchievementUnlockListenerBridge() {
+  useAchievementUnlockListener()
+  return null
+}
 
 function PublicRoute({ children }) {
   const { user, isBootstrapping, isAuthenticated } = useSession()
@@ -726,7 +736,10 @@ function AppRoutes() {
               <OfflineIndicator />
               {/* Achievements V2 — celebration modal for ?celebrate=:slug
                   fires globally so unlocks anywhere in the app surface a
-                  visible moment without per-page mounting. */}
+                  visible moment without per-page mounting. The listener
+                  bridges the dedicated `achievement:unlock` Socket.io
+                  event into the same URL-param flow. */}
+              <AchievementUnlockListenerBridge />
               <Suspense fallback={null}>
                 <AchievementUnlockModal />
               </Suspense>
