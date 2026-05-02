@@ -19,6 +19,7 @@ const fs = require('fs')
 const path = require('path')
 const os = require('os')
 const { captureError } = require('../../monitoring/sentry')
+const log = require('../../lib/logger')
 const { createNotification } = require('../../lib/notify')
 const r2 = require('../../lib/r2Storage')
 const prisma = require('../../lib/prisma')
@@ -342,8 +343,9 @@ async function processVideo(videoId) {
       // ffmpeg not installed — skip transcoding, use original file as-is.
       // This allows videos to still be playable (direct R2 streaming) even
       // without the full processing pipeline.
-      console.warn(
-        `[video:process] ffmpeg not available. Marking video ${videoId} as ready with original file only.`,
+      log.warn(
+        { event: 'video.process_no_ffmpeg', videoId },
+        '[video:process] ffmpeg not available; marking video ready with original file only',
       )
 
       const variants = {
@@ -613,7 +615,10 @@ async function processVideo(videoId) {
     })
   } catch (err) {
     captureError(err, { context: 'video-process-pipeline', videoId })
-    console.error(`[video:process] Pipeline failed for video ${videoId}:`, err.message)
+    log.error(
+      { event: 'video.process_pipeline_failed', videoId, errorMessage: err.message },
+      '[video:process] pipeline failed',
+    )
 
     // Mark as failed AND free R2 bytes. The raw upload + any partial
     // variants/thumbnail/manifest are useless once we transition to
