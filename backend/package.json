@@ -49,7 +49,7 @@
     "diff": "^9.0.0",
     "domelementtype": "^2.3.0",
     "domhandler": "^5.0.3",
-    "domutils": "^3.2.2",
+    "domutils": "^4.0.2",
     "dotenv": "^17.3.1",
     "express": "^5.2.1",
     "express-rate-limit": "^8.3.1",
