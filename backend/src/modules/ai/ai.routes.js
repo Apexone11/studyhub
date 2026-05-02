@@ -39,8 +39,13 @@ const aiMessageLimiter = createAiMessageLimiter(AI_RATE_LIMIT_RPM)
 // GET /api/ai/conversations
 router.get('/conversations', requireAuth, readLimiter, async (req, res) => {
   try {
-    const limit = Math.min(Number.parseInt(req.query.limit, 10) || 30, 100)
-    const offset = Number.parseInt(req.query.offset, 10) || 0
+    // Clamp both ends — a negative `?limit=-10` or `?offset=-5` would
+    // otherwise be passed straight to the service. Floor at 1 / 0 and
+    // ceiling at 100 to match the per-page cap.
+    const rawLimit = Number.parseInt(req.query.limit, 10) || 30
+    const limit = Math.min(Math.max(rawLimit, 1), 100)
+    const rawOffset = Number.parseInt(req.query.offset, 10) || 0
+    const offset = Math.max(rawOffset, 0)
     const result = await aiService.listConversations(req.user.userId, { limit, offset })
     res.json(result)
   } catch (err) {

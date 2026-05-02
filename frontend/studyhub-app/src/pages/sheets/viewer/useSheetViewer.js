@@ -311,13 +311,23 @@ export default function useSheetViewer() {
    * we'd flip viewerInteractive back off with no UI feedback. Surface a
    * specific error message instead so the user knows why interaction
    * isn't engaging. */
+  // Latest in-flight runtime fetch — used to abort if the user navigates
+  // to a different sheet (or toggles back to safe preview) while the
+  // previous request is still pending. Without this, a late failure from
+  // sheet A would set runtimeError on the now-mounted sheet B viewer.
+  const runtimeFetchRef = useRef(null)
   const loadInteractiveRuntime = useCallback(() => {
     if (!isHtmlSheet || !sheet?.id || runtimeUrl) return
+    if (runtimeFetchRef.current) runtimeFetchRef.current.abort()
+    const controller = new AbortController()
+    runtimeFetchRef.current = controller
+    const requestedSheetId = sheet.id
     setRuntimeLoading(true)
     setRuntimeError('')
     fetch(`${API}/api/sheets/${sheet.id}/html-runtime`, {
       headers: authHeaders(),
       credentials: 'include',
+      signal: controller.signal,
     })
       .then(async (r) => {
         const data = await r.json().catch(() => ({}))
@@ -330,25 +340,55 @@ export default function useSheetViewer() {
         if (!data?.runtimeUrl) {
           throw new Error('Interactive preview is not available for this sheet.')
         }
+        // Belt-and-suspenders: even if the abort raced, drop the response
+        // when the active sheet has changed since this request started.
+        if (requestedSheetId !== sheet?.id) return
         setRuntimeUrl(data.runtimeUrl)
       })
       .catch((err) => {
+        if (err?.name === 'AbortError') return
+        if (requestedSheetId !== sheet?.id) return
         setViewerInteractive(false)
         setRuntimeError(err?.message || 'Could not load interactive preview.')
       })
       .finally(() => {
-        setRuntimeLoading(false)
+        if (runtimeFetchRef.current === controller) {
+          runtimeFetchRef.current = null
+        }
+        if (requestedSheetId === sheet?.id) {
+          setRuntimeLoading(false)
+        }
       })
   }, [isHtmlSheet, sheet?.id, runtimeUrl])
 
   const toggleViewerInteractive = useCallback(() => {
     if (viewerInteractive) {
       setViewerInteractive(false)
+      // Clear any prior error when the user explicitly toggles back to
+      // safe preview — keeping the warning around after the user already
+      // chose the safe view is just noise.
+      setRuntimeError('')
     } else {
       setViewerInteractive(true)
       if (!runtimeUrl) loadInteractiveRuntime()
     }
   }, [viewerInteractive, runtimeUrl, loadInteractiveRuntime])
+
+  // Reset all per-sheet preview state when the sheet id changes. Without
+  // this, navigating from sheet A to sheet B while staying mounted on
+  // the viewer would carry stale runtimeUrl / runtimeError / safePreview
+  // / warning-ack state into the new sheet's render.
+  useEffect(() => {
+    if (runtimeFetchRef.current) {
+      runtimeFetchRef.current.abort()
+      runtimeFetchRef.current = null
+    }
+    setRuntimeUrl('')
+    setRuntimeError('')
+    setRuntimeLoading(false)
+    setSafePreviewUrl('')
+    setViewerInteractive(false)
+  }, [sheet?.id])
 
   const acceptHtmlWarning = () => {
     if (sheet?.id) localStorage.setItem(`htmlSheetWarnAck:${sheet.id}`, '1')

@@ -285,93 +285,102 @@ export default function UsersTab({
                   />
                 </td>
                 <td style={{ ...tableCell, position: 'relative', whiteSpace: 'nowrap' }}>
-                  <button
-                    type="button"
-                    aria-haspopup="menu"
-                    aria-expanded={actionsMenuFor === record.id}
-                    aria-label={`Actions for ${record.username}`}
-                    onClick={() =>
-                      setActionsMenuFor((current) => (current === record.id ? null : record.id))
-                    }
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: 8,
-                      border: '1px solid var(--sh-border)',
-                      background: 'var(--sh-surface)',
-                      color: 'var(--sh-muted)',
-                      cursor: 'pointer',
-                      fontSize: 18,
-                      lineHeight: '14px',
-                      fontWeight: 700,
-                      fontFamily: FONT,
-                      padding: 0,
-                    }}
+                  {/* Ref wraps BOTH trigger and menu panel so the click-
+                      outside handler treats the ⋯ button as inside the
+                      menu — otherwise mousedown closes the menu before
+                      the trigger's onClick toggles it back open, and
+                      the button can't reliably dismiss its own menu. */}
+                  <div
+                    ref={actionsMenuFor === record.id ? actionsMenuRef : null}
+                    style={{ display: 'inline-block', position: 'relative' }}
                   >
-                    ⋯
-                  </button>
-                  {actionsMenuFor === record.id && (
-                    <div
-                      ref={actionsMenuRef}
-                      role="menu"
+                    <button
+                      type="button"
+                      aria-haspopup="menu"
+                      aria-expanded={actionsMenuFor === record.id}
+                      aria-label={`Actions for ${record.username}`}
+                      onClick={() =>
+                        setActionsMenuFor((current) => (current === record.id ? null : record.id))
+                      }
                       style={{
-                        position: 'absolute',
-                        top: 38,
-                        right: 12,
-                        minWidth: 160,
-                        borderRadius: 10,
+                        width: 32,
+                        height: 32,
+                        borderRadius: 8,
                         border: '1px solid var(--sh-border)',
                         background: 'var(--sh-surface)',
-                        boxShadow: 'var(--elevation-3, 0 8px 24px rgba(0,0,0,0.12))',
-                        padding: 4,
-                        zIndex: 5,
+                        color: 'var(--sh-muted)',
+                        cursor: 'pointer',
+                        fontSize: 18,
+                        lineHeight: '14px',
+                        fontWeight: 700,
+                        fontFamily: FONT,
+                        padding: 0,
                       }}
                     >
-                      {record.role === 'student' ? (
-                        <UserActionMenuItem
-                          color="var(--sh-info-text)"
-                          onClick={() => {
-                            setActionsMenuFor(null)
-                            void patchRole(record.id, 'admin')
-                          }}
-                        >
-                          Make admin
-                        </UserActionMenuItem>
-                      ) : (
-                        <UserActionMenuItem
-                          color="var(--sh-danger)"
-                          onClick={() => {
-                            setActionsMenuFor(null)
-                            void patchRole(record.id, 'student')
-                          }}
-                        >
-                          Revoke admin
-                        </UserActionMenuItem>
-                      )}
-                      <UserActionMenuItem
-                        color="var(--sh-success-text)"
-                        onClick={() => {
-                          setActionsMenuFor(null)
-                          setGrantTarget(record)
-                          setGrantSlug('')
-                          setGrantError('')
+                      ⋯
+                    </button>
+                    {actionsMenuFor === record.id && (
+                      <div
+                        role="menu"
+                        style={{
+                          position: 'absolute',
+                          top: 38,
+                          right: 12,
+                          minWidth: 160,
+                          borderRadius: 10,
+                          border: '1px solid var(--sh-border)',
+                          background: 'var(--sh-surface)',
+                          boxShadow: 'var(--elevation-3, 0 8px 24px rgba(0,0,0,0.12))',
+                          padding: 4,
+                          zIndex: 5,
                         }}
                       >
-                        Grant badge
-                      </UserActionMenuItem>
-                      {record.id !== currentUserId ? (
+                        {record.role === 'student' ? (
+                          <UserActionMenuItem
+                            color="var(--sh-info-text)"
+                            onClick={() => {
+                              setActionsMenuFor(null)
+                              void patchRole(record.id, 'admin')
+                            }}
+                          >
+                            Make admin
+                          </UserActionMenuItem>
+                        ) : (
+                          <UserActionMenuItem
+                            color="var(--sh-danger)"
+                            onClick={() => {
+                              setActionsMenuFor(null)
+                              void patchRole(record.id, 'student')
+                            }}
+                          >
+                            Revoke admin
+                          </UserActionMenuItem>
+                        )}
                         <UserActionMenuItem
-                          color="var(--sh-danger)"
+                          color="var(--sh-success-text)"
                           onClick={() => {
                             setActionsMenuFor(null)
-                            void deleteUser(record.id)
+                            setGrantTarget(record)
+                            setGrantSlug('')
+                            setGrantError('')
                           }}
                         >
-                          Delete
+                          Grant badge
                         </UserActionMenuItem>
-                      ) : null}
-                    </div>
-                  )}
+                        {record.id !== currentUserId ? (
+                          <UserActionMenuItem
+                            color="var(--sh-danger)"
+                            onClick={() => {
+                              setActionsMenuFor(null)
+                              void deleteUser(record.id)
+                            }}
+                          >
+                            Delete
+                          </UserActionMenuItem>
+                        ) : null}
+                      </div>
+                    )}
+                  </div>
                 </td>
               </tr>
             ))}
