@@ -14,10 +14,11 @@ const {
  *   interactive — Tier 0: scripts allowed, full CSP
  *   interactive — Tier 0 (CLEAN) + Tier 1 (FLAGGED): scripts allowed in
  *                 the sandboxed iframe per the publish-with-warning policy.
- *                 SheetContentPanel renders a warning banner whenever
- *                 htmlWorkflow.riskSummary is present, so Tier 1 still
- *                 surfaces the warning copy without the in-viewer toggle
- *                 being suppressed.
+ *                 The "publish with warning" UI in SheetContentPanel keys
+ *                 off `htmlWorkflow.ackRequired` (set true exclusively for
+ *                 Tier 1 a few lines below), NOT off previewMode — so
+ *                 Tier 1 still renders the Flagged badge + warning panel
+ *                 even though previewMode is 'interactive'.
  *   restricted  — Tier 2 (HIGH_RISK): owner/admin only preview.
  *   disabled    — Tier 3 (QUARANTINED): no preview at all.
  */
@@ -28,9 +29,10 @@ function tierToPreviewMode(tier) {
     case RISK_TIER.QUARANTINED:
       return 'disabled'
     default:
-      // CLEAN (0) and FLAGGED (1) both fall through. Tier 1 keeps the
-      // warning banner via riskSummary; the gate that mattered (canInteract
-      // + html-runtime token) was already updated in sheets.html.controller.
+      // CLEAN (0) and FLAGGED (1) both fall through. The warning UI for
+      // Tier 1 lives behind `ackRequired` in the serializer payload; the
+      // interactivity gate also runs in sheets.html.controller (canInteract
+      // + the html-runtime token endpoint).
       return 'interactive'
   }
 }

@@ -146,7 +146,9 @@ function FeedVideoPlayer({ video }) {
   const [stalled, setStalled] = useState(false)
   // Hover/focus visual for the click-to-play overlay. State-driven (not
   // imperative `e.currentTarget.style` mutation) so :focus-visible from
-  // keyboard navigation gets the same treatment as a mouse hover.
+  // keyboard navigation gets the same treatment as a mouse hover. Reset
+  // alongside the other video-tied state below so a virtualised feed
+  // doesn't carry a "hot" overlay over to the next video.
   const [overlayHot, setOverlayHot] = useState(false)
   const videoRef = useRef(null)
 
@@ -164,21 +166,34 @@ function FeedVideoPlayer({ video }) {
     setError(null)
     setStreamUrl(null)
     setLoading(true)
+    setOverlayHot(false)
 
     async function fetchStream() {
       try {
         const res = await fetch(`${API}/api/video/${video.id}/stream`, { credentials: 'include' })
         if (!res.ok) {
-          // Surface the real failure so users / on-call see why playback
-          // didn't start instead of the generic "Could not load video".
-          // Most common 4xx for an authed feed viewer is 403 (downloads
-          // disabled by creator) or 409 (still processing).
-          let message = `Could not load video (HTTP ${res.status}).`
-          try {
-            const body = await res.json()
-            if (body?.error) message = body.error
-          } catch {
-            /* response wasn't JSON — keep the HTTP status fallback */
+          // Translate the failure into playback-specific copy. The backend's
+          // /stream endpoint is shared with the download path, so its raw
+          // 403 ("Downloads are disabled for this video.") is misleading
+          // when the user clicked Play. Map known statuses to playback
+          // wording and fall back to the HTTP status for the long tail.
+          // We don't render `body.error` directly for the same reason.
+          let message
+          switch (res.status) {
+            case 403:
+              message = 'Playback is restricted for this video.'
+              break
+            case 404:
+              message = 'This video is no longer available.'
+              break
+            case 409:
+              message = 'Video is still processing — try again in a minute.'
+              break
+            case 429:
+              message = 'Too many requests — please wait a moment and try again.'
+              break
+            default:
+              message = `Could not load video (HTTP ${res.status}).`
           }
           throw new Error(message)
         }

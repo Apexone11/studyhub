@@ -204,11 +204,15 @@ export default function SheetContentPanel({
 }) {
   if (!sheet) return null
 
-  // Tier 1 (FLAGGED) sheets now serialize with previewMode='interactive'
-  // so the in-viewer interactive toggle is reachable, but they still
-  // need the warning UI (badge, banner, "Load preview" gate). Drive
-  // those off `htmlWorkflow.ackRequired`, which the serializer already
-  // sets true exclusively for Tier 1.
+  // Tier 1 (FLAGGED) sheets serialize with previewMode='interactive' so
+  // the in-viewer Safe/Interactive toggle is reachable. The warning UI
+  // (Flagged badge, risk-summary span, "Flagged HTML Sheet" warning
+  // panel) keys off `htmlWorkflow.ackRequired` instead — the serializer
+  // sets that true exclusively for Tier 1, so Tier 0 stays warning-free
+  // and Tier 1 keeps the publish-with-warning experience even though
+  // previewMode is now 'interactive' for both. If you ever change which
+  // field gates the warning UI, also update sheets.serializer.js
+  // tierToPreviewMode docstring so the contract stays consistent.
   const isFlaggedHtml = Boolean(sheet.htmlWorkflow?.ackRequired)
 
   return (
