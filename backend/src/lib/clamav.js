@@ -1,5 +1,41 @@
 const net = require('node:net')
 
+// Logger is loaded lazily (and silenced under test) so this module stays
+// usable from any caller without a hard pino dependency at require-time.
+// The runbook (docs/internal/security/RUNBOOK_CLAMAV.md) references the
+// `clamav.scan_*` event keys emitted from `emitScanEvent()` below — keep
+// the keys in sync if you rename anything.
+let cachedLogger = null
+function getLogger() {
+  if (cachedLogger) return cachedLogger
+  try {
+    cachedLogger = require('./logger')
+  } catch {
+    cachedLogger = { info() {}, warn() {}, error() {} }
+  }
+  return cachedLogger
+}
+
+function emitScanEvent(result, ctx) {
+  // Skip noise in unit tests — the disabled-engine short-circuit returns
+  // synthetic clean replies and would spam logs. Real scan paths still log.
+  if (process.env.NODE_ENV === 'test' || result?.engine === 'disabled') return
+  const log = getLogger()
+  const base = {
+    event: `clamav.scan_${result?.status || 'error'}`,
+    engine: result?.engine || 'clamav',
+    bytes: ctx?.bytes,
+  }
+  if (result?.status === 'clean') {
+    log.info(base, 'clamav scan clean')
+  } else if (result?.status === 'infected') {
+    log.warn({ ...base, threat: result.threat }, 'clamav scan infected')
+  } else {
+    // status === 'error' (timeout, connect refused, malformed reply, …)
+    log.warn({ ...base, message: result?.message }, 'clamav scan failed')
+  }
+}
+
 const DEFAULT_CLAMAV_HOST = process.env.CLAMAV_HOST || 'clamav'
 const DEFAULT_CLAMAV_PORT = Number.parseInt(process.env.CLAMAV_PORT || '3310', 10)
 const DEFAULT_CLAMAV_TIMEOUT_MS = Number.parseInt(process.env.CLAMAV_TIMEOUT_MS || '12000', 10)
@@ -68,6 +104,8 @@ function scanBufferWithClamAv(buffer, options = {}) {
     ? options.timeoutMs
     : DEFAULT_CLAMAV_TIMEOUT_MS
 
+  const bytes = content.length
+
   return new Promise((resolve) => {
     let settled = false
     let response = ''
@@ -97,6 +135,13 @@ function scanBufferWithClamAv(buffer, options = {}) {
       if (settled) return
       settled = true
       socket.destroy()
+      // Structured pino event so the runbook's alert guidance has something
+      // to alert on. See RUNBOOK_CLAMAV.md "Logging and alerts" section.
+      try {
+        emitScanEvent(result, { bytes })
+      } catch {
+        // Never let log emission turn a clean scan into a failed scan.
+      }
       resolve(result)
     }
 

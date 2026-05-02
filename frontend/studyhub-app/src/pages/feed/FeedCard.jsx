@@ -270,11 +270,28 @@ function FeedVideoPlayer({ video }) {
         background: '#000',
       }}
     >
-      <div style={{ position: 'relative' }}>
-        {buffering && thumbnailUrl && (
+      {/*
+        Cross-fade poster ↔ video to remove the white-frame flash users saw
+        when clicking play (reported 2026-05-01). The earlier markup
+        unmounted the <img> overlay the moment `buffering` flipped to false,
+        which left the <video> element to paint its default (transparent /
+        white) backdrop for one frame before its first decoded frame
+        appeared. Pattern below mirrors what video.js / Mux Player / YouTube
+        Embed do:
+          1. Both layers stay mounted; only opacity changes.
+          2. The <video> element gets `background:#000` so the transition
+             never goes through a brighter colour.
+          3. The poster <img> is `pointerEvents:none` so it can't swallow
+             clicks on the native controls during the fade.
+          4. CSS transition is short (0.18s) — long enough to mask paint
+             jitter, short enough that fast networks feel instant.
+      */}
+      <div style={{ position: 'relative', backgroundColor: '#000' }}>
+        {thumbnailUrl && (
           <img
             src={thumbnailUrl}
             alt=""
+            aria-hidden="true"
             style={{
               position: 'absolute',
               top: 0,
@@ -283,6 +300,9 @@ function FeedVideoPlayer({ video }) {
               height: '100%',
               objectFit: 'cover',
               borderRadius: 8,
+              opacity: buffering ? 1 : 0,
+              transition: 'opacity 0.18s ease-out',
+              pointerEvents: 'none',
             }}
           />
         )}
@@ -298,14 +318,16 @@ function FeedVideoPlayer({ video }) {
           disablePictureInPicture={video.downloadable === false}
           onContextMenu={video.downloadable === false ? (e) => e.preventDefault() : undefined}
           onCanPlay={() => setBuffering(false)}
+          onLoadedData={() => setBuffering(false)}
           onWaiting={() => setBuffering(true)}
           onPlaying={() => setBuffering(false)}
           style={{
             width: '100%',
             display: 'block',
             maxHeight: 500,
+            backgroundColor: '#000',
             opacity: buffering ? 0 : 1,
-            transition: 'opacity 0.2s',
+            transition: 'opacity 0.18s ease-out',
           }}
         />
       </div>

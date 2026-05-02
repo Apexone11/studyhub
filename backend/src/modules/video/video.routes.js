@@ -19,6 +19,7 @@ const multer = require('multer')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const log = require('../../lib/logger')
+const { runWithHeartbeat } = require('../../lib/jobs/heartbeat')
 const prisma = require('../../lib/prisma')
 const r2 = require('../../lib/r2Storage')
 const {
@@ -465,10 +466,13 @@ router.post('/upload/complete', requireAuth, async (req, res) => {
       message: 'Upload complete. Video is being processed.',
     })
 
-    // Fire-and-forget: Start background processing
-    processVideo(videoId).catch((err) => {
-      captureError(err, { context: 'video-process-bg', videoId })
-    })
+    // Fire-and-forget: Start background processing.
+    // Wrapped in runWithHeartbeat so silent stalls show up as job.failure
+    // events in pino + Sentry instead of disappearing into the void
+    // (CLAUDE.md A10 — no bare fire-and-forget background work).
+    runWithHeartbeat('video.process', () => processVideo(videoId), { slaMs: 5 * 60_000 }).catch(
+      (err) => captureError(err, { context: 'video-process-bg', videoId }),
+    )
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Failed to complete upload.' })
@@ -559,7 +563,11 @@ router.get('/:id/stream', readLimiter, async (req, res) => {
       }
     }
 
-    const quality = req.query.quality || null
+    // CLAUDE.md A13: validate `quality` against an explicit allowlist.
+    // Anything outside the set falls back to "auto" (highest available).
+    const ALLOWED_QUALITIES = new Set(['360p', '720p', '1080p', 'original'])
+    const rawQuality = typeof req.query.quality === 'string' ? req.query.quality : null
+    const quality = rawQuality && ALLOWED_QUALITIES.has(rawQuality) ? rawQuality : null
     const variants = video.variants || {}
 
     // Determine which R2 key to stream
@@ -686,10 +694,11 @@ router.delete('/:id', requireAuth, async (req, res) => {
       return res.status(403).json({ error: 'Not authorized to delete this video.' })
     }
 
-    // Delete R2 assets in background
-    deleteVideoAssets(videoId).catch((err) => {
-      captureError(err, { context: 'video-delete-assets-bg', videoId })
-    })
+    // Delete R2 assets in background. Wrapped per CLAUDE.md A10 so a
+    // failed cleanup is visible (R2 leaks cost real money over time).
+    runWithHeartbeat('video.delete_assets', () => deleteVideoAssets(videoId), {
+      slaMs: 60_000,
+    }).catch((err) => captureError(err, { context: 'video-delete-assets-bg', videoId }))
 
     // Delete database record (cascades to captions)
     await prisma.video.delete({ where: { id: videoId } })

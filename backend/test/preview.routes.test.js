@@ -42,8 +42,17 @@ const mocks = vi.hoisted(() => {
 
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
-  [require.resolve('../src/lib/previewTokens'), { verifyHtmlPreviewToken: mocks.verifyHtmlPreviewToken }],
-  [require.resolve('../src/lib/html/htmlSecurity'), { validateHtmlForSubmission: mocks.validateHtmlForSubmission, RISK_TIER: { CLEAN: 0, FLAGGED: 1, HIGH_RISK: 2, QUARANTINED: 3 } }],
+  [
+    require.resolve('../src/lib/previewTokens'),
+    { verifyHtmlPreviewToken: mocks.verifyHtmlPreviewToken },
+  ],
+  [
+    require.resolve('../src/lib/html/htmlSecurity'),
+    {
+      validateHtmlForSubmission: mocks.validateHtmlForSubmission,
+      RISK_TIER: { CLEAN: 0, FLAGGED: 1, HIGH_RISK: 2, QUARANTINED: 3 },
+    },
+  ],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
 ])
 
@@ -115,9 +124,7 @@ describe('preview routes', () => {
   it('returns PREVIEW_TOKEN_INVALID when token is invalid or expired', async () => {
     mocks.state.tokenError = new Error('jwt expired')
 
-    const response = await request(app)
-      .get('/html')
-      .query({ token: 'expired-token' })
+    const response = await request(app).get('/html').query({ token: 'expired-token' })
 
     expect(response.status).toBe(403)
     expect(response.body).toMatchObject({
@@ -129,9 +136,7 @@ describe('preview routes', () => {
   it('rejects stale tokens when sheet version changes', async () => {
     mocks.state.payload.version = '2020-01-01T00:00:00.000Z'
 
-    const response = await request(app)
-      .get('/html')
-      .query({ token: 'stale-token' })
+    const response = await request(app).get('/html').query({ token: 'stale-token' })
 
     expect(response.status).toBe(403)
     expect(response.body).toMatchObject({
@@ -145,9 +150,7 @@ describe('preview routes', () => {
     mocks.state.payload.userId = 101
     mocks.state.payload.allowUnpublished = false
 
-    const response = await request(app)
-      .get('/html')
-      .query({ token: 'non-owner-token' })
+    const response = await request(app).get('/html').query({ token: 'non-owner-token' })
 
     expect(response.status).toBe(403)
     expect(response.body).toMatchObject({
@@ -161,9 +164,7 @@ describe('preview routes', () => {
     mocks.state.payload.userId = 101
     mocks.state.payload.allowUnpublished = true
 
-    const response = await request(app)
-      .get('/html')
-      .query({ token: 'owner-token' })
+    const response = await request(app).get('/html').query({ token: 'owner-token' })
 
     expect(response.status).toBe(200)
     expect(response.headers['content-type']).toMatch(/text\/html/)
@@ -174,11 +175,56 @@ describe('preview routes', () => {
     mocks.state.sheet.htmlRiskTier = 3
     mocks.state.payload.tier = 3
 
-    const response = await request(app)
-      .get('/html')
-      .query({ token: 'quarantined-token' })
+    const response = await request(app).get('/html').query({ token: 'quarantined-token' })
 
     expect(response.status).toBe(403)
     expect(response.body.error).toMatch(/quarantined/i)
+  })
+
+  // Regression guards for the Tier 1 (FLAGGED) runtime CSP fix from 2026-05-01.
+  // Earlier code always sent `script-src 'none'` for Tier 1, which silently
+  // blocked click handlers in the Interactive Preview iframe.
+  describe('Tier 1 (FLAGGED) interactive preview CSP', () => {
+    it('runtime token receives script-src unsafe-inline (allows interactivity)', async () => {
+      mocks.state.sheet.htmlRiskTier = 1
+      mocks.state.payload.type = 'html-runtime'
+      mocks.state.payload.tier = 1
+
+      const response = await request(app).get('/html').query({ token: 'runtime-flagged' })
+
+      expect(response.status).toBe(200)
+      const csp = response.headers['content-security-policy']
+      expect(csp).toBeDefined()
+      expect(csp).toMatch(/script-src 'unsafe-inline'/)
+      expect(csp).not.toMatch(/script-src 'none'/)
+    })
+
+    it('preview token receives script-src none (no interactivity)', async () => {
+      mocks.state.sheet.htmlRiskTier = 1
+      mocks.state.payload.type = 'html-preview'
+      mocks.state.payload.tier = 1
+
+      const response = await request(app).get('/html').query({ token: 'preview-flagged' })
+
+      expect(response.status).toBe(200)
+      const csp = response.headers['content-security-policy']
+      expect(csp).toBeDefined()
+      expect(csp).toMatch(/script-src 'none'/)
+      expect(csp).not.toMatch(/script-src 'unsafe-inline'/)
+    })
+
+    it('Tier 2 (HIGH_RISK) runtime still gets safe CSP regardless of token type', async () => {
+      mocks.state.sheet.htmlRiskTier = 2
+      mocks.state.payload.type = 'html-runtime'
+      mocks.state.payload.tier = 2
+      mocks.state.payload.allowUnpublished = true
+
+      const response = await request(app).get('/html').query({ token: 'runtime-high-risk' })
+
+      expect(response.status).toBe(200)
+      const csp = response.headers['content-security-policy']
+      expect(csp).toMatch(/script-src 'none'/)
+      expect(csp).not.toMatch(/script-src 'unsafe-inline'/)
+    })
   })
 })

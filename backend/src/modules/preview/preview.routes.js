@@ -158,14 +158,23 @@ router.get('/html', async (req, res) => {
       return res.status(200).send(outputHtml)
     }
 
-    // Tier 1 (flagged): use interactive document but with safe CSP (no script execution)
+    // Tier 1 (flagged): runtime token gets the interactive document AND
+    // the runtime CSP that allows inline scripts; preview token still gets
+    // the safe doc + safe CSP. Earlier code always sent SAFE_PREVIEW here
+    // (script-src 'none'), so even when the user opened Interactive Preview
+    // the iframe loaded an HTML doc with <script> tags but the CSP header
+    // silently blocked their execution. Click handlers never fired. Caught
+    // live in production 2026-05-01.
     if (effectiveTier >= RISK_TIER.FLAGGED) {
       const outputHtml = isRuntime
         ? buildInteractiveDocument({ title: sheet.title, html: sheet.content })
         : buildPreviewDocument({ title: sheet.title, html: sheet.content })
       res.setHeader('Cache-Control', 'private, no-store, max-age=0')
       res.setHeader('Content-Type', 'text/html; charset=utf-8')
-      res.setHeader('Content-Security-Policy', buildPreviewCsp(SAFE_PREVIEW_DIRECTIVES, res))
+      res.setHeader(
+        'Content-Security-Policy',
+        buildPreviewCsp(isRuntime ? RUNTIME_DIRECTIVES : SAFE_PREVIEW_DIRECTIVES, res),
+      )
       return res.status(200).send(outputHtml)
     }
 

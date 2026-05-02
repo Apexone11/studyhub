@@ -179,15 +179,55 @@ function buildCsp(directives) {
   return filtered.join('; ')
 }
 
+/**
+ * Build the list of R2 origins the browser may load media/images from.
+ * Two URL shapes are possible:
+ *   1. Signed URLs from `r2.getSignedDownloadUrl()` — point to
+ *      `https://<R2_ACCOUNT_ID>.r2.cloudflarestorage.com/...`
+ *   2. Public URLs when `R2_PUBLIC_URL` is configured (custom CDN domain).
+ * Without these in `media-src` / `img-src`, the browser blocks `<video src>`
+ * with a CSP violation that does NOT show up as a failed network request,
+ * making "video doesn't play" hard to diagnose. Caught in prod 2026-05-01.
+ */
+// Cloudflare R2 account IDs are lowercase hex (per Cloudflare's public
+// docs). Reject anything else so an operator-supplied env value can't
+// inject CSP directives via stray whitespace, semicolons, or quotes —
+// defense in depth on the Railway secret pipeline.
+const R2_ACCOUNT_ID_PATTERN = /^[a-f0-9]{8,64}$/i
+
+function r2CspOrigins() {
+  const origins = []
+  const accountId = (process.env.R2_ACCOUNT_ID || '').trim()
+  if (accountId && R2_ACCOUNT_ID_PATTERN.test(accountId)) {
+    origins.push(`https://${accountId}.r2.cloudflarestorage.com`)
+  }
+  const publicUrl = (process.env.R2_PUBLIC_URL || '').trim()
+  if (publicUrl) {
+    try {
+      const parsed = new URL(publicUrl)
+      // Only http(s) origins belong in a CSP source list.
+      if (parsed.protocol === 'http:' || parsed.protocol === 'https:') {
+        origins.push(parsed.origin)
+      }
+    } catch {
+      // Malformed env value — skip silently. secretValidator surfaces it.
+    }
+  }
+  return origins
+}
+
+const r2Origins = r2CspOrigins()
+const r2OriginList = r2Origins.length > 0 ? ' ' + r2Origins.join(' ') : ''
+
 const appSurfaceCsp = buildCsp([
   "default-src 'none'",
   "base-uri 'none'",
   "frame-ancestors 'none'",
   "form-action 'self'",
   "connect-src 'self'",
-  "img-src 'self' data:",
+  `img-src 'self' data:${r2OriginList}`,
   "font-src 'none'",
-  "media-src 'self'",
+  `media-src 'self' blob:${r2OriginList}`,
   "object-src 'none'",
   "script-src 'none'",
   "style-src 'none'",
