@@ -76,6 +76,11 @@ router.post('/register', registerLimiter, async (req, res) => {
         data: {
           username,
           passwordHash,
+          // Email-registered users picked their own password; flag
+          // them so sensitive ops (delete account, change email) can
+          // require it directly without first forcing a "set password"
+          // step. See migration 20260501000006_add_password_set_by_user.
+          passwordSetByUser: true,
           email,
           accountType,
           emailVerified: true,
@@ -250,6 +255,9 @@ router.post('/register/complete', registerLimiter, async (req, res) => {
         data: {
           username: challenge.username,
           passwordHash: challenge.passwordHash,
+          // Challenge flow is the email-OTP signup variant — the user
+          // entered the password themselves before the OTP was emailed.
+          passwordSetByUser: true,
           email: challenge.email,
           accountType: challenge.payload?.accountType || 'student',
           emailVerified: true,

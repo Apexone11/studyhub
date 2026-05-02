@@ -23,6 +23,14 @@ const { MILESTONES, CODE_CHARS, CODE_LENGTH } = require('./referrals.constants')
 // Basic email regex -- rejects obviously invalid formats
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/
 
+// Stable, non-reversible identifier for correlating invite retries without
+// logging raw PII. Last 8 hex chars of sha256 — collision-resistant enough
+// for log correlation, irreversible for compliance.
+function hashEmail(email) {
+  if (!email) return null
+  return crypto.createHash('sha256').update(String(email).toLowerCase()).digest('hex').slice(-8)
+}
+
 /**
  * Generate a cryptographically random referral code.
  * Maps random bytes to CODE_CHARS to avoid ambiguous characters.
@@ -164,17 +172,34 @@ async function sendInvites(userId, emails, inviterUsername) {
         },
       })
 
-      // Send invite email (best-effort)
+      // Send invite email (best-effort).
+      // PII rule: never log a raw invitee email. Hash to a stable
+      // identifier (last 8 hex chars of sha256) for correlating retries
+      // without persisting plaintext PII to log aggregators.
       try {
         await sendReferralInvite(email, inviterUsername, code)
       } catch (emailErr) {
-        log.warn({ err: emailErr, email }, 'Failed to send referral invite email')
+        log.warn(
+          {
+            event: 'referral.invite_email_failed',
+            err: emailErr.message,
+            emailHash: hashEmail(email),
+          },
+          'Failed to send referral invite email',
+        )
       }
 
       trackServerEvent(userId, EVENTS.REFERRAL_SENT, { channel: 'email' })
       results.push({ email, status: 'sent' })
     } catch (err) {
-      log.warn({ err, email }, 'Failed to create referral invite')
+      log.warn(
+        {
+          event: 'referral.invite_create_failed',
+          err: err.message,
+          emailHash: hashEmail(email),
+        },
+        'Failed to create referral invite',
+      )
       results.push({ email, status: 'error' })
     }
   }

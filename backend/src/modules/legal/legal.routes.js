@@ -2,7 +2,11 @@ const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
 const originAllowlist = require('../../middleware/originAllowlist')
-const { legalDataRequestLimiter, legalAcceptLimiter } = require('../../lib/rateLimiters')
+const {
+  legalDataRequestLimiter,
+  legalAcceptLimiter,
+  writeLimiter,
+} = require('../../lib/rateLimiters')
 const controller = require('./legal.controller')
 
 const router = express.Router()
@@ -37,6 +41,7 @@ router.post(
   requireAuth,
   requireAdmin,
   requireTrustedOrigin,
+  writeLimiter,
   controller.resolveDataRequestAdmin,
 )
 

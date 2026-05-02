@@ -50,6 +50,15 @@ model User {
   mfaEnforcedAt           DateTime?
   googleId                String?   @unique
   authProvider            String    @default("local")
+  // True only when the user has explicitly chosen a password they
+  // know — set on email registration, password reset, and the
+  // post-Google-signup "set password" onboarding step. Google signup
+  // creates the user with a random `passwordHash` (so the column is
+  // never null), but leaves this flag false so the UI can require
+  // a real password before delete-account / change-email / change-
+  // password flows. Without this, Google-only users could never
+  // confirm sensitive ops or use email/password as a fallback.
+  passwordSetByUser       Boolean   @default(false)
   accountType             String    @default("student")
   pendingAccountType      String?
   accountTypeChangedAt    DateTime?

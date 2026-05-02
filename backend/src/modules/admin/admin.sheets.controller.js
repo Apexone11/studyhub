@@ -111,9 +111,9 @@ router.get('/sheets/review', async (req, res) => {
 
 // ── GET /api/admin/sheets/:id/review-detail ─────────────────────────
 router.get('/sheets/:id/review-detail', async (req, res) => {
-  const sheetId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(sheetId)) {
-    return res.status(400).json({ error: 'Sheet id must be an integer.' })
+  const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId) || sheetId < 1) {
+    return res.status(400).json({ error: 'Sheet id must be a positive integer.' })
   }
 
   try {
@@ -192,7 +192,10 @@ router.get('/sheets/:id/review-detail', async (req, res) => {
 
 // ── PATCH /api/admin/sheets/:id/review ─────────────────────────────
 router.patch('/sheets/:id/review', async (req, res) => {
-  const sheetId = parseInt(req.params.id, 10)
+  const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId) || sheetId < 1) {
+    return res.status(400).json({ error: 'Sheet id must be a positive integer.' })
+  }
   const action = String(req.body?.action || '')
     .trim()
     .toLowerCase()
@@ -265,7 +268,11 @@ router.patch('/sheets/:id/review', async (req, res) => {
 // ── DELETE /api/admin/sheets/:id ─────────────────────────────
 router.delete('/sheets/:id', async (req, res) => {
   try {
-    await prisma.studySheet.delete({ where: { id: parseInt(req.params.id) } })
+    const id = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(id) || id < 1) {
+      return res.status(400).json({ error: 'Invalid sheet id.' })
+    }
+    await prisma.studySheet.delete({ where: { id } })
     res.json({ message: 'Sheet deleted.' })
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Sheet not found.' })
@@ -276,9 +283,9 @@ router.delete('/sheets/:id', async (req, res) => {
 
 // ── POST /api/admin/sheets/:id/ai-review — Trigger AI re-review ─────────
 router.post('/sheets/:id/ai-review', async (req, res) => {
-  const sheetId = parseInt(req.params.id, 10)
-  if (!Number.isInteger(sheetId)) {
-    return res.status(400).json({ error: 'Sheet id must be an integer.' })
+  const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId) || sheetId < 1) {
+    return res.status(400).json({ error: 'Sheet id must be a positive integer.' })
   }
 
   try {

@@ -354,4 +354,39 @@ function sanitizeDetails(details, parentKey = '') {
   return sanitized
 }
 
+// ── GET /api/admin/creator-audit-consents ───────────────────────────
+// Paginated list of CreatorAuditConsent rows for the admin Consent Log
+// tab. Surfaces who consented, when, the doc version they accepted,
+// the acceptance method (user / backfill / seed), and revocation
+// state. Supports `?revoked=true` to filter to revoked rows only.
+router.get('/creator-audit-consents', async (req, res) => {
+  const page = parsePage(req.query.page)
+  const revokedOnly = req.query.revoked === 'true'
+  const where = revokedOnly ? { NOT: [{ revokedAt: null }] } : {}
+  try {
+    const [rows, total] = await Promise.all([
+      prisma.creatorAuditConsent.findMany({
+        where,
+        select: {
+          id: true,
+          userId: true,
+          acceptedAt: true,
+          docVersion: true,
+          acceptanceMethod: true,
+          revokedAt: true,
+          user: { select: { username: true } },
+        },
+        orderBy: { acceptedAt: 'desc' },
+        take: PAGE_SIZE,
+        skip: (page - 1) * PAGE_SIZE,
+      }),
+      prisma.creatorAuditConsent.count({ where }),
+    ])
+    res.json({ rows, total, page, pages: Math.ceil(total / PAGE_SIZE) })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 module.exports = router

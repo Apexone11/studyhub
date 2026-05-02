@@ -14,12 +14,13 @@ import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import GoogleSignInButton from '../../components/GoogleSignInButton'
 import { getGoogleRedirectUri } from '../../components/googleSignInHelpers'
+import { AnimatedLogoMark as SiteAnimatedLogoMark } from '../../components/Icons'
 import { API, GOOGLE_CLIENT_ID } from '../../config'
 import { fadeInUp } from '../../lib/animations'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { useSession, SESSION_EXPIRED_FLAG } from '../../lib/session-context'
 import { LOGGED_OUT_FLAG } from '../../lib/session'
-import { useRolesV2Flags } from '../../lib/rolesV2Flags'
+import { useRolesV2Flags, isRolesV2FlagEnabled } from '../../lib/rolesV2Flags'
 import './LoginPage.css'
 
 export default function LoginPage() {
@@ -94,7 +95,11 @@ export default function LoginPage() {
         return
       }
       if (data.status === 'needs_role' && data.tempToken) {
-        if (!oauthPickerEnabled) {
+        // See useRegisterFlow.js — same race fix. Read the live flag
+        // value via the imperative helper so we don't false-flash the
+        // "paused" banner during the OAuth callback.
+        const oauthPickerLive = oauthPickerEnabled || (await isRolesV2FlagEnabled('oauthPicker'))
+        if (!oauthPickerLive) {
           setError('New Google signups are paused right now. Please sign up with email instead.')
           return
         }
@@ -198,7 +203,10 @@ export default function LoginPage() {
       }
 
       if (data.status === 'needs_role' && data.tempToken) {
-        if (!oauthPickerEnabled) {
+        // Same race fix as the code-callback path above — read the
+        // flag via imperative helper to avoid stale closure value.
+        const oauthPickerLive = oauthPickerEnabled || (await isRolesV2FlagEnabled('oauthPicker'))
+        if (!oauthPickerLive) {
           setError('New Google signups are paused right now. Please sign up with email instead.')
           return
         }
@@ -242,17 +250,14 @@ export default function LoginPage() {
       <main id="main-content" ref={cardRef} className="login-main">
         <div className="login-card">
           {/* ── Logo mark + heading ──────────────────────────────────── */}
+          {/* Using the official site logo (animated tree with color-cycling
+              branches/leaves) instead of the previous generic placeholder
+              SVG, so the first authenticated surface matches the brand mark
+              shown elsewhere. AnimatedLogoMark respects
+              prefers-reduced-motion. */}
           <div className="login-header">
-            <div className="login-logo-mark">
-              <svg width="28" height="28" viewBox="0 0 36 36" fill="none">
-                <path
-                  d="M18 6 L18 30 M10 14 L18 6 L26 14 M10 22 L18 14 L26 22"
-                  stroke="var(--sh-warning)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
+            <div className="login-logo-mark" style={{ background: 'transparent' }}>
+              <SiteAnimatedLogoMark size={56} />
             </div>
             <h1 className="login-h1">Welcome back</h1>
             <p className="login-subtitle">Sign in to your study sheets, dashboard, and more.</p>

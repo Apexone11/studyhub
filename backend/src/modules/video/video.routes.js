@@ -18,6 +18,7 @@ const express = require('express')
 const multer = require('multer')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
+const log = require('../../lib/logger')
 const prisma = require('../../lib/prisma')
 const r2 = require('../../lib/r2Storage')
 const {
@@ -325,13 +326,14 @@ router.post('/upload/chunk', requireAuth, videoUploadChunkLimiter, async (req, r
 
     const chunkBuffer = req.body
     if (!chunkBuffer || !Buffer.isBuffer(chunkBuffer) || chunkBuffer.length === 0) {
-      console.error(
-        '[video:chunk] Empty or unparsed body. Content-Type:',
-        req.headers['content-type'],
-        'Body type:',
-        typeof chunkBuffer,
-        'Is Buffer:',
-        Buffer.isBuffer(chunkBuffer),
+      log.warn(
+        {
+          event: 'video.chunk_empty_body',
+          contentType: req.headers['content-type'],
+          bodyType: typeof chunkBuffer,
+          isBuffer: Buffer.isBuffer(chunkBuffer),
+        },
+        'Empty or unparsed video chunk body',
       )
       return res
         .status(400)

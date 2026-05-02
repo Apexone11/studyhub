@@ -36,6 +36,22 @@ const REQUIRED_IN_PRODUCTION = [
     description:
       'Field-level encryption key for the PII vault. Must be a 64-char hex string (32 bytes).',
   },
+  {
+    // Provenance manifests are encrypted with a key derived from this
+    // secret. Without it lib/provenance.js falls back to a public dev
+    // key, which would silently downgrade integrity guarantees on
+    // creator-audit-grade sheets. Promoted to REQUIRED_IN_PRODUCTION
+    // alongside the prod-throw added in lib/provenance.js.
+    //
+    // 64 hex chars = 32 raw bytes. Pattern enforced so a short
+    // alphanumeric placeholder can't pass the boot check; mirrors the
+    // FIELD_ENCRYPTION_KEY validation directly above.
+    key: 'PROVENANCE_SECRET',
+    minLength: 64,
+    pattern: /^[0-9a-fA-F]{64}$/,
+    description:
+      'Encryption key for creator-audit provenance manifests. 32-byte hex (64 hex chars).',
+  },
 ]
 
 const OPTIONAL = [
@@ -44,6 +60,17 @@ const OPTIONAL = [
   { key: 'KMS_KEY_ARN', description: 'AWS KMS PII vault encryption' },
   { key: 'CLAMAV_HOST', description: 'ClamAV antivirus scanner' },
   { key: 'R2_ACCOUNT_ID', description: 'Cloudflare R2 storage' },
+  { key: 'R2_ACCESS_KEY_ID', description: 'Cloudflare R2 access key' },
+  { key: 'R2_SECRET_ACCESS_KEY', description: 'Cloudflare R2 secret key' },
+  { key: 'R2_BUCKET_NAME', description: 'Cloudflare R2 bucket name' },
+  { key: 'R2_PUBLIC_URL', description: 'Cloudflare R2 public CDN base URL' },
+  { key: 'STRIPE_PRICE_ID_PRO', description: 'Stripe Pro monthly price ID' },
+  { key: 'STRIPE_PRICE_ID_PRO_YEARLY', description: 'Stripe Pro yearly price ID' },
+  { key: 'STRIPE_PRICE_ID_DONATION', description: 'Stripe donation price ID (legacy)' },
+  { key: 'WEBAUTHN_RP_ID', description: 'WebAuthn relying-party ID' },
+  { key: 'WEBAUTHN_ORIGIN', description: 'WebAuthn origin URL' },
+  { key: 'GOOGLE_BOOKS_API_KEY', description: 'Google Books API key' },
+  { key: 'CSP_REPORT_URI', description: 'CSP violation reporting endpoint' },
 ]
 
 function validateSecrets() {

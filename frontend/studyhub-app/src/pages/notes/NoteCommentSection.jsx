@@ -806,7 +806,14 @@ export default function NoteCommentSection({
   isOwner,
   user,
   noteContent,
-  onReactToComment,
+  // onReactToComment kept for backward-compat but ignored. The hook
+  // below owns its own state, so a parent-supplied callback would run
+  // against a *different* `useNoteComments` instance (separate
+  // useState) and the child's rendered list would never see the
+  // optimistic update. Reproduced as the "like/dislike doesn't toggle"
+  // bug 2026-05-01. Use the local `reactToComment` instead.
+  // eslint-disable-next-line no-unused-vars
+  onReactToComment: _onReactToCompat,
 }) {
   const [expanded, setExpanded] = useState(false)
   const [currentTime, setCurrentTime] = useState(() => Date.now())
@@ -820,6 +827,7 @@ export default function NoteCommentSection({
     resolveComment,
     deleteComment,
     editComment,
+    reactToComment,
   } = useNoteComments(noteId)
 
   useEffect(() => {
@@ -833,6 +841,16 @@ export default function NoteCommentSection({
 
     return () => window.clearInterval(intervalId)
   }, [expanded])
+
+  // Fetch the comment count eagerly on mount so the collapsed toggle
+  // shows the real count instead of "0 comments". The hook caches by
+  // `loadedRef`, so expanding later is a free re-render. Without this
+  // the user sees a misleading "0 comments" until they click — which
+  // we just got a bug report on (2026-05-01).
+  useEffect(() => {
+    if (!noteId) return
+    loadComments()
+  }, [noteId, loadComments])
 
   const handleToggle = () => {
     const next = !expanded
@@ -924,7 +942,7 @@ export default function NoteCommentSection({
                   onResolve={resolveComment}
                   onDelete={deleteComment}
                   onEdit={handleEdit}
-                  onReact={user && onReactToComment ? onReactToComment : null}
+                  onReact={user ? reactToComment : null}
                   onReply={handleReply}
                   currentTime={currentTime}
                 />

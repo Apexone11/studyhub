@@ -641,6 +641,12 @@ const getMe = async (req, res) => {
         role: true,
         emailVerified: true,
         isStaffVerified: true,
+        // Drives the post-Google-signup "set your password" onboarding
+        // step + the Settings → Security banner. False for users who
+        // signed up via Google and never chose a password; true once
+        // they complete `POST /api/auth/set-password`.
+        passwordSetByUser: true,
+        authProvider: true,
         bio: true,
         profileLinks: true,
         isPrivate: true,
@@ -684,6 +690,8 @@ const getMe = async (req, res) => {
       role: user.role,
       accountType: user.accountType,
       verified: Boolean(user.emailVerified || user.isStaffVerified),
+      passwordSetByUser: user.passwordSetByUser === true,
+      authProvider: user.authProvider || 'local',
       isPrivate: user.isPrivate,
       createdAt: user.createdAt,
       schoolId: school?.id || null,

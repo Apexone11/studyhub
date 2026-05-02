@@ -99,6 +99,13 @@ router.get('/users', async (req, res) => {
           isStaffVerified: true,
           email: true,
           createdAt: true,
+          // Surfaced so the UsersTab can render the MFA toggle column
+          // and the recovery-codes audit cell.
+          twoFaEnabled: true,
+          mfaRequired: true,
+          mfaEnforcedAt: true,
+          twoFaRecoveryGeneratedAt: true,
+          twoFaRecoveryUsedCount: true,
           _count: { select: { studySheets: true } },
         },
         orderBy: { createdAt: 'desc' },
@@ -155,13 +162,16 @@ router.patch('/users/:id/role', async (req, res) => {
   if (!['admin', 'student'].includes(role)) {
     return res.status(400).json({ error: 'Role must be "admin" or "student".' })
   }
+  const targetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(targetId) || targetId < 1) {
+    return res.status(400).json({ error: 'Invalid user id.' })
+  }
   // Prevent removing your own admin role
-  if (parseInt(req.params.id) === req.user.userId) {
+  if (targetId === req.user.userId) {
     return res.status(400).json({ error: 'You cannot change your own role.' })
   }
   try {
     // Protect the super admin from being demoted by other admins
-    const targetId = parseInt(req.params.id)
     if (role !== 'admin' && (await isSuperAdmin(targetId))) {
       return res.status(403).json({
         error: 'The super admin account cannot be demoted.',
@@ -188,9 +198,9 @@ router.patch('/users/:id/trust-level', async (req, res) => {
   if (!['new', 'trusted', 'restricted'].includes(trustLevel)) {
     return res.status(400).json({ error: 'Trust level must be "new", "trusted", or "restricted".' })
   }
-  const targetId = parseInt(req.params.id)
-  if (!Number.isInteger(targetId)) {
-    return res.status(400).json({ error: 'User id must be an integer.' })
+  const targetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(targetId) || targetId < 1) {
+    return res.status(400).json({ error: 'User id must be a positive integer.' })
   }
 
   try {
@@ -228,11 +238,128 @@ router.patch('/users/:id/trust-level', async (req, res) => {
   }
 })
 
+// ── PATCH /api/admin/users/:id/mfa ──────────────────────────────
+// Toggle the per-user `mfaRequired` flag. Behind `flag_admin_mfa_required`
+// the login flow blocks the session cookie until the user completes 2FA
+// setup — flipping this to true on a regular admin forces them through
+// the gate. Behavior shipped 2026-04-30 in auth.login.controller.js.
+router.patch('/users/:id/mfa', async (req, res) => {
+  const targetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(targetId) || targetId < 1) {
+    return res.status(400).json({ error: 'User id must be a positive integer.' })
+  }
+  const { mfaRequired } = req.body || {}
+  if (typeof mfaRequired !== 'boolean') {
+    return res.status(400).json({ error: 'mfaRequired must be a boolean.' })
+  }
+  // Don't let an admin disable MFA on the super-admin seat — that would
+  // demote the founder seat below other admins.
+  if (mfaRequired === false && (await isSuperAdmin(targetId))) {
+    return res.status(403).json({
+      error: 'MFA cannot be disabled on the super admin account.',
+      code: 'SUPER_ADMIN_PROTECTED',
+    })
+  }
+  try {
+    const data = mfaRequired
+      ? { mfaRequired: true, mfaEnforcedAt: new Date() }
+      : { mfaRequired: false, mfaEnforcedAt: null }
+    const user = await prisma.user.update({
+      where: { id: targetId },
+      data,
+      select: {
+        id: true,
+        username: true,
+        mfaRequired: true,
+        mfaEnforcedAt: true,
+        twoFaEnabled: true,
+      },
+    })
+    await logModerationEvent({
+      userId: targetId,
+      action: 'mfa_required_changed',
+      reason: `MFA requirement set to ${mfaRequired} by admin`,
+      performedBy: req.user.userId,
+      metadata: { newValue: mfaRequired },
+    })
+    auditFromRequest(req, AUDIT_EVENTS.ADMIN_USER_EDIT, {
+      targetUserId: targetId,
+      change: 'mfaRequired',
+      newValue: mfaRequired,
+    })
+    res.json(user)
+  } catch (err) {
+    if (err.code === 'P2025') return res.status(404).json({ error: 'User not found.' })
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── POST /api/admin/users/:id/badges ─────────────────────────
+// Manual badge grant for a target user — used to award secret
+// badges (`isSecret: true`) and badges with `criteria.type =
+// 'admin_grant'` that never auto-award. Idempotent: granting a badge
+// the user already holds returns the existing row without erroring.
+router.post('/users/:id/badges', async (req, res) => {
+  const targetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(targetId) || targetId < 1) {
+    return res.status(400).json({ error: 'User id must be a positive integer.' })
+  }
+  const slug = typeof req.body?.slug === 'string' ? req.body.slug.trim() : ''
+  if (!slug || slug.length > 100) {
+    return res.status(400).json({ error: 'Badge slug is required.' })
+  }
+  try {
+    const { adminGrantBadge } = require('../achievements/achievements.engine')
+    const result = await adminGrantBadge(prisma, {
+      targetUserId: targetId,
+      slug,
+      performedBy: req.user.userId,
+    })
+    auditFromRequest(req, AUDIT_EVENTS.ADMIN_USER_EDIT, {
+      targetUserId: targetId,
+      change: 'badge_grant',
+      slug,
+    })
+    res.json(result)
+  } catch (err) {
+    if (err.code === 'BADGE_NOT_FOUND') {
+      return res.status(404).json({ error: err.message })
+    }
+    if (err.code === 'P2025') return res.status(404).json({ error: 'User not found.' })
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
+// ── GET /api/admin/badges ───────────────────────────────────
+// Catalog list for the manual-grant picker on UsersTab. Returns the
+// minimum fields needed to render a select: slug, name, tier, xp,
+// isSecret. Sorted by displayOrder so the list matches the gallery.
+router.get('/badges', async (req, res) => {
+  try {
+    const badges = await prisma.badge.findMany({
+      select: {
+        slug: true,
+        name: true,
+        tier: true,
+        xp: true,
+        isSecret: true,
+      },
+      orderBy: [{ displayOrder: 'asc' }, { slug: 'asc' }],
+    })
+    res.json({ badges })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ── DELETE /api/admin/users/:id ──────────────────────────────
 router.delete('/users/:id', async (req, res) => {
-  const targetId = parseInt(req.params.id)
-  if (!Number.isInteger(targetId)) {
-    return res.status(400).json({ error: 'User id must be an integer.' })
+  const targetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(targetId) || targetId < 1) {
+    return res.status(400).json({ error: 'User id must be a positive integer.' })
   }
   if (targetId === req.user.userId) {
     return res

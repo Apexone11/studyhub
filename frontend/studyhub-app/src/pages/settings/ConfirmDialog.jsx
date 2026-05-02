@@ -1,4 +1,5 @@
 import { createPortal } from 'react-dom'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 import { Button } from './settingsShared'
 import { FONT } from './settingsState'
 
@@ -13,12 +14,15 @@ export function ConfirmDialog({
   onCancel,
   busy = false,
 }) {
+  // Trap Tab + Shift+Tab inside the dialog so keyboard focus can't
+  // wander to background controls. Escape still dismisses via
+  // onCancel (the standard dialog close path) — focus trap and
+  // dismissal are separate concerns. (Audit Loop 13 finding C4.)
+  const trapRef = useFocusTrap({ active: open, onClose: onCancel })
+
   if (!open) return null
   return createPortal(
     <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={title}
       style={{
         position: 'fixed',
         inset: 0,
@@ -32,6 +36,10 @@ export function ConfirmDialog({
       onClick={onCancel}
     >
       <div
+        ref={trapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
         onClick={(e) => e.stopPropagation()}
         style={{
           background: 'var(--sh-surface)',

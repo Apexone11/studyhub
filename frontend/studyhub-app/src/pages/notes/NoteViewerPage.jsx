@@ -15,7 +15,6 @@ import { PAGE_FONT } from '../shared/pageUtils'
 import { MarkdownPreview, wordCount, countWordsFromHtml } from './notesConstants'
 import NoteCommentSection from './NoteCommentSection'
 import { useNoteViewer } from './useNoteViewer'
-import { useNoteComments } from './useNoteComments'
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -137,7 +136,6 @@ const actionBtnStyle = (active, color) => ({
 export default function NoteViewerPage() {
   const { user } = useSession()
   const { note, loading, error } = useNoteViewer()
-  const { reactToComment: handleReactToComment } = useNoteComments(note?.id)
   const [reportOpen, setReportOpen] = useState(false)
 
   // Local social state
@@ -482,7 +480,6 @@ export default function NoteViewerPage() {
           isOwner={note.isOwner}
           user={user}
           noteContent={note.content}
-          onReactToComment={handleReactToComment}
         />
       )}
 

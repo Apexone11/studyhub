@@ -21,6 +21,7 @@ export const TABS = [
   ['activation', 'Activation'],
   ['referrals-admin', 'Referrals'],
   ['observability', 'Observability'],
+  ['consent-log', 'Consent Log'],
 ]
 
 export function authHeaders() {

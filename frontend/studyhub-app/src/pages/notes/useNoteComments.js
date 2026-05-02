@@ -2,7 +2,7 @@
  * useNoteComments.js — Hook for fetching, posting, resolving, deleting
  * comments on a note. Supports threaded replies (1 level deep).
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 
@@ -13,6 +13,26 @@ export function useNoteComments(noteId) {
   const [posting, setPosting] = useState(false)
   const [error, setError] = useState('')
   const loadedRef = useRef(false)
+  const loadedNoteIdRef = useRef(null)
+  // Monotonic request sequence — every reactToComment dispatch increments
+  // this. Server reconciliation only writes to state if its sequence is
+  // still the latest. Prevents request-N's server response from
+  // overwriting request-(N+1)'s optimistic state on rapid double-click.
+  const reactSeqRef = useRef(0)
+
+  // Reset the per-note cache when navigating between notes so the
+  // collapsed-section count + list don't stay stuck on the previous
+  // note's data. Without this, NoteCommentSection's mount-effect fires
+  // for the new noteId but the loadedRef short-circuits because it was
+  // already true from the previous note.
+  useEffect(() => {
+    if (loadedNoteIdRef.current !== noteId) {
+      loadedRef.current = false
+      loadedNoteIdRef.current = noteId
+      setComments([])
+      setTotal(0)
+    }
+  }, [noteId])
 
   const loadComments = useCallback(async () => {
     if (loadedRef.current || !noteId) return
@@ -186,9 +206,44 @@ export function useNoteComments(noteId) {
 
   const reactToComment = useCallback(
     async (commentId, type) => {
+      // Snapshot the pre-update state so we can rollback if the POST
+      // fails. Without this, a 429 / 500 / network drop leaves the
+      // optimistic count inflated until the loadComments() refetch
+      // arrives — multi-second visual lie on the worst code path.
+      let snapshot = null
+      const reverseFor = (commentList) => {
+        return commentList.map((c) => {
+          if (c.id === commentId)
+            return {
+              ...c,
+              userReaction: snapshot?.userReaction ?? null,
+              reactionCounts: snapshot?.reactionCounts ?? { like: 0, dislike: 0 },
+            }
+          return {
+            ...c,
+            replies: (c.replies || []).map((r) => {
+              if (r.id !== commentId) return r
+              return {
+                ...r,
+                userReaction: snapshot?.userReaction ?? null,
+                reactionCounts: snapshot?.reactionCounts ?? { like: 0, dislike: 0 },
+              }
+            }),
+          }
+        })
+      }
+
       // Helper to update reaction in a comment
       const updateReaction = (comment) => {
         if (comment.id !== commentId) return comment
+        // Capture the first match for rollback. If the comment is a
+        // reply we'll re-capture below.
+        if (!snapshot) {
+          snapshot = {
+            userReaction: comment.userReaction ?? null,
+            reactionCounts: comment.reactionCounts ?? { like: 0, dislike: 0 },
+          }
+        }
         const oldType = comment.userReaction
         const newType = oldType === type ? null : type
         let newLikes = comment.reactionCounts?.like || 0
@@ -203,6 +258,12 @@ export function useNoteComments(noteId) {
           reactionCounts: { like: newLikes, dislike: newDislikes },
         }
       }
+
+      // Stamp this dispatch so a slow request from a previous click
+      // can't overwrite a faster, newer one when it eventually
+      // resolves (audit Loop 17 finding #3).
+      reactSeqRef.current += 1
+      const mySeq = reactSeqRef.current
 
       // Optimistic update (check both top-level and replies)
       setComments((prev) =>
@@ -223,8 +284,10 @@ export function useNoteComments(noteId) {
           body: JSON.stringify({ type }),
         })
         if (res.ok) {
-          // Reconcile against server truth so a slow optimistic update can't
-          // drift if another tab toggled the same comment in parallel.
+          // Only reconcile if this response is the latest dispatch;
+          // a stale request would otherwise stomp a newer optimistic
+          // update applied while it was in flight.
+          if (mySeq !== reactSeqRef.current) return
           const data = await res.json().catch(() => null)
           if (data && data.reactionCounts) {
             setComments((prev) =>
@@ -246,10 +309,18 @@ export function useNoteComments(noteId) {
             )
           }
         } else {
+          // Immediate rollback to the snapshot so the user doesn't
+          // see an inflated count for the duration of the refetch.
+          if (snapshot && mySeq === reactSeqRef.current) {
+            setComments((prev) => reverseFor(prev))
+          }
           loadedRef.current = false
           await loadComments()
         }
       } catch {
+        if (snapshot && mySeq === reactSeqRef.current) {
+          setComments((prev) => reverseFor(prev))
+        }
         loadedRef.current = false
         await loadComments()
       }

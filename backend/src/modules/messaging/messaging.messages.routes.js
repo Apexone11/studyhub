@@ -33,9 +33,12 @@ router.use(readLimiter)
  */
 router.get('/conversations/:id/messages', requireAuth, async (req, res) => {
   try {
-    const conversationId = parseInt(req.params.id, 10)
+    const conversationId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(conversationId) || conversationId < 1) {
+      return sendError(res, 400, 'Invalid conversation id.', ERROR_CODES.BAD_REQUEST)
+    }
     const { before, limit = 50 } = req.query
-    const limitNum = Math.min(parseInt(limit, 10) || 50, 100)
+    const limitNum = Math.min(Number.parseInt(limit, 10) || 50, 100)
 
     // Verify user is a participant
     const participant = await prisma.conversationParticipant.findUnique({
@@ -114,8 +117,18 @@ router.get('/conversations/:id/messages', requireAuth, async (req, res) => {
  */
 router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const conversationId = parseInt(req.params.id, 10)
+    const conversationId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(conversationId) || conversationId < 1) {
+      return sendError(res, 400, 'Invalid conversation id.', ERROR_CODES.BAD_REQUEST)
+    }
     const { content, type = 'text', replyToId, attachments = [], poll } = req.body
+
+    // Whitelist message type — clients can otherwise persist arbitrary
+    // strings to the `type` column and broadcast them to participants.
+    const ALLOWED_MESSAGE_TYPES = new Set(['text', 'image', 'gif', 'system'])
+    if (!ALLOWED_MESSAGE_TYPES.has(type)) {
+      return sendError(res, 400, 'Invalid message type.', ERROR_CODES.BAD_REQUEST)
+    }
 
     // Allow empty content when attachments are present (e.g. GIF-only messages)
     const hasAttachments = Array.isArray(attachments) && attachments.length > 0
@@ -142,6 +155,14 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
       if (!poll.question || typeof poll.question !== 'string' || poll.question.trim() === '') {
         return sendError(res, 400, 'Poll question required.', ERROR_CODES.BAD_REQUEST)
       }
+      if (poll.question.trim().length > 500) {
+        return sendError(
+          res,
+          400,
+          'Poll question must be 500 characters or fewer.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
       if (!Array.isArray(poll.options) || poll.options.length < 2) {
         return sendError(res, 400, 'Poll must have at least 2 options.', ERROR_CODES.BAD_REQUEST)
       }
@@ -153,6 +174,16 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
           ERROR_CODES.BAD_REQUEST,
         )
       }
+      for (const opt of poll.options) {
+        if (typeof opt !== 'string' || opt.trim().length === 0 || opt.length > 200) {
+          return sendError(
+            res,
+            400,
+            'Each poll option must be 1-200 characters.',
+            ERROR_CODES.BAD_REQUEST,
+          )
+        }
+      }
     }
 
     // Validate attachments
@@ -160,7 +191,15 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
       return sendError(res, 400, 'Maximum 5 attachments per message.', ERROR_CODES.BAD_REQUEST)
     }
 
+    // Whitelist attachment type — clients could otherwise persist
+    // arbitrary `type` values that the frontend dispatcher might not
+    // know how to render (or might silently treat as one of the known
+    // categories).
+    const ALLOWED_ATTACHMENT_TYPES = new Set(['image', 'gif', 'file', 'video'])
     for (const att of attachments) {
+      if (att.type && !ALLOWED_ATTACHMENT_TYPES.has(att.type)) {
+        return sendError(res, 400, 'Invalid attachment type.', ERROR_CODES.BAD_REQUEST)
+      }
       if (!att.url || typeof att.url !== 'string') {
         return sendError(res, 400, 'Attachment URL required.', ERROR_CODES.BAD_REQUEST)
       }
@@ -318,7 +357,10 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
  */
 router.patch('/:messageId', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const messageId = parseInt(req.params.messageId, 10)
+    const messageId = Number.parseInt(req.params.messageId, 10)
+    if (!Number.isInteger(messageId) || messageId < 1) {
+      return sendError(res, 400, 'Invalid message id.', ERROR_CODES.BAD_REQUEST)
+    }
     const { content } = req.body
 
     if (!content || typeof content !== 'string' || content.trim() === '') {
@@ -411,9 +453,12 @@ router.patch('/:messageId', requireAuth, messagingWriteLimiter, async (req, res)
  * DELETE /messages/:messageId
  * Soft delete a message (owner or conversation admin)
  */
-router.delete('/:messageId', requireAuth, async (req, res) => {
+router.delete('/:messageId', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const messageId = parseInt(req.params.messageId, 10)
+    const messageId = Number.parseInt(req.params.messageId, 10)
+    if (!Number.isInteger(messageId) || messageId < 1) {
+      return sendError(res, 400, 'Invalid message id.', ERROR_CODES.BAD_REQUEST)
+    }
 
     const message = await prisma.message.findUnique({
       where: { id: messageId },

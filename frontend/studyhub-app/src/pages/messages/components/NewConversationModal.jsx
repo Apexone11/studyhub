@@ -284,6 +284,7 @@ export function NewConversationModal({ isOpen, onClose, onCreate, currentUserId 
                   {user.username}
                   <button
                     onClick={() => handleUserSelect(user)}
+                    aria-label={`Remove ${user.username}`}
                     style={{
                       background: 'none',
                       border: 'none',

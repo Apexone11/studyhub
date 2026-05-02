@@ -35,10 +35,19 @@ function toDateInputValue(d) {
   return date.toISOString().slice(0, 10)
 }
 
-/** Take a `YYYY-MM-DD` string back to a full ISO datetime the API accepts. */
+/**
+ * Take a `YYYY-MM-DD` string back to a full ISO datetime the API
+ * accepts. Anchored at 12:00 UTC so the resulting instant always
+ * falls inside the picked calendar day in every real-world timezone
+ * (UTC-11 .. UTC+12). Earlier iterations tried `T00:00:00` local
+ * (shifted the UTC day for positive offsets) and `T14:00:00.000Z`
+ * (shifted the UTC day for offsets ≥ +10). UTC noon is the only
+ * fixed instant that round-trips correctly through
+ * `toISOString().slice(0,10)` for every timezone we care about.
+ */
 function toIsoDateTime(yyyyMmDd) {
   if (!yyyyMmDd) return null
-  const d = new Date(`${yyyyMmDd}T14:00:00.000Z`) // default to a mid-day UTC time
+  const d = new Date(`${yyyyMmDd}T12:00:00.000Z`)
   if (Number.isNaN(d.getTime())) return null
   return d.toISOString()
 }

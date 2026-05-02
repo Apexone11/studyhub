@@ -102,7 +102,12 @@ const styles = {
     padding: '22px 24px',
     borderRadius: 22,
     border: '1px solid var(--sh-border)',
-    background: 'linear-gradient(180deg, rgba(255,255,255,0.96) 0%, var(--sh-surface) 100%)',
+    // Token-based so the document body stays readable in dark mode.
+    // The previous `rgba(255,255,255,0.96)` top stop was a hardcoded
+    // near-white that left dark-mode text invisible against a light
+    // card.
+    background: 'linear-gradient(180deg, var(--sh-surface) 0%, var(--sh-soft) 100%)',
+    color: 'var(--sh-text)',
     boxShadow: 'var(--shadow-md)',
   },
   fallbackHeader: {
@@ -329,7 +334,7 @@ export default function LegalAcceptanceModal({ open, onAccept, onDecline }) {
                     padding: '12px 14px',
                     borderRadius: 14,
                     border: isActive ? '1px solid var(--sh-brand)' : '1px solid var(--sh-border)',
-                    background: isActive ? 'var(--sh-surface)' : 'rgba(255,255,255,0.35)',
+                    background: isActive ? 'var(--sh-surface)' : 'var(--sh-soft)',
                     cursor: 'pointer',
                     fontFamily: 'var(--font)',
                     fontSize: 13,

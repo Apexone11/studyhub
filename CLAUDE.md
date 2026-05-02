@@ -2,6 +2,179 @@
 
 Read this file before starting any task in StudyHub.
 
+## ⛔ AGENT BEHAVIORAL CONTRACT (READ FIRST, NON-NEGOTIABLE)
+
+These rules apply to **every AI agent (Claude, Copilot, any reviewer or builder)** that touches this repo. They take precedence over your default behavior. Violating them produces real bugs and failed CI runs and Abdul has to clean up after — don't.
+
+### A1 — Use every available skill, tool, and subagent
+
+You have access to specialized tools (Grep, Glob, Read, Edit, Agent, etc.) and to subagents (`code-reviewer`, `Explore`, `feature-dev:*`, `Plan`, `general-purpose`). **Use them.** A "I think the answer is X" response is unacceptable when you can verify in seconds.
+
+- Before answering anything non-trivial, run the relevant searches. "I'd guess this is in `auth.routes.js`" → no, `Grep` for it.
+- For audits, security passes, or open-ended investigations spanning >3 files, dispatch a subagent. Don't try to keep 50 file findings in main context.
+- For any change touching >5 files, run a `code-reviewer` subagent on the diff before reporting "done."
+- Run lint and build at the end of every change. Not "I think it's fine" — actually run them.
+
+If you skip available tooling because you "remember the answer," you are gambling with the user's time. Don't.
+
+### A2 — CI must be green before any "done"
+
+The user has been burned by red CI for weeks. Every PR-bound change must include:
+
+1. `npm --prefix backend run lint` clean (run it, paste the result if asked).
+2. `npm --prefix frontend/studyhub-app run lint` clean.
+3. `npm --prefix frontend/studyhub-app run build` succeeds.
+4. `npm --prefix backend test` passes (skip only if the tests are unrelated to your change AND would take >5 min).
+5. The release log entry exists in `docs/release-log.md`.
+
+If any of these fail, the change is **not done**. Fix it before reporting back. "Tests will pass" is not a substitute for running them.
+
+### A3 — Read before edit, every time
+
+Code may have changed since memory or CLAUDE.md was last updated. Before editing a file:
+
+- Use the `Read` tool. Don't write blind.
+- Verify imports actually resolve in the current schema (e.g., `core/db/prisma` re-exports `lib/prisma` — confirm before assuming).
+- Verify migrations match `schema.prisma`. Schema drift causes silent prod failures.
+
+### A4 — No optimistic UI without server confirmation
+
+Never assume a write succeeded by toggling local state to the inverse of what was sent. Always:
+
+1. Await the response.
+2. Hydrate UI from the response body's persisted value (or fall back to the requested value if the server didn't echo it).
+3. Surface errors via toast — don't swallow.
+
+Pattern that has caused production bugs: `onSuccess({ field: !current.field })`. Replace with: `const persisted = data.field ?? requested; onSuccess({ field: persisted })`. The toggle that "doesn't work" almost always traces back to optimistic-merge masking a silent persistence failure.
+
+### A5 — Migrations must be idempotent
+
+Every migration SQL must be safe to re-run. Use `IF NOT EXISTS`, `DO $$ ... EXCEPTION ... END $$`, or equivalent guards. Non-idempotent `ALTER TABLE ADD COLUMN` without a guard is forbidden — it breaks `prisma migrate deploy` on retry. Reviewer must reject. Existing offenders should be migrated to the safe form alongside any other change touching that file.
+
+### A6 — Defense in depth on every owner-control / privacy toggle
+
+When you add a feature with a "private," "downloads disabled," "members only," etc. toggle, the rule is **enforce in three places**:
+
+1. **Frontend visibility** — hide the affected button/tab.
+2. **Backend route handler** — return 403/404 even if the frontend was bypassed.
+3. **Backend serializer** — strip fields the user shouldn't see (e.g., `attachmentUrl` for non-allowed-download).
+
+Hiding only in the UI is a phishing-tier pseudo-fix. The user can hit `curl` directly. If a toggle exists, all three layers must enforce.
+
+### A7 — Rate limiters: IPv6-safe `keyGenerator`s only
+
+`express-rate-limit` v7+ rejects raw `req.ip` in custom keyGenerators (`ERR_ERL_KEY_GEN_IPV6`). Production has crashed on this. Allowed patterns:
+
+- `keyGenerator: (req) => \`prefix-${req.user?.userId || 'anon'}\``(auth-required routes; the`'anon'`fallback never fires when`requireAuth` precedes the limiter).
+- Default IP keying (no `keyGenerator` field) — express-rate-limit v8+ handles IPv6 normalization safely.
+
+**Forbidden:** `req.ip` as the key fallback in a custom keyGenerator. **Required:** optional chain `req.user?.userId`. Never `req.user.userId` without the `?.` — even if auth precedes the limiter today, a future middleware reorder will crash production at boot.
+
+### A8 — PII never enters logs unredacted
+
+Never pass `email`, `phone`, `ssn`, full names, IP addresses, or password fragments into a log call's context object — pino's redact list does NOT cover these. Use the `hashEmail()` pattern (sha256, last 8 chars) for correlation. Sentry `captureError` extras go through `redactObject` but the same rule applies — pass an `entryId`/`userId`, not the email itself.
+
+### A9 — Secrets: documented in `.env.example`, validated at boot, fail-closed in prod
+
+Every `process.env.X` your code reads must:
+
+1. Be listed in `.env.example` with a comment describing what it does.
+2. Be in `secretValidator.js` under `REQUIRED`, `REQUIRED_IN_PRODUCTION`, `RECOMMENDED`, or `OPTIONAL`.
+3. If used for crypto / signing / auth, fail-closed in production: `if (!secret && process.env.NODE_ENV === 'production') throw ...`.
+
+Never use a hardcoded dev fallback in code that's reachable in production. The `PROVENANCE_SECRET` incident is the canonical example — a dev fallback derived from a public string was silently used in prod for weeks.
+
+### A10 — Background jobs use `runWithHeartbeat`
+
+Every `setInterval` (and recursive `setTimeout` chain) must wrap its body in `runWithHeartbeat('job.name', fn, { slaMs })` from `lib/jobs/heartbeat.js`. This emits `event: 'job.start'` / `'job.success'` / `'job.failure'` to pino + Sentry. Bare `setInterval(() => fn().catch(() => {}))` is forbidden — it makes silent hung jobs invisible.
+
+`.unref()` every interval that doesn't need to keep the process alive. Tests fail to exit otherwise.
+
+### A11 — CSRF defense in depth on writes
+
+Every POST/PATCH/PUT/DELETE that touches user/payment/legal/auth state must apply `originAllowlist()` (alias `requireTrustedOrigin`) middleware in addition to the global Origin check. Settings, payments, exams, AI, legal, creator-audit are the canonical examples. New write modules must opt in.
+
+`originAllowlist` short-circuits GET/HEAD/OPTIONS, so applying it at the `router.use(...)` level on a module is safe even if the module mixes reads and writes.
+
+### A12 — parseInt is unsafe — use `Number.parseInt(x, 10) + Number.isInteger`
+
+`parseInt(req.params.id)` without a radix returns `NaN` for non-numeric input, which Prisma may coerce to `undefined` and produce surprising query behavior (or worse, return all rows). The required pattern:
+
+```js
+const id = Number.parseInt(req.params.id, 10)
+if (!Number.isInteger(id) || id < 1) {
+  return sendError(res, 400, 'Invalid id.', ERROR_CODES.BAD_REQUEST)
+}
+```
+
+This is the FIRST validation in any handler that touches a numeric ID from the URL or body. Don't skip it because "Express type-checks the route" — it doesn't.
+
+### A13 — Enum / type validation on every body field
+
+Any string from `req.body` that lands in a Prisma `where` or `data` clause must be validated against an explicit allowlist before it touches the DB. The messaging `type` field incident (clients could persist arbitrary `type` values to `Message.type`) is the canonical bug. Pattern:
+
+```js
+const ALLOWED_TYPES = new Set(['text', 'image', 'gif', 'system'])
+if (!ALLOWED_TYPES.has(type)) return sendError(res, 400, 'Invalid type.', ERROR_CODES.BAD_REQUEST)
+```
+
+### A14 — Iframe sandbox: never `allow-scripts allow-same-origin` together
+
+That combination is a documented sandbox escape vector (the iframe can rewrite `parent.frames[0].location` and execute in the parent origin). Allowed combinations:
+
+- `sandbox=""` — strictest, for pure preview of untrusted HTML.
+- `sandbox="allow-scripts allow-popups allow-forms"` — third-party iframe that needs JS but no DOM access to the parent.
+- `sandbox="allow-same-origin"` — first-party preview that needs to read same-origin cookies but never executes script.
+
+`data:` URIs always have an opaque origin, so `allow-same-origin` on a data URI is a no-op today but still wrong — future refactors that swap to a blob: or backend URL re-introduce the escape. Use `sandbox=""` for those.
+
+### A15 — `target="_blank"` requires `rel="noopener noreferrer"`
+
+Both. Always. `noreferrer` implies `noopener` in modern browsers, but the project convention is to write both — and convention is what reviewers grep for. Inconsistency means the next reviewer can't tell at a glance which links are reviewed and which were missed.
+
+### A16 — console.\* is forbidden in `backend/src/`
+
+Use `log.info/warn/error/fatal` from `lib/logger.js` with the structured shape:
+
+```js
+log.warn({ event: 'module.action_failed', ...ctx }, 'Human-readable message')
+```
+
+The `event` field is the alert key — without it, log aggregator alerts can't fire. `console.error` bypasses pino, loses request-id correlation, and is silent in test (where logger is `level: 'silent'`).
+
+### A17 — Never `--no-verify` git commits
+
+If a pre-commit hook fails, fix the failure. Bypassing it ships broken code to CI which then fails for the user, who has to push another commit, which is exactly what they're trying to stop.
+
+### A18 — Don't fabricate green CI
+
+When asked "did the tests pass?", you must have actually run them. "Should pass" / "I expect them to pass" / "in theory they pass" — these are lies dressed as caveats. If you didn't run them, say so. Then run them.
+
+### A19 — Read CHANGELOG.md and release-log.md before claiming a feature is unimplemented
+
+Half the "let me build feature X" requests are for features that already exist. Grep for the feature name first. The user's #1 frustration is duplicated work.
+
+### A20 — Stop saying "I think" — verify or say "I don't know"
+
+"I think this is wired up" → either verify it (in <30 seconds with grep) or say "I haven't verified this." Never both. The user can handle "I don't know yet, let me check"; they cannot handle "yes" that turns out to be "no."
+
+### A21 — Vet every Copilot / external bot bug report before acting on it
+
+Bot reviewers (GitHub Copilot, Sourcery, Codex, Dependabot security advisories, anything that opens a PR comment unprompted) are NOT a source of truth. They have no project context, they don't know our coding conventions, and they hallucinate "issues" that are either non-existent or stylistically inconsistent with the rest of the codebase. Blindly applying their suggestions has, in this repo, _introduced_ bugs and _broken_ established naming/style consistency more than once.
+
+Before touching code in response to a bot finding:
+
+1. **Reproduce or refute it against the actual code.** Read the file at the cited line. Run the test that supposedly fails. Grep for the function/variable. If you can't reproduce the issue, the finding is wrong — close the comment with a one-line "verified, false positive" and move on. Do NOT change code to "make the bot happy."
+2. **Cross-check against an industry standard.** Is the suggestion an MDN-documented best practice, an OWASP rule, a NIST control, an established a11y pattern (W3C ARIA), a CLAUDE.md A-rule, or a published library convention (Express, Prisma, React)? If none of these, the bot is offering style preference, not a bug — and bot style preferences usually don't match this codebase's preferences.
+3. **Refute it if it conflicts with an existing CLAUDE.md A-rule.** If the bot says "use `parseInt` without a radix" and A12 says "always pass radix + `Number.isInteger` guard," CLAUDE.md wins. If the bot says "wrap this in try/catch" but the surrounding module trusts internal callers, the bot is wrong.
+4. **Refute it if it breaks our coding-style consistency.** If the bot suggests `snake_case` in a `camelCase` file, `function expr` in an `arrow fn` file, `console.error` instead of `log.error`, raw `res.status().json({error})` instead of `sendError()`, or any other variant of "different from how the rest of the file/module is written" — reject the suggestion. Consistency is a feature; bot-induced drift is a regression.
+5. **If the finding IS real, fix it in our existing style.** Don't copy the bot's snippet verbatim. Match the surrounding code's naming, error envelope, log shape, validation pattern, and import order. A genuine bug fix that breaks our style is still a regression.
+6. **One bot finding ≠ one commit.** Batch real findings into a single coherent commit with a clear message. Don't spam the history with "address copilot review #1, #2, #3" if the underlying changes are trivial — that's bot-driven noise.
+
+The goal: bot review is an _input_ to the developer's judgment, not a directive. Treat it like a junior reviewer's comment — sometimes useful, sometimes wrong, always requires verification before action.
+
+---
+
 ## Project Overview
 
 StudyHub is a GitHub-style collaborative study platform for college students. Core product ideas:

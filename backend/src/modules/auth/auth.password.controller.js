@@ -1,13 +1,20 @@
 const express = require('express')
 const bcrypt = require('bcryptjs')
 const crypto = require('crypto')
+const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { captureError } = require('../../monitoring/sentry')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { sendPasswordReset } = require('../../lib/email/email')
 const { hashStoredSecret } = require('../../lib/authTokens')
+const { isPasswordPwned } = require('../../lib/passwordSafety')
 const prisma = require('../../lib/prisma')
 const { PASSWORD_MIN_LENGTH } = require('./auth.constants')
 const { forgotLimiter } = require('./auth.constants')
+const { writeLimiter } = require('../../lib/rateLimiters')
 const { handleAuthError } = require('./auth.service')
+
+const requireTrustedOrigin = originAllowlist()
 
 const router = express.Router()
 
@@ -108,6 +115,12 @@ router.post('/reset-password', forgotLimiter, async (req, res) => {
       where: { id: resetToken.userId },
       data: {
         passwordHash,
+        // The user just chose a password they know; flip the flag so
+        // they can confirm sensitive ops with it. Especially important
+        // for Google-signup users who used forgot-password as the
+        // workaround to set a real password (legacy behavior, kept
+        // working).
+        passwordSetByUser: true,
         failedAttempts: 0,
         lockedUntil: null,
       },
@@ -116,6 +129,95 @@ router.post('/reset-password', forgotLimiter, async (req, res) => {
 
     return res.json({ message: 'Password updated successfully.' })
   } catch (error) {
+    return handleAuthError(req, res, error)
+  }
+})
+
+/**
+ * POST /api/auth/set-password
+ *
+ * One-time password setter for users whose `passwordSetByUser` is
+ * still false — i.e. Google-signup users who never chose a password.
+ * After this call:
+ *   - they can confirm sensitive ops (delete account, change email,
+ *     change password) by entering the password they just chose
+ *   - they can fall back to email/password login if Google is
+ *     unavailable
+ *
+ * Refuses to run for users who already have `passwordSetByUser =
+ * true` — those callers must use `PATCH /api/settings/password`
+ * (which requires the existing password). This prevents anyone who
+ * gains short-lived session access from rotating the password
+ * silently to lock the real owner out.
+ */
+router.post('/set-password', requireAuth, requireTrustedOrigin, writeLimiter, async (req, res) => {
+  const { newPassword } = req.body || {}
+  if (!newPassword || typeof newPassword !== 'string') {
+    return sendError(res, 400, 'Password is required.', ERROR_CODES.BAD_REQUEST)
+  }
+  if (newPassword.length < PASSWORD_MIN_LENGTH) {
+    return sendError(
+      res,
+      400,
+      `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
+      ERROR_CODES.VALIDATION,
+    )
+  }
+  if (!/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
+    return sendError(
+      res,
+      400,
+      'Password must include at least one capital letter and one number.',
+      ERROR_CODES.VALIDATION,
+    )
+  }
+
+  try {
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { id: true, passwordSetByUser: true },
+    })
+    if (!user) {
+      return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
+    }
+    if (user.passwordSetByUser) {
+      // Don't let a session-hijack rotate the password silently. The
+      // legit "I want a different password" path is the existing
+      // `PATCH /api/settings/password`, which requires the current
+      // password. This endpoint is one-time-use only.
+      return sendError(
+        res,
+        409,
+        'Password already set. Use Settings → Security to change it.',
+        ERROR_CODES.CONFLICT,
+      )
+    }
+
+    // HIBP breach check (NIST 800-63B §5.1.1.2). Fail-OPEN if HIBP
+    // is unreachable so users aren't blocked by a network blip.
+    try {
+      const pwned = await isPasswordPwned(newPassword)
+      if (pwned) {
+        return sendError(
+          res,
+          400,
+          'This password appears in known breach lists. Please choose another.',
+          ERROR_CODES.VALIDATION,
+        )
+      }
+    } catch {
+      /* HIBP unreachable — proceed */
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12)
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { passwordHash, passwordSetByUser: true },
+    })
+
+    return res.json({ message: 'Password set successfully.' })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
     return handleAuthError(req, res, error)
   }
 })

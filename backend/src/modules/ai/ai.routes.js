@@ -45,77 +45,101 @@ router.get('/conversations', requireAuth, readLimiter, async (req, res) => {
     res.json(result)
   } catch (err) {
     captureError(err, { tags: { module: 'ai', action: 'listConversations' } })
-    res.status(500).json({ error: 'Failed to load conversations.' })
+    sendError(res, 500, 'Failed to load conversations.', ERROR_CODES.INTERNAL)
   }
 })
 
 // POST /api/ai/conversations
-router.post('/conversations', requireAuth, writeLimiter, async (req, res) => {
+router.post('/conversations', requireAuth, requireTrustedOrigin, writeLimiter, async (req, res) => {
   try {
     const conversation = await aiService.createConversation(req.user.userId, req.body.title || null)
     res.status(201).json(conversation)
   } catch (err) {
     captureError(err, { tags: { module: 'ai', action: 'createConversation' } })
-    res.status(500).json({ error: 'Failed to create conversation.' })
+    sendError(res, 500, 'Failed to create conversation.', ERROR_CODES.INTERNAL)
   }
 })
 
 // GET /api/ai/conversations/:id
 router.get('/conversations/:id', requireAuth, readLimiter, async (req, res) => {
   try {
-    const id = parseInt(req.params.id)
-    if (isNaN(id)) return res.status(400).json({ error: 'Invalid conversation ID.' })
+    const id = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(id) || id < 1) {
+      return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
+    }
 
     const conversation = await aiService.getConversation(id, req.user.userId)
-    if (!conversation) return res.status(404).json({ error: 'Conversation not found.' })
+    if (!conversation) {
+      return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
+    }
 
     res.json(conversation)
   } catch (err) {
     captureError(err, { tags: { module: 'ai', action: 'getConversation' } })
-    res.status(500).json({ error: 'Failed to load conversation.' })
+    sendError(res, 500, 'Failed to load conversation.', ERROR_CODES.INTERNAL)
   }
 })
 
 // DELETE /api/ai/conversations/:id
-router.delete('/conversations/:id', requireAuth, writeLimiter, async (req, res) => {
-  try {
-    const id = parseInt(req.params.id)
-    if (isNaN(id)) return res.status(400).json({ error: 'Invalid conversation ID.' })
+router.delete(
+  '/conversations/:id',
+  requireAuth,
+  requireTrustedOrigin,
+  writeLimiter,
+  async (req, res) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10)
+      if (!Number.isInteger(id) || id < 1) {
+        return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
+      }
 
-    const deleted = await aiService.deleteConversation(id, req.user.userId)
-    if (!deleted) return res.status(404).json({ error: 'Conversation not found.' })
+      const deleted = await aiService.deleteConversation(id, req.user.userId)
+      if (!deleted) {
+        return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
+      }
 
-    res.json({ message: 'Conversation deleted.' })
-  } catch (err) {
-    captureError(err, { tags: { module: 'ai', action: 'deleteConversation' } })
-    res.status(500).json({ error: 'Failed to delete conversation.' })
-  }
-})
+      res.json({ message: 'Conversation deleted.' })
+    } catch (err) {
+      captureError(err, { tags: { module: 'ai', action: 'deleteConversation' } })
+      sendError(res, 500, 'Failed to delete conversation.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 // PATCH /api/ai/conversations/:id
-router.patch('/conversations/:id', requireAuth, writeLimiter, async (req, res) => {
-  try {
-    const id = parseInt(req.params.id)
-    if (isNaN(id)) return res.status(400).json({ error: 'Invalid conversation ID.' })
+router.patch(
+  '/conversations/:id',
+  requireAuth,
+  requireTrustedOrigin,
+  writeLimiter,
+  async (req, res) => {
+    try {
+      const id = Number.parseInt(req.params.id, 10)
+      if (!Number.isInteger(id) || id < 1) {
+        return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
+      }
 
-    const { title } = req.body
-    if (!title || typeof title !== 'string' || title.trim().length === 0) {
-      return res.status(400).json({ error: 'Title is required.' })
+      const { title } = req.body
+      if (!title || typeof title !== 'string' || title.trim().length === 0) {
+        return sendError(res, 400, 'Title is required.', ERROR_CODES.BAD_REQUEST)
+      }
+
+      const updated = await aiService.renameConversation(
+        id,
+        req.user.userId,
+        title.trim().slice(0, 200),
+      )
+      if (!updated) {
+        return sendError(res, 404, 'Conversation not found.', ERROR_CODES.NOT_FOUND)
+      }
+
+      res.json(updated)
+    } catch (err) {
+      captureError(err, { tags: { module: 'ai', action: 'renameConversation' } })
+      sendError(res, 500, 'Failed to rename conversation.', ERROR_CODES.INTERNAL)
     }
-
-    const updated = await aiService.renameConversation(
-      id,
-      req.user.userId,
-      title.trim().slice(0, 200),
-    )
-    if (!updated) return res.status(404).json({ error: 'Conversation not found.' })
-
-    res.json(updated)
-  } catch (err) {
-    captureError(err, { tags: { module: 'ai', action: 'renameConversation' } })
-    res.status(500).json({ error: 'Failed to rename conversation.' })
-  }
-})
+  },
+)
 
 // ── Send message (SSE streaming response) ──────────────────────────
 

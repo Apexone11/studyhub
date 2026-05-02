@@ -45,7 +45,16 @@ function getEncryptionKey() {
     return crypto.createHash('sha256').update(secret).digest()
   }
 
-  // Dev fallback — deterministic but NOT suitable for production
+  // Fail-closed in production: a missing PROVENANCE_SECRET means manifests
+  // would be encrypted with a publicly-known dev key. Refuse to start up
+  // rather than silently degrading the integrity guarantee.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      "PROVENANCE_SECRET is required in production. Generate with: node -e \"console.log(require('node:crypto').randomBytes(32).toString('hex'))\"",
+    )
+  }
+
+  // Dev fallback — deterministic but NOT suitable for production.
   return crypto.createHash('sha256').update('studyhub-dev-provenance-key').digest()
 }
 

@@ -174,12 +174,16 @@ function buildRsaDerPublicKey(n, e) {
 
 // ── Challenge cleanup ───────────────────────────────────────────────────
 
+// .unref() so the timer doesn't keep the test process alive when this
+// module is required transitively. Matches the pattern used by every other
+// in-process sweep timer in the codebase (activeTracking, usedTokenCache,
+// socketio rate-limit map, abuseDetection).
 setInterval(() => {
   const now = Date.now()
   for (const [key, val] of challengeStore) {
     if (now - val.timestamp > 120_000) challengeStore.delete(key)
   }
-}, 300_000)
+}, 300_000).unref()
 
 module.exports = {
   crypto,

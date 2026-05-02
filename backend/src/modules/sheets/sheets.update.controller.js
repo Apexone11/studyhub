@@ -95,11 +95,33 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     if (courseId) {
       data.courseId = Number.parseInt(courseId, 10)
     }
+    // Owner-control toggles. Logged so production can correlate "the
+    // toggle didn't stick" reports against actual DB persistence.
     if (typeof allowDownloads === 'boolean') {
       data.allowDownloads = allowDownloads
+      log.info(
+        {
+          event: 'sheet.allow_downloads_changed',
+          sheetId,
+          ownerId: sheet.userId,
+          actorId: req.user.userId,
+          newValue: allowDownloads,
+        },
+        'Sheet allowDownloads toggled',
+      )
     }
     if (typeof allowEditing === 'boolean') {
       data.allowEditing = allowEditing
+      log.info(
+        {
+          event: 'sheet.allow_editing_changed',
+          sheetId,
+          ownerId: sheet.userId,
+          actorId: req.user.userId,
+          newValue: allowEditing,
+        },
+        'Sheet allowEditing toggled',
+      )
     }
     if (removeAttachment === true) {
       data.attachmentUrl = null

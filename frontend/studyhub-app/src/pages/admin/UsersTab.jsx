@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { API } from '../../config'
 import { Pager } from './AdminWidgets'
 import { tableHeadStyle, tableCell, tableCellStrong, pillButton } from './adminConstants'
@@ -9,6 +10,31 @@ export default function UsersTab({
   deleteUser,
   loadPagedData,
 }) {
+  // Manual badge-grant modal state. Lazy-loads the badge catalog the
+  // first time an admin opens the picker so the initial users-tab
+  // render isn't slowed by a 54-row catalog fetch nobody asked for.
+  const [grantTarget, setGrantTarget] = useState(null)
+  const [badgeCatalog, setBadgeCatalog] = useState(null)
+  const [grantSlug, setGrantSlug] = useState('')
+  const [grantBusy, setGrantBusy] = useState(false)
+  const [grantError, setGrantError] = useState('')
+
+  useEffect(() => {
+    if (!grantTarget || badgeCatalog) return
+    let cancelled = false
+    fetch(`${API}/api/admin/badges`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!cancelled && data?.badges) setBadgeCatalog(data.badges)
+      })
+      .catch(() => {
+        /* silent — admin sees an empty picker */
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [grantTarget, badgeCatalog])
+
   async function handleTrustLevelChange(userId, trustLevel) {
     try {
       await fetch(`${API}/api/admin/users/${userId}/trust-level`, {
@@ -20,6 +46,52 @@ export default function UsersTab({
       void loadPagedData('users', usersState.page)
     } catch {
       /* silent */
+    }
+  }
+
+  async function handleMfaToggle(userId, nextValue) {
+    try {
+      const r = await fetch(`${API}/api/admin/users/${userId}/mfa`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ mfaRequired: nextValue }),
+      })
+      if (!r.ok) {
+        const data = await r.json().catch(() => ({}))
+        // Admin will already see a non-checked checkbox so reload the
+        // page anyway to reset the visual state from the server.
+        if (data?.error) window.alert(data.error)
+      }
+      void loadPagedData('users', usersState.page)
+    } catch {
+      /* silent */
+    }
+  }
+
+  async function handleGrantBadge(event) {
+    event.preventDefault()
+    if (!grantSlug || !grantTarget) return
+    setGrantBusy(true)
+    setGrantError('')
+    try {
+      const r = await fetch(`${API}/api/admin/users/${grantTarget.id}/badges`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ slug: grantSlug }),
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        setGrantError(data?.error || 'Could not grant badge.')
+        return
+      }
+      setGrantTarget(null)
+      setGrantSlug('')
+    } catch {
+      setGrantError('Network error.')
+    } finally {
+      setGrantBusy(false)
     }
   }
 
@@ -37,9 +109,12 @@ export default function UsersTab({
                 'Email',
                 'Role',
                 'Trust',
+                '2FA',
+                'MFA Required',
+                'Recovery Codes',
                 'Sheets',
                 'Joined',
-                'Staff Verified',
+                'Verified',
                 'Actions',
               ].map((header) => (
                 <th key={header} style={tableHeadStyle}>
@@ -51,7 +126,7 @@ export default function UsersTab({
           <tbody>
             {usersState.items.length === 0 && (
               <tr>
-                <td colSpan={8} className="admin-empty">
+                <td colSpan={11} className="admin-empty">
                   No users found.
                 </td>
               </tr>
@@ -76,6 +151,53 @@ export default function UsersTab({
                     <option value="trusted">Trusted</option>
                     <option value="restricted">Restricted</option>
                   </select>
+                </td>
+                <td style={{ ...tableCell, textAlign: 'center' }}>
+                  {record.twoFaEnabled ? (
+                    <span title="2FA active" style={{ color: 'var(--sh-success)' }}>
+                      ✓
+                    </span>
+                  ) : (
+                    <span title="2FA not set up" style={{ color: 'var(--sh-muted)' }}>
+                      —
+                    </span>
+                  )}
+                </td>
+                <td style={{ padding: '10px 12px', textAlign: 'center' }}>
+                  <input
+                    type="checkbox"
+                    checked={Boolean(record.mfaRequired)}
+                    onChange={() => void handleMfaToggle(record.id, !record.mfaRequired)}
+                    title={
+                      record.mfaRequired
+                        ? `MFA required since ${
+                            record.mfaEnforcedAt
+                              ? new Date(record.mfaEnforcedAt).toLocaleDateString()
+                              : 'unknown'
+                          }`
+                        : 'Force this user to set up 2FA on next login'
+                    }
+                    style={{
+                      cursor: 'pointer',
+                      width: 16,
+                      height: 16,
+                      accentColor: 'var(--sh-brand)',
+                    }}
+                  />
+                </td>
+                <td style={tableCell}>
+                  {record.twoFaRecoveryGeneratedAt ? (
+                    <span title={`Used ${record.twoFaRecoveryUsedCount || 0}`}>
+                      {new Date(record.twoFaRecoveryGeneratedAt).toLocaleDateString()}
+                      {record.twoFaRecoveryUsedCount ? (
+                        <span style={{ color: 'var(--sh-warning)', marginLeft: 4 }}>
+                          ({record.twoFaRecoveryUsedCount})
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : (
+                    <span style={{ color: 'var(--sh-muted)' }}>—</span>
+                  )}
                 </td>
                 <td style={tableCell}>{record._count?.studySheets ?? 0}</td>
                 <td style={tableCell}>{new Date(record.createdAt).toLocaleDateString()}</td>
@@ -122,6 +244,17 @@ export default function UsersTab({
                       Revoke admin
                     </button>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setGrantTarget(record)
+                      setGrantSlug('')
+                      setGrantError('')
+                    }}
+                    style={pillButton('#f0fdf4', '#15803d', '#bbf7d0')}
+                  >
+                    Grant badge
+                  </button>
                   {record.id !== currentUserId ? (
                     <button
                       type="button"
@@ -142,6 +275,88 @@ export default function UsersTab({
         total={usersState.total}
         onChange={(page) => void loadPagedData('users', page)}
       />
+
+      {grantTarget && (
+        <div
+          role="presentation"
+          onClick={() => setGrantTarget(null)}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(0,0,0,0.55)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 10000,
+          }}
+        >
+          <form
+            role="dialog"
+            aria-modal="true"
+            aria-label="Grant badge"
+            onClick={(e) => e.stopPropagation()}
+            onSubmit={handleGrantBadge}
+            style={{
+              background: 'var(--sh-surface)',
+              border: '1px solid var(--sh-border)',
+              borderRadius: 14,
+              padding: 22,
+              width: 'min(420px, 90vw)',
+              color: 'var(--sh-text)',
+            }}
+          >
+            <h3 style={{ margin: '0 0 8px', fontSize: 17, color: 'var(--sh-heading)' }}>
+              Grant badge to {grantTarget.username}
+            </h3>
+            <p style={{ margin: '0 0 14px', fontSize: 13, color: 'var(--sh-muted)' }}>
+              Manual grants bypass criteria evaluation. Use for secret badges and admin-grant-only
+              awards. Idempotent — granting a badge the user already holds is a no-op.
+            </p>
+            <select
+              value={grantSlug}
+              onChange={(e) => setGrantSlug(e.target.value)}
+              style={{
+                width: '100%',
+                padding: '8px 10px',
+                fontSize: 13,
+                borderRadius: 8,
+                border: '1px solid var(--sh-border)',
+                background: 'var(--sh-surface)',
+                color: 'var(--sh-text)',
+                marginBottom: 12,
+              }}
+            >
+              <option value="">{badgeCatalog ? 'Select a badge…' : 'Loading badges…'}</option>
+              {badgeCatalog?.map((badge) => (
+                <option key={badge.slug} value={badge.slug}>
+                  {badge.name} ({badge.tier}, {badge.xp} XP){badge.isSecret ? ' · secret' : ''}
+                </option>
+              ))}
+            </select>
+            {grantError ? (
+              <div style={{ color: 'var(--sh-danger)', fontSize: 12, marginBottom: 10 }}>
+                {grantError}
+              </div>
+            ) : null}
+            <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+              <button
+                type="button"
+                onClick={() => setGrantTarget(null)}
+                style={pillButton('var(--sh-soft)', 'var(--sh-text)', 'var(--sh-border)')}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!grantSlug || grantBusy}
+                style={pillButton('#f0fdf4', '#15803d', '#bbf7d0')}
+              >
+                {grantBusy ? 'Granting…' : 'Grant badge'}
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </>
   )
 }

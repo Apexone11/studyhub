@@ -49,6 +49,17 @@ router.patch('/password', twoFaLimiter, async (req, res) => {
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } })
     if (!user) return res.status(404).json({ error: 'User not found.' })
 
+    // Google-signup users have a random passwordHash they don't know.
+    // Send a structured code so the frontend redirects them to the
+    // one-time `POST /api/auth/set-password` flow instead of showing
+    // "Current password is incorrect" forever.
+    if (!user.passwordSetByUser) {
+      return res.status(409).json({
+        error: 'Set a password first. Visit Settings → Security to choose one.',
+        code: 'PASSWORD_NOT_SET',
+      })
+    }
+
     const valid = await bcrypt.compare(currentPassword, user.passwordHash)
     if (!valid) return res.status(401).json({ error: 'Current password is incorrect.' })
 
@@ -78,6 +89,13 @@ router.patch('/username', async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } })
     if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    if (!user.passwordSetByUser) {
+      return res.status(409).json({
+        error: 'Set a password first. Visit Settings → Security to choose one.',
+        code: 'PASSWORD_NOT_SET',
+      })
+    }
 
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return res.status(401).json({ error: 'Password is incorrect.' })
@@ -249,6 +267,18 @@ router.delete('/account', twoFaLimiter, async (req, res) => {
   try {
     const user = await prisma.user.findUnique({ where: { id: req.user.userId } })
     if (!user) return res.status(404).json({ error: 'User not found.' })
+
+    // Google-signup users without a chosen password can never confirm
+    // delete-account today (bcrypt.compare always fails against the
+    // random hash) — that's a GDPR right-to-erasure violation. Send a
+    // structured code so the frontend pivots to the set-password flow
+    // before retrying the deletion.
+    if (!user.passwordSetByUser) {
+      return res.status(409).json({
+        error: 'Set a password first so we can confirm this destructive action.',
+        code: 'PASSWORD_NOT_SET',
+      })
+    }
 
     const valid = await bcrypt.compare(password, user.passwordHash)
     if (!valid) return res.status(401).json({ error: 'Password is incorrect.' })

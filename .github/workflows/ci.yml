@@ -16,13 +16,23 @@ jobs:
       run:
         working-directory: backend
     steps:
+      # fetch-depth: 0 so the release-log diff below can compute a merge
+      # base against the PR's base branch. With the default shallow
+      # checkout (depth=1), `git diff origin/main...HEAD` fails with
+      # "no merge base" on every dependabot PR — was the root cause of
+      # constantly-red dep PR CI as of 2026-05-01.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - name: Enforce release log update
         if: github.event_name == 'pull_request'
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
-          git fetch --no-tags --depth=1 origin "${{ github.base_ref }}"
+          # Fetch the PR's base ref deeply enough that the merge base
+          # exists locally. `--unshallow` would also work but is a
+          # no-op when fetch-depth is already 0.
+          git fetch --no-tags origin "${{ github.base_ref }}"
 
           CHANGED_FILES="$(git diff --name-only "origin/${{ github.base_ref }}"...HEAD)"
           echo "Changed files:"
