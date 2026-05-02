@@ -29,6 +29,7 @@ const SecurityTab = lazy(() => import('./SecurityTab'))
 const ActivationTab = lazy(() => import('./ActivationTab'))
 const AdminReferralsTab = lazy(() => import('./AdminReferralsTab'))
 const ObservabilityTab = lazy(() => import('./ObservabilityTab'))
+const ConsentLogTab = lazy(() => import('./ConsentLogTab'))
 
 export default function AdminPage() {
   const layout = useResponsiveAppLayout()
@@ -452,6 +453,16 @@ export default function AdminPage() {
                     }
                   >
                     <ObservabilityTab />
+                  </Suspense>
+                ) : null}
+
+                {activeTab === 'consent-log' ? (
+                  <Suspense
+                    fallback={
+                      <div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading...</div>
+                    }
+                  >
+                    <ConsentLogTab />
                   </Suspense>
                 ) : null}
 

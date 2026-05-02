@@ -564,10 +564,47 @@ async function seedBadgeCatalog(prisma) {
   }
 }
 
+/**
+ * Admin manual grant — used by `POST /api/admin/users/:id/badges`.
+ *
+ * Skips criteria evaluation entirely and unconditionally awards the
+ * badge. Idempotent: if the user already holds it, returns the
+ * existing UserBadge row. The `admin_grant` criteria type returns
+ * false from `kindMatchesCriteria` so it never auto-awards through
+ * the normal evaluator — the only way a user gets a secret /
+ * manually-awarded badge is via this path.
+ */
+async function adminGrantBadge(prisma, { targetUserId, slug, performedBy }) {
+  const badge = await prisma.badge.findUnique({ where: { slug } })
+  if (!badge) {
+    const err = new Error(`Badge "${slug}" not found.`)
+    err.code = 'BADGE_NOT_FOUND'
+    throw err
+  }
+  const ok = await awardBadge(prisma, targetUserId, badge)
+  // awardBadge logs an AchievementEvent with metadata; tag this one
+  // as admin-granted so the audit trail shows who granted what.
+  if (ok) {
+    try {
+      await prisma.achievementEvent.create({
+        data: {
+          userId: targetUserId,
+          kind: 'admin.grant',
+          metadata: { slug, performedBy },
+        },
+      })
+    } catch (error) {
+      captureError(error, { source: 'adminGrantBadge.audit', targetUserId, slug })
+    }
+  }
+  return { granted: ok, badge: { slug: badge.slug, name: badge.name, xp: badge.xp } }
+}
+
 module.exports = {
   EVENT_KINDS,
   emitAchievementEvent,
   recomputeUserAchievementStats,
   checkAndAwardBadgesLegacy,
   seedBadgeCatalog,
+  adminGrantBadge,
 }
