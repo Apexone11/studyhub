@@ -160,11 +160,9 @@ router.get('/html', async (req, res) => {
 
     // Tier 1 (flagged): runtime token gets the interactive document AND
     // the runtime CSP that allows inline scripts; preview token still gets
-    // the safe doc + safe CSP. Earlier code always sent SAFE_PREVIEW here
-    // (script-src 'none'), so even when the user opened Interactive Preview
-    // the iframe loaded an HTML doc with <script> tags but the CSP header
-    // silently blocked their execution. Click handlers never fired. Caught
-    // live in production 2026-05-01.
+    // the safe doc + safe CSP. Without the runtime CSP swap, the iframe
+    // loads an HTML doc with <script> tags but the CSP header silently
+    // blocks their execution and click handlers never fire.
     if (effectiveTier >= RISK_TIER.FLAGGED) {
       const outputHtml = isRuntime
         ? buildInteractiveDocument({ title: sheet.title, html: sheet.content })
@@ -182,7 +180,7 @@ router.get('/html', async (req, res) => {
     // so the route is not relying on the global preview-surface middleware
     // value silently flowing through. Safer against future route-ordering
     // refactors that could leave Tier 0 safe previews with frame-ancestors
-    // 'none' and produce the blank-iframe failure mode reported 2026-04-30.
+    // 'none' and produce a blank-iframe failure mode.
     const outputHtml = isRuntime
       ? buildInteractiveDocument({ title: sheet.title, html: sheet.content })
       : buildPreviewDocument({ title: sheet.title, html: sheet.content })

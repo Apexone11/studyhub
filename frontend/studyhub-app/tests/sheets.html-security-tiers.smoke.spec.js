@@ -18,7 +18,10 @@ async function setupPage(page) {
   })
 }
 
-function mockUploadRoutes(page, { tier, scanStatus, findings, riskSummary, tierExplanation, findingsByCategory }) {
+function mockUploadRoutes(
+  page,
+  { tier, scanStatus, findings, riskSummary, tierExplanation, findingsByCategory },
+) {
   let scanPollCount = 0
 
   return Promise.all([
@@ -31,22 +34,35 @@ function mockUploadRoutes(page, { tier, scanStatus, findings, riskSummary, tierE
         json: {
           message: 'HTML file imported into draft workflow.',
           draft: {
-            id: 888, title: 'Test Sheet', courseId: 101,
+            id: 888,
+            title: 'Test Sheet',
+            courseId: 101,
             description: 'Test description',
             content: '<main><h1>Test</h1></main>',
-            contentFormat: 'html', status: 'draft',
-            allowDownloads: true, hasAttachment: false,
+            contentFormat: 'html',
+            status: 'draft',
+            allowDownloads: true,
+            hasAttachment: false,
             htmlWorkflow: {
-              scanStatus: 'queued', tier: 0, scanFindings: [],
-              riskSummary: '', tierExplanation: '', findingsByCategory: {},
-              scanUpdatedAt: null, scanAcknowledgedAt: null,
-              hasOriginalVersion: true, hasWorkingVersion: true,
+              scanStatus: 'queued',
+              tier: 0,
+              scanFindings: [],
+              riskSummary: '',
+              tierExplanation: '',
+              findingsByCategory: {},
+              scanUpdatedAt: null,
+              scanAcknowledgedAt: null,
+              hasOriginalVersion: true,
+              hasWorkingVersion: true,
               originalSourceName: 'test.html',
             },
           },
           scan: {
-            status: 'queued', tier: 0, findings: [],
-            hasOriginalVersion: true, hasWorkingVersion: true,
+            status: 'queued',
+            tier: 0,
+            findings: [],
+            hasOriginalVersion: true,
+            hasWorkingVersion: true,
             originalSourceName: 'test.html',
           },
         },
@@ -55,15 +71,30 @@ function mockUploadRoutes(page, { tier, scanStatus, findings, riskSummary, tierE
     page.route('**/api/sheets/drafts/888/scan-status', async (route) => {
       scanPollCount += 1
       if (scanPollCount < 2) {
-        await route.fulfill({ status: 200, json: { status: 'running', tier: 0, findings: [], hasOriginalVersion: true, hasWorkingVersion: true, originalSourceName: 'test.html' } })
+        await route.fulfill({
+          status: 200,
+          json: {
+            status: 'running',
+            tier: 0,
+            findings: [],
+            hasOriginalVersion: true,
+            hasWorkingVersion: true,
+            originalSourceName: 'test.html',
+          },
+        })
         return
       }
       await route.fulfill({
         status: 200,
         json: {
-          status: scanStatus, tier, findings,
-          riskSummary, tierExplanation, findingsByCategory,
-          hasOriginalVersion: true, hasWorkingVersion: true,
+          status: scanStatus,
+          tier,
+          findings,
+          riskSummary,
+          tierExplanation,
+          findingsByCategory,
+          hasOriginalVersion: true,
+          hasWorkingVersion: true,
           originalSourceName: 'test.html',
         },
       })
@@ -80,9 +111,14 @@ function mockUploadRoutes(page, { tier, scanStatus, findings, riskSummary, tierE
         json: {
           draft: { id: 888, status: 'draft' },
           scan: {
-            status: scanStatus, tier, findings,
-            riskSummary, tierExplanation, findingsByCategory,
-            hasOriginalVersion: true, hasWorkingVersion: true,
+            status: scanStatus,
+            tier,
+            findings,
+            riskSummary,
+            tierExplanation,
+            findingsByCategory,
+            hasOriginalVersion: true,
+            hasWorkingVersion: true,
             originalSourceName: 'test.html',
           },
         },
@@ -110,13 +146,25 @@ async function triggerHtmlImport(page) {
  * Tier 2 — High Risk: pending_review, "Understood" button, no publish
  * ════════════════════════════════════════════════════════════════════════ */
 
-test('tier 2 high-risk upload shows grouped findings and blocks publishing @smoke', async ({ page }) => {
+test('tier 2 high-risk upload shows grouped findings and blocks publishing @smoke', async ({
+  page,
+}) => {
   await setupPage(page)
   await mockAuthenticatedApp(page)
 
   const findings = [
-    { source: 'js-risk', category: 'js-risk', severity: 'high', message: 'Dynamic code execution detected: eval() usage.' },
-    { source: 'inline-handler', category: 'inline-handler', severity: 'medium', message: 'Inline event handler found: onclick.' },
+    {
+      source: 'js-risk',
+      category: 'js-risk',
+      severity: 'high',
+      message: 'Dynamic code execution detected: eval() usage.',
+    },
+    {
+      source: 'inline-handler',
+      category: 'inline-handler',
+      severity: 'medium',
+      message: 'Inline event handler found: onclick.',
+    },
   ]
   const findingsByCategory = {
     'js-risk': {
@@ -136,7 +184,8 @@ test('tier 2 high-risk upload shows grouped findings and blocks publishing @smok
     scanStatus: 'failed',
     findings,
     riskSummary: 'Contains risky JavaScript and inline event handlers.',
-    tierExplanation: 'High risk — your content includes patterns associated with active security threats. It will be held for manual admin review before publication.',
+    tierExplanation:
+      'High risk — your content includes patterns associated with active security threats. It will be held for manual admin review before publication.',
     findingsByCategory,
   })
 
@@ -169,13 +218,25 @@ test('tier 2 high-risk upload shows grouped findings and blocks publishing @smok
  * Tier 3 — Quarantined: no publish, clear quarantine messaging
  * ════════════════════════════════════════════════════════════════════════ */
 
-test('tier 3 quarantined upload shows critical findings and prevents publishing @smoke', async ({ page }) => {
+test('tier 3 quarantined upload shows critical findings and prevents publishing @smoke', async ({
+  page,
+}) => {
   await setupPage(page)
   await mockAuthenticatedApp(page)
 
   const findings = [
-    { source: 'credential-capture', category: 'credential-capture', severity: 'critical', message: 'Form with password field submitting to external domain.' },
-    { source: 'exfiltration', category: 'exfiltration', severity: 'high', message: 'Possible data exfiltration via fetch to external domain.' },
+    {
+      source: 'credential-capture',
+      category: 'credential-capture',
+      severity: 'critical',
+      message: 'Form with password field submitting to external domain.',
+    },
+    {
+      source: 'exfiltration',
+      category: 'exfiltration',
+      severity: 'high',
+      message: 'Possible data exfiltration via fetch to external domain.',
+    },
   ]
   const findingsByCategory = {
     'credential-capture': {
@@ -183,7 +244,7 @@ test('tier 3 quarantined upload shows critical findings and prevents publishing 
       maxSeverity: 'critical',
       findings: [{ message: 'Form with password field submitting to external domain.' }],
     },
-    'exfiltration': {
+    exfiltration: {
       label: 'Data Exfiltration',
       maxSeverity: 'high',
       findings: [{ message: 'Possible data exfiltration via fetch to external domain.' }],
@@ -195,7 +256,8 @@ test('tier 3 quarantined upload shows critical findings and prevents publishing 
     scanStatus: 'quarantined',
     findings,
     riskSummary: 'Contains credential capture and data exfiltration.',
-    tierExplanation: 'Quarantined — this content has been automatically isolated due to critical security indicators. An administrator must review it. You cannot publish or preview this content.',
+    tierExplanation:
+      'Quarantined — this content has been automatically isolated due to critical security indicators. An administrator must review it. You cannot publish or preview this content.',
     findingsByCategory,
   })
 
@@ -228,12 +290,27 @@ test('scan modal shows category-grouped findings sorted by severity @smoke', asy
   await mockAuthenticatedApp(page)
 
   const findings = [
-    { source: 'obfuscation', category: 'obfuscation', severity: 'high', message: 'Base64-encoded script block detected.' },
-    { source: 'suspicious-tag', category: 'suspicious-tag', severity: 'medium', message: 'HTML contains flagged tags: script.' },
-    { source: 'redirect', category: 'redirect', severity: 'medium', message: 'Meta refresh redirect to external URL.' },
+    {
+      source: 'obfuscation',
+      category: 'obfuscation',
+      severity: 'high',
+      message: 'Base64-encoded script block detected.',
+    },
+    {
+      source: 'suspicious-tag',
+      category: 'suspicious-tag',
+      severity: 'medium',
+      message: 'HTML contains flagged tags: script.',
+    },
+    {
+      source: 'redirect',
+      category: 'redirect',
+      severity: 'medium',
+      message: 'Meta refresh redirect to external URL.',
+    },
   ]
   const findingsByCategory = {
-    'obfuscation': {
+    obfuscation: {
       label: 'Code Obfuscation',
       maxSeverity: 'high',
       findings: [{ message: 'Base64-encoded script block detected.' }],
@@ -243,7 +320,7 @@ test('scan modal shows category-grouped findings sorted by severity @smoke', asy
       maxSeverity: 'medium',
       findings: [{ message: 'HTML contains flagged tags: script.' }],
     },
-    'redirect': {
+    redirect: {
       label: 'Page Redirects',
       maxSeverity: 'medium',
       findings: [{ message: 'Meta refresh redirect to external URL.' }],
@@ -255,7 +332,8 @@ test('scan modal shows category-grouped findings sorted by severity @smoke', asy
     scanStatus: 'failed',
     findings,
     riskSummary: 'Contains code obfuscation, suspicious tags, and page redirects.',
-    tierExplanation: 'High risk — your content includes patterns associated with active security threats. It will be held for manual admin review before publication.',
+    tierExplanation:
+      'High risk — your content includes patterns associated with active security threats. It will be held for manual admin review before publication.',
     findingsByCategory,
   })
 
@@ -281,7 +359,9 @@ test('scan modal shows category-grouped findings sorted by severity @smoke', asy
  * Admin review queue — badges, review panel, grouped findings, templates
  * ════════════════════════════════════════════════════════════════════════ */
 
-test('admin review queue shows tier badges and review panel with grouped findings @smoke', async ({ page }) => {
+test('admin review queue shows tier badges and review panel with grouped findings @smoke', async ({
+  page,
+}) => {
   await setupPage(page)
 
   const reviewSheet = {
@@ -293,8 +373,18 @@ test('admin review queue shows tier badges and review panel with grouped finding
     htmlScanStatus: 'failed',
     htmlRiskTier: 2,
     htmlScanFindings: [
-      { source: 'js-risk', category: 'js-risk', severity: 'high', message: 'eval() detected in inline script.' },
-      { source: 'obfuscation', category: 'obfuscation', severity: 'high', message: 'Base64-encoded content detected.' },
+      {
+        source: 'js-risk',
+        category: 'js-risk',
+        severity: 'high',
+        message: 'eval() detected in inline script.',
+      },
+      {
+        source: 'obfuscation',
+        category: 'obfuscation',
+        severity: 'high',
+        message: 'Base64-encoded content detected.',
+      },
     ],
     htmlScanAcknowledgedAt: null,
     course: { id: 101, code: 'CMSC131' },
@@ -340,21 +430,23 @@ test('admin review queue shows tier badges and review panel with grouped finding
         course: { id: 101, code: 'CMSC131' },
         author: { id: 77, username: 'flagged_user' },
         riskSummary: 'Contains risky JavaScript and code obfuscation.',
-        tierExplanation: 'High risk — content includes patterns associated with active security threats.',
+        tierExplanation:
+          'High risk — content includes patterns associated with active security threats.',
         findingsByCategory: {
           'js-risk': {
             label: 'Risky JavaScript',
             maxSeverity: 'high',
             findings: [{ message: 'eval() detected in inline script.' }],
           },
-          'obfuscation': {
+          obfuscation: {
             label: 'Code Obfuscation',
             maxSeverity: 'high',
             findings: [{ message: 'Base64-encoded content detected.' }],
           },
         },
         liveRiskSummaryText: 'Contains risky JavaScript and code obfuscation.',
-        liveTierExplanation: 'High risk — content includes patterns associated with active security threats.',
+        liveTierExplanation:
+          'High risk — content includes patterns associated with active security threats.',
         liveFindingsByCategory: {},
         liveRiskTier: 2,
         createdAt: '2026-03-23T10:00:00.000Z',
@@ -434,7 +526,12 @@ test('sheet viewer shows risk summary for flagged HTML sheet @smoke', async ({ p
       forks: 0,
       commentCount: 0,
       reactions: { likes: 2, dislikes: 0, userReaction: null },
-      course: { id: 101, code: 'CMSC131', name: 'Object-Oriented Programming I', school: { id: 1, name: 'University of Maryland', short: 'UMD' } },
+      course: {
+        id: 101,
+        code: 'CMSC131',
+        name: 'Object-Oriented Programming I',
+        school: { id: 1, name: 'University of Maryland', short: 'UMD' },
+      },
       author: { id: 42, username: 'regression_admin' },
       incomingContributions: [],
       outgoingContributions: [],
@@ -443,9 +540,18 @@ test('sheet viewer shows risk summary for flagged HTML sheet @smoke', async ({ p
       htmlWorkflow: {
         scanStatus: 'flagged',
         riskTier: 1,
-        previewMode: 'safe',
-        ackRequired: false,
-        scanFindings: [{ source: 'suspicious-tag', severity: 'medium', message: 'HTML contains flagged tags: script.' }],
+        // Tier 1 (FLAGGED) now serializes previewMode='interactive' so the
+        // in-viewer Safe/Interactive toggle is reachable; the warning UI
+        // is driven off ackRequired (true exclusively for Tier 1).
+        previewMode: 'interactive',
+        ackRequired: true,
+        scanFindings: [
+          {
+            source: 'suspicious-tag',
+            severity: 'medium',
+            message: 'HTML contains flagged tags: script.',
+          },
+        ],
         riskSummary: 'Contains suspicious tags.',
         tierExplanation: 'Flagged — your content includes elements that could be risky.',
         findingsByCategory: {
@@ -464,7 +570,7 @@ test('sheet viewer shows risk summary for flagged HTML sheet @smoke', async ({ p
       status: 200,
       json: {
         html: '<h1>Flagged Sheet</h1>',
-        previewMode: 'safe',
+        previewMode: 'interactive',
         riskSummary: 'Contains suspicious tags.',
         tierExplanation: 'Flagged — your content includes elements that could be risky.',
       },
@@ -473,11 +579,15 @@ test('sheet viewer shows risk summary for flagged HTML sheet @smoke', async ({ p
 
   await page.goto('/sheets/501')
 
-  // Sheet title visible (use heading role to avoid strict mode violation)
-  await expect(page.getByRole('heading', { name: 'Flagged HTML Sheet' })).toBeVisible({ timeout: 5000 })
+  // The "Flagged HTML Sheet" warning-panel heading appears for Tier 1 sheets
+  // before the user has acknowledged the scanner warning.
+  await expect(page.getByRole('heading', { name: 'Flagged HTML Sheet' })).toBeVisible({
+    timeout: 5000,
+  })
 
-  // Safe preview tier badge
-  await expect(page.getByText('Safe Preview')).toBeVisible()
+  // The "Flagged" badge rendered next to the title is the in-viewer
+  // signal that this is Tier 1 (replaces the old previewMode==='safe' check).
+  await expect(page.getByText('Flagged', { exact: true })).toBeVisible()
 
   // Risk summary text displayed near tier badge
   await expect(page.getByText('Contains suspicious tags.')).toBeVisible()
