@@ -159,19 +159,21 @@ export default function SheetListRow({
             {sheet.starred ? <IconStarFilled size={13} /> : <IconStar size={13} />}
             Star
           </button>
-          <button
-            type="button"
-            className="sh-btn sh-btn--secondary sh-btn--sm sheets-repo-row__action"
-            onClick={(event) => {
-              event.stopPropagation()
-              onFork(sheet)
-            }}
-            disabled={forking}
-            aria-label={`Fork ${sheet.title}`}
-          >
-            <IconFork size={13} />
-            {forking ? 'Forking...' : 'Fork'}
-          </button>
+          {sheet.allowEditing === true ? (
+            <button
+              type="button"
+              className="sh-btn sh-btn--secondary sh-btn--sm sheets-repo-row__action"
+              onClick={(event) => {
+                event.stopPropagation()
+                onFork(sheet)
+              }}
+              disabled={forking}
+              aria-label={`Fork ${sheet.title}`}
+            >
+              <IconFork size={13} />
+              {forking ? 'Forking...' : 'Fork'}
+            </button>
+          ) : null}
         </div>
       </div>
     </article>

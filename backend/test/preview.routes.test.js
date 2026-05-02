@@ -181,9 +181,11 @@ describe('preview routes', () => {
     expect(response.body.error).toMatch(/quarantined/i)
   })
 
-  // Regression guards for the Tier 1 (FLAGGED) runtime CSP fix from 2026-05-01.
-  // Earlier code always sent `script-src 'none'` for Tier 1, which silently
-  // blocked click handlers in the Interactive Preview iframe.
+  // Regression guards for Tier 1 (FLAGGED) runtime CSP. Without this, a
+  // legacy bug surfaces: the iframe loads an interactive doc with <script>
+  // tags but the CSP header silently blocks them and click handlers never
+  // fire. Runtime tokens MUST get RUNTIME_DIRECTIVES, preview tokens MUST
+  // get SAFE_PREVIEW_DIRECTIVES, regardless of tier.
   describe('Tier 1 (FLAGGED) interactive preview CSP', () => {
     it('runtime token receives script-src unsafe-inline (allows interactivity)', async () => {
       mocks.state.sheet.htmlRiskTier = 1

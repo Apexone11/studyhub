@@ -204,6 +204,13 @@ export default function SheetContentPanel({
 }) {
   if (!sheet) return null
 
+  // Tier 1 (FLAGGED) sheets now serialize with previewMode='interactive'
+  // so the in-viewer interactive toggle is reachable, but they still
+  // need the warning UI (badge, banner, "Load preview" gate). Drive
+  // those off `htmlWorkflow.ackRequired`, which the serializer already
+  // sets true exclusively for Tier 1.
+  const isFlaggedHtml = Boolean(sheet.htmlWorkflow?.ackRequired)
+
   return (
     <section ref={sheetPanelRef} data-tutorial="viewer-content" style={panelStyle()}>
       <div
@@ -286,7 +293,7 @@ export default function SheetContentPanel({
                 >
                   Pending Review
                 </span>
-              ) : previewMode === 'safe' ? (
+              ) : isFlaggedHtml ? (
                 <span
                   style={{
                     fontSize: 10,
@@ -302,7 +309,7 @@ export default function SheetContentPanel({
                   Flagged
                 </span>
               ) : null}
-              {previewMode !== 'interactive' && sheet.htmlWorkflow?.riskSummary && (
+              {isFlaggedHtml && sheet.htmlWorkflow?.riskSummary && (
                 <span style={{ fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600 }}>
                   {sheet.htmlWorkflow.riskSummary}
                 </span>
@@ -404,11 +411,10 @@ export default function SheetContentPanel({
           <div
             style={{
               borderRadius: 16,
-              border:
-                previewMode !== 'interactive'
-                  ? '1px solid var(--sh-warning-border)'
-                  : '1px solid var(--sh-border)',
-              background: previewMode !== 'interactive' ? 'var(--sh-warning-bg)' : 'var(--sh-soft)',
+              border: isFlaggedHtml
+                ? '1px solid var(--sh-warning-border)'
+                : '1px solid var(--sh-border)',
+              background: isFlaggedHtml ? 'var(--sh-warning-bg)' : 'var(--sh-soft)',
               padding: 24,
               textAlign: 'center',
             }}
@@ -417,24 +423,22 @@ export default function SheetContentPanel({
               style={{
                 fontSize: 15,
                 fontWeight: 800,
-                color:
-                  previewMode !== 'interactive' ? 'var(--sh-warning-text)' : 'var(--sh-heading)',
+                color: isFlaggedHtml ? 'var(--sh-warning-text)' : 'var(--sh-heading)',
                 marginBottom: 8,
               }}
             >
-              {previewMode !== 'interactive' ? 'Flagged HTML Sheet' : 'Interactive HTML Sheet'}
+              {isFlaggedHtml ? 'Flagged HTML Sheet' : 'Interactive HTML Sheet'}
             </div>
             <div
               style={{
                 fontSize: 13,
-                color:
-                  previewMode !== 'interactive' ? 'var(--sh-warning-text)' : 'var(--sh-subtext)',
+                color: isFlaggedHtml ? 'var(--sh-warning-text)' : 'var(--sh-subtext)',
                 lineHeight: 1.6,
                 marginBottom: 16,
               }}
             >
-              {previewMode !== 'interactive'
-                ? 'This sheet contains flagged HTML features. Scripts are disabled in the preview. It runs in a secure sandbox with no network access.'
+              {isFlaggedHtml
+                ? 'This sheet was flagged by the security scanner. It still runs in a secure sandbox with no network access, no popups, and no access to your session — but review the warnings before loading.'
                 : 'This sheet contains HTML with scripts. It runs in a secure sandbox with no network access, no popups, and no access to your session. Click below to load it.'}
             </div>
             <button
@@ -452,7 +456,7 @@ export default function SheetContentPanel({
                 fontFamily: FONT,
               }}
             >
-              {previewMode !== 'interactive' ? 'Load safe preview' : 'Load preview'}
+              Load preview
             </button>
           </div>
         ) : previewLoading || (viewerInteractive && runtimeLoading) ? (

@@ -139,13 +139,15 @@ function FeedVideoPlayer({ video }) {
   const [error, setError] = useState(null)
   // `started` flips true after the first play() call; we never trap the
   // <video> at opacity:0 before that — the browser's native poster + play
-  // button handle the pre-play state. The earlier markup hid the controls
-  // until `onLoadedData` fired, which (with preload="metadata") only fires
-  // AFTER the user clicks play, creating an unbreakable chicken-and-egg.
+  // button handle the pre-play state.
   const [started, setStarted] = useState(false)
   // Buffering only reflects mid-playback stalls — never the initial idle
   // state. Initial idle = `started === false` (show big play overlay).
   const [stalled, setStalled] = useState(false)
+  // Hover/focus visual for the click-to-play overlay. State-driven (not
+  // imperative `e.currentTarget.style` mutation) so :focus-visible from
+  // keyboard navigation gets the same treatment as a mouse hover.
+  const [overlayHot, setOverlayHot] = useState(false)
   const videoRef = useRef(null)
 
   useEffect(() => {
@@ -166,7 +168,20 @@ function FeedVideoPlayer({ video }) {
     async function fetchStream() {
       try {
         const res = await fetch(`${API}/api/video/${video.id}/stream`, { credentials: 'include' })
-        if (!res.ok) throw new Error('Could not load video')
+        if (!res.ok) {
+          // Surface the real failure so users / on-call see why playback
+          // didn't start instead of the generic "Could not load video".
+          // Most common 4xx for an authed feed viewer is 403 (downloads
+          // disabled by creator) or 409 (still processing).
+          let message = `Could not load video (HTTP ${res.status}).`
+          try {
+            const body = await res.json()
+            if (body?.error) message = body.error
+          } catch {
+            /* response wasn't JSON — keep the HTTP status fallback */
+          }
+          throw new Error(message)
+        }
         const data = await res.json()
         if (!cancelled) {
           setStreamUrl(data.url)
@@ -174,7 +189,7 @@ function FeedVideoPlayer({ video }) {
         }
       } catch (err) {
         if (!cancelled) {
-          setError(err.message)
+          setError(err.message || 'Could not load video.')
           setLoading(false)
         }
       }
@@ -237,6 +252,10 @@ function FeedVideoPlayer({ video }) {
       // Don't steal keys from inputs (e.g. comment composer below the card).
       const tag = e.target?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
+      // Don't intercept browser/OS/screen-reader chords. Cmd/Ctrl + ArrowRight
+      // is browser navigation; Ctrl+M is the JAWS / NVDA modal-list toggle;
+      // Alt+ combos are app-switcher in many shells. Plain key presses only.
+      if (e.metaKey || e.ctrlKey || e.altKey) return
       switch (e.key) {
         case ' ':
         case 'k':
@@ -350,7 +369,7 @@ function FeedVideoPlayer({ video }) {
           fontSize: 'var(--type-sm)',
         }}
       >
-        Could not load video.
+        {error || 'Could not load video.'}
       </div>
     )
   }
@@ -454,6 +473,10 @@ function FeedVideoPlayer({ video }) {
           <button
             type="button"
             onClick={handlePlayClick}
+            onMouseEnter={() => setOverlayHot(true)}
+            onMouseLeave={() => setOverlayHot(false)}
+            onFocus={() => setOverlayHot(true)}
+            onBlur={() => setOverlayHot(false)}
             aria-label={video.title ? `Play video: ${video.title}` : 'Play video'}
             style={{
               position: 'absolute',
@@ -461,17 +484,12 @@ function FeedVideoPlayer({ video }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              background: 'rgba(0,0,0,0.18)',
+              background: overlayHot ? 'rgba(0,0,0,0.32)' : 'rgba(0,0,0,0.18)',
               border: 'none',
               cursor: 'pointer',
               padding: 0,
               transition: 'background 0.15s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.currentTarget.style.background = 'rgba(0,0,0,0.32)'
-            }}
-            onMouseLeave={(e) => {
-              e.currentTarget.style.background = 'rgba(0,0,0,0.18)'
+              outline: 'none',
             }}
           >
             <span
@@ -484,7 +502,11 @@ function FeedVideoPlayer({ video }) {
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+                boxShadow: overlayHot
+                  ? '0 4px 24px rgba(0,0,0,0.45), 0 0 0 4px rgba(255,255,255,0.35)'
+                  : '0 4px 16px rgba(0,0,0,0.3)',
+                transform: overlayHot ? 'scale(1.06)' : 'scale(1)',
+                transition: 'box-shadow 0.15s ease, transform 0.15s ease',
               }}
             >
               <svg width="32" height="32" viewBox="0 0 24 24" fill="#111">

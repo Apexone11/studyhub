@@ -1371,6 +1371,17 @@ textarea.sh-input {
   animation: fadeIn 0.3s ease forwards;
 }
 
+/* StudyHub player spinner — used by inline buffering / loading indicators
+ * across FeedCard, AnnouncementMedia, and the dedicated StudyHubPlayer.
+ * Keyframes live here (globally loaded) instead of only in
+ * components/video/studyhub-player.css so callers that don't import that
+ * file can still use `animation: shp-spin …`. */
+@keyframes shp-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @keyframes treePulse {
   0% {
     transform: scale(1);

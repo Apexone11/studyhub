@@ -187,7 +187,7 @@ function buildCsp(directives) {
  *   2. Public URLs when `R2_PUBLIC_URL` is configured (custom CDN domain).
  * Without these in `media-src` / `img-src`, the browser blocks `<video src>`
  * with a CSP violation that does NOT show up as a failed network request,
- * making "video doesn't play" hard to diagnose. Caught in prod 2026-05-01.
+ * making "video doesn't play" hard to diagnose.
  */
 // Cloudflare R2 account IDs are lowercase hex (per Cloudflare's public
 // docs). Reject anything else so an operator-supplied env value can't

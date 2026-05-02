@@ -16,22 +16,34 @@ function getLogger() {
   return cachedLogger
 }
 
+// Map a scan result `status` to the stable event key the runbook
+// alerts on. The status field uses the verb the parseClamAvReply layer
+// returns ("error" for any reachability/parse failure), but the
+// observability surface needs a stable noun the on-call can grep
+// (`clamav.scan_failed`). Keep this mapping in sync with
+// docs/internal/security/RUNBOOK_CLAMAV.md "Logging and alerts".
+const SCAN_EVENT_KEY_BY_STATUS = {
+  clean: 'clamav.scan_clean',
+  infected: 'clamav.scan_infected',
+  error: 'clamav.scan_failed',
+}
+
 function emitScanEvent(result, ctx) {
   // Skip noise in unit tests — the disabled-engine short-circuit returns
   // synthetic clean replies and would spam logs. Real scan paths still log.
   if (process.env.NODE_ENV === 'test' || result?.engine === 'disabled') return
   const log = getLogger()
+  const status = result?.status || 'error'
   const base = {
-    event: `clamav.scan_${result?.status || 'error'}`,
+    event: SCAN_EVENT_KEY_BY_STATUS[status] || 'clamav.scan_failed',
     engine: result?.engine || 'clamav',
     bytes: ctx?.bytes,
   }
-  if (result?.status === 'clean') {
+  if (status === 'clean') {
     log.info(base, 'clamav scan clean')
-  } else if (result?.status === 'infected') {
+  } else if (status === 'infected') {
     log.warn({ ...base, threat: result.threat }, 'clamav scan infected')
   } else {
-    // status === 'error' (timeout, connect refused, malformed reply, …)
     log.warn({ ...base, message: result?.message }, 'clamav scan failed')
   }
 }
