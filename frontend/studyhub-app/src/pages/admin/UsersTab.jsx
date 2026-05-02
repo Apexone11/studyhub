@@ -1,7 +1,39 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { API } from '../../config'
 import { Pager } from './AdminWidgets'
-import { tableHeadStyle, tableCell, tableCellStrong, pillButton } from './adminConstants'
+import { FONT, tableHeadStyle, tableCell, tableCellStrong, pillButton } from './adminConstants'
+
+function UserActionMenuItem({ color, onClick, children }) {
+  return (
+    <button
+      type="button"
+      role="menuitem"
+      onClick={onClick}
+      style={{
+        display: 'block',
+        width: '100%',
+        textAlign: 'left',
+        padding: '8px 12px',
+        borderRadius: 6,
+        border: 'none',
+        background: 'transparent',
+        color,
+        fontSize: 13,
+        fontWeight: 600,
+        cursor: 'pointer',
+        fontFamily: FONT,
+      }}
+      onMouseEnter={(event) => {
+        event.currentTarget.style.background = 'var(--sh-soft)'
+      }}
+      onMouseLeave={(event) => {
+        event.currentTarget.style.background = 'transparent'
+      }}
+    >
+      {children}
+    </button>
+  )
+}
 
 export default function UsersTab({
   usersState,
@@ -18,6 +50,32 @@ export default function UsersTab({
   const [grantSlug, setGrantSlug] = useState('')
   const [grantBusy, setGrantBusy] = useState(false)
   const [grantError, setGrantError] = useState('')
+  // Compact actions dropdown — only one menu open at a time. Holds the
+  // user id whose menu is open, or null when none. Collapsing the three
+  // stacked action pills into a "•••" menu keeps each table row a
+  // single line tall so the table doesn't waste 3× vertical space on
+  // controls the admin only needs occasionally.
+  const [actionsMenuFor, setActionsMenuFor] = useState(null)
+  const actionsMenuRef = useRef(null)
+
+  useEffect(() => {
+    if (actionsMenuFor === null) return
+    function handleDocMouseDown(event) {
+      if (!actionsMenuRef.current) return
+      if (!actionsMenuRef.current.contains(event.target)) {
+        setActionsMenuFor(null)
+      }
+    }
+    function handleEscape(event) {
+      if (event.key === 'Escape') setActionsMenuFor(null)
+    }
+    document.addEventListener('mousedown', handleDocMouseDown)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleDocMouseDown)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [actionsMenuFor])
 
   useEffect(() => {
     if (!grantTarget || badgeCatalog) return
@@ -226,44 +284,94 @@ export default function UsersTab({
                     }}
                   />
                 </td>
-                <td style={{ ...tableCell, display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                  {record.role === 'student' ? (
-                    <button
-                      type="button"
-                      onClick={() => void patchRole(record.id, 'admin')}
-                      style={pillButton('#eff6ff', '#1d4ed8', '#bfdbfe')}
-                    >
-                      Make admin
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => void patchRole(record.id, 'student')}
-                      style={pillButton('#fef2f2', '#dc2626', '#fecaca')}
-                    >
-                      Revoke admin
-                    </button>
-                  )}
+                <td style={{ ...tableCell, position: 'relative', whiteSpace: 'nowrap' }}>
                   <button
                     type="button"
-                    onClick={() => {
-                      setGrantTarget(record)
-                      setGrantSlug('')
-                      setGrantError('')
+                    aria-haspopup="menu"
+                    aria-expanded={actionsMenuFor === record.id}
+                    aria-label={`Actions for ${record.username}`}
+                    onClick={() =>
+                      setActionsMenuFor((current) => (current === record.id ? null : record.id))
+                    }
+                    style={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 8,
+                      border: '1px solid var(--sh-border)',
+                      background: 'var(--sh-surface)',
+                      color: 'var(--sh-muted)',
+                      cursor: 'pointer',
+                      fontSize: 18,
+                      lineHeight: '14px',
+                      fontWeight: 700,
+                      fontFamily: FONT,
+                      padding: 0,
                     }}
-                    style={pillButton('#f0fdf4', '#15803d', '#bbf7d0')}
                   >
-                    Grant badge
+                    ⋯
                   </button>
-                  {record.id !== currentUserId ? (
-                    <button
-                      type="button"
-                      onClick={() => void deleteUser(record.id)}
-                      style={pillButton('#fef2f2', '#dc2626', '#fecaca')}
+                  {actionsMenuFor === record.id && (
+                    <div
+                      ref={actionsMenuRef}
+                      role="menu"
+                      style={{
+                        position: 'absolute',
+                        top: 38,
+                        right: 12,
+                        minWidth: 160,
+                        borderRadius: 10,
+                        border: '1px solid var(--sh-border)',
+                        background: 'var(--sh-surface)',
+                        boxShadow: 'var(--elevation-3, 0 8px 24px rgba(0,0,0,0.12))',
+                        padding: 4,
+                        zIndex: 5,
+                      }}
                     >
-                      Delete
-                    </button>
-                  ) : null}
+                      {record.role === 'student' ? (
+                        <UserActionMenuItem
+                          color="var(--sh-info-text)"
+                          onClick={() => {
+                            setActionsMenuFor(null)
+                            void patchRole(record.id, 'admin')
+                          }}
+                        >
+                          Make admin
+                        </UserActionMenuItem>
+                      ) : (
+                        <UserActionMenuItem
+                          color="var(--sh-danger)"
+                          onClick={() => {
+                            setActionsMenuFor(null)
+                            void patchRole(record.id, 'student')
+                          }}
+                        >
+                          Revoke admin
+                        </UserActionMenuItem>
+                      )}
+                      <UserActionMenuItem
+                        color="var(--sh-success-text)"
+                        onClick={() => {
+                          setActionsMenuFor(null)
+                          setGrantTarget(record)
+                          setGrantSlug('')
+                          setGrantError('')
+                        }}
+                      >
+                        Grant badge
+                      </UserActionMenuItem>
+                      {record.id !== currentUserId ? (
+                        <UserActionMenuItem
+                          color="var(--sh-danger)"
+                          onClick={() => {
+                            setActionsMenuFor(null)
+                            void deleteUser(record.id)
+                          }}
+                        >
+                          Delete
+                        </UserActionMenuItem>
+                      ) : null}
+                    </div>
+                  )}
                 </td>
               </tr>
             ))}

@@ -696,65 +696,76 @@ export default function AnnouncementsPage() {
               </div>
             </article>
           ) : (
-            /* Regular announcement card */
-            <article
-              key={a.id}
-              className="announcement-card"
-              style={{
-                background: 'var(--sh-surface)',
-                borderRadius: 16,
-                border: '1px solid var(--sh-border)',
-                padding: '20px 24px',
-                boxShadow: '0 2px 10px rgba(15,23,42,0.04)',
-                transition: 'box-shadow .15s',
-              }}
-            >
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <UserAvatar
-                  username={a.author?.username}
-                  avatarUrl={a.author?.avatarUrl}
-                  role={a.author?.role}
-                  size={36}
-                />
-                <div>
-                  <Link
-                    to={`/users/${a.author?.username}`}
+            /* Regular announcement card. Left-border accent flips to the
+               brand color when the announcement was posted within the
+               last 24h — same "fresh" cue used on the Sheets Grid card.
+               Stays grey otherwise so older cards don't visually shout. */
+            (() => {
+              const postedAtMs = new Date(a.createdAt || 0).getTime()
+              const isNew =
+                Number.isFinite(postedAtMs) && Date.now() - postedAtMs < 24 * 60 * 60 * 1000
+              return (
+                <article
+                  key={a.id}
+                  className="announcement-card"
+                  style={{
+                    background: 'var(--sh-surface)',
+                    borderRadius: 16,
+                    border: '1px solid var(--sh-border)',
+                    borderLeft: `3px solid ${isNew ? 'var(--sh-brand)' : 'var(--sh-border)'}`,
+                    padding: '20px 24px',
+                    boxShadow: '0 2px 10px rgba(15,23,42,0.04)',
+                    transition: 'box-shadow .15s',
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                    <UserAvatar
+                      username={a.author?.username}
+                      avatarUrl={a.author?.avatarUrl}
+                      role={a.author?.role}
+                      size={36}
+                    />
+                    <div>
+                      <Link
+                        to={`/users/${a.author?.username}`}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 700,
+                          color: 'var(--sh-heading)',
+                          textDecoration: 'none',
+                        }}
+                      >
+                        {a.author?.username}
+                      </Link>
+                      <div style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>
+                        {timeAgo(a.createdAt)}
+                      </div>
+                    </div>
+                  </div>
+                  <div
                     style={{
-                      fontSize: 13,
+                      fontSize: 16,
                       fontWeight: 700,
                       color: 'var(--sh-heading)',
-                      textDecoration: 'none',
+                      marginBottom: 6,
                     }}
                   >
-                    {a.author?.username}
-                  </Link>
-                  <div style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>
-                    {timeAgo(a.createdAt)}
+                    {a.title}
                   </div>
-                </div>
-              </div>
-              <div
-                style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  color: 'var(--sh-heading)',
-                  marginBottom: 6,
-                }}
-              >
-                {a.title}
-              </div>
-              <div
-                style={{
-                  fontSize: 13,
-                  color: 'var(--sh-muted)',
-                  lineHeight: 1.8,
-                  whiteSpace: 'pre-wrap',
-                }}
-              >
-                <MentionText text={a.body} />
-              </div>
-              {a.media && a.media.length > 0 && <AnnouncementMediaGallery media={a.media} />}
-            </article>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      color: 'var(--sh-muted)',
+                      lineHeight: 1.8,
+                      whiteSpace: 'pre-wrap',
+                    }}
+                  >
+                    <MentionText text={a.body} />
+                  </div>
+                  {a.media && a.media.length > 0 && <AnnouncementMediaGallery media={a.media} />}
+                </article>
+              )
+            })()
           ),
         )}
       </div>

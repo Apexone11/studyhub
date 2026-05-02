@@ -1,18 +1,17 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
+const optionalAuth = require('../../core/auth/optionalAuth')
 const prisma = require('../../lib/prisma')
 const { evaluateFlag } = require('../../lib/featureFlags')
 const { ERROR_CODES, sendError } = require('../../middleware/errorEnvelope')
 const { captureError } = require('../../monitoring/sentry')
-const { adminLimiter } = require('../../lib/rateLimiters')
+const { adminLimiter, readLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
-router.use(adminLimiter)
-
 // GET /api/flags — List all flags (admin only)
-router.get('/', requireAuth, requireAdmin, async (req, res) => {
+router.get('/', adminLimiter, requireAuth, requireAdmin, async (req, res) => {
   try {
     const flags = await prisma.featureFlag.findMany({
       orderBy: { createdAt: 'desc' },
@@ -25,7 +24,7 @@ router.get('/', requireAuth, requireAdmin, async (req, res) => {
 })
 
 // POST /api/flags — Create a flag (admin only)
-router.post('/', requireAuth, requireAdmin, async (req, res) => {
+router.post('/', adminLimiter, requireAuth, requireAdmin, async (req, res) => {
   const { name, description, enabled, rolloutPercentage, conditions } = req.body
 
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
@@ -53,7 +52,7 @@ router.post('/', requireAuth, requireAdmin, async (req, res) => {
 })
 
 // PUT /api/flags/:name — Update a flag (admin only)
-router.put('/:name', requireAuth, requireAdmin, async (req, res) => {
+router.put('/:name', adminLimiter, requireAuth, requireAdmin, async (req, res) => {
   const { name } = req.params
   const { description, enabled, rolloutPercentage, conditions } = req.body
 
@@ -79,7 +78,7 @@ router.put('/:name', requireAuth, requireAdmin, async (req, res) => {
 })
 
 // DELETE /api/flags/:name — Delete a flag (admin only)
-router.delete('/:name', requireAuth, requireAdmin, async (req, res) => {
+router.delete('/:name', adminLimiter, requireAuth, requireAdmin, async (req, res) => {
   const { name } = req.params
 
   try {
@@ -96,12 +95,21 @@ router.delete('/:name', requireAuth, requireAdmin, async (req, res) => {
   }
 })
 
-// GET /api/flags/evaluate/:name — Evaluate a flag for the current user (any authenticated user)
-router.get('/evaluate/:name', requireAuth, async (req, res) => {
+// GET /api/flags/evaluate/:name — Evaluate a flag for the current viewer.
+// Public on purpose: shipped flags gate signup-flow surfaces (Google OAuth
+// picker, role picker) that anonymous users on /register need to evaluate
+// BEFORE they have a session. Requiring auth here is a chicken-and-egg
+// bug — it 401s on /register, fail-closed flips the gate to disabled,
+// and Google signups silently break. Anonymous evaluation falls back to
+// `userId: null` which `evaluateFlag()` handles: percentage rollouts <
+// 100% return NO_USER_FOR_ROLLOUT (still fail-closed, no leak), but a
+// fully shipped flag (enabled=true, rollout=100%) returns ENABLED so
+// the picker actually appears.
+router.get('/evaluate/:name', readLimiter, optionalAuth, async (req, res) => {
   try {
     const result = await evaluateFlag(req.params.name, {
-      userId: req.user.userId,
-      role: req.user.role,
+      userId: req.user?.userId || null,
+      role: req.user?.role || null,
     })
     res.json({ enabled: result.enabled, reason: result.reason })
   } catch (err) {

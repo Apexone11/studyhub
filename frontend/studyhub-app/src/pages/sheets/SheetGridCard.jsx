@@ -16,6 +16,7 @@
  * primitive — the List view renders the same field as a plain styled
  * span. Different surface, different treatment, intentional.
  */
+import { useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import Chip from '../../components/ui/Chip/Chip'
 import { IconComment, IconFork, IconStar, IconStarFilled } from '../../components/Icons'
@@ -35,7 +36,27 @@ export default function SheetGridCard({ sheet, forking, onOpen, onStar, onFork, 
   const courseCode = sheet.course?.code || 'General'
   const schoolLabel = sheet.course?.school?.short || sheet.course?.school?.name || 'StudyHub'
   const author = sheet.author?.username || 'Unknown'
-  const previewText = (sheet.previewText || '').trim()
+  // Fall back to author-supplied description when the server-extracted
+  // previewText is null. Older sheets (created before the previewText
+  // backfill ran) and AI-generated sheets whose visible text is mostly
+  // SVG-icon labels can leave previewText empty even though the sheet
+  // has a perfectly good description. Without this fallback the Grid
+  // card renders nothing under the title, which looks broken next to
+  // sheets that DO have a preview.
+  const previewText = (sheet.previewText || sheet.description || '').trim()
+  // Surface a "Fresh" chip on the card when the sheet was updated within
+  // the last 24h. Computing `Date.now()` directly in render trips React
+  // 19's react-hooks/purity rule, and even useMemo isn't enough — the
+  // rule rejects impure calls inside useMemo callbacks too. The lazy
+  // useState initializer runs once per mount and is on the rule's
+  // allowlist; for a 24h freshness window the staleness across a
+  // single mount is irrelevant (the user would have to leave the page
+  // mounted for a full day to ever see the chip mis-render).
+  const [mountedAt] = useState(() => Date.now())
+  const isFresh = useMemo(() => {
+    const updatedAtMs = new Date(sheet.updatedAt || sheet.createdAt || 0).getTime()
+    return Number.isFinite(updatedAtMs) && mountedAt - updatedAtMs < 24 * 60 * 60 * 1000
+  }, [mountedAt, sheet.updatedAt, sheet.createdAt])
   const signal = computeSignalBadge(sheet)
   const signalConfig = signal ? SIGNAL_BADGE_CONFIG[signal] : null
   // Map `signal` to the local CSS-Module class. `SIGNAL_BADGE_CONFIG`
@@ -83,12 +104,29 @@ export default function SheetGridCard({ sheet, forking, onOpen, onStar, onFork, 
         </Link>
       </h3>
 
-      {signalConfig || studyStatus ? (
+      {signalConfig || studyStatus || isFresh ? (
         <div className={styles.badges}>
           {signalConfig ? (
             <span className={`${styles.signal} ${signalToneClass}`}>{signalConfig.label}</span>
           ) : null}
           {studyStatus ? <StudyStatusChip status={studyStatus} /> : null}
+          {isFresh ? (
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                padding: '2px 8px',
+                borderRadius: 999,
+                background: 'var(--sh-success-bg)',
+                color: 'var(--sh-success-text)',
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
+            >
+              Fresh
+            </span>
+          ) : null}
         </div>
       ) : null}
 

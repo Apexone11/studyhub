@@ -35,8 +35,8 @@ export default function AiPage() {
 
   // If URL has ?conversation=id, select it on mount.
   useEffect(() => {
-    const convId = parseInt(searchParams.get('conversation'))
-    if (convId && !isNaN(convId)) {
+    const convId = Number.parseInt(searchParams.get('conversation'), 10)
+    if (Number.isInteger(convId) && convId > 0) {
       chat.selectConversation(convId)
     }
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

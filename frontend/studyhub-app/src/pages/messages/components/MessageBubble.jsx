@@ -2,8 +2,16 @@
  * MessageBubble.jsx
  * Message display with edit/delete actions and link preview
  * ───────────────────────────────────────────────────────────── */
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import UserAvatar from '../../../components/UserAvatar'
+
+// React 19 react-hooks/purity rejects raw `Date.now()` in render. The
+// lazy useState initializer is on the rule's allowlist, runs once per
+// mount, and is acceptable here because the 15-minute edit window is
+// shorter than a typical message-list mount lifetime — once the cutoff
+// passes for a given mount the user just sees a stale enabled button
+// that the backend will 403 on click, which is already toast-handled
+// in the edit submit handler.
 import { truncateText, groupReactions, formatMessageTime } from '../messagesHelpers'
 import { PAGE_FONT } from '../../shared/pageUtils'
 import { MessagePollDisplay } from './MessagePollDisplay'
@@ -82,8 +90,20 @@ export function MessageBubble({
   const senderName = message.sender?.username || 'Unknown'
   const senderAvatar = message.sender?.avatarUrl || null
 
-  // Only own, non-deleted, recent messages can be edited (15-minute window)
-  const canEdit = isOwn && !isDeleted && Boolean(message.editableUntil || message.createdAt)
+  // Only own, non-deleted, recent messages can be edited (15-minute
+  // window). Bug previously: `Boolean(... || createdAt)` was always
+  // truthy because every persisted message has a createdAt — so the
+  // edit button stayed visible forever and clicks 403'd against the
+  // backend window. Now we capture the mount time once and compare to
+  // the cutoff derived from `editableUntil` / `createdAt + 15min`.
+  const [mountedAt] = useState(() => Date.now())
+  const canEdit = useMemo(() => {
+    if (!isOwn || isDeleted) return false
+    let cutoffMs = 0
+    if (message.editableUntil) cutoffMs = new Date(message.editableUntil).getTime()
+    else if (message.createdAt) cutoffMs = new Date(message.createdAt).getTime() + 15 * 60 * 1000
+    return mountedAt < cutoffMs
+  }, [mountedAt, isOwn, isDeleted, message.editableUntil, message.createdAt])
 
   // Find the replied-to message
   const replyToMsg = message.replyToId

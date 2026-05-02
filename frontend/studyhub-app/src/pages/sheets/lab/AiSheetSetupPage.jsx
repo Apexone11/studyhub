@@ -446,7 +446,14 @@ body { font-family: system-ui, sans-serif; padding: 24px; color: #1a1a2e; line-h
                 </div>
                 <iframe
                   src={previewSrc}
-                  sandbox="allow-same-origin"
+                  // Strictest sandbox for an AI-generated `data:` URI
+                  // preview. `data:` URIs always have an opaque origin so
+                  // `allow-same-origin` is a no-op today, but per CLAUDE.md
+                  // A14 leaving it on the attribute re-introduces the
+                  // sandbox-escape vector if a future refactor swaps the
+                  // src to a `blob:` or backend URL. This is a static
+                  // preview — no scripts, no forms, no popups needed.
+                  sandbox=""
                   title="AI Sheet Preview"
                   style={{ width: '100%', height: 'calc(100% - 40px)', border: 'none' }}
                 />

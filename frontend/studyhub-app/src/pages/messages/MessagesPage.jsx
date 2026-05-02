@@ -98,8 +98,8 @@ export default function MessagesPage() {
     if (!dmUserId || !user || dmInitRef.current) return
     dmInitRef.current = true
 
-    const targetId = parseInt(dmUserId, 10)
-    if (!Number.isFinite(targetId) || targetId === currentUserId) return
+    const targetId = Number.parseInt(dmUserId, 10)
+    if (!Number.isInteger(targetId) || targetId < 1 || targetId === currentUserId) return
 
     // Clear the dm param from URL
     setSearchParams(

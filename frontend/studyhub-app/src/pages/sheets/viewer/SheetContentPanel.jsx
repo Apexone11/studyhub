@@ -198,6 +198,7 @@ export default function SheetContentPanel({
   runtimeUrl,
   previewLoading,
   runtimeLoading,
+  runtimeError,
   viewerInteractive,
   toggleViewerInteractive,
   sheetPanelRef,
@@ -542,6 +543,23 @@ export default function SheetContentPanel({
                     ? 'Scripts enabled in a locked sandbox — no access to your account or network.'
                     : 'Scripts disabled for maximum security.'}
                 </span>
+              </div>
+            ) : null}
+            {runtimeError ? (
+              <div
+                role="alert"
+                style={{
+                  margin: 12,
+                  padding: '10px 14px',
+                  borderRadius: 10,
+                  border: '1px solid var(--sh-warning-border)',
+                  background: 'var(--sh-warning-bg)',
+                  color: 'var(--sh-warning-text)',
+                  fontSize: 12,
+                  lineHeight: 1.5,
+                }}
+              >
+                {runtimeError} The viewer fell back to safe preview mode.
               </div>
             ) : null}
             <iframe

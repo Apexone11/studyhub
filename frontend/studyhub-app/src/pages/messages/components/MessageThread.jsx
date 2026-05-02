@@ -479,7 +479,7 @@ export function MessageThread({
                   danger: true,
                   onClick: () => {
                     setShowHeaderMenu(false)
-                    window.open('/support', '_blank')
+                    window.open('/support', '_blank', 'noopener,noreferrer')
                   },
                 },
               ].map((item) => (

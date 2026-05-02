@@ -72,6 +72,7 @@ function PrivateAccountToggle() {
 
   async function handleToggle() {
     const newValue = !isPrivate
+    const previousValue = isPrivate
     setIsPrivate(newValue)
     setSaving(true)
     try {
@@ -83,17 +84,24 @@ function PrivateAccountToggle() {
       })
       const data = await res.json()
       if (res.ok) {
-        setSessionUser((u) => (u ? { ...u, isPrivate: newValue } : u))
+        // CLAUDE.md A4 — never optimistically commit a toggle to the
+        // requested value. Hydrate from the server's persisted value
+        // (data.isPrivate) so a partial-success or normalized response
+        // doesn't desync the UI from the DB. Falls back to the
+        // requested value when the endpoint omits the field.
+        const persisted = typeof data.isPrivate === 'boolean' ? data.isPrivate : newValue
+        setIsPrivate(persisted)
+        setSessionUser((u) => (u ? { ...u, isPrivate: persisted } : u))
         showToast(
-          newValue ? 'Your account is now private.' : 'Your account is now public.',
+          persisted ? 'Your account is now private.' : 'Your account is now public.',
           'success',
         )
       } else {
-        setIsPrivate(!newValue) // revert
+        setIsPrivate(previousValue) // revert
         showToast(data.error || 'Could not update privacy setting.', 'error')
       }
     } catch {
-      setIsPrivate(!newValue) // revert
+      setIsPrivate(previousValue) // revert
       showToast('Check your connection and try again.', 'error')
     } finally {
       setSaving(false)

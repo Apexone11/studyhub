@@ -39,8 +39,8 @@ const aiMessageLimiter = createAiMessageLimiter(AI_RATE_LIMIT_RPM)
 // GET /api/ai/conversations
 router.get('/conversations', requireAuth, readLimiter, async (req, res) => {
   try {
-    const limit = Math.min(parseInt(req.query.limit) || 30, 100)
-    const offset = parseInt(req.query.offset) || 0
+    const limit = Math.min(Number.parseInt(req.query.limit, 10) || 30, 100)
+    const offset = Number.parseInt(req.query.offset, 10) || 0
     const result = await aiService.listConversations(req.user.userId, { limit, offset })
     res.json(result)
   } catch (err) {

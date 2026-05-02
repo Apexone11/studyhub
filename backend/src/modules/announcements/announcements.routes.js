@@ -169,8 +169,8 @@ router.post(
   },
   imageUpload.array('images', MAX_IMAGES),
   async (req, res) => {
-    const announcementId = parseInt(req.params.id, 10)
-    if (isNaN(announcementId))
+    const announcementId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(announcementId) || announcementId < 1)
       return sendError(res, 400, 'Invalid announcement ID.', ERROR_CODES.BAD_REQUEST)
 
     try {
@@ -190,9 +190,12 @@ router.post(
         where: { announcementId },
       })
       if (existingCount + files.length > MAX_IMAGES) {
-        return res
-          .status(400)
-          .json({ error: `Maximum ${MAX_IMAGES} media items per announcement.` })
+        return sendError(
+          res,
+          400,
+          `Maximum ${MAX_IMAGES} media items per announcement.`,
+          ERROR_CODES.BAD_REQUEST,
+        )
       }
 
       const mediaRecords = []
@@ -258,9 +261,14 @@ router.delete('/:id/media/:mediaId', requireAuth, requireTrustedOrigin, async (r
     return sendForbidden(res, 'Admin access required.')
   }
 
-  const announcementId = parseInt(req.params.id, 10)
-  const mediaId = parseInt(req.params.mediaId, 10)
-  if (isNaN(announcementId) || isNaN(mediaId)) {
+  const announcementId = Number.parseInt(req.params.id, 10)
+  const mediaId = Number.parseInt(req.params.mediaId, 10)
+  if (
+    !Number.isInteger(announcementId) ||
+    announcementId < 1 ||
+    !Number.isInteger(mediaId) ||
+    mediaId < 1
+  ) {
     return sendError(res, 400, 'Invalid ID.', ERROR_CODES.BAD_REQUEST)
   }
 
@@ -297,12 +305,15 @@ router.post('/:id/video', requireAuth, requireTrustedOrigin, async (req, res) =>
     return sendForbidden(res, 'Admin access required.')
   }
 
-  const announcementId = parseInt(req.params.id, 10)
-  const videoId = req.body.videoId ? parseInt(req.body.videoId, 10) : null
+  const announcementId = Number.parseInt(req.params.id, 10)
+  const videoIdRaw = req.body.videoId
+  const videoId =
+    videoIdRaw !== undefined && videoIdRaw !== null ? Number.parseInt(videoIdRaw, 10) : null
 
-  if (isNaN(announcementId))
+  if (!Number.isInteger(announcementId) || announcementId < 1)
     return sendError(res, 400, 'Invalid announcement ID.', ERROR_CODES.BAD_REQUEST)
-  if (!videoId) return sendError(res, 400, 'videoId is required.', ERROR_CODES.BAD_REQUEST)
+  if (!Number.isInteger(videoId) || videoId < 1)
+    return sendError(res, 400, 'videoId is required.', ERROR_CODES.BAD_REQUEST)
 
   try {
     const announcement = await prisma.announcement.findUnique({
@@ -373,8 +384,9 @@ router.delete('/:id', requireAuth, requireTrustedOrigin, async (req, res) => {
     return sendForbidden(res, 'Admin access required.')
   }
 
-  const announcementId = parseInt(req.params.id, 10)
-  if (isNaN(announcementId)) return sendError(res, 400, 'Invalid ID.', ERROR_CODES.BAD_REQUEST)
+  const announcementId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(announcementId) || announcementId < 1)
+    return sendError(res, 400, 'Invalid ID.', ERROR_CODES.BAD_REQUEST)
 
   try {
     // Clean up R2 images before deleting

@@ -37,6 +37,7 @@ export default function useSheetViewer() {
   const [runtimeUrl, setRuntimeUrl] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
   const [runtimeLoading, setRuntimeLoading] = useState(false)
+  const [runtimeError, setRuntimeError] = useState('')
   const [htmlWarningAcked, setHtmlWarningAcked] = useState(false)
   const [viewerInteractive, setViewerInteractive] = useState(false)
   const [relatedSheets, setRelatedSheets] = useState([])
@@ -298,21 +299,42 @@ export default function useSheetViewer() {
     }
   }, [isHtmlSheet, htmlWarningAcked, sheet?.id])
 
-  /* Load interactive runtime URL on demand (owner/admin only) */
+  /* Load interactive runtime URL on demand. Per the publish-with-warning
+   * policy (CLAUDE.md HTML Security Policy + interactive-preview.test.js),
+   * Tier 0 + Tier 1 sheets are interactive for any authenticated viewer;
+   * only Tier 2+ HIGH_RISK sheets restrict to owner/admin. Older comment
+   * here said "owner/admin only" — that was wrong, fixed below. The
+   * silent fallback to safe-preview when the fetch failed was the actual
+   * cause of "user can't interact with the iframe" reports: we'd toggle
+   * viewerInteractive on, click the button, the runtime fetch would 4xx
+   * (e.g. unauthenticated, expired session) or return an empty body, and
+   * we'd flip viewerInteractive back off with no UI feedback. Surface a
+   * specific error message instead so the user knows why interaction
+   * isn't engaging. */
   const loadInteractiveRuntime = useCallback(() => {
     if (!isHtmlSheet || !sheet?.id || runtimeUrl) return
     setRuntimeLoading(true)
+    setRuntimeError('')
     fetch(`${API}/api/sheets/${sheet.id}/html-runtime`, {
       headers: authHeaders(),
       credentials: 'include',
     })
-      .then((r) => r.json().catch(() => ({})))
-      .then((data) => {
-        if (data?.runtimeUrl) setRuntimeUrl(data.runtimeUrl)
-        else setViewerInteractive(false)
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) {
+          // Backend returns 401 for unauth, 403 for non-owner on Tier 2,
+          // 404 for missing sheet. Surface the server-supplied message
+          // when available — it's the most accurate diagnosis.
+          throw new Error(data?.error || `Could not load interactive preview (HTTP ${r.status}).`)
+        }
+        if (!data?.runtimeUrl) {
+          throw new Error('Interactive preview is not available for this sheet.')
+        }
+        setRuntimeUrl(data.runtimeUrl)
       })
-      .catch(() => {
+      .catch((err) => {
         setViewerInteractive(false)
+        setRuntimeError(err?.message || 'Could not load interactive preview.')
       })
       .finally(() => {
         setRuntimeLoading(false)
@@ -615,6 +637,7 @@ export default function useSheetViewer() {
     runtimeUrl,
     previewLoading,
     runtimeLoading,
+    runtimeError,
     htmlWarningAcked,
     viewerInteractive,
     toggleViewerInteractive,

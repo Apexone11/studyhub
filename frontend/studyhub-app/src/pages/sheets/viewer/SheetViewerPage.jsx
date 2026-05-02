@@ -48,6 +48,7 @@ export default function SheetViewerPage() {
     runtimeUrl,
     previewLoading,
     runtimeLoading,
+    runtimeError,
     htmlWarningAcked,
     viewerInteractive,
     toggleViewerInteractive,
@@ -276,6 +277,7 @@ export default function SheetViewerPage() {
                     runtimeUrl={runtimeUrl}
                     previewLoading={previewLoading}
                     runtimeLoading={runtimeLoading}
+                    runtimeError={runtimeError}
                     viewerInteractive={viewerInteractive}
                     toggleViewerInteractive={toggleViewerInteractive}
                     sheetPanelRef={sheetPanelRef}

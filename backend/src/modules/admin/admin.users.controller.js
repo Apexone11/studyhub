@@ -6,6 +6,7 @@ const { isSuperAdmin } = require('../../lib/superAdmin')
 const { logModerationEvent } = require('../../lib/moderation/moderationLogger')
 const { auditFromRequest, AUDIT_EVENTS } = require('../../lib/auditLog')
 const { maskEmail } = require('../../lib/fieldEncryption')
+const log = require('../../lib/logger')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
 const { DURATION_7D_MS } = require('../../lib/constants')
 
@@ -402,6 +403,9 @@ router.delete('/users/:id', async (req, res) => {
 // ── PATCH /api/admin/users/:id/staff-verified ────────────────
 router.patch('/users/:id/staff-verified', async (req, res) => {
   const targetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(targetId) || targetId < 1) {
+    return res.status(400).json({ error: 'User id must be a positive integer.' })
+  }
   const { isStaffVerified } = req.body || {}
 
   if (typeof isStaffVerified !== 'boolean') {
@@ -465,7 +469,11 @@ router.get('/moderation/users/:userId/log', async (req, res) => {
     ])
     res.json({ items, page, totalPages: Math.ceil(total / limit) || 1 })
   } catch (err) {
-    console.error('[admin] Failed to load moderation log:', err.message)
+    log.error(
+      { event: 'admin.moderation_log_failed', err: err.message, route: req.originalUrl },
+      'Failed to load moderation log',
+    )
+    captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Failed to load log.' })
   }
 })
@@ -474,7 +482,8 @@ router.get('/moderation/users/:userId/log', async (req, res) => {
 router.get('/moderation/users/:userId/log/export', async (req, res) => {
   try {
     const userId = Number.parseInt(req.params.userId, 10)
-    if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Invalid userId.' })
+    if (!Number.isInteger(userId) || userId < 1)
+      return res.status(400).json({ error: 'Invalid userId.' })
 
     const user = await prisma.user.findUnique({ where: { id: userId }, select: { username: true } })
     if (!user) return res.status(404).json({ error: 'User not found.' })
@@ -521,7 +530,11 @@ router.get('/moderation/users/:userId/log/export', async (req, res) => {
 
     res.end()
   } catch (err) {
-    console.error('[admin] CSV export failed:', err.message)
+    log.error(
+      { event: 'admin.moderation_log_export_failed', err: err.message, route: req.originalUrl },
+      'Moderation log CSV export failed',
+    )
+    captureError(err, { route: req.originalUrl, method: req.method })
     res.status(500).json({ error: 'Export failed.' })
   }
 })

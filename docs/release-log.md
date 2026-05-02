@@ -28,6 +28,49 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Dependency changes (2026-05-02)
+
+Accepted 9 of the 10 bumps in the Dependabot `backend-minor-patch` group. All are minor or patch within the existing major line:
+
+- `@aws-sdk/client-kms` 3.1036.0 → 3.1041.0 (5-patch within 3.10x)
+- `@aws-sdk/client-s3` 3.1036.0 → 3.1041.0
+- `@aws-sdk/s3-request-presigner` 3.1036.0 → 3.1041.0
+- `@sentry/node` 10.50.0 → 10.51.0
+- `express-rate-limit` 8.4.0 → 8.4.1
+- `nodemailer` 8.0.5 → 8.0.7
+- `posthog-node` 5.30.1 → 5.33.0
+- `eslint` 10.2.1 → 10.3.0 (devDep)
+- `globals` 17.5.0 → 17.6.0 (devDep)
+
+Rollback plan if any of these regress in prod: `npm --prefix backend install <pkg>@<prior>` for the offending package only, commit `package.json` + `package-lock.json` together, redeploy. Backend lint clean and 59/59 messaging + interactive-preview tests pass after the install.
+
+**Deferred:** `@anthropic-ai/sdk` 0.39.0 → 0.92.0 — that's a 53-version jump on a 0.x SDK and effectively a major bump. In 0.x semver every minor is a potential break, and the Hub AI surface relies on streaming, tool use, and SSE event shapes that have all churned across that range. Will be done in a dedicated migration cycle with `claude-api` skill + smoke-test pass on `/ai`.
+
+### 11-loop sweep — security hardening + UI polish (2026-05-02)
+
+After the live-bug sweep below, ran 6 broader review loops (Feed, Sheets/Notes/Library, Messaging/Groups/AI, Profile/Settings/Onboarding, Auth/Pricing/Public, Admin/Misc) and applied the high-confidence findings:
+
+- **A11 critical:** `backend/src/modules/admin/admin.content.controller.js` was the last admin write router missing `originAllowlist()` defense in depth (announcement create/pin/delete + HTML-uploads kill switch). Added at the router level — `originAllowlist` short-circuits GETs so applying broadly is safe.
+- **A12 input validation:** added `Number.isInteger + < 1` guards on `feed.social.controller.js` PATCH `/posts/:id/comments/:commentId` (was using bare `Number()`), `admin.users.controller.js` PATCH `/users/:id/staff-verified`, and replaced `Number.isFinite` with `Number.isInteger` on the moderation-log CSV export. Frontend: `LibraryPage` page param (was producing `NaN` totalPages on malformed `?page=abc`), `MessagesPage` DM `targetId`, `AiPage` conversation id (was missing radix).
+- **Bug:** `MessageBubble.canEdit` previously stayed truthy forever because `Boolean(... || createdAt)` always passed — every persisted message has a createdAt. Now derives the cutoff from `editableUntil` or `createdAt + 15min` and compares to mount time.
+- **A16:** two `console.error` calls in `admin.users.controller.js` (moderation log + CSV export error paths) replaced with `log.error({event, ...}, message)` so log-aggregator alerts can fire.
+- **A4:** `PrivacyTab.handleToggle` now hydrates `isPrivate` from the server response body's `isPrivate` field (falling back to the requested value) instead of writing the requested value blindly into session state.
+- **A15:** `MessageThread.jsx` "Report" menu item was calling `window.open('/support', '_blank')` without the `noopener,noreferrer` window-features string. Fixed.
+- **Token consistency:** `SheetsTab.jsx` Delete pill button was using hardcoded `#fef2f2` / `#dc2626` / `#fecaca` hex values instead of `var(--sh-danger-*)` tokens (CLAUDE.md CSS conventions). Switched to tokens — now respects dark mode.
+- **UI polish (one per cluster):** "Fresh" chip on Sheet Grid cards updated within the last 24h (`SheetGridCard.jsx`); `<time>` element with native title-tooltip on FeedCard timestamps for hover-reveal absolute date; "Save $10 with yearly" pill above the PricingPage subscribe buttons; brand-color left-border accent on AnnouncementsPage cards posted within the last 24h.
+
+### Live-bug sweep + 5-loop review pass (2026-05-02)
+
+- **Video playback fixed.** The frontend Cloudflare Pages CSP at `frontend/studyhub-app/public/_headers` was missing a `media-src` directive entirely, so `<video>` elements loading from R2 fell back to `default-src 'self'` and were blocked. Added `media-src 'self' blob: https://*.r2.cloudflarestorage.com https://api.getstudyhub.org`. The browser-level "Video playback failed." banner on `/feed?filter=videos` is gone after this lands.
+- **Google signups un-paused.** `GET /api/flags/evaluate/:name` required auth, but anonymous users on `/register` need to evaluate the OAuth picker flag BEFORE they have a session. Switched the eval route to `optionalAuth` + `readLimiter`, kept all 4 admin write routes on `requireAuth + requireAdmin + adminLimiter`. Fail-closed semantics preserved: `evaluateFlag()` returns `NO_USER_FOR_ROLLOUT` for `<100%` rollouts when called anonymously.
+- **Sheet Grid card description fallback.** `SheetGridCard.jsx` now falls back to `sheet.description` when the server-extracted `previewText` is null (older sheets pre-backfill, AI sheets where visible text is mostly SVG-icon labels). Sheets without either field still render no preview block — same as before — but the common case where `description` exists now renders.
+- **Admin user table density.** Three stacked action pills (Make admin / Grant badge / Delete) collapsed into a single `⋯` dropdown menu so each row stays one line tall. Click-outside + Escape dismissal, ARIA roles wired.
+- **Interactive sheet preview surfaces silent errors.** `useSheetViewer.js` now sets `runtimeError` and shows it in `SheetContentPanel.jsx` when the runtime fetch fails or returns no `runtimeUrl`, instead of silently flipping `viewerInteractive` back off with no UI feedback. Outdated "owner/admin only" comment corrected — Tier 0 + Tier 1 are open to all authenticated viewers per the publish-with-warning policy.
+- **Iframe sandbox tightening (sweep findings).** `AiSheetSetupPage.jsx` `data:`-URI preview iframe changed from `sandbox="allow-same-origin"` to `sandbox=""` (CLAUDE.md A14: a no-op today on opaque-origin URIs but re-introduces the escape vector under a future refactor). Admin `ContentPreviewModal.jsx` PDF iframe gained `sandbox="allow-same-origin"` + `referrerPolicy="no-referrer"`. Admin `SheetReviewDetails.jsx` interactive-preview sandbox gained `allow-popups`.
+- **A12 input-validation sweep:** four `parseInt(req.params.messageId, 10)` call sites in `messaging.reactions.routes.js` now have explicit `Number.isInteger(id) && id >= 1` guards. `ai.routes.js` pagination `parseInt` calls gained the missing radix. `announcements.routes.js` switched four `isNaN()` guards to the canonical `!Number.isInteger || < 1` shape and the lone raw `res.status(400).json({error})` was migrated to `sendError(...)`.
+- **A10/A16 observability:** `htmlArchiveScheduler.js` 6-hour interval is now wrapped in `runWithHeartbeat('html.archive_expired_versions', …, { slaMs: 5*60_000 })` and the `console.error` swallow was replaced — failures now emit `job.failure` events to pino + Sentry.
+- **DOMPurify call-site consistency:** the two `DOMPurify.sanitize()` calls in `NoteEditor.jsx` (markdown-to-HTML render + print/export) now pass `{ USE_PROFILES: { html: true } }` explicitly, matching the convention used in `notesComponents.jsx`, `SheetContentPanel.jsx`, and `BookDetailPage.jsx`. Default behavior is unchanged today, but the explicit profile survives a future DOMPurify default change.
+
 ### Feed video player rewritten + click-to-play overlay + keyboard shortcuts (2026-05-02)
 
 - **Feed videos now actually play.** The previous player kept the `<video>` element at `opacity: 0` until `onLoadedData` fired, but with `preload="metadata"` that event only fires AFTER the user clicks play — and the user couldn't click play because the controls were invisible behind the thumbnail. Restructured around the standard `<video poster=…>` pattern: the video element is always at full opacity, controls are always reachable, and a custom click-to-play overlay (big white play button on a slight scrim) sits on top of the poster only while the user hasn't started yet. The stall spinner only appears when the user has actually started AND playback stalls mid-stream — never on initial idle.
