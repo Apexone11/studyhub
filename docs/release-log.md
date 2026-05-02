@@ -28,6 +28,20 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Fork gate + Tier-1 interactive preview opened to all viewers (2026-05-01)
+
+- **Fork is now gated on `allowEditing`.** When a sheet creator turns OFF "Allow others to edit," the Fork button disappears for non-owners on the sheet viewer, sheet browse cards, and the mobile detail view; the backend `POST /api/sheets/:id/fork` returns 403 `FORK_DISABLED` for the same case (CLAUDE.md A6 defense in depth — frontend hide + backend reject). Owners never saw Fork on their own sheets to begin with (backend already 400'd self-forks).
+- **Interactive Preview now works for non-owner viewers on Tier 1 (FLAGGED) sheets.** Previously, AI-generated study tools that include `<script>` (flashcards, quiz, match game, etc.) tripped Tier 1 and the runtime token endpoint was owner-only — meaning the creator saw the working interactive UI but every other viewer got Safe Preview only. The HTML risk policy already documents Tier 1 as "publish with warning, viewable by all" — gate is now `tier <= RISK_TIER.FLAGGED` on `canInteract`, and the runtime route requires owner/admin only at Tier 2 (HIGH_RISK). Sandbox stays `allow-scripts allow-forms` (never combined with `allow-same-origin` per A14), so the parent app stays isolated regardless of tier. New regression tests in `backend/test/interactive-preview.test.js` lock the `<= FLAGGED` gate and the new HIGH_RISK 403 message in place.
+
+### Post-deploy polish + Google signups deploy-safe (2026-05-01)
+
+- **Admin tab pills** get more breathing room — pill row now has `padding: 14px 18px`, `gap: 12`, `rowGap: 10`, and `flexWrap: wrap` so the tab cluster doesn't look cramped at narrower widths.
+- **Public Navbar logo** swapped from the static `LogoMark` to the `AnimatedLogoMark` for the landing/auth/marketing routes (where `isLanding || !user`). Authenticated app chrome keeps the static mark.
+- **Google signups deploy-safe.** `scripts/seedRolesV2Flags.js` now supports `forceEnabled: true` per flag — `flag_roles_v2_oauth_picker` is now force-enabled at every Railway boot, so an accidental admin-UI flip-off self-heals on the next deploy. Operators can opt out for incident-response kill-switching by setting `ROLES_V2_HONOR_ADMIN_TOGGLES=true`. New env-var documented in `backend/.env.example`.
+- **Creator Audit Consent Log empty state** rewritten with a proper subtitle ("Read-only audit trail of CreatorAuditConsent rows for legal disputes…") and a polished "No consent rows yet / No revoked consents" body that explains _why_ the table is empty and how rows get populated.
+- **Achievements page chrome fixed.** `/achievements` and `/achievements/:slug` now use the canonical authenticated-app layout (`Navbar` + `AppSidebar` + `app-two-col-grid` + `pageShell('app')`) — previously they rendered the sidebar without the top Navbar, producing a cut-off avatar header and no visible Hide button.
+- **`docs/internal/security/RUNBOOK_CLAMAV.md`** added — Railway sidecar setup procedure for the ClamAV daemon (resolves the "Security scanner unavailable" 503 on prod video uploads + HTML drafts), with the `CLAMAV_DISABLED=true` emergency-bypass path documented as the founder-approved exception.
+
 ### 2FA recovery codes + Admin MFA enforcement scaffolding (2026-05-01)
 
 - **2FA recovery codes** (NIST 800-63B AAL2 alt-factor pattern). Generates 10 single-use 64-bit codes (`xxxxx-xxxxx` hex), stores bcrypt hashes, exposes plaintext once at generation. Endpoints: `POST /api/settings/2fa/recovery-codes/regenerate`, `GET /api/settings/2fa/recovery-codes/status`, `POST /api/auth/login/recovery-code`. Behind `flag_2fa_recovery_codes` (ships disabled, founder flips on after testing).

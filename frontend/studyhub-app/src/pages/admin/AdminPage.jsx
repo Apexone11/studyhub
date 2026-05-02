@@ -185,14 +185,29 @@ export default function AdminPage() {
                     padding: '18px 20px',
                   }}
                 >
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      // Wider column-gap + an explicit row-gap so the
+                      // second wrapped row has breathing space instead
+                      // of stacking flush against the first. Beta
+                      // tester reported the row felt cramped at full
+                      // admin width (16 tabs).
+                      columnGap: 10,
+                      rowGap: 10,
+                      flexWrap: 'wrap',
+                    }}
+                  >
                     {TABS.map(([value, label]) => (
                       <button
                         key={value}
                         type="button"
                         onClick={() => setActiveTab(value)}
                         style={{
-                          padding: '8px 14px',
+                          // Slightly taller pills give the active-tab
+                          // border more visual weight and align better
+                          // with the v2 button kit (height ~36).
+                          padding: '9px 16px',
                           borderRadius: 10,
                           border:
                             activeTab === value

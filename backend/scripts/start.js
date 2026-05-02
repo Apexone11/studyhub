@@ -79,11 +79,17 @@ async function runFeatureFlagSeeds() {
 
     const rolesV2 = await seedRolesV2Flags(prisma)
     for (const r of rolesV2) {
-      console.log(
-        r.existed
-          ? `[boot-seed] kept ${r.name} (enabled=${r.enabled}, rollout=${r.rolloutPercentage}%)`
-          : `[boot-seed] seeded ${r.name} (enabled=true, rollout=100%)`,
-      )
+      if (r.forced) {
+        console.log(
+          `[boot-seed] forced ${r.name} (enabled=true, rollout=100%) — ROLES_V2_HONOR_ADMIN_TOGGLES=true to opt out`,
+        )
+      } else if (r.existed) {
+        console.log(
+          `[boot-seed] kept ${r.name} (enabled=${r.enabled}, rollout=${r.rolloutPercentage}%)`,
+        )
+      } else {
+        console.log(`[boot-seed] seeded ${r.name} (enabled=true, rollout=100%)`)
+      }
     }
 
     const notesHardening = await seedNotesHardeningFlag(prisma)

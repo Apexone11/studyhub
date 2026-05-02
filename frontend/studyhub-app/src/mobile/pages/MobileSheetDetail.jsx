@@ -218,20 +218,22 @@ export default function MobileSheetDetail() {
             <span>{starred ? 'Starred' : 'Star'}</span>
           </button>
 
-          <button type="button" className="mob-sheet-action-btn" onClick={handleFork}>
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <circle cx="12" cy="18" r="3" stroke="currentColor" strokeWidth="2" />
-              <circle cx="6" cy="6" r="3" stroke="currentColor" strokeWidth="2" />
-              <circle cx="18" cy="6" r="3" stroke="currentColor" strokeWidth="2" />
-              <path
-                d="M12 15V9M6 9v1c0 2 2 3 6 3s6-1 6-3V9"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-              />
-            </svg>
-            <span>Fork</span>
-          </button>
+          {sheet?.allowEditing === true && sheet?.userId !== user?.id ? (
+            <button type="button" className="mob-sheet-action-btn" onClick={handleFork}>
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="12" cy="18" r="3" stroke="currentColor" strokeWidth="2" />
+                <circle cx="6" cy="6" r="3" stroke="currentColor" strokeWidth="2" />
+                <circle cx="18" cy="6" r="3" stroke="currentColor" strokeWidth="2" />
+                <path
+                  d="M12 15V9M6 9v1c0 2 2 3 6 3s6-1 6-3V9"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                />
+              </svg>
+              <span>Fork</span>
+            </button>
+          ) : null}
 
           <button
             type="button"

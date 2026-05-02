@@ -45,6 +45,7 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
         attachmentType: true,
         attachmentName: true,
         allowDownloads: true,
+        allowEditing: true,
       },
     })
 
@@ -54,6 +55,15 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
     }
     if (original.userId === req.user.userId) {
       return res.status(400).json({ error: 'You cannot fork your own sheet.' })
+    }
+    // Forking creates an editable copy of the content, which would defeat the
+    // creator's intent if they've explicitly disabled edits. Gate Fork on the
+    // same allowEditing flag the SheetLab edit gate uses.
+    if (original.allowEditing !== true) {
+      return res.status(403).json({
+        error: 'Forking is disabled by the creator of this sheet.',
+        code: 'FORK_DISABLED',
+      })
     }
 
     // ── Idempotent: return existing fork if user already forked this sheet ──
