@@ -28,6 +28,12 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### ClamAV antivirus wired to production (2026-05-01)
+
+- **ClamAV sidecar is now live on Railway.** The `clamav/clamav:stable` image runs as a private service at `clamav.railway.internal:3310`; backend `CLAMAV_HOST`/`CLAMAV_PORT`/`CLAMAV_DISABLED` are wired so video uploads now fail-CLOSED in production per CLAUDE.md, and HTML sheet submissions get a real "antivirus clean" signal instead of the soft "scanner unavailable" warning.
+- **Wire-protocol fix in `backend/src/lib/clamav.js`.** The streaming command was `INSTREAM\0` (legacy format); clamd 1.x+ rejects that with `UNKNOWN COMMAND`, which surfaced in the UI as "Antivirus scanner unavailable — Details: UNKNOWN COMMAND" on every sheet upload and "Security scanner unavailable. Please retry." in the feed composer. Command is now `zINSTREAM\0` (NUL-terminated mode prefix). New regression test under `backend/test/clamav.adapter.test.js` spins up a mock TCP server and asserts the wire bytes — the protocol cannot silently regress again.
+- **New runbook** at `docs/internal/security/RUNBOOK_CLAMAV.md` documents the Railway sidecar setup, smoke test, failure modes (incl. emergency `CLAMAV_DISABLED=true` bypass with a 1-hour window), and the wire-protocol gotcha so future operators don't re-hit it.
+
 ### Fork gate + Tier-1 interactive preview opened to all viewers (2026-05-01)
 
 - **Fork is now gated on `allowEditing`.** When a sheet creator turns OFF "Allow others to edit," the Fork button disappears for non-owners on the sheet viewer, sheet browse cards, and the mobile detail view; the backend `POST /api/sheets/:id/fork` returns 403 `FORK_DISABLED` for the same case (CLAUDE.md A6 defense in depth — frontend hide + backend reject). Owners never saw Fork on their own sheets to begin with (backend already 400'd self-forks).
