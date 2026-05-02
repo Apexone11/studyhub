@@ -28,6 +28,12 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Feed video player rewritten + click-to-play overlay + keyboard shortcuts (2026-05-02)
+
+- **Feed videos now actually play.** The previous player kept the `<video>` element at `opacity: 0` until `onLoadedData` fired, but with `preload="metadata"` that event only fires AFTER the user clicks play — and the user couldn't click play because the controls were invisible behind the thumbnail. Restructured around the standard `<video poster=…>` pattern: the video element is always at full opacity, controls are always reachable, and a custom click-to-play overlay (big white play button on a slight scrim) sits on top of the poster only while the user hasn't started yet. The stall spinner only appears when the user has actually started AND playback stalls mid-stream — never on initial idle.
+- **New small features:** mute preference persists across sessions (single boolean in localStorage at `studyhub.feed.video.muted`, fail-silent on private mode); keyboard shortcuts when the video has focus — Space/K (play/pause), M (mute), F (fullscreen), ←/→ (±5s seek). Comment composers and other inputs are not stolen from (early-return on `INPUT`/`TEXTAREA`/`contentEditable`).
+- **Two parallel security loops caught four bugs before commit:** (1) `started` state never reset when `video.id` changed — fixed by resetting all video-tied state in the fetch effect, so a parent that swaps the prop on the same mounted instance still gets a fresh overlay; (2) F-key fullscreen shortcut bypassed `controlsList="nofullscreen"` when the creator disabled downloads — gated; (3) Safari fullscreen API not handled (`webkitRequestFullscreen` / `webkitFullscreenElement`) — added the prefixed fallbacks; (4) `stalled` could stick at `true` forever on mid-play network drop because `onWaiting` fires but `onCanPlay` never does — added `onError` to clear the spinner and surface the failure. All ship-ready.
+
 ### Security-loop fixes on the 2026-05-01 work (2026-05-02)
 
 - **Structured `clamav.scan_*` pino events now emitted from `lib/clamav.js`** so the alerting guidance in `RUNBOOK_CLAMAV.md` has something to alert on. Three event keys (`clamav.scan_clean` info, `clamav.scan_infected` warn, `clamav.scan_failed` warn) carry `engine` + `bytes` + threat / message context. Logger loaded lazily so a require-time failure can never block scans.

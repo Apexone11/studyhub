@@ -112,15 +112,56 @@ function ShareIcon({ size = 20 }) {
 
 /* ── Inline feed video player (lazy loaded) ────────────────────────────── */
 
+// Persisted across sessions so a user who muted yesterday isn't blasted
+// today. Stored as a single boolean string under one key — no PII, no
+// per-video state, safe to fail silently if storage is unavailable.
+const MUTE_PREF_KEY = 'studyhub.feed.video.muted'
+
+function readMutedPreference() {
+  try {
+    return window.localStorage.getItem(MUTE_PREF_KEY) === 'true'
+  } catch {
+    return false
+  }
+}
+
+function writeMutedPreference(muted) {
+  try {
+    window.localStorage.setItem(MUTE_PREF_KEY, muted ? 'true' : 'false')
+  } catch {
+    /* private mode / disabled storage — ignore */
+  }
+}
+
 function FeedVideoPlayer({ video }) {
   const [streamUrl, setStreamUrl] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
-  const [buffering, setBuffering] = useState(true)
+  // `started` flips true after the first play() call; we never trap the
+  // <video> at opacity:0 before that — the browser's native poster + play
+  // button handle the pre-play state. The earlier markup hid the controls
+  // until `onLoadedData` fired, which (with preload="metadata") only fires
+  // AFTER the user clicks play, creating an unbreakable chicken-and-egg.
+  const [started, setStarted] = useState(false)
+  // Buffering only reflects mid-playback stalls — never the initial idle
+  // state. Initial idle = `started === false` (show big play overlay).
+  const [stalled, setStalled] = useState(false)
+  const videoRef = useRef(null)
 
   useEffect(() => {
     if (!video?.id || video.status !== 'ready') return
     let cancelled = false
+
+    // Reset every state that's tied to a specific video src. If a parent
+    // ever swaps the `video` prop on the same mounted instance (virtualised
+    // feed, FLIP animation, key-less conditional render), the previous
+    // video's `started=true` would otherwise hide the click-to-play overlay
+    // forever for the new video. Same for stalled / error / streamUrl.
+    setStarted(false)
+    setStalled(false)
+    setError(null)
+    setStreamUrl(null)
+    setLoading(true)
 
     async function fetchStream() {
       try {
@@ -148,6 +189,100 @@ function FeedVideoPlayer({ video }) {
   const thumbnailUrl = video?.thumbnailR2Key
     ? `${API}/api/video/media/${encodeURIComponent(video.thumbnailR2Key)}`
     : null
+
+  // Apply the persisted mute preference once the <video> element exists
+  // and a stream URL is in place. Doing this in an effect (rather than as
+  // an attribute) keeps the muted state consistent if React re-renders
+  // mid-playback; `muted` as a JSX attribute would otherwise reset the
+  // user's in-session toggle.
+  useEffect(() => {
+    if (!videoRef.current || !streamUrl) return
+    videoRef.current.muted = readMutedPreference()
+  }, [streamUrl])
+
+  const handlePlayClick = useCallback(() => {
+    const el = videoRef.current
+    if (!el) return
+    setStarted(true)
+    // Apply mute pref before play so autoplay-with-sound rejection rules
+    // never block first frame.
+    el.muted = readMutedPreference()
+    const playPromise = el.play()
+    if (playPromise && typeof playPromise.catch === 'function') {
+      // User-gesture-rejected play (mobile autoplay policy, etc.) is
+      // benign — the native controls still let them retry. Swallow the
+      // unhandled-rejection without surfacing a fake error.
+      playPromise.catch(() => {})
+    }
+  }, [])
+
+  // Persist mute toggles on every change. `volumechange` covers both the
+  // user clicking the mute button on native controls and any keyboard
+  // shortcut handler below.
+  const handleVolumeChange = useCallback(() => {
+    if (!videoRef.current) return
+    writeMutedPreference(videoRef.current.muted)
+  }, [])
+
+  // Keyboard shortcuts when the video element has focus. Mirrors the
+  // standard YouTube / Mux Player bindings: Space = toggle play, M =
+  // toggle mute, F = fullscreen, ←/→ = ±5s seek. Native <video controls>
+  // already handles Space when the controls bar is focused, but binding
+  // it on the element itself makes the whole surface keyboard-driven
+  // once it's focused.
+  const handleKeyDown = useCallback(
+    (e) => {
+      const el = videoRef.current
+      if (!el) return
+      // Don't steal keys from inputs (e.g. comment composer below the card).
+      const tag = e.target?.tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return
+      switch (e.key) {
+        case ' ':
+        case 'k':
+        case 'K':
+          e.preventDefault()
+          if (el.paused) el.play().catch(() => {})
+          else el.pause()
+          break
+        case 'm':
+        case 'M':
+          e.preventDefault()
+          el.muted = !el.muted
+          break
+        case 'f':
+        case 'F': {
+          // Honor the creator's `nofullscreen` controlsList — if downloads /
+          // fullscreen are disabled, the keyboard shortcut must not bypass.
+          if (video?.downloadable === false) break
+          e.preventDefault()
+          // Safari (iOS + Safari ≤15 on macOS) only exposes the webkit-
+          // prefixed APIs; the standard `document.fullscreenElement` reads
+          // null there. Check both, call both.
+          const fsEl = document.fullscreenElement || document.webkitFullscreenElement
+          if (fsEl === el) {
+            const exit = document.exitFullscreen || document.webkitExitFullscreen
+            exit?.call(document)?.catch?.(() => {})
+          } else {
+            const enter = el.requestFullscreen || el.webkitRequestFullscreen
+            enter?.call(el)?.catch?.(() => {})
+          }
+          break
+        }
+        case 'ArrowLeft':
+          e.preventDefault()
+          el.currentTime = Math.max(0, el.currentTime - 5)
+          break
+        case 'ArrowRight':
+          e.preventDefault()
+          el.currentTime = Math.min(el.duration || 0, el.currentTime + 5)
+          break
+        default:
+          break
+      }
+    },
+    [video?.downloadable],
+  )
 
   if (video?.status === 'processing') {
     return (
@@ -271,65 +406,111 @@ function FeedVideoPlayer({ video }) {
       }}
     >
       {/*
-        Cross-fade poster ↔ video to remove the white-frame flash users saw
-        when clicking play (reported 2026-05-01). The earlier markup
-        unmounted the <img> overlay the moment `buffering` flipped to false,
-        which left the <video> element to paint its default (transparent /
-        white) backdrop for one frame before its first decoded frame
-        appeared. Pattern below mirrors what video.js / Mux Player / YouTube
-        Embed do:
-          1. Both layers stay mounted; only opacity changes.
-          2. The <video> element gets `background:#000` so the transition
-             never goes through a brighter colour.
-          3. The poster <img> is `pointerEvents:none` so it can't swallow
-             clicks on the native controls during the fade.
-          4. CSS transition is short (0.18s) — long enough to mask paint
-             jitter, short enough that fast networks feel instant.
+        Standard `<video poster>` pattern — the browser renders the poster
+        image until first play, after which it shows decoded frames. No
+        opacity hacks: the video element is always visible at full opacity,
+        controls are always reachable. A custom click-to-play overlay sits
+        on top of the poster only while `started === false`, so users get
+        a big obvious play target instead of the small native control.
       */}
       <div style={{ position: 'relative', backgroundColor: '#000' }}>
-        {thumbnailUrl && (
-          <img
-            src={thumbnailUrl}
-            alt=""
-            aria-hidden="true"
-            style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              borderRadius: 8,
-              opacity: buffering ? 1 : 0,
-              transition: 'opacity 0.18s ease-out',
-              pointerEvents: 'none',
-            }}
-          />
-        )}
         <video
+          ref={videoRef}
           src={streamUrl}
           poster={thumbnailUrl || undefined}
           controls
           playsInline
           preload="metadata"
+          tabIndex={0}
           controlsList={
             video.downloadable === false ? 'nodownload nofullscreen noremoteplayback' : undefined
           }
           disablePictureInPicture={video.downloadable === false}
           onContextMenu={video.downloadable === false ? (e) => e.preventDefault() : undefined}
-          onCanPlay={() => setBuffering(false)}
-          onLoadedData={() => setBuffering(false)}
-          onWaiting={() => setBuffering(true)}
-          onPlaying={() => setBuffering(false)}
+          onPlay={() => {
+            setStarted(true)
+            setStalled(false)
+          }}
+          onPlaying={() => setStalled(false)}
+          onWaiting={() => setStalled(true)}
+          onCanPlay={() => setStalled(false)}
+          // Without this, a mid-play network drop / stream 404 leaves the
+          // spinner spinning forever — onWaiting fires but onCanPlay never
+          // does. Surface the failure so the user isn't lied to.
+          onError={() => {
+            setStalled(false)
+            setError('Video playback failed.')
+          }}
+          onVolumeChange={handleVolumeChange}
+          onKeyDown={handleKeyDown}
           style={{
             width: '100%',
             display: 'block',
             maxHeight: 500,
             backgroundColor: '#000',
-            opacity: buffering ? 0 : 1,
-            transition: 'opacity 0.18s ease-out',
           }}
         />
+        {!started && (
+          <button
+            type="button"
+            onClick={handlePlayClick}
+            aria-label={video.title ? `Play video: ${video.title}` : 'Play video'}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              background: 'rgba(0,0,0,0.18)',
+              border: 'none',
+              cursor: 'pointer',
+              padding: 0,
+              transition: 'background 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(0,0,0,0.32)'
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(0,0,0,0.18)'
+            }}
+          >
+            <span
+              aria-hidden="true"
+              style={{
+                width: 72,
+                height: 72,
+                borderRadius: '50%',
+                background: 'rgba(255,255,255,0.92)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                boxShadow: '0 4px 16px rgba(0,0,0,0.3)',
+              }}
+            >
+              <svg width="32" height="32" viewBox="0 0 24 24" fill="#111">
+                <path d="M8 5v14l11-7z" />
+              </svg>
+            </span>
+          </button>
+        )}
+        {started && stalled && (
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 40,
+              height: 40,
+              border: '3px solid rgba(255,255,255,0.25)',
+              borderTopColor: '#fff',
+              borderRadius: '50%',
+              animation: 'shp-spin 0.8s linear infinite',
+              pointerEvents: 'none',
+            }}
+          />
+        )}
       </div>
       <div
         style={{
