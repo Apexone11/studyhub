@@ -160,10 +160,12 @@ describe('Preview CSP directives', () => {
 })
 
 /* ═══════════════════════════════════════════════════════════════════════════
- * 4) Owner/admin gate — html-runtime requires canModerateOrOwnSheet
+ * 4) Owner/admin gate — html-runtime requires canModerateOrOwnSheet for
+ *    HIGH_RISK (Tier 2) and QUARANTINED (Tier 3). Tier 0 (CLEAN) and Tier 1
+ *    (FLAGGED) are publish-and-show for any authenticated viewer.
  * ═══════════════════════════════════════════════════════════════════════════ */
 describe('html-runtime endpoint — owner/admin gate', () => {
-  it('html-runtime controller checks canModerateOrOwnSheet before tier checks', () => {
+  it('html-runtime controller checks canModerateOrOwnSheet for HIGH_RISK before quarantine check', () => {
     const fs = require('node:fs')
     const path = require('node:path')
     const source = fs.readFileSync(
@@ -171,7 +173,7 @@ describe('html-runtime endpoint — owner/admin gate', () => {
       'utf8',
     )
 
-    // The canModerateOrOwnSheet check must come BEFORE the tier checks
+    // The canModerateOrOwnSheet check must come BEFORE the quarantine tier check
     const runtimeSection = source.indexOf("get('/:id/html-runtime'")
 
     // Find the owner gate within the runtime handler (after the route declaration)
@@ -183,7 +185,7 @@ describe('html-runtime endpoint — owner/admin gate', () => {
     expect(tierCheckInRuntime).toBeGreaterThan(ownerCheckInRuntime)
   })
 
-  it('html-runtime returns 403 message for non-owner/admin', () => {
+  it('html-runtime returns 403 message for non-owner/admin on HIGH_RISK sheets', () => {
     const fs = require('node:fs')
     const path = require('node:path')
     const source = fs.readFileSync(
@@ -191,8 +193,41 @@ describe('html-runtime endpoint — owner/admin gate', () => {
       'utf8',
     )
     expect(source).toContain(
-      'Interactive preview for flagged sheets is only available to the sheet owner or an admin.',
+      'Interactive preview for high-risk sheets is only available to the sheet owner or an admin.',
     )
+  })
+
+  it('html-runtime gates owner-only on HIGH_RISK (Tier 2) — Tier 1 stays open for all authenticated viewers', () => {
+    const fs = require('node:fs')
+    const path = require('node:path')
+    const source = fs.readFileSync(
+      path.join(__dirname, '../src/modules/sheets/sheets.html.controller.js'),
+      'utf8',
+    )
+    const runtimeSection = source.indexOf("get('/:id/html-runtime'")
+    const runtimeBody = source.slice(runtimeSection)
+    // The publish-with-warning policy (CLAUDE.md HTML Security Policy) means
+    // Tier 1 (FLAGGED) sheets ARE viewable + interactive for everyone, with
+    // the warning shown in the UI. Owner-only restriction kicks in at Tier 2
+    // (HIGH_RISK). Regression-guard against re-tightening the gate to FLAGGED.
+    expect(runtimeBody).toContain('RISK_TIER.HIGH_RISK')
+    expect(runtimeBody).not.toMatch(/tier\s*>=\s*RISK_TIER\.FLAGGED\s*&&\s*!canModerateOrOwnSheet/)
+  })
+
+  it('html-preview canInteract opens Tier 0 + Tier 1 to all authenticated users', () => {
+    const fs = require('node:fs')
+    const path = require('node:path')
+    const source = fs.readFileSync(
+      path.join(__dirname, '../src/modules/sheets/sheets.html.controller.js'),
+      'utf8',
+    )
+    const previewSection = source.indexOf("get('/:id/html-preview'")
+    const runtimeSection = source.indexOf("get('/:id/html-runtime'")
+    const previewBody = source.slice(previewSection, runtimeSection)
+    // canInteract must use `tier <= RISK_TIER.FLAGGED` (Tier 0 OR Tier 1
+    // open to all authed) — NOT `tier < RISK_TIER.FLAGGED` (Tier 0 only).
+    expect(previewBody).toMatch(/tier\s*<=\s*RISK_TIER\.FLAGGED/)
+    expect(previewBody).not.toMatch(/tier\s*<\s*RISK_TIER\.FLAGGED\b/)
   })
 })
 

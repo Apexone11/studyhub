@@ -92,7 +92,10 @@ export default function ConsentLogTab() {
           <h2 style={{ margin: 0, fontSize: 16, color: 'var(--sh-heading)' }}>
             Creator Audit Consent Log
           </h2>
-          <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 4 }}>
+          <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 4, lineHeight: 1.5 }}>
+            Read-only audit trail of CreatorAuditConsent rows for legal disputes and auditor
+            walkthroughs.
+            <br />
             {data.total} total {revokedOnly ? 'revoked ' : ''}rows
           </div>
         </div>
@@ -144,8 +147,30 @@ export default function ConsentLogTab() {
             )}
             {!loading && data.rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="admin-empty">
-                  No consent rows found.
+                <td colSpan={5} style={{ padding: '40px 16px', textAlign: 'center' }}>
+                  <div
+                    style={{
+                      color: 'var(--sh-text)',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      marginBottom: 6,
+                    }}
+                  >
+                    {revokedOnly ? 'No revoked consents' : 'No consent rows yet'}
+                  </div>
+                  <div
+                    style={{
+                      color: 'var(--sh-muted)',
+                      fontSize: 12,
+                      maxWidth: 420,
+                      margin: '0 auto',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {revokedOnly
+                      ? 'No users have revoked their creator-audit consent. Toggle off "Show revoked only" to see all rows.'
+                      : 'Rows appear here once users accept the creator-audit consent on publish, or when the backfill script writes acceptanceMethod=backfill rows for existing users.'}
+                  </div>
                 </td>
               </tr>
             )}

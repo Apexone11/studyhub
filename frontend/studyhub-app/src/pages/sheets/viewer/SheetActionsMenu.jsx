@@ -179,7 +179,13 @@ export default function SheetActionsMenu({
         <Link to={`/sheets/${sheet.id}/lab`} style={linkButton()}>
           Edit in SheetLab
         </Link>
-      ) : user && sheet.userId !== user.id ? (
+      ) : null}
+
+      {/* Fork is gated on the creator's allowEditing toggle. When edits are
+          disabled, forking is also disabled — a fork is just a writable copy
+          of the content, which would defeat the creator's no-edit intent.
+          Backend POST /api/sheets/:id/fork enforces the same rule (403). */}
+      {user && sheet.userId !== user.id && sheet.allowEditing === true ? (
         <button
           type="button"
           onClick={handleFork}

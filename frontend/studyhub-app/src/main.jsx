@@ -50,7 +50,29 @@ createRoot(document.getElementById('root')).render(
 // Register service worker for offline support and update detection.
 // Pattern used by GitHub, Vercel, Shopify: detect new SW, show update toast.
 // Skip on Capacitor native shell — native apps update through the Play Store.
-if ('serviceWorker' in navigator && !window.__SH_NATIVE__) {
+//
+// Skip in dev too. Vite serves chunks with content-hashed URLs that change
+// on every restart; an SW cache from a previous dev session (or worse, a
+// previous prod visit on the same hostname) intercepts requests and
+// returns stale chunks, producing the classic "white screen + 504 +
+// blocked:other" symptom on the next dev boot. Anyone who needs to test
+// the SW itself can flip `import.meta.env.PROD` locally or run
+// `npm run build && npm run preview`.
+if ('serviceWorker' in navigator && !window.__SH_NATIVE__ && import.meta.env.PROD) {
+  // Belt-and-suspenders: if a dev session previously installed an SW
+  // before this guard landed, eagerly unregister it on dev boot so the
+  // user doesn't have to manually clear site data.
+} else if (
+  'serviceWorker' in navigator &&
+  !import.meta.env.PROD &&
+  typeof navigator.serviceWorker.getRegistrations === 'function'
+) {
+  navigator.serviceWorker
+    .getRegistrations()
+    .then((rs) => rs.forEach((r) => r.unregister()))
+    .catch(() => {})
+}
+if ('serviceWorker' in navigator && !window.__SH_NATIVE__ && import.meta.env.PROD) {
   window.addEventListener('load', () => {
     navigator.serviceWorker
       .register('/sw.js')

@@ -12,7 +12,7 @@
 
 import { useState, useEffect, Fragment, lazy, Suspense } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LogoMark, IconSearch } from '../Icons'
+import { LogoMark, AnimatedLogoMark, IconSearch } from '../Icons'
 const SearchModal = lazy(() => import('../search/SearchModal'))
 const ChatPanel = lazy(() => import('../ChatPanel'))
 import KeyboardShortcuts from '../KeyboardShortcuts'
@@ -171,7 +171,17 @@ export default function Navbar({
             to={user ? '/feed' : '/'}
             style={{ textDecoration: 'none', display: 'flex', alignItems: 'center', gap: 8 }}
           >
-            <LogoMark size={isLanding ? 34 : 28} />
+            {/* Public surfaces (landing + login + register) get the
+                animated, color-cycling logo so the brand mark on the
+                first impression matches what authenticated users see
+                on the login card. Authenticated nav keeps the static
+                LogoMark — too many cycling marks at once would be
+                visual noise. */}
+            {isLanding || !user ? (
+              <AnimatedLogoMark size={isLanding ? 34 : 28} />
+            ) : (
+              <LogoMark size={28} />
+            )}
             <span style={wordmarkStyle}>
               Study<span style={{ color: 'var(--sh-nav-tab-active)' }}>Hub</span>
             </span>

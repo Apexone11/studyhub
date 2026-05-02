@@ -101,8 +101,17 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       expiresInSeconds: HTML_PREVIEW_TOKEN_TTL_SECONDS,
       sanitized: issues.length > 0,
       issues,
+      // Interactive Preview availability:
+      //   - Tier 0 (CLEAN) and Tier 1 (FLAGGED) are both publish-and-show
+      //     per the documented HTML risk policy ("Tier 0 publishes, Tier 1
+      //     publishes with warning"). The sandboxed iframe runs scripts in
+      //     `allow-scripts allow-forms` only — never `allow-same-origin` —
+      //     so the parent app stays isolated regardless of tier.
+      //   - Tier 2 (HIGH_RISK) and Tier 3 (QUARANTINED) require owner /
+      //     admin to bypass the gate (Tier 2 normally never reaches a
+      //     non-owner anyway because canReadSheet rejects non-published).
       canInteract:
-        Boolean(req.user) && (tier < RISK_TIER.FLAGGED || canModerateOrOwnSheet(sheet, req.user)),
+        Boolean(req.user) && (tier <= RISK_TIER.FLAGGED || canModerateOrOwnSheet(sheet, req.user)),
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
@@ -138,12 +147,16 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
 
     const tier = sheet.htmlRiskTier || 0
 
-    // Tier 0 (clean) sheets: any authenticated user can toggle interactive mode.
-    // Higher-risk tiers: restrict to owner/admin only.
-    if (tier >= RISK_TIER.FLAGGED && !canModerateOrOwnSheet(sheet, req.user)) {
+    // Interactive runtime gate (mirrors the canInteract calculation in
+    // /html-preview, keep them in sync). Tier 0 + Tier 1 are publish-and-show
+    // for any authenticated viewer — the sandboxed iframe (`allow-scripts
+    // allow-forms` with no `allow-same-origin` per CLAUDE.md A14) keeps the
+    // parent app isolated regardless of tier. Tier 2 (HIGH_RISK) is owner /
+    // admin only; Tier 3 (QUARANTINED) is blocked everywhere.
+    if (tier >= RISK_TIER.HIGH_RISK && !canModerateOrOwnSheet(sheet, req.user)) {
       return res.status(403).json({
         error:
-          'Interactive preview for flagged sheets is only available to the sheet owner or an admin.',
+          'Interactive preview for high-risk sheets is only available to the sheet owner or an admin.',
       })
     }
 

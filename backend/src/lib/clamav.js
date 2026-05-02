@@ -73,7 +73,10 @@ function scanBufferWithClamAv(buffer, options = {}) {
     let response = ''
 
     const socket = net.createConnection({ host, port }, () => {
-      const streamCommand = Buffer.from('INSTREAM\0')
+      // ClamAV protocol: every streaming command must be prefixed with `z` (null-terminated)
+      // or `n` (newline-terminated). Plain `INSTREAM\0` is legacy and rejected by clamd 1.x+
+      // with "UNKNOWN COMMAND". `z` matches the rest of this code which uses NUL terminators.
+      const streamCommand = Buffer.from('zINSTREAM\0')
       socket.write(streamCommand)
 
       const chunkSize = 64 * 1024
