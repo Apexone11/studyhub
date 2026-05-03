@@ -6,6 +6,7 @@ import { useSession } from '../../lib/session-context'
 import { ACCOUNT_TYPE_OPTIONS } from '../../lib/roleLabel'
 
 const STORAGE_KEY = 'studyhub.google.pending'
+const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
 
 function readPending() {
   try {
@@ -25,6 +26,19 @@ function clearPending() {
   }
 }
 
+function deriveDefaultUsername(email, name) {
+  const fromEmail = String(email || '')
+    .split('@')[0]
+    .replace(/[^a-zA-Z0-9_]/g, '')
+    .slice(0, 20)
+  if (fromEmail.length >= 3) return fromEmail
+  const fromName = String(name || '')
+    .replace(/[^a-zA-Z0-9_]/g, '')
+    .slice(0, 20)
+  if (fromName.length >= 3) return fromName
+  return ''
+}
+
 export default function RolePickerPage() {
   const navigate = useNavigate()
   const { completeAuthentication } = useSession()
@@ -33,6 +47,14 @@ export default function RolePickerPage() {
   const [legalAck, setLegalAck] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+
+  const [username, setUsername] = useState(() =>
+    pending ? deriveDefaultUsername(pending.email, pending.name) : '',
+  )
+  const [usernameStatus, setUsernameStatus] = useState({ checking: false, kind: null, message: '' })
+  const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
+  const [setPasswordNow, setSetPasswordNow] = useState(true)
 
   const profile = useMemo(
     () =>
@@ -46,6 +68,64 @@ export default function RolePickerPage() {
     }
   }, [pending, navigate])
 
+  // Live username availability check (debounced). Hits the public
+  // /api/auth/check-username endpoint; results never leak data we don't
+  // already expose at /users/<u>.
+  useEffect(() => {
+    if (!username) {
+      setUsernameStatus({ checking: false, kind: null, message: '' })
+      return
+    }
+    if (!USERNAME_REGEX.test(username)) {
+      setUsernameStatus({
+        checking: false,
+        kind: 'error',
+        message: '3-20 chars: letters, numbers, or underscore.',
+      })
+      return
+    }
+    setUsernameStatus({ checking: true, kind: null, message: 'Checking…' })
+    const controller = new AbortController()
+    const timer = setTimeout(() => {
+      fetch(`${API}/api/auth/check-username?username=${encodeURIComponent(username)}`, {
+        signal: controller.signal,
+        credentials: 'include',
+      })
+        .then((r) => r.json())
+        .then((data) => {
+          if (controller.signal.aborted) return
+          if (data.available) {
+            setUsernameStatus({ checking: false, kind: 'success', message: 'Available.' })
+          } else {
+            const msg =
+              data.reason === 'reserved'
+                ? 'That username is reserved. Pick another.'
+                : data.reason === 'invalid'
+                  ? '3-20 chars: letters, numbers, or underscore.'
+                  : 'Already taken.'
+            setUsernameStatus({ checking: false, kind: 'error', message: msg })
+          }
+        })
+        .catch(() => {
+          // Fail-open: don't block submit on a network blip; backend
+          // will surface a 409 if it really collides.
+          if (!controller.signal.aborted) {
+            setUsernameStatus({ checking: false, kind: null, message: '' })
+          }
+        })
+    }, 350)
+    return () => {
+      clearTimeout(timer)
+      controller.abort()
+    }
+  }, [username])
+
+  const passwordOk = setPasswordNow
+    ? password.length >= 8 && /[A-Z]/.test(password) && /[0-9]/.test(password)
+    : true
+  const passwordsMatch = setPasswordNow ? password === confirmPassword : true
+  const usernameOk = USERNAME_REGEX.test(username) && usernameStatus.kind !== 'error'
+
   async function handleSubmit() {
     if (!accountType) {
       setError('Pick a role to continue.')
@@ -53,6 +133,18 @@ export default function RolePickerPage() {
     }
     if (!legalAck) {
       setError('Please review and accept the legal documents to continue.')
+      return
+    }
+    if (!usernameOk) {
+      setError('Pick a valid username.')
+      return
+    }
+    if (setPasswordNow && !passwordOk) {
+      setError('Password needs 8+ characters, one capital, and one number.')
+      return
+    }
+    if (setPasswordNow && !passwordsMatch) {
+      setError('Passwords do not match.')
       return
     }
     setSubmitting(true)
@@ -67,6 +159,8 @@ export default function RolePickerPage() {
           accountType,
           legalAccepted: true,
           legalVersion: CURRENT_LEGAL_VERSION,
+          username,
+          password: setPasswordNow ? password : undefined,
         }),
       })
       const data = await res.json().catch(() => ({}))
@@ -85,6 +179,13 @@ export default function RolePickerPage() {
   }
 
   if (!pending) return null
+
+  const continueDisabled =
+    submitting ||
+    !accountType ||
+    !legalAck ||
+    !usernameOk ||
+    (setPasswordNow && (!passwordOk || !passwordsMatch))
 
   return (
     <main
@@ -109,6 +210,94 @@ export default function RolePickerPage() {
           </p>
         ) : null}
       </header>
+
+      {/* Username */}
+      <div style={{ display: 'grid', gap: 6 }}>
+        <label
+          htmlFor="rolepicker-username"
+          style={{ fontSize: 13, fontWeight: 700, color: 'var(--sh-heading)' }}
+        >
+          Choose your username
+        </label>
+        <input
+          id="rolepicker-username"
+          type="text"
+          value={username}
+          onChange={(e) => {
+            setUsername(e.target.value.trim())
+            setError('')
+          }}
+          autoComplete="username"
+          maxLength={20}
+          style={inputStyle}
+          placeholder="3-20 chars, letters/numbers/_"
+        />
+        {usernameStatus.message ? (
+          <span
+            style={{
+              fontSize: 12,
+              color:
+                usernameStatus.kind === 'success'
+                  ? 'var(--sh-success-text)'
+                  : usernameStatus.kind === 'error'
+                    ? 'var(--sh-danger-text)'
+                    : 'var(--sh-muted)',
+            }}
+          >
+            {usernameStatus.message}
+          </span>
+        ) : null}
+      </div>
+
+      {/* Optional password — keeps password-confirm gates working post-signup */}
+      <div style={{ display: 'grid', gap: 8 }}>
+        <label
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            fontSize: 13,
+            color: 'var(--sh-text)',
+          }}
+        >
+          <input
+            type="checkbox"
+            checked={setPasswordNow}
+            onChange={(e) => setSetPasswordNow(e.target.checked)}
+          />
+          Set a password (recommended — used when deleting your account or changing email)
+        </label>
+        {setPasswordNow ? (
+          <div style={{ display: 'grid', gap: 8 }}>
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              placeholder="Password (8+ chars, 1 capital, 1 number)"
+              style={inputStyle}
+            />
+            <input
+              type="password"
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+              placeholder="Confirm password"
+              style={inputStyle}
+            />
+            {password && !passwordOk ? (
+              <span style={{ fontSize: 12, color: 'var(--sh-danger-text)' }}>
+                Password needs 8+ chars, one capital, and one number.
+              </span>
+            ) : null}
+            {password && confirmPassword && !passwordsMatch ? (
+              <span style={{ fontSize: 12, color: 'var(--sh-danger-text)' }}>
+                Passwords do not match.
+              </span>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       <fieldset
         style={{
@@ -157,11 +346,6 @@ export default function RolePickerPage() {
         ))}
       </fieldset>
 
-      {/* Legal acknowledgement — explicit, with links to each doc so the user
-       * can read what they're agreeing to before clicking Continue. Without
-       * this checkbox the OAuth completion endpoint silently rejects the
-       * submit, leaving the user staring at a generic error and an account
-       * that was never persisted. */}
       <label
         style={{
           display: 'flex',
@@ -233,20 +417,58 @@ export default function RolePickerPage() {
             clearPending()
             navigate('/signup', { replace: true })
           }}
-          className="sh-button"
           disabled={submitting}
+          style={secondaryButtonStyle}
         >
           Cancel
         </button>
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={submitting || !accountType || !legalAck}
-          className="sh-button sh-button--primary"
+          disabled={continueDisabled}
+          style={{
+            ...primaryButtonStyle,
+            opacity: continueDisabled ? 0.55 : 1,
+            cursor: continueDisabled ? 'not-allowed' : 'pointer',
+          }}
         >
           {submitting ? 'Finishing…' : 'Continue'}
         </button>
       </div>
     </main>
   )
+}
+
+const inputStyle = {
+  width: '100%',
+  boxSizing: 'border-box',
+  padding: '11px 12px',
+  borderRadius: 10,
+  border: '1px solid var(--sh-input-border)',
+  background: 'var(--sh-input-bg, var(--sh-surface))',
+  color: 'var(--sh-input-text, var(--sh-text))',
+  fontSize: 14,
+  fontFamily: 'inherit',
+}
+
+const primaryButtonStyle = {
+  padding: '10px 20px',
+  borderRadius: 10,
+  border: 'none',
+  background: 'var(--sh-brand)',
+  color: '#fff',
+  fontSize: 13,
+  fontWeight: 700,
+  cursor: 'pointer',
+}
+
+const secondaryButtonStyle = {
+  padding: '10px 20px',
+  borderRadius: 10,
+  border: '1px solid var(--sh-border)',
+  background: 'transparent',
+  color: 'var(--sh-text)',
+  fontSize: 13,
+  fontWeight: 600,
+  cursor: 'pointer',
 }

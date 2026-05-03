@@ -24,6 +24,7 @@ import AccountTab from './AccountTab'
 import NotificationsTab from './NotificationsTab'
 import PrivacyTab from './PrivacyTab'
 import AppearanceTab from './AppearanceTab'
+import AccessibilityTab from './AccessibilityTab'
 import SubscriptionTab from './SubscriptionTab'
 import ModerationTab from './ModerationTab'
 import ReviewTab from './ReviewTab'
@@ -52,6 +53,7 @@ const NAV_TABS = [
   { id: 'notifications', label: 'Notifications', icon: IconBell },
   { id: 'privacy', label: 'Privacy', icon: IconEye },
   { id: 'appearance', label: 'Appearance', icon: IconPalette },
+  { id: 'accessibility', label: 'Accessibility', icon: IconEye },
   { id: 'account', label: 'Account', icon: IconUser },
   { id: 'subscription', label: 'Subscription', icon: IconSpark },
   { id: 'referrals', label: 'Referrals', icon: IconUsers },
@@ -310,6 +312,8 @@ export default function SettingsPage() {
             <AppearanceTab />
           </div>
         )
+      case 'accessibility':
+        return <AccessibilityTab />
       case 'account':
         return (
           <AccountTab

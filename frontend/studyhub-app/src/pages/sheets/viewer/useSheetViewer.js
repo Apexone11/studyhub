@@ -377,7 +377,10 @@ export default function useSheetViewer() {
   // Reset all per-sheet preview state when the sheet id changes. Without
   // this, navigating from sheet A to sheet B while staying mounted on
   // the viewer would carry stale runtimeUrl / runtimeError / safePreview
-  // / warning-ack state into the new sheet's render.
+  // / warning-ack state into the new sheet's render. htmlWarningAcked
+  // resets here too — the per-sheet localStorage-ack effect re-promotes
+  // it to true on the next tick if the new sheet was previously acked,
+  // so the warning gate stays correct on sheet-to-sheet navigation.
   useEffect(() => {
     if (runtimeFetchRef.current) {
       runtimeFetchRef.current.abort()
@@ -388,6 +391,7 @@ export default function useSheetViewer() {
     setRuntimeLoading(false)
     setSafePreviewUrl('')
     setViewerInteractive(false)
+    setHtmlWarningAcked(false)
   }, [sheet?.id])
 
   const acceptHtmlWarning = () => {

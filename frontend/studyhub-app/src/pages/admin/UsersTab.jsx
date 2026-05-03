@@ -7,7 +7,6 @@ function UserActionMenuItem({ color, onClick, children }) {
   return (
     <button
       type="button"
-      role="menuitem"
       onClick={onClick}
       style={{
         display: 'block',
@@ -321,7 +320,6 @@ export default function UsersTab({
                     </button>
                     {actionsMenuFor === record.id && (
                       <div
-                        role="menu"
                         style={{
                           position: 'absolute',
                           top: 38,

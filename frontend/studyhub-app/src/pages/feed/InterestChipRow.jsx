@@ -1,20 +1,11 @@
 import { useCallback, useEffect, useState } from 'react'
 import { API } from '../../config'
-
-const HASHTAG_REGEX = /^[a-z0-9_]{1,40}$/
-
-function normalizeInput(raw) {
-  return String(raw || '')
-    .trim()
-    .toLowerCase()
-    .replace(/^#/, '')
-}
+import TopicPickerModal from './TopicPickerModal'
 
 export default function InterestChipRow({ onSelect, activeTopic = null }) {
   const [topics, setTopics] = useState([])
   const [loading, setLoading] = useState(true)
-  const [adding, setAdding] = useState(false)
-  const [draft, setDraft] = useState('')
+  const [pickerOpen, setPickerOpen] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
@@ -34,34 +25,34 @@ export default function InterestChipRow({ onSelect, activeTopic = null }) {
     }
   }, [])
 
-  const handleAdd = useCallback(async () => {
-    const name = normalizeInput(draft)
-    if (!name || !HASHTAG_REGEX.test(name)) {
-      setError('Topic must be 1-40 chars, letters/numbers/underscores only.')
-      return
-    }
-    setError('')
-    try {
-      const res = await fetch(`${API}/api/hashtags/follow`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name }),
-      })
-      const data = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        setError(data.error || 'Could not follow topic.')
-        return
+  const handleFollow = useCallback(
+    async (name) => {
+      setError('')
+      try {
+        const res = await fetch(`${API}/api/hashtags/follow`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (!res.ok) {
+          const msg = data.error || 'Could not follow topic.'
+          setError(msg)
+          throw new Error(msg)
+        }
+        setTopics((prev) =>
+          prev.find((t) => t.id === data.hashtag.id)
+            ? prev
+            : [{ ...data.hashtag, followedAt: new Date().toISOString() }, ...prev],
+        )
+      } catch (err) {
+        if (!error) setError(err.message || 'Check your connection and try again.')
+        throw err
       }
-      if (!topics.find((t) => t.id === data.hashtag.id)) {
-        setTopics((prev) => [{ ...data.hashtag, followedAt: new Date().toISOString() }, ...prev])
-      }
-      setDraft('')
-      setAdding(false)
-    } catch {
-      setError('Check your connection and try again.')
-    }
-  }, [draft, topics])
+    },
+    [error],
+  )
 
   const handleRemove = useCallback(
     async (name) => {
@@ -154,64 +145,36 @@ export default function InterestChipRow({ onSelect, activeTopic = null }) {
         </span>
       ))}
 
-      {adding ? (
-        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <input
-            value={draft}
-            onChange={(e) => setDraft(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                e.preventDefault()
-                handleAdd()
-              } else if (e.key === 'Escape') {
-                setAdding(false)
-                setDraft('')
-                setError('')
-              }
-            }}
-            placeholder="topic"
-            aria-label="New topic name"
-            className="sh-input"
-            autoFocus
-            style={{ fontSize: 12, padding: '4px 8px', width: 120 }}
-          />
-          <button
-            type="button"
-            onClick={handleAdd}
-            className="sh-button sh-button--primary"
-            style={{ fontSize: 11, padding: '4px 10px' }}
-          >
-            Add
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setAdding(false)
-              setDraft('')
-              setError('')
-            }}
-            className="sh-button"
-            style={{ fontSize: 11, padding: '4px 10px' }}
-          >
-            Cancel
-          </button>
-        </span>
-      ) : (
-        <button
-          type="button"
-          onClick={() => setAdding(true)}
-          className="sh-button"
-          style={{ fontSize: 11, padding: '4px 10px' }}
-        >
-          + Add topic
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setPickerOpen(true)}
+        style={{
+          fontSize: 11,
+          fontWeight: 700,
+          padding: '4px 12px',
+          borderRadius: 999,
+          border: '1px solid var(--sh-brand)',
+          background: 'var(--sh-brand-soft)',
+          color: 'var(--sh-brand-text, var(--sh-brand))',
+          cursor: 'pointer',
+        }}
+      >
+        + Add topic
+      </button>
 
       {error ? (
         <span role="alert" style={{ fontSize: 11, color: 'var(--sh-danger-text)', width: '100%' }}>
           {error}
         </span>
       ) : null}
+
+      <TopicPickerModal
+        open={pickerOpen}
+        onClose={() => setPickerOpen(false)}
+        followedNames={topics.map((t) => t.name)}
+        onFollow={handleFollow}
+        onUnfollow={handleRemove}
+      />
     </div>
   )
 }

@@ -99,14 +99,22 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
           <div className="register-google-wrap">
             <GoogleSignInButton
               onSuccess={(credentialResponse) => {
-                if (form.termsAccepted) {
-                  void onGoogleSuccess(credentialResponse, { legalAccepted: true })
-                  return
-                }
-
-                setPendingGoogleCredential(credentialResponse)
-                setShowLegalModal(true)
-                setError('Review and accept the legal documents to continue with Google sign-up.')
+                // Legal acceptance for the Google path is collected in the
+                // onboarding step at /signup/role (the OAuth picker page
+                // has its own "I've reviewed and agree to the Terms"
+                // checkbox). Pre-flighting the legal modal here was
+                // breaking the flow — the user landed on /register
+                // already-signed-into-Google, the modal opened
+                // unprompted, the close button fired the "must accept"
+                // error, and the whole signup felt broken. The first
+                // `/api/auth/google` call does NOT require legalAccepted
+                // (only `/api/auth/google/complete` does), so it's safe
+                // to forward with the local checkbox value: if the user
+                // ticked it on /register they short-circuit through;
+                // otherwise they pick it up in onboarding.
+                void onGoogleSuccess(credentialResponse, {
+                  legalAccepted: form.termsAccepted,
+                })
               }}
               onError={(msg) => setError(msg || 'Google sign-up was cancelled or failed.')}
               text="signup_with"

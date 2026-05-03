@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { formatRelativeTime, truncateText } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 import MediaComposer from './MediaComposer'
+import { AttachmentPreviewModal } from '../../components/AttachmentPreview'
 
 /**
  * Resources tab. Phase 4 additions:
@@ -107,6 +108,7 @@ function ResourceRow({ resource, isAdminOrMod, userId, onDelete, onViewDetail })
   const isImage = resource.mediaType === 'image' && resource.mediaUrl
   const isVideo = resource.mediaType === 'video' && resource.mediaUrl
   const canDelete = isAdminOrMod || resource.userId === userId || resource.user?.id === userId
+  const [previewAttachment, setPreviewAttachment] = useState(null)
 
   return (
     <div
@@ -135,53 +137,102 @@ function ResourceRow({ resource, isAdminOrMod, userId, onDelete, onViewDetail })
           </p>
         )}
 
-        {/* Phase 4: inline media preview */}
+        {/* Phase 4: inline media preview. Images stay rendered inline as
+            thumbnails so the resource list scans visually, but a click
+            opens the AttachmentPreview modal with fullscreen support.
+            Videos and other file types route through the modal directly. */}
         {isImage ? (
-          <img
-            src={resource.mediaUrl}
-            alt={resource.title}
-            loading="lazy"
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setPreviewAttachment({
+                url: resource.mediaUrl,
+                name: resource.title || 'image',
+                kind: 'image',
+              })
+            }}
             style={{
-              display: 'block',
-              maxWidth: 320,
-              maxHeight: 240,
-              borderRadius: 8,
-              border: '1px solid var(--sh-border)',
+              padding: 0,
+              border: 'none',
+              background: 'transparent',
+              cursor: 'zoom-in',
               marginBottom: 'var(--space-2)',
             }}
-          />
+            aria-label={`Open preview of ${resource.title}`}
+          >
+            <img
+              src={resource.mediaUrl}
+              alt={resource.title}
+              loading="lazy"
+              style={{
+                display: 'block',
+                maxWidth: 320,
+                maxHeight: 240,
+                borderRadius: 8,
+                border: '1px solid var(--sh-border)',
+              }}
+            />
+          </button>
         ) : null}
         {isVideo ? (
-          <video
-            src={resource.mediaUrl}
-            controls
-            preload="metadata"
-            onClick={(e) => e.stopPropagation()}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setPreviewAttachment({
+                url: resource.mediaUrl,
+                name: resource.title || 'video',
+                kind: 'video',
+              })
+            }}
             style={{
-              display: 'block',
-              maxWidth: 320,
+              padding: '8px 14px',
               borderRadius: 8,
               border: '1px solid var(--sh-border)',
-              marginBottom: 'var(--space-2)',
-            }}
-          />
-        ) : null}
-        {resource.mediaUrl && !isImage && !isVideo ? (
-          <a
-            href={resource.mediaUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={(e) => e.stopPropagation()}
-            style={{
-              display: 'inline-block',
-              fontSize: 'var(--type-sm)',
-              color: 'var(--sh-brand)',
+              background: 'var(--sh-surface)',
+              color: 'var(--sh-text)',
+              fontSize: 13,
               fontWeight: 600,
+              cursor: 'pointer',
               marginBottom: 'var(--space-2)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
             }}
           >
-            Download attached file
-          </a>
+            <span aria-hidden>🎬</span>
+            <span>Open video preview</span>
+          </button>
+        ) : null}
+        {resource.mediaUrl && !isImage && !isVideo ? (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation()
+              setPreviewAttachment({
+                url: resource.mediaUrl,
+                name: resource.title || 'file',
+              })
+            }}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 8,
+              border: '1px solid var(--sh-border)',
+              background: 'var(--sh-surface)',
+              color: 'var(--sh-text)',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              marginBottom: 'var(--space-2)',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 8,
+            }}
+          >
+            <span aria-hidden>📎</span>
+            <span>Open preview</span>
+          </button>
         ) : null}
 
         <div style={styles.itemMeta}>
@@ -204,6 +255,12 @@ function ResourceRow({ resource, isAdminOrMod, userId, onDelete, onViewDetail })
           </button>
         </div>
       )}
+      {previewAttachment ? (
+        <AttachmentPreviewModal
+          attachment={previewAttachment}
+          onClose={() => setPreviewAttachment(null)}
+        />
+      ) : null}
     </div>
   )
 }

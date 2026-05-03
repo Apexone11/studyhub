@@ -2554,13 +2554,23 @@ model UserEnrollmentArchive {
 }
 
 model Hashtag {
-  id        Int      @id @default(autoincrement())
-  name      String   @unique
-  createdAt DateTime @default(now())
+  id          Int      @id @default(autoincrement())
+  name        String   @unique
+  // Canonical topics are seeded curated entries surfaced first in the
+  // topic picker. User-created tags stay isCanonical=false. Category is
+  // free-text for canonical rows ("Computer Science", "Biology", etc.)
+  // and null for ad-hoc tags. displayName lets us seed "Computer
+  // Science" as the human-friendly label while `name` stays a
+  // slug-friendly key (`computer_science`).
+  isCanonical Boolean  @default(false)
+  category    String?
+  displayName String?
+  createdAt   DateTime @default(now())
 
   follows HashtagFollow[]
 
   @@index([name])
+  @@index([isCanonical, category])
 }
 
 model HashtagFollow {

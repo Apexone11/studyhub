@@ -163,7 +163,14 @@ router.post('/google', googleLimiter, async (req, res) => {
  * issues a session cookie, and returns the authenticated user + next route.
  */
 router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
-  const { tempToken, accountType, legalAccepted, legalVersion } = req.body || {}
+  const {
+    tempToken,
+    accountType,
+    legalAccepted,
+    legalVersion,
+    password: requestedPassword,
+    username: requestedUsername,
+  } = req.body || {}
 
   if (!tempToken) {
     return sendError(
@@ -191,6 +198,46 @@ router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
   }
   if (!isGoogleOAuthEnabled()) {
     return sendError(res, 503, 'Google sign-in is not available right now.', ERROR_CODES.INTERNAL)
+  }
+
+  // Optional: caller may set a real password during onboarding so the
+  // "Confirm with Password" gate (delete account, change email, etc.)
+  // works for OAuth users. If absent, we fall back to a 32-byte random
+  // hash they can't use — exactly the legacy behavior. If provided, it
+  // must match the same strength rule as the local-signup flow.
+  let userSuppliedPassword = null
+  if (requestedPassword !== undefined && requestedPassword !== null && requestedPassword !== '') {
+    if (
+      typeof requestedPassword !== 'string' ||
+      requestedPassword.length < 8 ||
+      !/[A-Z]/.test(requestedPassword) ||
+      !/[0-9]/.test(requestedPassword)
+    ) {
+      return sendError(
+        res,
+        400,
+        'Password must be at least 8 characters with one capital letter and one number.',
+        ERROR_CODES.VALIDATION,
+      )
+    }
+    userSuppliedPassword = requestedPassword
+  }
+
+  // Optional: caller may set a custom username during onboarding so we
+  // don't auto-derive a colliding one from email/name. The shape is
+  // checked by the existing USERNAME_REGEX. If absent, fall back to
+  // the existing buildGoogleUsernameBase + collision-retry loop.
+  let userSuppliedUsername = null
+  if (requestedUsername !== undefined && requestedUsername !== null && requestedUsername !== '') {
+    if (typeof requestedUsername !== 'string' || !/^[a-zA-Z0-9_]{3,20}$/.test(requestedUsername)) {
+      return sendError(
+        res,
+        400,
+        'Username must be 3-20 chars: letters, numbers, or underscore.',
+        ERROR_CODES.VALIDATION,
+      )
+    }
+    userSuppliedUsername = requestedUsername
   }
 
   let pending
@@ -257,18 +304,32 @@ router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
       )
     }
 
-    const randomPassword = crypto.randomBytes(32).toString('hex')
-    const passwordHash = await bcrypt.hash(randomPassword, 12)
+    // Hash the user-supplied password if they set one in onboarding,
+    // otherwise burn 32 random bytes so the row has a non-empty hash but
+    // nothing the user could ever guess. The point is to ensure
+    // password-confirmation gates (delete, email change) can be flipped
+    // on later without crashing.
+    const passwordToHash = userSuppliedPassword || crypto.randomBytes(32).toString('hex')
+    const passwordHash = await bcrypt.hash(passwordToHash, 12)
     const acceptedAt = new Date()
 
-    const baseUsername = buildGoogleUsernameBase({
-      name: pending.name,
-      email: pending.email,
-    })
+    const baseUsername =
+      userSuppliedUsername ||
+      buildGoogleUsernameBase({
+        name: pending.name,
+        email: pending.email,
+      })
     let createdUser = null
+    // If the user picked a username explicitly, honor it on attempt 0
+    // and DON'T fall through to numeric-suffix retry on collision —
+    // we'd rather 409 back so the onboarding form can prompt them to
+    // pick a different one. Auto-derived usernames keep the legacy
+    // retry loop to avoid 100% collision failures on common email
+    // prefixes (john@, mike@).
+    const maxAttempts = userSuppliedUsername ? 1 : MAX_GOOGLE_USERNAME_ATTEMPTS
 
-    for (let attempt = 0; attempt < MAX_GOOGLE_USERNAME_ATTEMPTS; attempt += 1) {
-      const username = buildGoogleUsernameCandidate(baseUsername, attempt)
+    for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+      const username = userSuppliedUsername || buildGoogleUsernameCandidate(baseUsername, attempt)
 
       try {
         createdUser = await prisma.$transaction(async (tx) => {
@@ -301,7 +362,22 @@ router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
         if (error?.code !== 'P2002') throw error
 
         const targets = getP2002Targets(error)
-        if (targets.includes('username')) continue
+        if (targets.includes('username')) {
+          // If the user picked the username themselves, surface the
+          // collision so they can pick a different one. The /check-username
+          // endpoint should have caught this earlier, but it's a TOCTOU
+          // window — between check and create another signup could grab
+          // the same name.
+          if (userSuppliedUsername) {
+            return sendError(
+              res,
+              409,
+              'That username is already taken. Pick another and try again.',
+              ERROR_CODES.CONFLICT,
+            )
+          }
+          continue
+        }
         if (targets.includes('email')) {
           return sendError(
             res,
