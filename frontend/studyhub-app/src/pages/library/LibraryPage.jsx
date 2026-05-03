@@ -179,7 +179,11 @@ export default function LibraryPage() {
   }
 
   const booksPerPage = 20 // Google Books returns up to 20 per page
-  const pageNumber = parseInt(page || '1', 10)
+  // Guard against malformed `?page=abc` URLs — without this, Number.parseInt
+  // returns NaN, totalPages becomes NaN, and pagination buttons are silently
+  // permanently disabled. Default any non-positive-integer value to page 1.
+  const parsedPage = Number.parseInt(page || '1', 10)
+  const pageNumber = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1
   const totalPages = Math.ceil(totalCount / booksPerPage)
   const hasNextPage = pageNumber < totalPages
 

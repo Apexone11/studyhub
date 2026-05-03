@@ -77,7 +77,11 @@ function isMarkdown(content) {
 function markdownToHtml(content) {
   if (!content?.trim()) return ''
   const raw = marked.parse(content)
-  return DOMPurify.sanitize(raw)
+  // Explicit profile matches the project-wide convention (notesComponents,
+  // SheetContentPanel, BookDetailPage). The default already implies html,
+  // but stating it makes the intent grep-able and survives a future
+  // DOMPurify default change.
+  return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
 }
 
 /* ── Word count from HTML text content ──────────────────────── */
@@ -737,7 +741,9 @@ export default function NoteEditor({
             const printWin = window.open('', '_blank', 'width=800,height=600')
             if (!printWin) return
             // For the rich editor, content is already HTML
-            const exportHtml = DOMPurify.sanitize(editorContent || '<p>No content to export.</p>')
+            const exportHtml = DOMPurify.sanitize(editorContent || '<p>No content to export.</p>', {
+              USE_PROFILES: { html: true },
+            })
             const safeTitle = (editorTitle || '')
               .replace(/&/g, '&amp;')
               .replace(/</g, '&lt;')

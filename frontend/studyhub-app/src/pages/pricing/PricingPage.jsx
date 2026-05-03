@@ -382,24 +382,45 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
             </a>
           </div>
         ) : (
-          <div style={c.btnGroup}>
-            <button
-              style={c.btnPrimary}
-              disabled={subscribing !== null}
-              onClick={() => doSubscribe('pro_monthly')}
+          <>
+            <div
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                background: 'var(--sh-success-bg)',
+                color: 'var(--sh-success-text)',
+                border: '1px solid var(--sh-success-border)',
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                padding: '3px 10px',
+                marginBottom: 10,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+              }}
             >
-              {subscribing === 'pro_monthly' ? 'Redirecting...' : 'Subscribe Monthly -- $4.99/mo'}
-            </button>
-            <button
-              style={c.btnOutline}
-              disabled={subscribing !== null}
-              onClick={() => doSubscribe('pro_yearly')}
-            >
-              {subscribing === 'pro_yearly'
-                ? 'Redirecting...'
-                : 'Subscribe Yearly -- $49.99/yr (Save 17%)'}
-            </button>
-          </div>
+              Save $10 with yearly
+            </div>
+            <div style={c.btnGroup}>
+              <button
+                style={c.btnPrimary}
+                disabled={subscribing !== null}
+                onClick={() => doSubscribe('pro_monthly')}
+              >
+                {subscribing === 'pro_monthly' ? 'Redirecting...' : 'Subscribe Monthly -- $4.99/mo'}
+              </button>
+              <button
+                style={c.btnOutline}
+                disabled={subscribing !== null}
+                onClick={() => doSubscribe('pro_yearly')}
+              >
+                {subscribing === 'pro_yearly'
+                  ? 'Redirecting...'
+                  : 'Subscribe Yearly -- $49.99/yr (Save 17%)'}
+              </button>
+            </div>
+          </>
         )}
         {error && <div style={c.errorMsg}>{error}</div>}
       </div>

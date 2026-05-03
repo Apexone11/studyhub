@@ -37,6 +37,7 @@ export default function useSheetViewer() {
   const [runtimeUrl, setRuntimeUrl] = useState('')
   const [previewLoading, setPreviewLoading] = useState(false)
   const [runtimeLoading, setRuntimeLoading] = useState(false)
+  const [runtimeError, setRuntimeError] = useState('')
   const [htmlWarningAcked, setHtmlWarningAcked] = useState(false)
   const [viewerInteractive, setViewerInteractive] = useState(false)
   const [relatedSheets, setRelatedSheets] = useState([])
@@ -298,35 +299,96 @@ export default function useSheetViewer() {
     }
   }, [isHtmlSheet, htmlWarningAcked, sheet?.id])
 
-  /* Load interactive runtime URL on demand (owner/admin only) */
+  /* Load interactive runtime URL on demand. Per the publish-with-warning
+   * policy (CLAUDE.md HTML Security Policy + interactive-preview.test.js),
+   * Tier 0 + Tier 1 sheets are interactive for any authenticated viewer;
+   * only Tier 2+ HIGH_RISK sheets restrict to owner/admin. Older comment
+   * here said "owner/admin only" — that was wrong, fixed below. The
+   * silent fallback to safe-preview when the fetch failed was the actual
+   * cause of "user can't interact with the iframe" reports: we'd toggle
+   * viewerInteractive on, click the button, the runtime fetch would 4xx
+   * (e.g. unauthenticated, expired session) or return an empty body, and
+   * we'd flip viewerInteractive back off with no UI feedback. Surface a
+   * specific error message instead so the user knows why interaction
+   * isn't engaging. */
+  // Latest in-flight runtime fetch — used to abort if the user navigates
+  // to a different sheet (or toggles back to safe preview) while the
+  // previous request is still pending. Without this, a late failure from
+  // sheet A would set runtimeError on the now-mounted sheet B viewer.
+  const runtimeFetchRef = useRef(null)
   const loadInteractiveRuntime = useCallback(() => {
     if (!isHtmlSheet || !sheet?.id || runtimeUrl) return
+    if (runtimeFetchRef.current) runtimeFetchRef.current.abort()
+    const controller = new AbortController()
+    runtimeFetchRef.current = controller
+    const requestedSheetId = sheet.id
     setRuntimeLoading(true)
+    setRuntimeError('')
     fetch(`${API}/api/sheets/${sheet.id}/html-runtime`, {
       headers: authHeaders(),
       credentials: 'include',
+      signal: controller.signal,
     })
-      .then((r) => r.json().catch(() => ({})))
-      .then((data) => {
-        if (data?.runtimeUrl) setRuntimeUrl(data.runtimeUrl)
-        else setViewerInteractive(false)
+      .then(async (r) => {
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) {
+          // Backend returns 401 for unauth, 403 for non-owner on Tier 2,
+          // 404 for missing sheet. Surface the server-supplied message
+          // when available — it's the most accurate diagnosis.
+          throw new Error(data?.error || `Could not load interactive preview (HTTP ${r.status}).`)
+        }
+        if (!data?.runtimeUrl) {
+          throw new Error('Interactive preview is not available for this sheet.')
+        }
+        // Belt-and-suspenders: even if the abort raced, drop the response
+        // when the active sheet has changed since this request started.
+        if (requestedSheetId !== sheet?.id) return
+        setRuntimeUrl(data.runtimeUrl)
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err?.name === 'AbortError') return
+        if (requestedSheetId !== sheet?.id) return
         setViewerInteractive(false)
+        setRuntimeError(err?.message || 'Could not load interactive preview.')
       })
       .finally(() => {
-        setRuntimeLoading(false)
+        if (runtimeFetchRef.current === controller) {
+          runtimeFetchRef.current = null
+        }
+        if (requestedSheetId === sheet?.id) {
+          setRuntimeLoading(false)
+        }
       })
   }, [isHtmlSheet, sheet?.id, runtimeUrl])
 
   const toggleViewerInteractive = useCallback(() => {
     if (viewerInteractive) {
       setViewerInteractive(false)
+      // Clear any prior error when the user explicitly toggles back to
+      // safe preview — keeping the warning around after the user already
+      // chose the safe view is just noise.
+      setRuntimeError('')
     } else {
       setViewerInteractive(true)
       if (!runtimeUrl) loadInteractiveRuntime()
     }
   }, [viewerInteractive, runtimeUrl, loadInteractiveRuntime])
+
+  // Reset all per-sheet preview state when the sheet id changes. Without
+  // this, navigating from sheet A to sheet B while staying mounted on
+  // the viewer would carry stale runtimeUrl / runtimeError / safePreview
+  // / warning-ack state into the new sheet's render.
+  useEffect(() => {
+    if (runtimeFetchRef.current) {
+      runtimeFetchRef.current.abort()
+      runtimeFetchRef.current = null
+    }
+    setRuntimeUrl('')
+    setRuntimeError('')
+    setRuntimeLoading(false)
+    setSafePreviewUrl('')
+    setViewerInteractive(false)
+  }, [sheet?.id])
 
   const acceptHtmlWarning = () => {
     if (sheet?.id) localStorage.setItem(`htmlSheetWarnAck:${sheet.id}`, '1')
@@ -615,6 +677,7 @@ export default function useSheetViewer() {
     runtimeUrl,
     previewLoading,
     runtimeLoading,
+    runtimeError,
     htmlWarningAcked,
     viewerInteractive,
     toggleViewerInteractive,

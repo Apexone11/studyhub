@@ -39,7 +39,11 @@ export default function SheetsTab({ sheetsState, deleteSheet, loadPagedData }) {
             <button
               type="button"
               onClick={() => void deleteSheet(record.id)}
-              style={pillButton('#fef2f2', '#dc2626', '#fecaca')}
+              style={pillButton(
+                'var(--sh-danger-bg)',
+                'var(--sh-danger-text)',
+                'var(--sh-danger-border)',
+              )}
             >
               Delete
             </button>

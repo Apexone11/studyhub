@@ -58,6 +58,13 @@ export default function AnnouncementsPage() {
   const cardsRef = useRef(null)
   const animatedRef = useRef(false)
 
+  // Capture "now" once per mount so the per-card `isNew` flag below
+  // doesn't call Date.now() during render (React 19 react-hooks/purity).
+  // The 24h freshness window is far longer than a typical mount, so a
+  // static snapshot is fine — the only mis-render would be a card sitting
+  // open across midnight, which would pull a fresh value on the next nav.
+  const [mountedAt] = useState(() => Date.now())
+
   /* Tutorial */
   const tutorial = useTutorial('announcements', ANNOUNCEMENTS_STEPS, {
     version: TUTORIAL_VERSIONS.announcements,
@@ -604,8 +611,10 @@ export default function AnnouncementsPage() {
 
       {/* Announcement cards */}
       <div ref={cardsRef} data-tutorial="announcements-list" style={{ display: 'grid', gap: 14 }}>
-        {announcements.map((a) =>
-          a.pinned ? (
+        {announcements.map((a) => {
+          const postedAtMs = new Date(a.createdAt || 0).getTime()
+          const isNew = Number.isFinite(postedAtMs) && mountedAt - postedAtMs < 24 * 60 * 60 * 1000
+          return a.pinned ? (
             /* Pinned announcement card -- yellow highlight */
             <article
               key={a.id}
@@ -696,7 +705,10 @@ export default function AnnouncementsPage() {
               </div>
             </article>
           ) : (
-            /* Regular announcement card */
+            /* Regular announcement card. Left-border accent flips to the
+               brand color when the announcement was posted within the
+               last 24h — same "fresh" cue used on the Sheets Grid card.
+               Stays grey otherwise so older cards don't visually shout. */
             <article
               key={a.id}
               className="announcement-card"
@@ -704,6 +716,7 @@ export default function AnnouncementsPage() {
                 background: 'var(--sh-surface)',
                 borderRadius: 16,
                 border: '1px solid var(--sh-border)',
+                borderLeft: `3px solid ${isNew ? 'var(--sh-brand)' : 'var(--sh-border)'}`,
                 padding: '20px 24px',
                 boxShadow: '0 2px 10px rgba(15,23,42,0.04)',
                 transition: 'box-shadow .15s',
@@ -755,8 +768,8 @@ export default function AnnouncementsPage() {
               </div>
               {a.media && a.media.length > 0 && <AnnouncementMediaGallery media={a.media} />}
             </article>
-          ),
-        )}
+          )
+        })}
       </div>
 
       <SafeJoyride {...tutorial.joyrideProps} />

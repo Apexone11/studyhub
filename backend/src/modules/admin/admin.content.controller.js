@@ -6,9 +6,17 @@ const {
   readEnvOverride,
 } = require('../../lib/html/htmlKillSwitch')
 const prisma = require('../../lib/prisma')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — every POST/PATCH/PUT/DELETE on this router is an admin
+// content / settings write that needs Origin defense in depth on top of
+// the global Origin check. originAllowlist short-circuits GET/HEAD/OPTIONS
+// so applying it at the router level is safe even though /announcements
+// and /settings/html-uploads each support both reads and writes.
+router.use(originAllowlist())
 
 // ── GET /api/admin/announcements ─────────────────────────────
 router.get('/announcements', async (req, res) => {

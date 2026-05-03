@@ -389,8 +389,11 @@ router.delete('/posts/:id/comments/:commentId', requireAuth, feedWriteLimiter, a
 // ── PATCH /posts/:id/comments/:commentId ── edit comment content
 router.patch('/posts/:id/comments/:commentId', requireAuth, commentLimiter, async (req, res) => {
   try {
-    const postId = Number(req.params.id)
-    const commentId = Number(req.params.commentId)
+    const postId = Number.parseInt(req.params.id, 10)
+    const commentId = Number.parseInt(req.params.commentId, 10)
+    if (!Number.isInteger(postId) || postId < 1 || !Number.isInteger(commentId) || commentId < 1) {
+      return sendError(res, 400, 'Invalid id.', ERROR_CODES.BAD_REQUEST)
+    }
     const { content } = req.body
 
     if (!content || typeof content !== 'string' || content.trim().length === 0) {

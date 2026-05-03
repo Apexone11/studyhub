@@ -1,5 +1,6 @@
 const prisma = require('../prisma')
 const { archiveExpiredOriginalVersions } = require('./htmlArchive')
+const { runWithHeartbeat } = require('../jobs/heartbeat')
 
 let archiveInterval = null
 
@@ -13,20 +14,24 @@ function startHtmlArchiveScheduler() {
   )
   const intervalMs = Number.isFinite(parsedIntervalMs) ? parsedIntervalMs : 6 * 60 * 60 * 1000
 
-  const runArchive = async () => {
-    try {
-      await archiveExpiredOriginalVersions(prisma, {
-        olderThanDays: Number.parseInt(process.env.HTML_ARCHIVE_DAYS || '20', 10),
-        limit: Number.parseInt(process.env.HTML_ARCHIVE_BATCH_SIZE || '50', 10),
-      })
-    } catch (error) {
-      // Archive is best-effort and should not crash API runtime.
-      console.error('HTML archive scheduler run failed:', error)
-    }
-  }
+  // The archive task is wrapped in `runWithHeartbeat` so a stalled or
+  // failing run produces structured `job.start` / `job.success` /
+  // `job.failure` events in pino + Sentry. Bare try/catch + console.error
+  // (the prior shape) was invisible to the log aggregator's job-health
+  // alerts (CLAUDE.md A10 + A16).
+  const runArchive = () =>
+    archiveExpiredOriginalVersions(prisma, {
+      olderThanDays: Number.parseInt(process.env.HTML_ARCHIVE_DAYS || '20', 10),
+      limit: Number.parseInt(process.env.HTML_ARCHIVE_BATCH_SIZE || '50', 10),
+    })
 
-  void runArchive()
-  archiveInterval = setInterval(runArchive, Math.max(60000, intervalMs))
+  void runWithHeartbeat('html.archive_expired_versions', runArchive, { slaMs: 5 * 60_000 })
+  archiveInterval = setInterval(
+    () => {
+      void runWithHeartbeat('html.archive_expired_versions', runArchive, { slaMs: 5 * 60_000 })
+    },
+    Math.max(60000, intervalMs),
+  )
   if (typeof archiveInterval.unref === 'function') archiveInterval.unref()
 }
 

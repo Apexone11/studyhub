@@ -113,6 +113,17 @@ export function ContentPane({ preview }) {
                   key={i}
                   src={pdfUrl}
                   title="PDF Preview"
+                  // PDFs are served from the API origin (same parent origin
+                  // when reverse-proxied, cross-origin in the split-stack
+                  // beta). Using `allow-same-origin` lets Chrome render
+                  // cross-origin PDFs that an empty sandbox would block
+                  // ("(blocked:origin)" placeholder). Withholding
+                  // `allow-scripts` is the security boundary: even if an
+                  // attacker smuggles HTML through the `kind === 'pdf'`
+                  // branch (the kind is read from API response data),
+                  // scripts cannot run.
+                  sandbox="allow-same-origin"
+                  referrerPolicy="no-referrer"
                   style={{
                     width: '100%',
                     height: 400,

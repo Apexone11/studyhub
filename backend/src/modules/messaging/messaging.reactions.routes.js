@@ -26,7 +26,10 @@ const router = express.Router({ mergeParams: true })
  */
 router.post('/:messageId/reactions', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const messageId = parseInt(req.params.messageId, 10)
+    const messageId = Number.parseInt(req.params.messageId, 10)
+    if (!Number.isInteger(messageId) || messageId < 1) {
+      return sendError(res, 400, 'Invalid message ID.', ERROR_CODES.BAD_REQUEST)
+    }
     const { emoji } = req.body
 
     if (!emoji || typeof emoji !== 'string' || emoji.trim() === '') {
@@ -92,7 +95,10 @@ router.delete(
   messagingWriteLimiter,
   async (req, res) => {
     try {
-      const messageId = parseInt(req.params.messageId, 10)
+      const messageId = Number.parseInt(req.params.messageId, 10)
+      if (!Number.isInteger(messageId) || messageId < 1) {
+        return sendError(res, 400, 'Invalid message ID.', ERROR_CODES.BAD_REQUEST)
+      }
       const emoji = decodeURIComponent(req.params.emoji)
 
       // Verify the user is a participant in the conversation
@@ -136,7 +142,10 @@ router.delete(
  */
 router.post('/:messageId/poll/vote', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const messageId = parseInt(req.params.messageId, 10)
+    const messageId = Number.parseInt(req.params.messageId, 10)
+    if (!Number.isInteger(messageId) || messageId < 1) {
+      return sendError(res, 400, 'Invalid message ID.', ERROR_CODES.BAD_REQUEST)
+    }
     const { optionId } = req.body
 
     if (!optionId) {
@@ -270,7 +279,10 @@ router.post('/:messageId/poll/vote', requireAuth, messagingWriteLimiter, async (
  */
 router.post('/:messageId/poll/close', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const messageId = parseInt(req.params.messageId, 10)
+    const messageId = Number.parseInt(req.params.messageId, 10)
+    if (!Number.isInteger(messageId) || messageId < 1) {
+      return sendError(res, 400, 'Invalid message ID.', ERROR_CODES.BAD_REQUEST)
+    }
 
     // Verify the user is a participant in the conversation
     const verified = await verifyMessageParticipant(req, res, messageId)

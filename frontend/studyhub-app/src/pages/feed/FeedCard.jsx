@@ -770,9 +770,21 @@ function FeedCardInner({
                 ) : null}
                 {isSheet && studyStatus ? <StudyStatusChip status={studyStatus} /> : null}
               </div>
-              <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 4 }}>
+              {/* <time> for SR + structured-data parsers; native title
+                  attribute reveals the absolute date on hover, no JS. */}
+              <time
+                dateTime={item.createdAt || ''}
+                title={item.createdAt ? new Date(item.createdAt).toLocaleString() : ''}
+                style={{
+                  display: 'block',
+                  fontSize: 11,
+                  color: 'var(--sh-muted)',
+                  marginTop: 4,
+                  cursor: 'default',
+                }}
+              >
                 {timeAgo(item.createdAt)}
-              </div>
+              </time>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               {item.linkPath && item.type !== 'post' ? (

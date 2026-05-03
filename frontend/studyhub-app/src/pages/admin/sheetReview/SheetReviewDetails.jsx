@@ -76,7 +76,16 @@ export function InteractivePreview({ loading, error, runtimeUrl, sheetId }) {
       <iframe
         title={`admin-review-interactive-${sheetId}`}
         src={runtimeUrl}
-        sandbox="allow-scripts allow-forms allow-modals allow-downloads"
+        // Sandbox composition (CLAUDE.md A14): allow-scripts so quizzes
+        // run, allow-forms for inline answer submission, allow-popups so
+        // target="_blank" links in the sheet open a new window instead
+        // of failing silently, allow-modals so window.alert / confirm
+        // surface for the admin during behavior verification, and
+        // allow-downloads so a "Download PDF" button inside an
+        // interactive sheet works under review. NEVER add allow-same-
+        // origin alongside allow-scripts — that's the documented
+        // sandbox-escape vector.
+        sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads"
         referrerPolicy="no-referrer"
         style={{
           width: '100%',
