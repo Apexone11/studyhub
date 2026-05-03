@@ -17,7 +17,19 @@ function extractMentionUsernames(text = '') {
 
 async function notifyMentionedUsers(
   prisma,
-  { text, actorId, actorUsername, message, linkPath, excludeUserIds = [] },
+  {
+    text,
+    actorId,
+    actorUsername,
+    message,
+    linkPath,
+    excludeUserIds = [],
+    // Optional allowlist — when provided, only mentions of users in
+    // this set are notified. Used by the study-group discussion path
+    // so an `@username` in a private group can't ping a user who
+    // isn't a member of that group (Codex P2 finding 2026-05-03).
+    restrictToUserIds = null,
+  },
 ) {
   const usernames = extractMentionUsernames(text)
   if (usernames.length === 0) return []
@@ -32,10 +44,15 @@ async function notifyMentionedUsers(
   })
 
   const excluded = new Set([actorId, ...excludeUserIds].filter(Boolean))
+  const restrictSet =
+    restrictToUserIds && Array.isArray(restrictToUserIds)
+      ? new Set(restrictToUserIds.filter(Boolean))
+      : null
 
   await Promise.all(
     users
       .filter((user) => !excluded.has(user.id))
+      .filter((user) => !restrictSet || restrictSet.has(user.id))
       .map((user) =>
         createNotification(prisma, {
           userId: user.id,

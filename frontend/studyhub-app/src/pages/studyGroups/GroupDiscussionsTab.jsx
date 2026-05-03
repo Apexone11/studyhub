@@ -370,6 +370,7 @@ function DiscussionPostItem({
 export function GroupDiscussionsTab({
   groupId,
   discussions,
+  loading,
   onCreatePost,
   onDeletePost,
   onAddReply,
@@ -488,6 +489,17 @@ export function GroupDiscussionsTab({
   // pinned-section never rendered even when a mod had pinned a post.
   const pinnedDiscussions = filteredDiscussions.filter((d) => d.pinned)
   const regularDiscussions = filteredDiscussions.filter((d) => !d.pinned)
+
+  // Don't flash "No Discussions Yet" while the initial fetch is in
+  // flight — wait for `loading=false` before deciding the list is empty.
+  // (Copilot 2026-05-03 finding.)
+  if (loading) {
+    return (
+      <div style={styles.tabContainer}>
+        <div style={{ ...styles.emptyState, color: 'var(--sh-muted)' }}>Loading discussions…</div>
+      </div>
+    )
+  }
 
   if (!discussions || discussions.length === 0) {
     return (
@@ -640,7 +652,7 @@ export function GroupDiscussionsTab({
           type="search"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search discussions, replies, or @author…"
+          placeholder="Search discussions by title, body, or author…"
           aria-label="Search group discussions"
           style={{
             width: '100%',

@@ -337,26 +337,13 @@ function ConversationSidebar({
         {conversations.map((conv) => (
           <div
             key={conv.id}
-            // Conversation rows are now keyboard-reachable: role="button"
-            // surfaces them as activatable to assistive tech, tabIndex=0
-            // puts them in the tab order, and Enter/Space activate the
-            // selection (mirrors how the rest of the codebase handles
-            // role-button divs — see SheetGridCard.jsx).
-            role="button"
-            tabIndex={editingId === conv.id ? -1 : 0}
-            aria-current={conv.id === activeId ? 'page' : undefined}
-            aria-label={`Open conversation: ${conv.title || 'New conversation'}`}
-            onClick={() => editingId !== conv.id && onSelect(conv.id)}
-            onKeyDown={(e) => {
-              if (editingId === conv.id) return
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault()
-                onSelect(conv.id)
-              }
-            }}
+            // Outer wrapper is a non-interactive container so the
+            // <button> activator + <button>(Rename) + <button>(Delete)
+            // are siblings, not nested interactive elements (HTML
+            // forbids interactive-in-interactive nesting; screen
+            // readers were getting confused). Copilot a11y finding
+            // 2026-05-03.
             style={{
-              padding: '10px 16px',
-              cursor: 'pointer',
               background: conv.id === activeId ? 'var(--sh-soft)' : 'transparent',
               borderLeft:
                 conv.id === activeId ? '3px solid var(--sh-brand)' : '3px solid transparent',
@@ -375,7 +362,7 @@ function ConversationSidebar({
                   e.preventDefault()
                   submitRename()
                 }}
-                style={{ display: 'flex', gap: 6 }}
+                style={{ display: 'flex', gap: 6, padding: '10px 16px' }}
               >
                 <input
                   autoFocus
@@ -395,58 +382,70 @@ function ConversationSidebar({
                 />
               </form>
             ) : (
-              <>
-                <div
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  alignItems: 'center',
+                  columnGap: 6,
+                  padding: '10px 16px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => onSelect(conv.id)}
+                  aria-current={conv.id === activeId ? 'page' : undefined}
+                  aria-label={`Open conversation: ${conv.title || 'New conversation'}`}
                   style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: 'var(--sh-text)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    marginBottom: 2,
+                    display: 'block',
+                    width: '100%',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    color: 'inherit',
+                    font: 'inherit',
                   }}
                 >
-                  {conv.title || 'New conversation'}
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--sh-muted)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>{conv._count?.messages || 0} messages</span>
-                  <span style={{ display: 'flex', gap: 4, opacity: conv.id === activeId ? 1 : 0 }}>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleRename(conv)
-                      }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
-                      aria-label="Rename conversation"
-                      title="Rename"
-                    >
-                      <IconPen size={12} style={{ color: 'var(--sh-muted)' }} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDelete(conv.id)
-                      }}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
-                      aria-label="Delete conversation"
-                      title="Delete"
-                    >
-                      <IconX size={12} style={{ color: 'var(--sh-danger-text)' }} />
-                    </button>
-                  </span>
-                </div>
-              </>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: 'var(--sh-text)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      marginBottom: 2,
+                    }}
+                  >
+                    {conv.title || 'New conversation'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                    {conv._count?.messages || 0} messages
+                  </div>
+                </button>
+                <span style={{ display: 'flex', gap: 4, opacity: conv.id === activeId ? 1 : 0 }}>
+                  <button
+                    type="button"
+                    onClick={() => handleRename(conv)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                    aria-label="Rename conversation"
+                    title="Rename"
+                  >
+                    <IconPen size={12} style={{ color: 'var(--sh-muted)' }} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onDelete(conv.id)}
+                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                    aria-label="Delete conversation"
+                    title="Delete"
+                  >
+                    <IconX size={12} style={{ color: 'var(--sh-danger-text)' }} />
+                  </button>
+                </span>
+              </div>
             )}
           </div>
         ))}

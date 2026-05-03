@@ -166,6 +166,17 @@ export default function GroupDetailView({ groupId }) {
     }
   }, [activeTab, groupId, activeGroup, members.length, loadMembers])
 
+  // Same prefetch for the right-rail "Recent activity" card. Without
+  // this, opening Discussions before ever visiting Overview leaves
+  // the activity card on "No activity yet." even though there's
+  // plenty of data — `activities` is just unfetched. (Copilot
+  // 2026-05-03 finding.)
+  useEffect(() => {
+    if (activeTab === 'discussions' && activeGroup?.isMember && activities.length === 0) {
+      loadActivity(groupId)
+    }
+  }, [activeTab, groupId, activeGroup, activities.length, loadActivity])
+
   if (activeGroupLoading) {
     return (
       <PageShell

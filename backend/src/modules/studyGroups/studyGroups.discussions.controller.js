@@ -275,13 +275,18 @@ async function createDiscussion(req, res) {
       // group-wide notification above is a generic "new post" ping;
       // a mention is a personal call-out and deserves its own row in
       // the recipient's bell with a distinct type so the frontend can
-      // style it differently.
+      // style it differently. Restrict to active group members so an
+      // @username from a private group cannot ping a non-member
+      // (Codex P2 finding 2026-05-03 — group membership IS the
+      // privacy boundary for mention pings).
+      const memberAllowlist = members.map((m) => m.userId)
       const { notifyMentionedUsers } = require('../../lib/mentions')
       await notifyMentionedUsers(prisma, {
         text: strippedContent,
         actorId: req.user.userId,
         actorUsername: req.user.username,
         linkPath: `/study-groups/${groupId}`,
+        restrictToUserIds: memberAllowlist,
       })
     } catch (notifErr) {
       // Fire-and-forget: don't fail the request
@@ -424,9 +429,12 @@ async function updateDiscussion(req, res) {
     // skipped it, which let a removed user PATCH their own old post
     // after they'd been kicked from the group. Mirror the create-side
     // gate so post edits respect membership.
+    // requireGroupMember returns pending/invited/banned rows too — gate
+    // explicitly on `status === 'active'` so a banned user can't slip
+    // through to mutate their old posts (Copilot 2026-05-03 finding).
     const member = await requireGroupMember(groupId, req.user.userId)
-    if (!member) {
-      return res.status(403).json({ error: 'You must be a member of this group.' })
+    if (!member || member.status !== 'active') {
+      return res.status(403).json({ error: 'You must be an active member of this group.' })
     }
 
     const post = await prisma.groupDiscussionPost.findUnique({
@@ -438,18 +446,28 @@ async function updateDiscussion(req, res) {
     }
 
     // Check permission. Editing the post body / title is restricted to
-    // the author or an admin. Pinning is a moderator-tier action so we
-    // also resolve `isModOrAdmin` and use that for the `pinned` field
-    // specifically — the frontend pin button is shown to mods, and the
-    // backend was silently ignoring the field for them before this
-    // change (see Loop B finding HIGH #3, 2026-05-03).
+    // the author or an admin. Pinning is a moderator-tier action.
+    // Codex P1 + Copilot 2026-05-03 finding: the previous gate
+    // `if (!isAuthor && !isAdmin) return 403` ran BEFORE the pinned-
+    // only branch, so a non-author moderator clicking "Pin" hit 403
+    // and the new `pinned && isModOrAdmin` branch was unreachable.
+    // Fix: detect a pin-only body (no title / no content changes) and
+    // use `isModOrAdmin` for that specific shape; everything else
+    // still requires author-or-admin.
     const isAdmin = await isGroupAdmin(groupId, req.user.userId)
     const isModOrAdmin = await isGroupAdminOrMod(groupId, req.user.userId)
-    if (post.userId !== req.user.userId && !isAdmin) {
+    const { title, content, pinned } = req.body
+    const isPinOnlyUpdate = pinned !== undefined && title === undefined && content === undefined
+    const isAuthor = post.userId === req.user.userId
+
+    if (isPinOnlyUpdate) {
+      if (!isModOrAdmin) {
+        return res.status(403).json({ error: 'Moderator access required to pin posts.' })
+      }
+    } else if (!isAuthor && !isAdmin) {
       return res.status(403).json({ error: 'Not authorized.' })
     }
 
-    const { title, content, pinned } = req.body
     const updates = {}
 
     if (title !== undefined) {
@@ -554,9 +572,12 @@ async function deleteDiscussion(req, res) {
     }
 
     // Active-membership gate (Loop B 2026-05-03 finding MED #7).
+    // requireGroupMember returns pending/invited/banned rows too — gate
+    // explicitly on `status === 'active'` so a banned user can't slip
+    // through to mutate their old posts (Copilot 2026-05-03 finding).
     const member = await requireGroupMember(groupId, req.user.userId)
-    if (!member) {
-      return res.status(403).json({ error: 'You must be a member of this group.' })
+    if (!member || member.status !== 'active') {
+      return res.status(403).json({ error: 'You must be an active member of this group.' })
     }
 
     const post = await prisma.groupDiscussionPost.findUnique({
@@ -740,12 +761,20 @@ async function createReply(req, res) {
           linkPath: `/study-groups/${groupId}`,
         })
       }
+      // Same membership-restricted mention pipeline as createDiscussion
+      // (Codex P2 finding 2026-05-03). A private-group reply with
+      // `@username` must not ping a user who isn't in the group.
+      const replyMembers = await prisma.studyGroupMember.findMany({
+        where: { groupId, status: 'active' },
+        select: { userId: true },
+      })
       const { notifyMentionedUsers } = require('../../lib/mentions')
       await notifyMentionedUsers(prisma, {
         text: strippedContent,
         actorId: req.user.userId,
         actorUsername: req.user.username,
         linkPath: `/study-groups/${groupId}`,
+        restrictToUserIds: replyMembers.map((m) => m.userId),
       })
     } catch (notifErr) {
       log.warn(
@@ -902,9 +931,12 @@ async function resolveDiscussion(req, res) {
     }
 
     // Active-membership gate (Loop B 2026-05-03 finding MED #7).
+    // requireGroupMember returns pending/invited/banned rows too — gate
+    // explicitly on `status === 'active'` so a banned user can't slip
+    // through to mutate their old posts (Copilot 2026-05-03 finding).
     const member = await requireGroupMember(groupId, req.user.userId)
-    if (!member) {
-      return res.status(403).json({ error: 'You must be a member of this group.' })
+    if (!member || member.status !== 'active') {
+      return res.status(403).json({ error: 'You must be an active member of this group.' })
     }
 
     const post = await prisma.groupDiscussionPost.findUnique({
