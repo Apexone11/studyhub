@@ -6,6 +6,7 @@
 
 const { captureError } = require('../../monitoring/sentry')
 const { createNotifications } = require('../../lib/notify')
+const log = require('../../lib/logger')
 const prisma = require('../../lib/prisma')
 const { getIO } = require('../../lib/socketio')
 const SOCKET_EVENTS = require('../../lib/socketEvents')
@@ -174,7 +175,23 @@ async function createDiscussion(req, res) {
         if (!raw || typeof raw !== 'object') {
           return res.status(400).json({ error: 'Each attachment must be an object.' })
         }
-        if (typeof raw.url !== 'string' || !raw.url.startsWith('/uploads/group-media/')) {
+        // Hardened path check (Loop B 2026-05-03 finding HIGH #4):
+        // a bare `startsWith('/uploads/group-media/')` admits
+        // protocol-relative URLs like `//evil.com/uploads/group-media/x`
+        // (the leading `/` matches but `//` reroutes the browser to a
+        // different host), URL-encoded prefixes that decode after the
+        // check, and `..` traversal sequences. Reject anything that
+        // contains another scheme separator (`//`), a `..` segment, a
+        // backslash, or any percent-encoding — group-media URLs never
+        // need any of those.
+        if (
+          typeof raw.url !== 'string' ||
+          !raw.url.startsWith('/uploads/group-media/') ||
+          raw.url.includes('//', 1) ||
+          raw.url.includes('..') ||
+          raw.url.includes('\\') ||
+          raw.url.includes('%')
+        ) {
           return res
             .status(400)
             .json({ error: 'attachment.url must be an uploaded /uploads/group-media/... path.' })
@@ -254,9 +271,24 @@ async function createDiscussion(req, res) {
           })),
         )
       }
+      // @mentions in the post body fire individual notifications. The
+      // group-wide notification above is a generic "new post" ping;
+      // a mention is a personal call-out and deserves its own row in
+      // the recipient's bell with a distinct type so the frontend can
+      // style it differently.
+      const { notifyMentionedUsers } = require('../../lib/mentions')
+      await notifyMentionedUsers(prisma, {
+        text: strippedContent,
+        actorId: req.user.userId,
+        actorUsername: req.user.username,
+        linkPath: `/study-groups/${groupId}`,
+      })
     } catch (notifErr) {
       // Fire-and-forget: don't fail the request
-      console.error('Failed to create notifications:', notifErr.message)
+      log.warn(
+        { event: 'studyGroups.discussions.notify_failed', err: notifErr.message },
+        'Failed to create discussion notifications',
+      )
     }
 
     const formattedPost = {
@@ -387,6 +419,16 @@ async function updateDiscussion(req, res) {
       return res.status(400).json({ error: 'Invalid IDs.' })
     }
 
+    // Active-membership gate. createDiscussion + createReply already
+    // require this; the edit / delete / resolve paths previously
+    // skipped it, which let a removed user PATCH their own old post
+    // after they'd been kicked from the group. Mirror the create-side
+    // gate so post edits respect membership.
+    const member = await requireGroupMember(groupId, req.user.userId)
+    if (!member) {
+      return res.status(403).json({ error: 'You must be a member of this group.' })
+    }
+
     const post = await prisma.groupDiscussionPost.findUnique({
       where: { id: postId },
     })
@@ -395,8 +437,14 @@ async function updateDiscussion(req, res) {
       return res.status(404).json({ error: 'Post not found.' })
     }
 
-    // Check permission (author or admin)
+    // Check permission. Editing the post body / title is restricted to
+    // the author or an admin. Pinning is a moderator-tier action so we
+    // also resolve `isModOrAdmin` and use that for the `pinned` field
+    // specifically — the frontend pin button is shown to mods, and the
+    // backend was silently ignoring the field for them before this
+    // change (see Loop B finding HIGH #3, 2026-05-03).
     const isAdmin = await isGroupAdmin(groupId, req.user.userId)
+    const isModOrAdmin = await isGroupAdminOrMod(groupId, req.user.userId)
     if (post.userId !== req.user.userId && !isAdmin) {
       return res.status(403).json({ error: 'Not authorized.' })
     }
@@ -423,7 +471,7 @@ async function updateDiscussion(req, res) {
       updates.content = strippedContent
     }
 
-    if (pinned !== undefined && isAdmin) {
+    if (pinned !== undefined && isModOrAdmin) {
       updates.pinned = Boolean(pinned)
     }
 
@@ -434,8 +482,37 @@ async function updateDiscussion(req, res) {
       data: updates,
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
+        _count: { select: { replies: true } },
       },
     })
+
+    // Pin / unpin emits a notification to the post author so they know
+    // a moderator promoted (or demoted) their thread. Skip when the
+    // post-author is also the actor (mod pinning their own post is
+    // a no-op signal). Only fires when the field actually flipped.
+    if (
+      updates.pinned !== undefined &&
+      Boolean(updates.pinned) !== Boolean(post.pinned) &&
+      post.userId !== req.user.userId
+    ) {
+      try {
+        const { createNotification } = require('../../lib/notify')
+        await createNotification(prisma, {
+          userId: post.userId,
+          type: 'group_post_pinned',
+          message: updates.pinned
+            ? `A moderator pinned your post "${updated.title}"`
+            : `Your post "${updated.title}" was unpinned`,
+          actorId: req.user.userId,
+          linkPath: `/study-groups/${groupId}`,
+        })
+      } catch (notifErr) {
+        log.warn(
+          { event: 'studyGroups.discussions.pin_notify_failed', err: notifErr.message },
+          'Failed to notify post author on pin',
+        )
+      }
+    }
 
     res.json({
       id: updated.id,
@@ -447,7 +524,13 @@ async function updateDiscussion(req, res) {
       type: updated.type,
       pinned: updated.pinned,
       resolved: updated.resolved,
-      replyCount: 0,
+      attachments: updated.attachments || null,
+      // Use the real reply count from Prisma's _count include. The
+      // hook (`useGroupDiscussions.updatePost`) replaces the post in
+      // local state with whatever the server returns, so a hardcoded 0
+      // here would wipe the visible reply count from the UI on every
+      // pin / edit. Same fix applied below in resolveDiscussion.
+      replyCount: updated._count?.replies ?? 0,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     })
@@ -468,6 +551,12 @@ async function deleteDiscussion(req, res) {
 
     if (groupId === null || postId === null) {
       return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    // Active-membership gate (Loop B 2026-05-03 finding MED #7).
+    const member = await requireGroupMember(groupId, req.user.userId)
+    if (!member) {
+      return res.status(403).json({ error: 'You must be a member of this group.' })
     }
 
     const post = await prisma.groupDiscussionPost.findUnique({
@@ -636,6 +725,35 @@ async function createReply(req, res) {
       /* fire-and-forget */
     }
 
+    // Notify the original post author (skip if the author is replying to
+    // their own post, that's noise). Also notify @mentioned users in the
+    // reply body. Both go through the standard notify pipeline so they
+    // honor the user's notification preferences.
+    try {
+      if (post.userId !== req.user.userId) {
+        const { createNotification } = require('../../lib/notify')
+        await createNotification(prisma, {
+          userId: post.userId,
+          type: 'group_reply',
+          message: `${req.user.username} replied to "${post.title}"`,
+          actorId: req.user.userId,
+          linkPath: `/study-groups/${groupId}`,
+        })
+      }
+      const { notifyMentionedUsers } = require('../../lib/mentions')
+      await notifyMentionedUsers(prisma, {
+        text: strippedContent,
+        actorId: req.user.userId,
+        actorUsername: req.user.username,
+        linkPath: `/study-groups/${groupId}`,
+      })
+    } catch (notifErr) {
+      log.warn(
+        { event: 'studyGroups.discussions.reply_notify_failed', err: notifErr.message },
+        'Failed to notify on reply',
+      )
+    }
+
     res.status(201).json(formattedReply)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -783,6 +901,12 @@ async function resolveDiscussion(req, res) {
       return res.status(400).json({ error: 'Invalid IDs.' })
     }
 
+    // Active-membership gate (Loop B 2026-05-03 finding MED #7).
+    const member = await requireGroupMember(groupId, req.user.userId)
+    if (!member) {
+      return res.status(403).json({ error: 'You must be a member of this group.' })
+    }
+
     const post = await prisma.groupDiscussionPost.findUnique({
       where: { id: postId },
     })
@@ -811,6 +935,7 @@ async function resolveDiscussion(req, res) {
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
+        _count: { select: { replies: true } },
       },
     })
 
@@ -824,7 +949,8 @@ async function resolveDiscussion(req, res) {
       type: updated.type,
       pinned: updated.pinned,
       resolved: updated.resolved,
-      replyCount: 0,
+      attachments: updated.attachments || null,
+      replyCount: updated._count?.replies ?? 0,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     })

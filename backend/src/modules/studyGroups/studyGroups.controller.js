@@ -16,6 +16,7 @@
  */
 
 const prisma = require('../../lib/prisma')
+const log = require('../../lib/logger')
 const { captureError } = require('../../monitoring/sentry')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { createNotification } = require('../../lib/notify')
@@ -886,7 +887,10 @@ async function updateMember(req, res) {
         })
       } catch (notifErr) {
         // Fire-and-forget: don't fail the request
-        console.error('Failed to create notification:', notifErr.message)
+        log.warn(
+          { event: 'studyGroups.notify_failed', err: notifErr.message },
+          'Failed to create study-group notification',
+        )
       }
     }
 
@@ -950,6 +954,30 @@ async function removeMember(req, res) {
     await prisma.studyGroupMember.delete({
       where: { id: targetMember.id },
     })
+
+    // Notify the removed user so they aren't left wondering why the
+    // group disappeared from their list. Skip if a user removed
+    // themselves (that's a leave, not a kick).
+    if (targetMember.userId !== req.user.userId) {
+      try {
+        const groupName = await prisma.studyGroup.findUnique({
+          where: { id: groupId },
+          select: { name: true },
+        })
+        await createNotification(prisma, {
+          userId: targetMember.userId,
+          type: 'group_removed',
+          message: `You were removed from ${groupName?.name || 'a study group'}.`,
+          actorId: req.user.userId,
+          linkPath: '/study-groups',
+        })
+      } catch (notifErr) {
+        log.warn(
+          { event: 'studyGroups.member_removed_notify_failed', err: notifErr.message },
+          'Failed to notify removed group member',
+        )
+      }
+    }
 
     res.status(204).send()
   } catch (err) {
@@ -1075,7 +1103,10 @@ async function inviteUser(req, res) {
       })
     } catch (notifErr) {
       // Fire-and-forget: don't fail the request
-      console.error('Failed to create notification:', notifErr.message)
+      log.warn(
+        { event: 'studyGroups.notify_failed', err: notifErr.message },
+        'Failed to create study-group notification',
+      )
     }
 
     res.status(201).json({

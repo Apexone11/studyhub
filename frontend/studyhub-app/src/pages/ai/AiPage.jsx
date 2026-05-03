@@ -217,6 +217,22 @@ export default function AiPage() {
 /* ═══════════════════════════════════════════════════════════════════════════
  * Conversation Sidebar
  * ═══════════════════════════════════════════════════════════════════════════ */
+// Three-dot pulsing "Thinking" indicator — staggered animation-delay
+// so each dot lights up sequentially. Falls back to a static dim dot
+// under prefers-reduced-motion / data-reduced-motion (already handled
+// globally in index.css).
+function pulseDotStyle(delayMs) {
+  return {
+    width: 5,
+    height: 5,
+    borderRadius: '50%',
+    background: 'var(--sh-ai-gradient, linear-gradient(135deg,#7c3aed,#2563eb))',
+    animation: 'sh-ai-thinking 1s ease-in-out infinite',
+    animationDelay: `${delayMs}ms`,
+    display: 'inline-block',
+  }
+}
+
 function ConversationSidebar({
   conversations,
   activeId,
@@ -321,7 +337,23 @@ function ConversationSidebar({
         {conversations.map((conv) => (
           <div
             key={conv.id}
+            // Conversation rows are now keyboard-reachable: role="button"
+            // surfaces them as activatable to assistive tech, tabIndex=0
+            // puts them in the tab order, and Enter/Space activate the
+            // selection (mirrors how the rest of the codebase handles
+            // role-button divs — see SheetGridCard.jsx).
+            role="button"
+            tabIndex={editingId === conv.id ? -1 : 0}
+            aria-current={conv.id === activeId ? 'page' : undefined}
+            aria-label={`Open conversation: ${conv.title || 'New conversation'}`}
             onClick={() => editingId !== conv.id && onSelect(conv.id)}
+            onKeyDown={(e) => {
+              if (editingId === conv.id) return
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault()
+                onSelect(conv.id)
+              }
+            }}
             style={{
               padding: '10px 16px',
               cursor: 'pointer',
@@ -389,21 +421,25 @@ function ConversationSidebar({
                   <span>{conv._count?.messages || 0} messages</span>
                   <span style={{ display: 'flex', gap: 4, opacity: conv.id === activeId ? 1 : 0 }}>
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation()
                         handleRename(conv)
                       }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                      aria-label="Rename conversation"
                       title="Rename"
                     >
                       <IconPen size={12} style={{ color: 'var(--sh-muted)' }} />
                     </button>
                     <button
+                      type="button"
                       onClick={(e) => {
                         e.stopPropagation()
                         onDelete(conv.id)
                       }}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                      aria-label="Delete conversation"
                       title="Delete"
                     >
                       <IconX size={12} style={{ color: 'var(--sh-danger-text)' }} />
@@ -634,14 +670,21 @@ function ChatArea({
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
+      {/* Header — Figma 2026-05-03 redesign:
+          - Title left
+          - Gradient-bordered model pill ("CLAUDE SONNET 4.5") right of title
+          - Streaming indicator pinned to the right via marginLeft: auto */}
       <div
         style={{
-          padding: '12px 16px',
+          padding: '14px 18px',
           borderBottom: '1px solid var(--sh-border)',
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
+          gap: 12,
+          background: 'var(--sh-surface)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 2,
         }}
       >
         {onBack && (
@@ -659,19 +702,70 @@ function ChatArea({
             Back
           </button>
         )}
-        <IconSpark size={16} style={{ color: 'var(--sh-brand)' }} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--sh-heading)' }}>Hub AI</span>
+        <IconSpark size={18} style={{ color: 'var(--sh-brand)' }} />
+        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)' }}>Hub AI</span>
+        {/* Model pill — gradient border via padding-box / border-box trick
+            so the pill stays text-readable instead of solid-fill gradient.
+            Hardcoded to the active model since AI service exposes one. */}
+        <span
+          aria-label="Active AI model"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px 10px',
+            borderRadius: 999,
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: 'var(--sh-heading)',
+            background:
+              'linear-gradient(var(--sh-surface), var(--sh-surface)) padding-box, var(--sh-ai-gradient, linear-gradient(135deg,#7c3aed,#2563eb)) border-box',
+            border: '1.5px solid transparent',
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'var(--sh-ai-gradient, linear-gradient(135deg,#7c3aed,#2563eb))',
+            }}
+          />
+          Claude Sonnet 4
+        </span>
         {streaming && (
           <span
-            style={{ fontSize: 11, color: 'var(--sh-brand)', fontWeight: 500, marginLeft: 'auto' }}
+            style={{
+              fontSize: 11,
+              color: 'var(--sh-brand)',
+              fontWeight: 600,
+              marginLeft: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
           >
-            Thinking...
+            <span aria-hidden style={pulseDotStyle(0)} />
+            <span aria-hidden style={pulseDotStyle(150)} />
+            <span aria-hidden style={pulseDotStyle(300)} />
+            Thinking
           </span>
         )}
       </div>
 
-      {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+      {/* Messages — role="log" + aria-live="polite" so screen-reader users
+          are told when a streaming response is appended. WCAG 2.1 SC 4.1.3
+          (Status Messages, Level AA). */}
+      <div
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+        aria-label="Hub AI conversation"
+        style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}
+      >
         {loading && (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--sh-muted)' }}>
             <IconSpinner size={24} style={{ animation: 'spin 1s linear infinite' }} />
@@ -877,29 +971,37 @@ function ChatArea({
               Stop
             </button>
           ) : (
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || input.length > MAX_MESSAGE_LENGTH}
-              style={{
-                background:
-                  input.trim() && input.length <= MAX_MESSAGE_LENGTH
-                    ? 'var(--sh-brand)'
-                    : 'var(--sh-soft)',
-                color:
-                  input.trim() && input.length <= MAX_MESSAGE_LENGTH ? '#fff' : 'var(--sh-muted)',
-                border: 'none',
-                borderRadius: 10,
-                padding: '10px 16px',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor:
-                  input.trim() && input.length <= MAX_MESSAGE_LENGTH ? 'pointer' : 'not-allowed',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s',
-              }}
-            >
-              Send
-            </button>
+            (() => {
+              const canSend = input.trim() && input.length <= MAX_MESSAGE_LENGTH
+              return (
+                <button
+                  onClick={handleSend}
+                  disabled={!canSend}
+                  aria-label="Send message"
+                  style={{
+                    // Figma 2026-05-03: send button switches to AI gradient
+                    // when ready to fire, falls back to muted soft when
+                    // disabled. Slight box-shadow gives the button a small
+                    // amount of lift to match the Figma's elevated CTA.
+                    background: canSend
+                      ? 'var(--sh-ai-gradient, linear-gradient(135deg,#7c3aed,#2563eb))'
+                      : 'var(--sh-soft)',
+                    color: canSend ? '#fff' : 'var(--sh-muted)',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '10px 18px',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: canSend ? 'pointer' : 'not-allowed',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s',
+                    boxShadow: canSend ? '0 4px 14px rgba(124,58,237,0.25)' : 'none',
+                  }}
+                >
+                  Send
+                </button>
+              )
+            })()
           )}
         </div>
         <div

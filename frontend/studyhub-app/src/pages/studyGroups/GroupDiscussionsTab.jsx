@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import MediaComposer from './MediaComposer'
 import UserAvatar from '../../components/UserAvatar'
+import AttachmentPreview from '../../components/AttachmentPreview'
+import MentionText from '../../components/MentionText'
 import { formatRelativeTime, getPostTypeLabel } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 
@@ -12,6 +14,7 @@ function DiscussionPostItem({
   onReplySubmit,
   onResolve,
   onDelete,
+  onTogglePin,
   onUpvote,
   onApprove,
   onReject,
@@ -148,16 +151,72 @@ function DiscussionPostItem({
 
       {expanded && (
         <div style={styles.expandedContent} onClick={(e) => e.stopPropagation()}>
+          {/* Backend rejects empty body with 400 in createDiscussion +
+              updateDiscussion, so post.content is always non-empty for
+              persisted posts. No fallback needed. */}
           <p
             style={{
               fontSize: 'var(--type-sm)',
               color: 'var(--sh-text)',
               lineHeight: '1.6',
               marginBottom: 'var(--space-4)',
+              whiteSpace: 'pre-wrap',
+              wordBreak: 'break-word',
             }}
           >
-            {post.content}
+            <MentionText text={post.content || ''} />
           </p>
+
+          {/* Phase 4 attachments: render thumbnails / preview triggers
+              for each attachment that came back from the backend. The
+              backend persists `{ url, mime, bytes, kind }` on
+              feedPost.attachments and serializes them on every read.
+              Without this block the attachment was uploaded + saved but
+              never visible to other group members on the post card. */}
+          {Array.isArray(post.attachments) && post.attachments.length > 0 && (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))',
+                gap: 8,
+                marginBottom: 'var(--space-4)',
+              }}
+            >
+              {post.attachments.map((att, idx) => {
+                const name =
+                  att.name || (att.url ? att.url.split('/').pop() : `attachment-${idx + 1}`)
+                if (att.kind === 'image' && att.url) {
+                  return (
+                    <AttachmentPreview
+                      key={`${att.url}-${idx}`}
+                      attachment={{ url: att.url, name, type: att.mime, kind: 'image' }}
+                      triggerStyle={{
+                        padding: 0,
+                        border: '1px solid var(--sh-border)',
+                        borderRadius: 8,
+                        background: 'var(--sh-soft)',
+                        cursor: 'zoom-in',
+                        overflow: 'hidden',
+                      }}
+                    >
+                      <img
+                        src={att.url}
+                        alt={name}
+                        loading="lazy"
+                        style={{ display: 'block', width: '100%', height: 110, objectFit: 'cover' }}
+                      />
+                    </AttachmentPreview>
+                  )
+                }
+                return (
+                  <AttachmentPreview
+                    key={`${att.url}-${idx}`}
+                    attachment={{ url: att.url, name, type: att.mime, kind: att.kind }}
+                  />
+                )
+              })}
+            </div>
+          )}
 
           <div
             style={{
@@ -209,6 +268,26 @@ function DiscussionPostItem({
               </button>
             )}
 
+            {/* New 2026-05-03 feature: pin / unpin a thread.
+                Mod-only, surfaces a pinned section above the regular
+                feed (the pinned filter already runs against post.pinned
+                — same field the backend serializes). */}
+            {isAdminOrMod && onTogglePin && (
+              <button
+                onClick={() => onTogglePin(post.id, !post.pinned)}
+                style={{
+                  ...styles.button,
+                  ...styles.buttonSmall,
+                  backgroundColor: post.pinned ? 'var(--sh-warning)' : 'var(--sh-soft)',
+                  color: post.pinned ? '#fff' : 'var(--sh-text)',
+                  border: '1px solid var(--sh-border)',
+                }}
+                aria-pressed={Boolean(post.pinned)}
+              >
+                {post.pinned ? 'Unpin' : 'Pin to top'}
+              </button>
+            )}
+
             {(isAuthor || isAdminOrMod) && (
               <button
                 onClick={() => onDelete(post.id)}
@@ -230,7 +309,35 @@ function DiscussionPostItem({
                   <div style={styles.replyAuthor}>
                     {reply.author?.username || reply.authorName || 'Unknown'}
                   </div>
-                  <div style={styles.replyContent}>{reply.content}</div>
+                  <div style={styles.replyContent}>
+                    <MentionText text={reply.content || ''} />
+                  </div>
+                  {Array.isArray(reply.attachments) && reply.attachments.length > 0 && (
+                    <div
+                      style={{
+                        display: 'flex',
+                        flexWrap: 'wrap',
+                        gap: 6,
+                        marginTop: 6,
+                      }}
+                    >
+                      {reply.attachments.map((att, idx) => {
+                        const name =
+                          att.name || (att.url ? att.url.split('/').pop() : `attachment-${idx + 1}`)
+                        return (
+                          <AttachmentPreview
+                            key={`${att.url}-${idx}`}
+                            attachment={{
+                              url: att.url,
+                              name,
+                              type: att.mime,
+                              kind: att.kind,
+                            }}
+                          />
+                        )
+                      })}
+                    </div>
+                  )}
                   <div style={styles.replyTime}>{formatRelativeTime(reply.createdAt)}</div>
                 </div>
               ))}
@@ -267,6 +374,7 @@ export function GroupDiscussionsTab({
   onDeletePost,
   onAddReply,
   onResolve,
+  onTogglePin,
   onUpvote,
   onApprovePost,
   onRejectPost,
@@ -277,6 +385,11 @@ export function GroupDiscussionsTab({
   const [newPostModalOpen, setNewPostModalOpen] = useState(false)
   const [expandedPostId, setExpandedPostId] = useState(null)
   const [typeFilter, setTypeFilter] = useState('all')
+  // New 2026-05-03 features: client-side search across title/body/author,
+  // and pinned-thread sort. Search is debounced via the input itself
+  // (only re-renders the list when the user types) and is purely
+  // client-side over the already-loaded discussions list.
+  const [searchQuery, setSearchQuery] = useState('')
   const [formData, setFormData] = useState({
     title: '',
     content: '',
@@ -317,11 +430,9 @@ export function GroupDiscussionsTab({
 
     setSubmitting(true)
     try {
-      // Hook signature is createPost(groupId, postData) — two positional
-      // args. Passing a single bag as the first arg made the fetch URL
-      // resolve to `/api/study-groups/[object Object]/discussions`, which
-      // the backend's parseId() rejected with 400 "Invalid group ID."
-      await onCreatePost(groupId, {
+      // Parent (GroupDetailView) wraps onCreatePost so it already
+      // knows the groupId. Pass only the post payload here.
+      await onCreatePost({
         ...formData,
         attachments: attachments.length > 0 ? attachments : undefined,
       })
@@ -353,13 +464,30 @@ export function GroupDiscussionsTab({
     }
   }
 
-  const filteredDiscussions =
+  const baseFiltered =
     typeFilter === 'all'
       ? discussions || []
       : (discussions || []).filter((d) => d.type === typeFilter)
 
-  const pinnedDiscussions = filteredDiscussions.filter((d) => d.isPinned)
-  const regularDiscussions = filteredDiscussions.filter((d) => !d.isPinned)
+  // Client-side search across title, body, and author username so the
+  // user can find an old thread without scrolling. Empty query short-
+  // circuits to the unfiltered list. Trimmed + lowercased once per
+  // render rather than per-post.
+  const q = searchQuery.trim().toLowerCase()
+  const filteredDiscussions = q
+    ? baseFiltered.filter((d) => {
+        const title = (d.title || '').toLowerCase()
+        const body = (d.content || '').toLowerCase()
+        const author = (d.author?.username || d.authorName || '').toLowerCase()
+        return title.includes(q) || body.includes(q) || author.includes(q)
+      })
+    : baseFiltered
+
+  // Backend serializes the field as `pinned` (not `isPinned`). The
+  // older `d.isPinned` lookup always returned undefined, so the
+  // pinned-section never rendered even when a mod had pinned a post.
+  const pinnedDiscussions = filteredDiscussions.filter((d) => d.pinned)
+  const regularDiscussions = filteredDiscussions.filter((d) => !d.pinned)
 
   if (!discussions || discussions.length === 0) {
     return (
@@ -507,6 +635,37 @@ export function GroupDiscussionsTab({
         ))}
       </div>
 
+      <div style={{ marginBottom: 'var(--space-4)', position: 'relative' }}>
+        <input
+          type="search"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          placeholder="Search discussions, replies, or @author…"
+          aria-label="Search group discussions"
+          style={{
+            width: '100%',
+            padding: '10px 14px',
+            borderRadius: 10,
+            border: '1px solid var(--sh-input-border)',
+            background: 'var(--sh-input-bg, var(--sh-surface))',
+            color: 'var(--sh-text)',
+            fontSize: 13,
+            fontFamily: 'inherit',
+          }}
+        />
+        {q && filteredDiscussions.length === 0 ? (
+          <p
+            style={{
+              fontSize: 12,
+              color: 'var(--sh-muted)',
+              marginTop: 6,
+            }}
+          >
+            No posts match &ldquo;{searchQuery}&rdquo;.
+          </p>
+        ) : null}
+      </div>
+
       <div style={styles.section}>
         {pinnedDiscussions.length > 0 && (
           <>
@@ -522,6 +681,7 @@ export function GroupDiscussionsTab({
                 onReplySubmit={handleReplySubmit}
                 onResolve={onResolve}
                 onDelete={onDeletePost}
+                onTogglePin={onTogglePin}
                 onUpvote={onUpvote}
                 onApprove={onApprovePost}
                 onReject={onRejectPost}
@@ -552,6 +712,7 @@ export function GroupDiscussionsTab({
                 onReplySubmit={handleReplySubmit}
                 onResolve={onResolve}
                 onDelete={onDeletePost}
+                onTogglePin={onTogglePin}
                 onUpvote={onUpvote}
                 onApprove={onApprovePost}
                 onReject={onRejectPost}

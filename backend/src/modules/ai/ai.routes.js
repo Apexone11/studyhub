@@ -149,7 +149,11 @@ router.patch(
 // ── Send message (SSE streaming response) ──────────────────────────
 
 // POST /api/ai/messages
-router.post('/messages', requireAuth, aiMessageLimiter, async (req, res) => {
+// CLAUDE.md A11 — `requireTrustedOrigin` is mandatory on every write
+// route in this module. The `/messages` endpoint is the most expensive
+// surface in the entire AI module (it triggers Anthropic API calls and
+// burns daily quota), so the cross-origin defense is non-negotiable.
+router.post('/messages', requireAuth, requireTrustedOrigin, aiMessageLimiter, async (req, res) => {
   try {
     const { conversationId, content, currentPage, images } = req.body
 
@@ -184,6 +188,45 @@ router.post('/messages', requireAuth, aiMessageLimiter, async (req, res) => {
         const approxSize = (img.base64.length * 3) / 4
         if (approxSize > MAX_IMAGE_SIZE) {
           return res.status(400).json({ error: 'Image exceeds 5 MB size limit.' })
+        }
+        // Magic-byte check — verifies the actual file matches the
+        // claimed MIME so a client can't smuggle a non-image binary
+        // (PE / ELF / HTML) under `mediaType: 'image/png'`. Decode
+        // only the first 12 bytes to keep this cheap. Loop B finding
+        // I2, 2026-05-03 audit.
+        try {
+          const head = Buffer.from(img.base64.slice(0, 16), 'base64')
+          const ok =
+            (img.mediaType === 'image/png' &&
+              head[0] === 0x89 &&
+              head[1] === 0x50 &&
+              head[2] === 0x4e &&
+              head[3] === 0x47) ||
+            (img.mediaType === 'image/jpeg' &&
+              head[0] === 0xff &&
+              head[1] === 0xd8 &&
+              head[2] === 0xff) ||
+            (img.mediaType === 'image/webp' &&
+              head[0] === 0x52 &&
+              head[1] === 0x49 &&
+              head[2] === 0x46 &&
+              head[3] === 0x46 &&
+              head[8] === 0x57 &&
+              head[9] === 0x45 &&
+              head[10] === 0x42 &&
+              head[11] === 0x50) ||
+            (img.mediaType === 'image/gif' &&
+              head[0] === 0x47 &&
+              head[1] === 0x49 &&
+              head[2] === 0x46 &&
+              head[3] === 0x38)
+          if (!ok) {
+            return res
+              .status(400)
+              .json({ error: `Image bytes do not match declared type ${img.mediaType}.` })
+          }
+        } catch {
+          return res.status(400).json({ error: 'Invalid base64 in image payload.' })
         }
       }
     }

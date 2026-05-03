@@ -31,7 +31,12 @@ export function useGroupDiscussions(activeGroupId) {
       }
 
       const data = await response.json()
-      setDiscussions(data.discussions || [])
+      // Backend's listDiscussions response shape is `{ posts, total, ... }`.
+      // Older code read `data.discussions` and silently fell through to
+      // `[]` on every load — the Discussions tab was always blank as a
+      // result. Read `data.posts` first, fall back to `data.discussions`
+      // only as defensive padding for a future shape rename.
+      setDiscussions(data.posts || data.discussions || [])
     } catch {
       showToast('Failed to load discussions', 'error')
     } finally {

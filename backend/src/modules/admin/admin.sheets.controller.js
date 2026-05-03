@@ -254,6 +254,28 @@ router.patch('/sheets/:id/review', async (req, res) => {
       },
     })
 
+    // Notify the sheet author when their pending review lands. Without
+    // this the user has to refresh the page and check status manually.
+    // Skip when admin == author (self-review of their own sheet — rare
+    // but the notification would just be noise).
+    if (updated.author && updated.author.id !== req.user.userId) {
+      try {
+        const { createNotification } = require('../../lib/notify')
+        await createNotification(prisma, {
+          userId: updated.author.id,
+          type: action === 'approve' ? 'sheet_approved' : 'sheet_rejected',
+          message:
+            action === 'approve'
+              ? `Your sheet "${updated.title}" was approved and published.`
+              : `Your sheet "${updated.title}" was rejected by an admin.`,
+          actorId: req.user.userId,
+          linkPath: `/sheets/${updated.id}`,
+        })
+      } catch {
+        /* fire-and-forget — admin action is the source of truth */
+      }
+    }
+
     res.json({
       message: action === 'approve' ? 'Sheet approved and published.' : 'Sheet rejected.',
       sheet: updated,

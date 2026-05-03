@@ -9,8 +9,10 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { captureError } = require('../../monitoring/sentry')
 const { createNotifications } = require('../../lib/notify')
+const log = require('../../lib/logger')
 const prisma = require('../../lib/prisma')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const {
@@ -22,6 +24,10 @@ const {
 } = require('./studyGroups.helpers')
 
 const router = express.Router({ mergeParams: true })
+
+// CLAUDE.md A11 — defense in depth on every session write
+// (POST/PATCH/DELETE/RSVP). Short-circuits GETs.
+router.use(originAllowlist())
 
 /**
  * GET /:id/sessions
@@ -189,7 +195,10 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       }
     } catch (notifErr) {
       // Fire-and-forget: don't fail the request
-      console.error('Failed to create notifications:', notifErr.message)
+      log.warn(
+        { event: 'studyGroups.sessions.notify_failed', err: notifErr.message },
+        'Failed to create session notifications',
+      )
     }
 
     res.status(201).json({
