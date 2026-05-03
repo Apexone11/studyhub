@@ -25,34 +25,37 @@ export default function InterestChipRow({ onSelect, activeTopic = null }) {
     }
   }, [])
 
-  const handleFollow = useCallback(
-    async (name) => {
-      setError('')
-      try {
-        const res = await fetch(`${API}/api/hashtags/follow`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name }),
-        })
-        const data = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          const msg = data.error || 'Could not follow topic.'
-          setError(msg)
-          throw new Error(msg)
-        }
-        setTopics((prev) =>
-          prev.find((t) => t.id === data.hashtag.id)
-            ? prev
-            : [{ ...data.hashtag, followedAt: new Date().toISOString() }, ...prev],
-        )
-      } catch (err) {
-        if (!error) setError(err.message || 'Check your connection and try again.')
-        throw err
+  const handleFollow = useCallback(async (name) => {
+    setError('')
+    try {
+      const res = await fetch(`${API}/api/hashtags/follow`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        const msg = data.error || 'Could not follow topic.'
+        setError(msg)
+        throw new Error(msg)
       }
-    },
-    [error],
-  )
+      setTopics((prev) =>
+        prev.find((t) => t.id === data.hashtag.id)
+          ? prev
+          : [{ ...data.hashtag, followedAt: new Date().toISOString() }, ...prev],
+      )
+    } catch (err) {
+      // Always surface the real failure message — gating on the stale
+      // `error` closure was masking later failures (the value captured
+      // when the callback was created may already be cleared by an
+      // earlier setError(''), so the "if (!error)" guard skipped the
+      // setError call and left the user with no feedback).
+      const msg = err?.message || 'Check your connection and try again.'
+      setError(msg)
+      throw err
+    }
+  }, [])
 
   const handleRemove = useCallback(
     async (name) => {

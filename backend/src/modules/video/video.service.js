@@ -446,6 +446,17 @@ async function processVideo(videoId) {
             where: { id: videoId },
             data: { status: VIDEO_STATUS.FAILED, processingStep: 'security_scan_unavailable' },
           })
+          // Drop the unscanned R2 object too. Without this, a scanner
+          // outage leaves the user-uploaded blob sitting in R2 forever
+          // even though the DB row is FAILED — and `/api/video/media/*`
+          // serves arbitrary keys, so the file is still reachable until
+          // the next orphan-sweep tick. Match the prior fail-closed
+          // behavior from when the scan ran inside /upload/complete.
+          try {
+            await r2.deleteObject(video.r2Key)
+          } catch {
+            /* sweeper will catch stragglers */
+          }
           captureError(new Error(`ClamAV scanner error: ${scanResult.message}`), {
             context: 'video-clamav-scan',
             videoId,
@@ -467,6 +478,11 @@ async function processVideo(videoId) {
           where: { id: videoId },
           data: { status: VIDEO_STATUS.FAILED, processingStep: 'security_scan_error' },
         })
+        try {
+          await r2.deleteObject(video.r2Key)
+        } catch {
+          /* sweeper will catch stragglers */
+        }
         cleanup(baseDir)
         return
       }

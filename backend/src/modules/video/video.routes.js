@@ -669,10 +669,10 @@ router.delete('/:id', requireAuth, async (req, res) => {
         await prisma.video.updateMany({
           where: {
             contentHash: video.contentHash,
-            status: 'blocked',
+            status: VIDEO_STATUS.BLOCKED,
             id: { not: videoId },
           },
-          data: { status: 'failed' },
+          data: { status: VIDEO_STATUS.FAILED },
         })
       } catch {
         /* non-fatal — sweeper will catch stragglers */

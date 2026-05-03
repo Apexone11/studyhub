@@ -127,8 +127,8 @@ export default function GoalsCard({ isOwnProfile }) {
         </span>
       </header>
       <p style={{ margin: '6px 0 14px', fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.6 }}>
-        Track what you&rsquo;re working toward. Add up to {MAX_GOALS} goals and check them off as
-        you finish.
+        Track what you&rsquo;re working toward. Add up to {MAX_GOALS} goals and remove them when
+        they no longer apply.
       </p>
 
       <form onSubmit={handleAdd} style={{ display: 'flex', gap: 8, marginBottom: 14 }}>

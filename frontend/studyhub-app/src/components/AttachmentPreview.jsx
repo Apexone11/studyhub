@@ -32,19 +32,28 @@ const KIND_LABELS = {
   other: 'File',
 }
 
-function inferKind(name = '', urlOrType = '') {
-  const haystack = `${name} ${urlOrType}`.toLowerCase()
-  if (/\.(png|jpe?g|gif|webp|svg|bmp)(\?|$)/.test(haystack) || haystack.startsWith('image/')) {
+function inferKind(name = '', url = '', type = '') {
+  // Inspect MIME type and the name+URL haystack independently. Older
+  // callers passed `(name, urlOrType)`; the trigger picks `url` first
+  // and `type` falls through, which broke `startsWith('image/')`
+  // whenever both fields were present. Splitting the args means
+  // `{ name: 'photo', url: 'blob:abc', type: 'image/png' }` correctly
+  // resolves to 'image'.
+  const ext = `${name} ${url}`.toLowerCase()
+  const mime = String(type || (url && !url.startsWith('blob:') ? url : ''))
+    .trim()
+    .toLowerCase()
+  if (/\.(png|jpe?g|gif|webp|svg|bmp)(\?|$)/.test(ext) || mime.startsWith('image/')) {
     return 'image'
   }
-  if (/\.pdf(\?|$)/.test(haystack) || haystack.includes('application/pdf')) return 'pdf'
-  if (/\.(mp4|webm|mov|m4v|ogv)(\?|$)/.test(haystack) || haystack.startsWith('video/')) {
+  if (/\.pdf(\?|$)/.test(ext) || mime.includes('application/pdf')) return 'pdf'
+  if (/\.(mp4|webm|mov|m4v|ogv)(\?|$)/.test(ext) || mime.startsWith('video/')) {
     return 'video'
   }
-  if (/\.(mp3|wav|m4a|ogg|flac)(\?|$)/.test(haystack) || haystack.startsWith('audio/')) {
+  if (/\.(mp3|wav|m4a|ogg|flac)(\?|$)/.test(ext) || mime.startsWith('audio/')) {
     return 'audio'
   }
-  if (/\.(docx?|odt|rtf|txt|md|pptx?|xlsx?|csv)(\?|$)/.test(haystack)) return 'doc'
+  if (/\.(docx?|odt|rtf|txt|md|pptx?|xlsx?|csv)(\?|$)/.test(ext)) return 'doc'
   return 'other'
 }
 
@@ -52,7 +61,7 @@ export function AttachmentPreviewModal({ attachment, onClose }) {
   const containerRef = useRef(null)
   const closeButtonRef = useRef(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
-  const kind = attachment.kind || inferKind(attachment.name, attachment.url || attachment.type)
+  const kind = attachment.kind || inferKind(attachment.name, attachment.url, attachment.type)
 
   useEffect(() => {
     function handleKeyDown(event) {
@@ -299,7 +308,7 @@ const iconButtonStyle = {
  */
 export default function AttachmentPreview({ attachment, children, triggerStyle }) {
   const [open, setOpen] = useState(false)
-  const kind = attachment.kind || inferKind(attachment.name, attachment.url || attachment.type)
+  const kind = attachment.kind || inferKind(attachment.name, attachment.url, attachment.type)
 
   return (
     <>
@@ -329,16 +338,17 @@ export default function AttachmentPreview({ attachment, children, triggerStyle }
       >
         {children ?? (
           <>
-            <span aria-hidden style={{ color: 'var(--sh-muted)' }}>
-              {kind === 'image'
-                ? '🖼'
-                : kind === 'pdf'
-                  ? '📄'
-                  : kind === 'video'
-                    ? '🎬'
-                    : kind === 'audio'
-                      ? '🎵'
-                      : '📎'}
+            <span
+              aria-hidden
+              style={{
+                fontSize: 10,
+                fontWeight: 800,
+                letterSpacing: '0.04em',
+                textTransform: 'uppercase',
+                color: 'var(--sh-muted)',
+              }}
+            >
+              {KIND_LABELS[kind] || 'File'}
             </span>
             <span
               style={{

@@ -159,7 +159,7 @@ function ResourceRow({ resource, isAdminOrMod, userId, onDelete, onViewDetail })
               cursor: 'zoom-in',
               marginBottom: 'var(--space-2)',
             }}
-            aria-label={`Open preview of ${resource.title}`}
+            aria-label={resource.title ? `Open preview of ${resource.title}` : 'Open image preview'}
           >
             <img
               src={resource.mediaUrl}
@@ -201,7 +201,6 @@ function ResourceRow({ resource, isAdminOrMod, userId, onDelete, onViewDetail })
               gap: 8,
             }}
           >
-            <span aria-hidden>🎬</span>
             <span>Open video preview</span>
           </button>
         ) : null}
@@ -230,8 +229,7 @@ function ResourceRow({ resource, isAdminOrMod, userId, onDelete, onViewDetail })
               gap: 8,
             }}
           >
-            <span aria-hidden>📎</span>
-            <span>Open preview</span>
+            <span>Open file preview</span>
           </button>
         ) : null}
 
