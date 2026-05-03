@@ -10,12 +10,20 @@ const sessionController = require('./auth.session.controller')
 const revokeLinkController = require('./revokeLink.controller')
 const reauthController = require('./reauth.controller')
 const panicController = require('./panic.controller')
+const usernameController = require('./auth.username.controller')
 
 const router = express.Router()
 
 // Rate limit all auth endpoints — 15 req / 15 min per IP.
-router.use(authLimiter)
+// Username check has its OWN read-tier limiter inside the controller
+// because the onboarding form polls it on every keystroke (debounced)
+// and the global authLimiter would 429 a real signup mid-keystroke.
+router.use((req, res, next) => {
+  if (req.path === '/check-username') return next()
+  return authLimiter(req, res, next)
+})
 
+router.use(usernameController)
 router.use(registerController)
 router.use(loginController)
 router.use(loginChallengeController)

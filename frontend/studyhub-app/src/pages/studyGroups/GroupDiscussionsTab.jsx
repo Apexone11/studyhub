@@ -310,11 +310,19 @@ export function GroupDiscussionsTab({
       return
     }
 
+    if (!groupId) {
+      setError('Group not loaded yet — refresh and try again.')
+      return
+    }
+
     setSubmitting(true)
     try {
-      await onCreatePost({
+      // Hook signature is createPost(groupId, postData) — two positional
+      // args. Passing a single bag as the first arg made the fetch URL
+      // resolve to `/api/study-groups/[object Object]/discussions`, which
+      // the backend's parseId() rejected with 400 "Invalid group ID."
+      await onCreatePost(groupId, {
         ...formData,
-        groupId,
         attachments: attachments.length > 0 ? attachments : undefined,
       })
       setNewPostModalOpen(false)

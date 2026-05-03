@@ -3905,21 +3905,44 @@ textarea.sh-input {
 }
 
 /* ── Focus ring styles (keyboard accessibility) ──────────────────── */
-*:focus-visible {
+/* Default: ring is shown for keyboard users via :focus-visible. The
+   Accessibility settings toggle flips html[data-focus-ring="off"] which
+   hides the ring everywhere. We deliberately gate on data-focus-ring,
+   not data-focus-ring="on", so users who never opened the toggle still
+   get the WCAG 2.1 AA ring by default (axe-core CI gate would fail
+   otherwise). */
+html:not([data-focus-ring='off']) *:focus-visible {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;
 }
-button:focus-visible,
-a:focus-visible,
-input:focus-visible,
-textarea:focus-visible,
-select:focus-visible {
+html:not([data-focus-ring='off']) button:focus-visible,
+html:not([data-focus-ring='off']) a:focus-visible,
+html:not([data-focus-ring='off']) input:focus-visible,
+html:not([data-focus-ring='off']) textarea:focus-visible,
+html:not([data-focus-ring='off']) select:focus-visible {
   outline: 2px solid #3b82f6;
   outline-offset: 2px;
   border-radius: inherit;
 }
-[data-theme='dark'] *:focus-visible {
+html:not([data-focus-ring='off'])[data-theme='dark'] *:focus-visible {
   outline-color: #60a5fa;
+}
+html[data-focus-ring='off'] *:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+/* Reduced motion override — disables every animation, transition, and
+   transform on the page. Triggered by Accessibility settings or the OS
+   preference (prefers-reduced-motion: reduce) at the @media level
+   elsewhere in this stylesheet. */
+html[data-reduced-motion='on'] *,
+html[data-reduced-motion='on'] *::before,
+html[data-reduced-motion='on'] *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
 }
 
 /* ── Load More button ────────────────────────────────────────────── */

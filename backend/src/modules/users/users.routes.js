@@ -85,6 +85,11 @@ router.get('/me/learning-goal', requireAuth, usersController.getLearningGoal)
 // ── PUT /api/users/me/learning-goal ────────────────────────────
 router.put('/me/learning-goal', requireAuth, usersController.setLearningGoal)
 
+// ── Multi-goal collection (UserProfilePage Goals widget) ───────
+router.get('/me/goals', requireAuth, usersController.listGoals)
+router.post('/me/goals', requireAuth, usersController.createGoal)
+router.delete('/me/goals/:goalId', requireAuth, usersController.deleteGoal)
+
 // ── GET /api/users/me/onboarding-state ─────────────────────────
 // Per-role Getting Started checklist state (Design Refresh v2 Week 2).
 // Each counter is derived from existing tables with graceful-degradation

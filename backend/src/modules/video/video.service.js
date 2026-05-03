@@ -23,6 +23,7 @@ const log = require('../../lib/logger')
 const { createNotification } = require('../../lib/notify')
 const r2 = require('../../lib/r2Storage')
 const prisma = require('../../lib/prisma')
+const { scanBufferWithClamAv } = require('../../lib/clamav')
 const {
   TRANSCODE_PRESETS,
   VIDEO_STATUS,
@@ -413,6 +414,79 @@ async function processVideo(videoId) {
       writeStream.on('finish', () => settle(resolve))
       body.pipe(writeStream)
     })
+
+    // ClamAV scan on the first 5MB. Moved out of /upload/complete so the
+    // request returns immediately and the user is no longer staring at a
+    // 12s spinner per upload during a ClamAV outage. Fail-CLOSED in
+    // production: infected → quarantine + delete; scanner-error → mark
+    // failed and surface via the polled status. Dev passes through if
+    // CLAMAV_DISABLED=true.
+    try {
+      await updateProgress('scanning', 8)
+      const scanFd = fs.openSync(rawPath, 'r')
+      try {
+        const scanBuffer = Buffer.allocUnsafe(Math.min(5 * 1024 * 1024, fs.statSync(rawPath).size))
+        fs.readSync(scanFd, scanBuffer, 0, scanBuffer.length, 0)
+        const scanResult = await scanBufferWithClamAv(scanBuffer)
+        if (scanResult && scanResult.status === 'infected') {
+          await prisma.video.update({
+            where: { id: videoId },
+            data: { status: VIDEO_STATUS.FAILED, processingStep: 'security_scan_infected' },
+          })
+          try {
+            await r2.deleteObject(video.r2Key)
+          } catch {
+            /* best effort */
+          }
+          cleanup(baseDir)
+          return
+        }
+        if (scanResult && scanResult.status === 'error' && process.env.NODE_ENV === 'production') {
+          await prisma.video.update({
+            where: { id: videoId },
+            data: { status: VIDEO_STATUS.FAILED, processingStep: 'security_scan_unavailable' },
+          })
+          // Drop the unscanned R2 object too. Without this, a scanner
+          // outage leaves the user-uploaded blob sitting in R2 forever
+          // even though the DB row is FAILED — and `/api/video/media/*`
+          // serves arbitrary keys, so the file is still reachable until
+          // the next orphan-sweep tick. Match the prior fail-closed
+          // behavior from when the scan ran inside /upload/complete.
+          try {
+            await r2.deleteObject(video.r2Key)
+          } catch {
+            /* sweeper will catch stragglers */
+          }
+          captureError(new Error(`ClamAV scanner error: ${scanResult.message}`), {
+            context: 'video-clamav-scan',
+            videoId,
+          })
+          cleanup(baseDir)
+          return
+        }
+      } finally {
+        try {
+          fs.closeSync(scanFd)
+        } catch {
+          /* already closed */
+        }
+      }
+    } catch (scanErr) {
+      captureError(scanErr, { context: 'video-clamav-scan', videoId })
+      if (process.env.NODE_ENV === 'production') {
+        await prisma.video.update({
+          where: { id: videoId },
+          data: { status: VIDEO_STATUS.FAILED, processingStep: 'security_scan_error' },
+        })
+        try {
+          await r2.deleteObject(video.r2Key)
+        } catch {
+          /* sweeper will catch stragglers */
+        }
+        cleanup(baseDir)
+        return
+      }
+    }
 
     // Compute SHA-256 content hash for plagiarism detection
     let contentHash = null

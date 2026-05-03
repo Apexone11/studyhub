@@ -711,6 +711,15 @@ const getMe = async (req, res) => {
 // ── GET /api/users/me/follow-suggestions ──────────────────────────
 // Returns up to 8 users the authenticated user may want to follow,
 // prioritizing users at the same school and users with popular content.
+//
+// Empty-state gate: a brand-new account that follows nobody AND hasn't
+// enrolled in any courses yet has no signal we can use to recommend
+// anyone meaningful, so we'd just be suggesting the platform's most-
+// followed users at random. That feels broken on Day 1 ("how does it
+// know about these strangers?") and was a real user complaint. Return
+// an empty array in that case so the frontend can render an empty-
+// state CTA ("follow classmates / pick topics to see suggestions")
+// instead of strangers.
 const getFollowSuggestions = async (req, res) => {
   try {
     // Get IDs the user already follows (active or pending)
@@ -719,6 +728,21 @@ const getFollowSuggestions = async (req, res) => {
       select: { followingId: true },
     })
     const followingIds = following.map((f) => f.followingId)
+
+    // Cold-start gate. If the caller has no following relationships AND
+    // no course enrollments AND no hashtag follows, we have zero signal —
+    // bail with an empty list so the UI shows an empty state instead of
+    // strangers. The signal floor is INTENTIONALLY low: a single follow,
+    // course, or topic is enough to start recommending.
+    if (followingIds.length === 0) {
+      const [enrollmentCount, hashtagFollowCount] = await Promise.all([
+        prisma.enrollment.count({ where: { userId: req.user.userId } }),
+        prisma.hashtagFollow.count({ where: { userId: req.user.userId } }),
+      ])
+      if (enrollmentCount === 0 && hashtagFollowCount === 0) {
+        return res.json([])
+      }
+    }
 
     // Get blocked user IDs (graceful degradation)
     let blockedIds = []
@@ -1172,6 +1196,9 @@ module.exports = {
   getAccountTypeStatus,
   getLearningGoal,
   setLearningGoal,
+  listGoals,
+  createGoal,
+  deleteGoal,
   getOnboardingState,
 }
 
@@ -1214,6 +1241,82 @@ async function setLearningGoal(req, res) {
   } catch (err) {
     captureError(err, { where: 'setLearningGoal' })
     return sendError(res, 500, 'Failed to save learning goal', ERROR_CODES.INTERNAL)
+  }
+}
+
+const MAX_GOALS_PER_USER = 10
+
+// Multi-goal collection (the single-goal getLearningGoal/setLearningGoal
+// helpers above are kept for the legacy feed widget that still posts to
+// /me/learning-goal). The profile page renders this collection so the
+// user can hold multiple in-flight goals and check them off.
+async function listGoals(req, res) {
+  try {
+    const goals = await prisma.learningGoal.findMany({
+      where: { userId: req.user.userId },
+      orderBy: { createdAt: 'desc' },
+      select: { id: true, goal: true, createdAt: true },
+    })
+    return res.json({ goals })
+  } catch (err) {
+    captureError(err, { where: 'listGoals' })
+    return sendError(res, 500, 'Failed to load goals.', ERROR_CODES.INTERNAL)
+  }
+}
+
+async function createGoal(req, res) {
+  try {
+    const raw = typeof req.body?.goal === 'string' ? req.body.goal.trim() : ''
+    if (!raw) {
+      return sendError(res, 400, 'goal is required.', ERROR_CODES.BAD_REQUEST)
+    }
+    if (raw.length > MAX_LEARNING_GOAL_LENGTH) {
+      return sendError(
+        res,
+        400,
+        `goal must be ${MAX_LEARNING_GOAL_LENGTH} characters or fewer.`,
+        ERROR_CODES.VALIDATION,
+      )
+    }
+    // Cap per-user goal count so a malicious or just careless client
+    // can't unboundedly grow the table.
+    const count = await prisma.learningGoal.count({ where: { userId: req.user.userId } })
+    if (count >= MAX_GOALS_PER_USER) {
+      return sendError(
+        res,
+        400,
+        `You can have up to ${MAX_GOALS_PER_USER} active goals at once. Delete one first.`,
+        ERROR_CODES.VALIDATION,
+      )
+    }
+    const created = await prisma.learningGoal.create({
+      data: { userId: req.user.userId, goal: raw },
+      select: { id: true, goal: true, createdAt: true },
+    })
+    return res.status(201).json({ goal: created })
+  } catch (err) {
+    captureError(err, { where: 'createGoal' })
+    return sendError(res, 500, 'Failed to save goal.', ERROR_CODES.INTERNAL)
+  }
+}
+
+async function deleteGoal(req, res) {
+  try {
+    const goalId = Number.parseInt(req.params.goalId, 10)
+    if (!Number.isInteger(goalId) || goalId < 1) {
+      return sendError(res, 400, 'Invalid goal id.', ERROR_CODES.BAD_REQUEST)
+    }
+    // deleteMany scoped to the caller's userId so no IDOR on the goalId.
+    const result = await prisma.learningGoal.deleteMany({
+      where: { id: goalId, userId: req.user.userId },
+    })
+    if (result.count === 0) {
+      return sendError(res, 404, 'Goal not found.', ERROR_CODES.NOT_FOUND)
+    }
+    return res.json({ ok: true })
+  } catch (err) {
+    captureError(err, { where: 'deleteGoal' })
+    return sendError(res, 500, 'Failed to delete goal.', ERROR_CODES.INTERNAL)
   }
 }
 

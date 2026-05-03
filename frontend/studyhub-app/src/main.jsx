@@ -35,6 +35,17 @@ try {
 } catch {
   /* best-effort */
 }
+// Apply persisted accessibility preferences before first paint so the
+// user never sees a flash of focus-ring or animation that they
+// previously turned off in Settings → Accessibility.
+try {
+  const focusRing = localStorage.getItem('studyhub.a11y.focusRing')
+  if (focusRing === 'false') document.documentElement.dataset.focusRing = 'off'
+  const reducedMotion = localStorage.getItem('studyhub.a11y.reducedMotion')
+  if (reducedMotion === 'true') document.documentElement.dataset.reducedMotion = 'on'
+} catch {
+  /* private mode — preferences just won't apply this session */
+}
 try {
   startWebVitals()
 } catch {

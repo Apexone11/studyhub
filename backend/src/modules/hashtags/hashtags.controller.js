@@ -102,10 +102,42 @@ async function unfollowHashtag(req, res) {
   }
 }
 
+/** GET /api/hashtags/catalog?q=…&category=… — searchable canonical-topic catalog. */
+async function listCatalog(req, res) {
+  try {
+    const q = String(req.query.q || '')
+      .trim()
+      .toLowerCase()
+    const category = String(req.query.category || '').trim()
+    const where = { isCanonical: true }
+    if (category) where.category = category
+    if (q) {
+      where.OR = [
+        { name: { contains: q.replace(/\s+/g, '_'), mode: 'insensitive' } },
+        { displayName: { contains: q, mode: 'insensitive' } },
+      ]
+    }
+    const topics = await prisma.hashtag.findMany({
+      where,
+      select: { id: true, name: true, displayName: true, category: true },
+      orderBy: [{ category: 'asc' }, { displayName: 'asc' }],
+      take: 200,
+    })
+    // Return categories alongside the result list so the frontend can
+    // render a category sidebar without a second round trip.
+    const categories = Array.from(new Set(topics.map((t) => t.category).filter(Boolean))).sort()
+    return res.json({ topics, categories })
+  } catch (err) {
+    captureError(err, { where: 'listCatalog' })
+    return sendError(res, 500, 'Failed to load topic catalog.', ERROR_CODES.INTERNAL)
+  }
+}
+
 module.exports = {
   listMyFollows,
   followHashtag,
   unfollowHashtag,
+  listCatalog,
   normalizeName,
   MAX_FOLLOWS_PER_USER,
   MAX_HASHTAG_LENGTH,

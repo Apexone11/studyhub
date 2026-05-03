@@ -65,6 +65,7 @@ async function runFeatureFlagSeeds() {
   const { seedFeatureFlags } = require('./seedFeatureFlags')
   const { seedRolesV2Flags } = require('./seedRolesV2Flags')
   const { seedNotesHardeningFlag } = require('./seedNotesHardeningFlag')
+  const { seedCanonicalTopics } = require('./seedCanonicalTopics')
 
   const prisma = createPrismaClient()
   try {
@@ -98,6 +99,15 @@ async function runFeatureFlagSeeds() {
         ? `[boot-seed] kept ${notesHardening.name} (enabled=${notesHardening.enabled}, rollout=${notesHardening.rolloutPercentage}%)`
         : `[boot-seed] seeded ${notesHardening.name} (enabled=${notesHardening.enabled}, rollout=${notesHardening.rolloutPercentage}%)`,
     )
+
+    try {
+      const topics = await seedCanonicalTopics(prisma)
+      console.log(`[boot-seed] upserted ${topics.length} canonical topics`)
+    } catch (err) {
+      // Non-fatal — picker still works against existing tags, the user
+      // just won't see the curated catalog until the seed succeeds.
+      console.error('[boot-seed] canonical topics seed failed; continuing.', err?.message)
+    }
   } finally {
     await prisma.$disconnect()
   }

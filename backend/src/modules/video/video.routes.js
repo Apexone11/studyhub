@@ -28,7 +28,6 @@ const {
   regenerateThumbnailFromFrame,
   replaceThumbnailFromUpload,
 } = require('./video.service')
-const { scanBufferWithClamAv } = require('../../lib/clamav')
 
 // Allowlist for the `?quality=` query param on GET /:id/stream. Hoisted to
 // module scope so the Set isn't reallocated per request.
@@ -410,57 +409,13 @@ router.post('/upload/complete', requireAuth, async (req, res) => {
     // Complete the multipart upload in R2
     await r2.completeMultipartUpload(r2Key, uploadId, parts)
 
-    // ClamAV scan on the first 5MB (heuristic scan — full scan would require downloading)
-    try {
-      const { body } = await r2.getObject(r2Key)
-      const chunks = []
-      let totalRead = 0
-      for await (const chunk of body) {
-        chunks.push(chunk)
-        totalRead += chunk.length
-        if (totalRead >= 5 * 1024 * 1024) break // Read up to 5MB for scanning
-      }
-      // Destroy the rest of the stream
-      if (body.destroy) body.destroy()
-
-      const scanBuffer = Buffer.concat(chunks)
-      const scanResult = await scanBufferWithClamAv(scanBuffer)
-      if (scanResult && scanResult.status === 'infected') {
-        // Delete the uploaded file and mark as failed
-        await r2.deleteObject(r2Key)
-        await prisma.video.update({ where: { id: videoId }, data: { status: VIDEO_STATUS.FAILED } })
-        return res.status(400).json({ error: 'File failed security scan.' })
-      }
-      // Fail-CLOSED in production when the scanner is unreachable.
-      // Without this, a transient ClamAV outage silently bypasses the
-      // AV gate. Dev still passes through (scanner often missing
-      // locally) and CLAMAV_DISABLED=true short-circuits to 'clean'
-      // upstream.
-      if (scanResult && scanResult.status === 'error' && process.env.NODE_ENV === 'production') {
-        await r2.deleteObject(r2Key)
-        await prisma.video.update({ where: { id: videoId }, data: { status: VIDEO_STATUS.FAILED } })
-        captureError(new Error(`ClamAV scanner error: ${scanResult.message}`), {
-          context: 'video-clamav-scan',
-          videoId,
-        })
-        return res.status(503).json({ error: 'Security scanner unavailable. Please retry.' })
-      }
-    } catch (scanErr) {
-      captureError(scanErr, { context: 'video-clamav-scan', videoId })
-      // Catch-all also fail-CLOSED in production.
-      if (process.env.NODE_ENV === 'production') {
-        try {
-          await r2.deleteObject(r2Key)
-          await prisma.video.update({
-            where: { id: videoId },
-            data: { status: VIDEO_STATUS.FAILED },
-          })
-        } catch (cleanupErr) {
-          captureError(cleanupErr, { context: 'video-clamav-cleanup', videoId })
-        }
-        return res.status(503).json({ error: 'Security scanner unavailable. Please retry.' })
-      }
-    }
+    // ClamAV scan moved into the background processVideo() pipeline so a
+    // slow / unreachable scanner cannot stall this request behind a 12s
+    // socket timeout (the prior root cause of "stuck on processing"
+    // reports). Fail-closed in production is preserved — the background
+    // job marks the video FAILED + scrubs R2 if the scan errors, and the
+    // frontend's poll surfaces the failure state via the standard
+    // processingStep field.
 
     // Return the video immediately, then process in background
     const updated = await prisma.video.findUnique({ where: { id: videoId } })
@@ -685,8 +640,9 @@ router.patch('/:id', requireAuth, async (req, res) => {
  */
 router.delete('/:id', requireAuth, async (req, res) => {
   try {
-    const videoId = parseInt(req.params.id, 10)
-    if (isNaN(videoId)) return res.status(400).json({ error: 'Invalid video ID.' })
+    const videoId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(videoId) || videoId < 1)
+      return res.status(400).json({ error: 'Invalid video ID.' })
 
     const video = await prisma.video.findUnique({ where: { id: videoId } })
     if (!video) return res.status(404).json({ error: 'Video not found.' })
@@ -702,6 +658,26 @@ router.delete('/:id', requireAuth, async (req, res) => {
     void runWithHeartbeat('video.delete_assets', () => deleteVideoAssets(videoId), {
       slaMs: 60_000,
     })
+
+    // Unblock any duplicates that were rejected because of THIS video.
+    // Once the original is gone, those clones are no longer copies of
+    // anything, so they shouldn't stay permanently quarantined. Mark
+    // them `failed` (not `ready`) so they don't quietly re-publish; the
+    // owner can re-trigger processing through the normal upload flow.
+    if (video.contentHash) {
+      try {
+        await prisma.video.updateMany({
+          where: {
+            contentHash: video.contentHash,
+            status: VIDEO_STATUS.BLOCKED,
+            id: { not: videoId },
+          },
+          data: { status: VIDEO_STATUS.FAILED },
+        })
+      } catch {
+        /* non-fatal — sweeper will catch stragglers */
+      }
+    }
 
     // Delete database record (cascades to captions)
     await prisma.video.delete({ where: { id: videoId } })
@@ -720,8 +696,9 @@ router.delete('/:id', requireAuth, async (req, res) => {
  */
 router.post('/:id/appeal', requireAuth, async (req, res) => {
   try {
-    const videoId = parseInt(req.params.id, 10)
-    if (isNaN(videoId)) return res.status(400).json({ error: 'Invalid video ID.' })
+    const videoId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(videoId) || videoId < 1)
+      return res.status(400).json({ error: 'Invalid video ID.' })
 
     const { reason } = req.body || {}
     if (!reason || reason.trim().length < 10) {

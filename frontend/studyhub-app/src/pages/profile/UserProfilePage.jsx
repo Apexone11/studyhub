@@ -84,6 +84,7 @@ import {
 } from '../dashboard/DashboardWidgets'
 import ProfileStatsWidget from './ProfileStatsWidget'
 import FollowSuggestions from './FollowSuggestions'
+import GoalsCard from './GoalsCard'
 import FeedCard from '../feed/FeedCard'
 import FollowRequestsList from './FollowRequestsList'
 import TopContributors from '../../components/TopContributors'
@@ -1257,6 +1258,10 @@ function OwnOverviewTab({
             Replaces the legacy BadgesSection coin-renderer (deleted
             2026-05-01). Full gallery lives on the Achievements tab. */}
         <PinnedBadgesCard username={profile.username} ownerView />
+        {/* Multi-goal Goals card — replaces the single-goal feed widget
+            so the profile is the canonical place to manage what the
+            user is working toward. */}
+        <GoalsCard isOwnProfile />
         {phase1On ? (
           <TopContributors
             contributors={topContributors}
