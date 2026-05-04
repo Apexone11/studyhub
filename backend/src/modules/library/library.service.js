@@ -325,15 +325,21 @@ async function searchBooks(query, page = 1, filters = {}) {
     // accurate pagination instead of "Page 11 of 2500" with zero results.
     if (results.length === 0 && page > 1) {
       const confirmed = recordEmptyPageHit(query, filters, page)
-      const lastReachable = page - 1
+      // After confirmation, the memo holds the AUTHORITATIVE cap, which
+      // can be smaller than `page - 1` (e.g. page 11 empty + page 12
+      // empty confirms cap = 10, not 11). Read the memo back so the
+      // frontend bounces to the page we actually know is non-empty.
+      // (Copilot review 2026-05-03.)
+      const memoCap = getLastReachablePage(query, filters)
+      const effectiveCap = confirmed && memoCap !== null ? memoCap : page - 1
       // Surface endOfResults to the client only when confirmed (2 strikes).
       // First-strike: respond with empty results but DON'T flag endOfResults
       // so the user / prefetch can retry once before the cap is permanent.
       const result = {
         results: [],
-        count: confirmed ? lastReachable * DEFAULT_PAGE_SIZE : page * DEFAULT_PAGE_SIZE,
+        count: confirmed ? effectiveCap * DEFAULT_PAGE_SIZE : page * DEFAULT_PAGE_SIZE,
         endOfResults: confirmed,
-        lastReachablePage: confirmed ? lastReachable : null,
+        lastReachablePage: confirmed ? effectiveCap : null,
       }
       // Don't cache the empty page itself — the cap memo handles repeat hits.
       return result

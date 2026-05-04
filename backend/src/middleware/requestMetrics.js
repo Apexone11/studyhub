@@ -138,15 +138,24 @@ function requestMetricsMiddleware(req, res, next) {
  * Start the flush and cleanup timers. Call once at boot.
  */
 function startMetricsTimers() {
-  // Flush buffer to DB every 30 seconds
-  flushTimer = setInterval(flushBuffer, FLUSH_INTERVAL_MS)
+  // Both intervals write to the DB. Wrap in runWithHeartbeat so a
+  // hung flush or hung cleanup emits job.start / job.success /
+  // job.failure events to pino + Sentry instead of failing silently
+  // (CLAUDE.md A10).
+  const { runWithHeartbeat } = require('../lib/jobs/heartbeat')
+  flushTimer = setInterval(
+    () => runWithHeartbeat('metrics.flush', flushBuffer, { slaMs: 10 * 1000 }),
+    FLUSH_INTERVAL_MS,
+  )
   flushTimer.unref()
 
-  // Run cleanup on boot
-  cleanupOldMetrics()
+  // Run cleanup on boot (also wrapped so the boot run is observable).
+  void runWithHeartbeat('metrics.cleanup', cleanupOldMetrics, { slaMs: 60 * 1000 })
 
-  // Then every 24 hours
-  cleanupTimer = setInterval(cleanupOldMetrics, CLEANUP_INTERVAL_MS)
+  cleanupTimer = setInterval(
+    () => runWithHeartbeat('metrics.cleanup', cleanupOldMetrics, { slaMs: 60 * 1000 }),
+    CLEANUP_INTERVAL_MS,
+  )
   cleanupTimer.unref()
 }
 

@@ -54,14 +54,12 @@ export default function NotificationsPage() {
   const [sessionExpired, setSessionExpired] = useState(false)
   const [loadError, setLoadError] = useState(false)
 
-   
   useEffect(() => {
     if (user) {
       setSessionExpired(false)
       setLoadError(false)
     }
   }, [user])
-   
 
   async function refresh({ signal, startTransition } = {}) {
     if (!user) return
@@ -127,18 +125,24 @@ export default function NotificationsPage() {
     return notifications.filter((n) => allowedTypes.includes(n.type))
   }, [filter, notifications])
 
-  // CLAUDE.md A4: never optimistically toggle state without awaiting the
-  // server. The previous version of these handlers fired the PATCH/DELETE
-  // and immediately set state, ignoring failures. A failed PATCH would
-  // leave the UI green while the server still had unread rows; the next
-  // polling cycle re-flipped them and the user thought the app was stuck.
-  // Now: optimistic update for UX speed, ROLLBACK + toast on failure.
+  // CLAUDE.md A4 + Copilot review 2026-05-03: optimistic updates with
+  // PER-ROW rollback. The earlier "snapshot the whole array, restore on
+  // failure" pattern dropped notifications that arrived via socket push
+  // or polling while the request was in flight. Each handler below now
+  // mutates ONLY the rows its action touches (target row by id, or all
+  // rows that were unread at the time of the call), so unrelated newly-
+  // arrived rows survive rollback intact.
   async function markAllRead() {
     if (unreadCount === 0) return
-    const snapshot = notifications
+    // Capture which row IDs were unread when the user clicked. On
+    // failure we re-mark exactly those rows as unread; rows that arrived
+    // mid-request (still unread, not in the snapshot) are left alone.
+    const previouslyUnreadIds = new Set(notifications.filter((n) => !n.read).map((n) => n.id))
     const prevUnread = unreadCount
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-    setUnreadCount(0)
+    setNotifications((prev) =>
+      prev.map((n) => (previouslyUnreadIds.has(n.id) ? { ...n, read: true } : n)),
+    )
+    setUnreadCount((current) => Math.max(0, current - previouslyUnreadIds.size))
     try {
       const res = await fetch(`${API}/api/notifications/read-all`, {
         method: 'PATCH',
@@ -147,15 +151,21 @@ export default function NotificationsPage() {
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
     } catch {
-      setNotifications(snapshot)
+      setNotifications((prev) =>
+        prev.map((n) => (previouslyUnreadIds.has(n.id) ? { ...n, read: false } : n)),
+      )
       setUnreadCount(prevUnread)
       showToast('Could not mark all as read. Try again.', 'error')
     }
   }
 
   async function clearRead() {
-    const snapshot = notifications
-    setNotifications((prev) => prev.filter((n) => !n.read))
+    // Snapshot only the rows we're about to remove. On failure, re-insert
+    // them while preserving any rows that arrived during the request.
+    const removed = notifications.filter((n) => n.read)
+    if (removed.length === 0) return
+    const removedIds = new Set(removed.map((n) => n.id))
+    setNotifications((prev) => prev.filter((n) => !removedIds.has(n.id)))
     try {
       const res = await fetch(`${API}/api/notifications/read`, {
         method: 'DELETE',
@@ -164,15 +174,18 @@ export default function NotificationsPage() {
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
     } catch {
-      setNotifications(snapshot)
+      setNotifications((prev) => {
+        const have = new Set(prev.map((n) => n.id))
+        const restored = removed.filter((r) => !have.has(r.id))
+        // Restore by createdAt order so the list stays sorted.
+        return [...prev, ...restored].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      })
       showToast('Could not clear read notifications.', 'error')
     }
   }
 
   async function markOneRead(notif) {
     if (!notif.read && user) {
-      const snapshot = notifications
-      const prevUnread = unreadCount
       setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)))
       setUnreadCount((c) => Math.max(0, c - 1))
       try {
@@ -183,8 +196,10 @@ export default function NotificationsPage() {
         })
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
       } catch {
-        setNotifications(snapshot)
-        setUnreadCount(prevUnread)
+        // Per-row rollback: only touch THIS notification, preserving
+        // socket pushes that landed during the in-flight request.
+        setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: false } : n)))
+        setUnreadCount((c) => c + 1)
         // Silent on this one — the user already navigated, a toast on a
         // background mark-read failure would be more confusing than helpful.
       }
@@ -200,13 +215,12 @@ export default function NotificationsPage() {
 
   async function deleteOne(e, notifId) {
     e.stopPropagation()
-    const snapshot = notifications
-    const prevUnread = unreadCount
-    setNotifications((prev) => {
-      const removed = prev.find((n) => n.id === notifId)
-      if (removed && !removed.read) setUnreadCount((c) => Math.max(0, c - 1))
-      return prev.filter((n) => n.id !== notifId)
-    })
+    // Snapshot just the one row so rollback re-inserts it without
+    // touching any other notifications that arrived since.
+    const removed = notifications.find((n) => n.id === notifId)
+    if (!removed) return
+    setNotifications((prev) => prev.filter((n) => n.id !== notifId))
+    if (!removed.read) setUnreadCount((c) => Math.max(0, c - 1))
     try {
       const res = await fetch(`${API}/api/notifications/${notifId}`, {
         method: 'DELETE',
@@ -215,8 +229,11 @@ export default function NotificationsPage() {
       })
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
     } catch {
-      setNotifications(snapshot)
-      setUnreadCount(prevUnread)
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === notifId)) return prev
+        return [...prev, removed].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      })
+      if (!removed.read) setUnreadCount((c) => c + 1)
       showToast('Could not delete notification.', 'error')
     }
   }
