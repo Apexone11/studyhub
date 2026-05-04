@@ -14,6 +14,7 @@
 import { Link } from 'react-router-dom'
 import { Panel } from './FeedWidgets'
 import UserAvatar from '../../components/UserAvatar'
+import { Skeleton } from '../../components/Skeleton'
 import useFetch from '../../lib/useFetch'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
@@ -31,10 +32,13 @@ export function StreakWidget() {
     swr: 5 * 60 * 1000,
   })
 
-  if (loading) {
+  if (loading && !streak.lastActiveDate && streak.currentStreak === 0) {
     return (
       <Panel title="Your Streak" helper="Stay consistent">
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading...</div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          <Skeleton height={64} />
+          <Skeleton height={64} />
+        </div>
       </Panel>
     )
   }
@@ -106,10 +110,18 @@ export function WeeklyProgressWidget() {
     swr: 5 * 60 * 1000,
   })
 
-  if (loading) {
+  if (
+    loading &&
+    weekly.daysActive === 0 &&
+    weekly.totalActions === 0 &&
+    weekly.dailyBreakdown.length === 0
+  ) {
     return (
       <Panel title="This Week" helper="Activity goal">
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading...</div>
+        <div style={{ display: 'grid', gap: 12 }}>
+          <Skeleton height={80} />
+          <Skeleton height={20} />
+        </div>
       </Panel>
     )
   }
@@ -305,10 +317,14 @@ export function LeaderboardWidget() {
       ? leaderboard.findIndex((u) => u.userId === currentUser.id)
       : -1
 
-  if (loading) {
+  if (loading && (!leaderboard || leaderboard.length === 0)) {
     return (
       <Panel title="Weekly Leaderboard" helper="Top performers">
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading...</div>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <Skeleton height={36} />
+          <Skeleton height={36} />
+          <Skeleton height={36} />
+        </div>
       </Panel>
     )
   }

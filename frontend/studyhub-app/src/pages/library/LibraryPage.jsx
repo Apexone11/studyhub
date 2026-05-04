@@ -224,7 +224,7 @@ export default function LibraryPage() {
           </div>
           <div className="library-hero__content">
             <div className="library-hero__badge">Millions of Books</div>
-            <h1 className="library-hero__title">BookHub</h1>
+            <h1 className="library-hero__title">Library</h1>
             <p className="library-hero__subtitle">
               Discover and read books powered by Google Books
             </p>

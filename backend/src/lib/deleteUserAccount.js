@@ -78,6 +78,10 @@ async function cleanupAnnouncementImage(imageUrl, context = {}) {
 async function deleteUserAccount(prisma, { userId, username, reason = null, details = null }) {
   await cancelStripeSubscriptionIfNeeded(prisma, userId)
 
+  // Collected inside the transaction; drained AFTER the tx commits so the
+  // R2 round-trip never holds a Postgres row lock.
+  let aiAttachmentR2Keys = []
+
   const deletedAssetRefs = await prisma.$transaction(async (tx) => {
     const userRecord = await tx.user.findUnique({
       where: { id: userId },
@@ -353,9 +357,29 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
     await tx.notification.deleteMany({ where: { userId } })
 
     // ── Hub AI cleanup (messages cascade from conversations, but explicit for safety) ──
+    // L13-HIGH-1: GDPR Art. 17 erasure now covers Hub AI v2 + Scholar tables.
+    // R2 attachment objects are added to the cleanup queue so they get
+    // hard-deleted alongside the row. The sweeper would eventually drain
+    // them but explicit erasure on account deletion is a regulatory must.
+    const userAiAttachments = await tx.aiAttachment
+      .findMany({ where: { userId }, select: { r2Key: true } })
+      .catch(() => [])
+    aiAttachmentR2Keys = userAiAttachments.map((a) => a.r2Key).filter(Boolean)
+    await tx.aiAttachment.deleteMany({ where: { userId } }).catch(() => {})
+    await tx.aiUploadIdempotency.deleteMany({ where: { userId } }).catch(() => {})
+    await tx.userAiStorageQuota.deleteMany({ where: { userId } }).catch(() => {})
     await tx.aiMessage.deleteMany({ where: { userId } })
     await tx.aiUsageLog.deleteMany({ where: { userId } })
     await tx.aiConversation.deleteMany({ where: { userId } })
+
+    // ── Scholar cleanup (annotations are owner data; threads soft-delete) ──
+    await tx.scholarAnnotation.deleteMany({ where: { userId } }).catch(() => {})
+    await tx.scholarDiscussionThread
+      .updateMany({
+        where: { authorId: userId },
+        data: { deletedAt: new Date(), body: '' },
+      })
+      .catch(() => {})
 
     await tx.studySheet.deleteMany({ where: { userId } })
     await tx.user.delete({ where: { id: userId } })
@@ -401,6 +425,23 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
       }),
     ),
     ...deletedAssetRefs.videos.map((video) => deleteVideoAssetRefs(video)),
+    // L13-HIGH-1: drain Hub AI attachment R2 keys after the DB tx commits.
+    // Errors are tolerated; the sweeper would catch any leftovers later.
+    ...aiAttachmentR2Keys.map((r2Key) =>
+      (async () => {
+        try {
+          const attachmentsService = require('../modules/ai/attachments/attachments.service')
+          if (typeof attachmentsService.deleteFromBucket === 'function') {
+            await attachmentsService.deleteFromBucket(r2Key)
+          }
+        } catch (err) {
+          captureError(err, {
+            tags: { module: 'deleteUserAccount', action: 'aiAttachmentR2Delete' },
+            extra: { userId, r2Key: '<redacted>' },
+          })
+        }
+      })(),
+    ),
   ]
 
   if (deletedAssetRefs.avatarUrl) {

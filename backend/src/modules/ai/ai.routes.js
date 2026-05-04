@@ -155,11 +155,26 @@ router.patch(
 // burns daily quota), so the cross-origin defense is non-negotiable.
 router.post('/messages', requireAuth, requireTrustedOrigin, aiMessageLimiter, async (req, res) => {
   try {
-    const { conversationId, content, currentPage, images } = req.body
+    const { conversationId, content, currentPage, images, attachmentIds } = req.body
+    // Hub AI v2 — attachmentIds is an array of AiAttachment.id values.
+    // We allow up to 5 per request; the service layer re-checks
+    // ownership + soft-delete state before forwarding to Anthropic.
+    if (attachmentIds !== undefined) {
+      if (!Array.isArray(attachmentIds) || attachmentIds.length > 5) {
+        return res.status(400).json({ error: 'attachmentIds must be an array of up to 5 ids.' })
+      }
+      for (const a of attachmentIds) {
+        const n = Number.parseInt(a, 10)
+        if (!Number.isInteger(n) || n < 1) {
+          return res.status(400).json({ error: 'Each attachmentId must be a positive integer.' })
+        }
+      }
+    }
 
-    // Validate required fields.
-    if (!conversationId || typeof conversationId !== 'number') {
-      return res.status(400).json({ error: 'conversationId is required.' })
+    // Validate required fields. CLAUDE.md A12: parseInt + Number.isInteger.
+    const conversationIdInt = Number.parseInt(conversationId, 10)
+    if (!Number.isInteger(conversationIdInt) || conversationIdInt < 1) {
+      return res.status(400).json({ error: 'Invalid conversationId.' })
     }
     if (!content || typeof content !== 'string' || content.trim().length === 0) {
       return res.status(400).json({ error: 'Message content is required.' })
@@ -268,10 +283,11 @@ router.post('/messages', requireAuth, requireTrustedOrigin, aiMessageLimiter, as
     // Stream the response.
     await aiService.streamMessage({
       user,
-      conversationId,
+      conversationId: conversationIdInt,
       content: content.trim(),
       currentPage: currentPage || null,
       images: images || null,
+      attachmentIds: attachmentIds || null,
       res,
       signal: abortController.signal,
     })
@@ -398,5 +414,60 @@ router.post(
     }
   },
 )
+
+// POST /api/ai/save-to-notes
+// L15-HIGH-1: persists an AI message as a private note for the current user.
+// Frontend AiSaveToNotesButton.jsx posts here.
+router.post('/save-to-notes', requireAuth, requireTrustedOrigin, writeLimiter, async (req, res) => {
+  try {
+    const { messageId, courseId, title, content } = req.body || {}
+    const messageIdInt = Number.parseInt(messageId, 10)
+    if (!Number.isInteger(messageIdInt) || messageIdInt < 1) {
+      return sendError(res, 400, 'Invalid messageId.', ERROR_CODES.BAD_REQUEST)
+    }
+    const titleStr = typeof title === 'string' ? title.trim().slice(0, 140) : ''
+    const contentStr = typeof content === 'string' ? content.trim().slice(0, 50000) : ''
+    if (!titleStr) {
+      return sendError(res, 400, 'Title is required.', ERROR_CODES.VALIDATION)
+    }
+    if (!contentStr) {
+      return sendError(res, 400, 'Content is required.', ERROR_CODES.VALIDATION)
+    }
+    let courseIdInt = null
+    if (courseId !== undefined && courseId !== null && courseId !== '') {
+      courseIdInt = Number.parseInt(courseId, 10)
+      if (!Number.isInteger(courseIdInt) || courseIdInt < 1) {
+        return sendError(res, 400, 'Invalid courseId.', ERROR_CODES.BAD_REQUEST)
+      }
+    }
+
+    const prisma = require('../../lib/prisma')
+
+    const message = await prisma.aiMessage.findFirst({
+      where: { id: messageIdInt, conversation: { userId: req.user.userId } },
+      select: { id: true, role: true },
+    })
+    if (!message) {
+      return sendError(res, 404, 'Message not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    const note = await prisma.note.create({
+      data: {
+        userId: req.user.userId,
+        courseId: courseIdInt,
+        title: titleStr,
+        content: contentStr,
+        source: 'hub_ai_save',
+        isPublic: false,
+      },
+      select: { id: true, title: true, courseId: true, createdAt: true },
+    })
+
+    res.status(201).json({ note })
+  } catch (err) {
+    captureError(err, { tags: { module: 'ai', action: 'saveToNotes' } })
+    sendError(res, 500, 'Failed to save note.', ERROR_CODES.INTERNAL)
+  }
+})
 
 module.exports = router

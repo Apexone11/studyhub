@@ -10,6 +10,7 @@ const {
 } = require('./library.constants')
 const cache = require('./library.cache')
 const { captureError } = require('../../monitoring/sentry')
+const log = require('../../lib/logger')
 const sanitizeHtml = require('sanitize-html')
 
 const BOOK_DESCRIPTION_TRANSFORM = sanitizeHtml.simpleTransform(
@@ -578,8 +579,7 @@ async function syncPopularBooksToDB(maxPages = 3) {
     }
   }
 
-  // Operational log -- allowed by ESLint no-console rule
-  console.warn(`[Library] Synced ${synced} books to CachedBook table`)
+  log.warn({ event: 'library.sync_complete', synced }, 'Library popular books synced')
   return synced
 }
 
@@ -656,8 +656,7 @@ async function preloadPopularBooks() {
       // Silent failure -- preloading is best-effort
     }
   }
-  // Operational log -- allowed by ESLint no-console rule
-  console.warn(`[Library] Popular books cache pre-warmed (${fetched} books synced to DB)`)
+  log.info({ event: 'library.prewarm_complete', fetched }, 'Popular books cache pre-warmed')
 }
 
 module.exports = {

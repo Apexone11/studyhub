@@ -367,6 +367,42 @@ Live files inside `pages/dashboard/` (KEEP — imported by UserProfilePage):
 - Seed: `seedBetaUsers.js` calls `seedAchievementsV2` which seeds the 54-badge catalog and unlocks ~15 badges (3 secrets, 6 pinned) for `beta_student1`. Required for CLAUDE.md §11 — `seed:beta` must produce a visible-end-to-end demo state.
 - Plan + decisions: `docs/internal/audits/2026-04-30-achievements-v2-plan.md`. Founder-locked decisions A1–A8 documented there.
 
+### Hub AI v2 — document upload (2026-05-04)
+
+- Backend submodule: `backend/src/modules/ai/attachments/{routes,service,parsers,constants}.js`. Mounted at `/api/ai/attachments` in `index.js`. Routes apply `requireAuth + requireTrustedOrigin + aiAttachment*Limiter` AND `requireFeatureFlag('flag_hub_ai_attachments')` (L20-CRIT-1 fail-closed kill switch).
+- Endpoints: `POST /api/ai/attachments` (multer + R2 + parse), `GET /api/ai/attachments` (paginated list), `DELETE /api/ai/attachments/:id` (soft-delete; sweeper drains R2 later), `POST /api/ai/attachments/:id/pin` (extend retention up to per-plan max), `POST /api/ai/save-to-notes` (persist an AI message as a private note).
+- Format support: PDF (Anthropic native `document` block), DOCX (mammoth ≥ 1.11.0 — CVE-2025-11849 fix), TXT/MD/code (UTF-8 inline), images (existing vision block). PPTX/RTF/ODT/XLSX/CSV deferred to v3.
+- Per-plan caps: `payments.constants.js#PLANS[plan].aiDocument*`. Free 5 MB / 40 pages / 3 docs/day, verified 15 / 60 / 5, pro 30 / 100 / 20, admin 30 / 100 / unlimited. Per-plan caps enforced at the upload route BEFORE R2 write (CLAUDE.md A4 + L3-HIGH-3 atomic-storage-quota race fix).
+- `cache_control: { type:'ephemeral', ttl:'1h' }` on system prompt + every document content block (master plan L1-CRIT-2). Verify cache-hit fraction via `usage.cache_read_input_tokens` in the SSE response — target ≥ 60% across active doc-Q sessions.
+- Anthropic spend ceiling: `AI_DAILY_SPEND_USD_CEILING` env var (default 100, in dollars). Atomic UPDATE-and-compare on `AiGlobalSpendDay` per call. **Setting to 0 is a true kill switch** for all non-admin Anthropic calls (L20-HIGH-5). Admin tier always bypasses (founder-locked 2026-05-04, unlimited messages AND unlimited spend).
+- R2 bucket isolation: `R2_BUCKET_AI_ATTACHMENTS` is REQUIRED in production (separate from public-image bucket). Opaque keys via `crypto.randomBytes(32).toString('hex')`. Signed URL TTL ≤ 10 min. `Cache-Control: private, no-store` on every PUT.
+- Two-phase retention sweeper (`backend/src/lib/jobs/aiAttachmentSweeper.js`, scheduled every 6h via `runWithHeartbeat`): mark `deletedAt` first, then drain R2 at ≤ 10 deletes/sec with no DB transaction wrapping the round-trip.
+- Idempotency-Key support on uploads: 24h TTL via `AiUploadIdempotency`. Cross-user reuse treated as a miss.
+- Salted XML wrapper around document content per Anthropic prompt-injection guidance: `<document_${conversationId.slice(0,8)}>` in `attachments.constants.js`. Plus 9-defense prompt-injection list per master plan §4.6 (NFKC normalize, vision-block trust clause, PDF metadata strip, etc.).
+- Frontend composer: `components/ai/{AiComposer, AiAttachmentUpload, AiSlashCommandMenu, AiMentionMenu, AiStopButton, AiSaveToNotesButton, AiCitationFootnote, AiCitationSidePanel, AiDensityToggle, AiStreamAnnouncer}.jsx`. Slash menu + mention menu use the WAI-ARIA APG combobox-with-listbox pattern (Tab/Enter confirms — L4-F1).
+- Streaming flicker fix (Bug D): 5-layer fix — `useFetch` SWR `keepPreviousData` semantics, `streamState` refcount + 5-min watchdog, `useLivePolling` attention-throttle + `isStreamingActive()` skip, call-site `loading && !data` skeleton guards, `useAiChat` provider-unmount cleanup that aborts the controller AND decrements the refcount (L16-HIGH-3).
+
+### Scholar v1 + v1.5 (2026-05-04)
+
+- Backend module: `backend/src/modules/scholar/{routes, *.controller, service, constants, rateBucket, sources/*}.js`. Mounted at `/api/scholar`. Routes apply `requireAuth + requireFeatureFlag('flag_scholar_enabled')` (L20-CRIT-2 fail-closed kill switch). Writes also apply `originAllowlist`.
+- 5 v1 source adapters (`scholar.sources/*.js`): Semantic Scholar, OpenAlex, CrossRef, arXiv, Unpaywall. CORE + PubMed deferred to v1.5. Per-source token bucket (`rateBucket.js`) enforces upstream rate-limit etiquette (S2 1/s, OpenAlex 8/s with key, CrossRef 30/s, arXiv 0.33/s = 1 per 3s per arXiv ToS, Unpaywall 8/s).
+- OpenAlex requires API key as of Feb 13 2026 — `OPENALEX_API_KEY` is RECOMMENDED in `secretValidator.js`. `SEMANTIC_SCHOLAR_API_KEY` raises rate from 1/s to 10/s when present.
+- Search dedupe: DOI primary, then `(normalized title, first-author)` hash. Search results cached in `ScholarPaperSearchCache` (1h TTL, sweeper required).
+- Paper detail / citations / references / pdf: read-side cache via `cacheControl(maxAge=300, sMaxAge=3600)` on stable endpoints. Topic feed at `cacheControl(60)`.
+- OA-PDF cache: license-gate `isOpenAccessLicense()` BEFORE any R2 write. Static `SCHOLAR_PDF_HOST_ALLOWLIST` (arxiv, pmc, plos, peerj, mdpi, etc.) — derived-from-upstream allowlist was the L1-CRIT-2 SSRF amplification bug, now fixed.
+- 8-style citation export (`scholar.cite.controller.js`): BibTeX, RIS, CSL JSON, APA, MLA, Chicago, IEEE, Harvard. BibTeX exporter escapes the 10 LaTeX-active chars + strips bare `\letter` to neutralize `\input{}` / `\write18{}` (L3-HIGH-6 fix).
+- v1.5: `ScholarAnnotation` (highlight, color, body, visibility=private/school/public) + `ScholarDiscussionThread` (school-scoped peer-review). Annotation `school` visibility filters by `viewerSchoolId` joined through `UserSchoolEnrollment` per L13-HIGH-3 — earlier code leaked annotations cross-school.
+- AI deep-link endpoints (`POST /api/scholar/ai/summarize`, `POST /api/scholar/ai/generate-sheet`) return `{ context, suggestedPrompt, quotaCostMessages }` only — they do NOT call the AI module internally. Frontend forwards to `POST /api/ai/messages` so spend ceiling + per-user quota stay enforced in one place.
+- Frontend pages: `frontend/studyhub-app/src/pages/scholar/{ScholarPage, ScholarSearchPage, ScholarPaperPage, ScholarSavedPage, ScholarTopicPage}.jsx`. Editorial-serif headings (`var(--font-paper)`: Noto Serif → Noto Sans CJK/Arabic/Devanagari → Georgia → serif). PDF.js iframe sandbox is `allow-scripts allow-popups allow-forms` — NEVER `allow-same-origin` (CLAUDE.md A14).
+- Plan + decisions: `docs/internal/audits/2026-05-04-master-plan-hub-ai-library-bugs.md`. Figma direction at `docs/internal/audits/2026-05-04-figma-prompt-hub-ai-scholar.md`. All 91 findings from the 5-loop pre-implementation review folded in §24; ~245 findings from the 20-loop post-implementation review tracked across that doc + the deploy checklist.
+
+### Library — weekly corpus sync (2026-05-04)
+
+- New job in `backend/src/modules/library/library.weeklySync.js` paged through Google Books to grow `CachedBook` ~5K rows/week via 49 rotating academic queries (`scripts/seedLibrarySyncQueries.js`).
+- Scheduled in `index.js` via `runWithHeartbeat('library.weekly_corpus_sync', fn, { slaMs })` INSIDE the `setInterval` arrow (CLAUDE.md A10 + L2-CRIT-1).
+- `LIBRARY_SYNC_ENABLED=false` is the kill switch. `LIBRARY_SYNC_CONTACT_EMAIL` populates Google Books polite-pool User-Agent (CRLF-stripped per L2-MED-4 to defeat header injection).
+- After ~10 weeks the corpus reaches ~50K titles; the read path can flip to "local-first, Google-fallback" — addresses the page-10-of-50K cap users hit pre-cycle.
+
 ### Performance Infrastructure
 
 - `useFetch` hook (`frontend/studyhub-app/src/lib/useFetch.js`) supports opt-in SWR caching via `swr` option (ms). Cached data is returned instantly while a background revalidation fetch runs. Cache is a module-level `Map` exported as `cache`.
@@ -431,6 +467,9 @@ Tables with migrations (safe to query):
 - NoteStar, NoteVersion (migration: `20260331000003_add_note_star_and_note_version`)
 - AiConversation, AiMessage, AiUsageLog (migration: `20260331000004_add_ai_assistant_tables`)
 - Subscription, Payment, Donation (migration: `20260403000001_add_payment_tables`)
+- StudyGroup trust & safety (moderation, mute, strikes, GroupReport, GroupAppeal, GroupAuditLog, GroupBlock) — migration `20260409000002_add_group_trust_and_safety` (rewritten 2026-05-04 with full `IF NOT EXISTS` / `DO $$ EXCEPTION WHEN duplicate_object` guards per CLAUDE.md A5 — closes Bug A "Failed to load groups").
+- Hub AI v2 + library weekly sync — migration `20260504000001_hub_ai_v2_and_library_sync`. Adds `AiAttachment`, `UserAiStorageQuota`, `AiGlobalSpendDay`, `AiUploadIdempotency`, `LibrarySyncState` tables + `AiMessage.attachments` + `AiUsageLog.{documentCount,tokensIn,tokensOut,documentTokens,costUsdCents}`.
+- Scholar v1 + v1.5 — migration `20260504000002_scholar_v15`. Adds `ScholarPaper`, `ScholarPaperSearchCache`, `ScholarAnnotation`, `ScholarDiscussionThread` + `ShelfBook.sourceType` / `paperId`.
 
 ## Internal Documentation Layout (added 2026-04-30)
 
@@ -675,6 +714,34 @@ Founder-approved design refresh in progress. Context for any agent picking up th
     2. If the code is using <50 LOC worth of the library (like `idb` was) and there is a first-party standard API that replaces it (IndexedDB, fetch, FormData, URL, Intl, crypto.subtle, etc.), rewrite inline with no new dep.
     3. If neither option works, follow the "Allowed when it is the ONLY viable path" checklist above and log the exception.
   - **`package-lock.json` rules specifically:** never hand-edit. Only regenerate via `npm install`. If `package-lock.json` changes because of a legitimate install, commit it with the matching `package.json` change in the same commit so bisect stays clean.
+
+### Workspace lockfile sync — non-negotiable (added 2026-05-04)
+
+This repo is an **npm workspaces** project (root `package.json` declares `workspaces: ["backend", "frontend/studyhub-app"]`). That setup has one quirk that has bitten us: **the ROOT `package-lock.json` is the lockfile CI and Cloudflare Pages use, not the per-workspace lockfiles.** Local dev tooling sometimes regenerates `backend/package-lock.json` or `frontend/studyhub-app/package-lock.json` independently, and the standalone files can drift out of sync with the root.
+
+**The exact failure mode:** if you run `npm --prefix backend install` after editing `backend/package.json`, the backend lockfile updates but the **root `package-lock.json` does NOT**. Cloudflare Pages and Railway deploy by running `npm clean-install` from the repo root. `npm ci` is strict — if any workspace `package.json` declares a version the root lock doesn't reflect, the build fails with `EUSAGE: lock file's X@1.2.3 does not satisfy X@2.0.0`. Production deploy stops. Real example (2026-05-04, commit d3eb22d5): bumped `@anthropic-ai/sdk` in `backend/package.json` only, root lockfile stayed at the old version, Cloudflare deploy failed.
+
+**Hard rules — every dependency change MUST follow these:**
+
+1. **Run `npm install` at the REPO ROOT, not in a workspace prefix.** A root install regenerates the root `package-lock.json` AND the workspace lockfiles in one pass, keeping all three in sync. Never run `npm --prefix backend install` or `npm --prefix frontend/studyhub-app install` as your only install step — those commands only update their own lockfile and leave the root drifting.
+
+2. **Commit ALL three lockfiles in the same commit as the `package.json` change.** That's `package-lock.json` (root), `backend/package-lock.json`, and `frontend/studyhub-app/package-lock.json`. Skipping any of them poisons future bisects and risks the same EUSAGE failure on the next deploy.
+
+3. **Before pushing a dependency commit, verify the root lockfile is in sync.** Run:
+
+   ```powershell
+   git status package-lock.json backend/package-lock.json frontend/studyhub-app/package-lock.json
+   ```
+
+   If the root lockfile is NOT in the diff after a `package.json` change, the root is out of sync — go back and run `npm install` at the root before committing.
+
+4. **CI and Cloudflare Pages run `npm clean-install` (`npm ci`), which fails closed on lockfile drift.** This is the intended behaviour — silent drift would let prod deploy a different dependency tree than was tested locally. Treat any `npm ci` "lock file does not satisfy" error as a P0 deploy block.
+
+5. **Never delete `backend/package-lock.json` or `frontend/studyhub-app/package-lock.json` to "fix" drift.** The root lockfile alone is not enough for `npm --prefix <ws> ci` to work in CI sub-steps. Keep all three; sync them via root `npm install`.
+
+6. **The "v2.1 dependency exception" §1 above already says you can run `npm install` at a workspace root** to sync `node_modules`. That exception still stands for local dev convenience, but for any commit that lands on `main`, the **root** `npm install` is the canonical command — every other invocation must be followed by it before commit.
+
+If you skip rule #1, your commit lands on `main`, Cloudflare or Railway deploys, and the deploy fails with `EUSAGE`. The fix is always: `npm install` at root → commit the regenerated root lockfile → push. Don't try to hand-merge the lockfiles.
 
 ## Feature Expansion Plan (post-Phase-2)
 

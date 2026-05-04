@@ -73,6 +73,7 @@ const docsRoutes = require('./modules/docs')
 const sharingRoutes = require('./modules/sharing')
 const aiRoutes = require('./modules/ai')
 const libraryRoutes = require('./modules/library')
+const scholarRoutes = require('./modules/scholar')
 const videoRoutes = require('./modules/video')
 const paymentsRoutes = require('./modules/payments')
 const reviewsRoutes = require('./modules/reviews')
@@ -698,6 +699,9 @@ app.use('/api/ai', aiRoutes)
 // Library module endpoints under /api/library.
 app.use('/api/library', libraryRoutes)
 
+// Scholar v1 endpoints under /api/scholar (master plan §18).
+app.use('/api/scholar', scholarRoutes)
+
 // Video module endpoints under /api/video.
 app.use('/api/video', videoRoutes)
 
@@ -829,6 +833,33 @@ async function startServer() {
       },
       24 * 60 * 60 * 1000,
     ).unref()
+
+    // Hub AI v2 — retention sweeper for AI document attachments. Runs every
+    // 6h. Two-phase (mark soft-delete → drain to R2). Master plan §4.3 +
+    // L5-CRIT-4. SLA 10 min.
+    const { sweepAiAttachments } = require('./lib/jobs/aiAttachmentSweeper')
+    setInterval(
+      () => {
+        runWithHeartbeat('ai.attachment_sweep', () => sweepAiAttachments(), {
+          slaMs: 10 * 60_000,
+        })
+      },
+      6 * 60 * 60 * 1000,
+    ).unref()
+
+    // Hub AI v2 — weekly Google Books corpus expansion. Master plan §3.3 +
+    // L2-CRIT-1: runWithHeartbeat is INSIDE the arrow function, not
+    // wrapping the setInterval itself.
+    const { syncWeeklyCorpus } = require('./modules/library/library.weeklySync')
+    setInterval(
+      () => {
+        runWithHeartbeat('library.weekly_corpus_sync', () => syncWeeklyCorpus(), {
+          slaMs: 20 * 60_000,
+        })
+      },
+      7 * 24 * 60 * 60 * 1000,
+    ).unref()
+
     log.info({ port: PORT }, `Server running on http://localhost:${PORT}`)
   })
 

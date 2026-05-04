@@ -4,6 +4,7 @@
  * ───────────────────────────────────────────────────────────── */
 import { useMemo, useState } from 'react'
 import UserAvatar from '../../../components/UserAvatar'
+import { resolveImageUrl } from '../../../lib/imageUrls'
 
 // React 19 react-hooks/purity rejects raw `Date.now()` in render. The
 // lazy useState initializer is on the rule's allowlist, runs once per
@@ -235,16 +236,18 @@ export function MessageBubble({
                 {/* Attachments (images/files) */}
                 {Array.isArray(message.attachments) && message.attachments.length > 0 && (
                   <div style={{ marginTop: 6, display: 'flex', flexDirection: 'column', gap: 4 }}>
-                    {message.attachments.map((att, idx) =>
-                      att.type === 'image' ? (
+                    {message.attachments.map((att, idx) => {
+                      const resolvedUrl = resolveImageUrl(att.url)
+                      if (!resolvedUrl) return null
+                      return att.type === 'image' ? (
                         <a
                           key={att.id || idx}
-                          href={att.url}
+                          href={resolvedUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                         >
                           <img
-                            src={att.url}
+                            src={resolvedUrl}
                             alt={att.fileName || 'Image'}
                             style={{
                               maxWidth: '100%',
@@ -260,7 +263,7 @@ export function MessageBubble({
                       ) : (
                         <a
                           key={att.id || idx}
-                          href={att.url}
+                          href={resolvedUrl}
                           target="_blank"
                           rel="noopener noreferrer"
                           style={{
@@ -289,8 +292,8 @@ export function MessageBubble({
                           {att.fileName || 'Download file'}
                           {att.fileSize ? ` (${Math.round(att.fileSize / 1024)}KB)` : ''}
                         </a>
-                      ),
-                    )}
+                      )
+                    })}
                   </div>
                 )}
 

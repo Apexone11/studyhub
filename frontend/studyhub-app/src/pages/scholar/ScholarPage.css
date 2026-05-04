@@ -1,0 +1,756 @@
+/* ════════════════════════════════════════════════════════════════════════
+ * Scholar pages — shared styles.
+ *
+ * Visual language per founder Figma (master plan §23):
+ *  - Editorial serif on paper titles + page headlines (var(--font-paper))
+ *  - Centered hero, dual-gradient backdrop with subtle grid
+ *  - Glass-effect search bar
+ *  - White cards, 14px radius, 1px border, hover-lift
+ *  - All colors via var(--sh-*) tokens (no raw hex)
+ *
+ * Notes:
+ *  - All animation respects prefers-reduced-motion (gate at the
+ *    @media level so hover-lift transitions only run when the user
+ *    has not asked for reduced motion).
+ * ════════════════════════════════════════════════════════════════════════ */
+
+.scholar-page {
+  min-height: 100vh;
+  background: var(--sh-bg);
+  color: var(--sh-text);
+  font-family: var(--font);
+}
+
+.scholar-shell {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 24px 64px;
+}
+
+/* ── Hero ──────────────────────────────────────────────────────────────── */
+
+.scholar-hero {
+  position: relative;
+  padding: clamp(48px, 8vw, 96px) 24px clamp(40px, 6vw, 64px);
+  text-align: center;
+  overflow: hidden;
+  background:
+    linear-gradient(180deg, var(--sh-brand-soft) 0%, var(--sh-bg) 70%),
+    radial-gradient(circle at 30% 20%, var(--sh-brand-soft) 0%, transparent 60%);
+}
+
+.scholar-hero__pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: var(--sh-brand-soft);
+  color: var(--sh-pill-text, var(--sh-brand));
+  border-radius: 999px;
+  font-size: var(--type-xs);
+  font-weight: 600;
+  letter-spaced: 0.04em;
+  margin-bottom: 24px;
+}
+
+.scholar-hero__title {
+  font-family: var(--font-paper);
+  font-size: var(--type-hero);
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--sh-heading);
+  max-width: 18ch;
+  margin: 0 auto 20px;
+  font-weight: 500;
+}
+
+.scholar-hero__title-accent {
+  font-style: italic;
+  background: linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+@media (forced-colors: active) {
+  .scholar-hero__title-accent {
+    background: none;
+    -webkit-text-fill-color: initial;
+    color: LinkText;
+  }
+}
+
+.scholar-hero__subline {
+  font-size: var(--type-md);
+  color: var(--sh-subtext);
+  max-width: 65ch;
+  margin: 0 auto 32px;
+  line-height: 1.55;
+}
+
+.scholar-hero__search {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.scholar-search-box {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 18px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+  box-shadow: var(--shadow-sm);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.scholar-search-box:focus-within {
+  border-color: var(--sh-brand);
+  box-shadow: 0 0 0 4px var(--sh-brand-soft);
+}
+
+.scholar-search-box input {
+  flex: 1;
+  border: 0;
+  background: transparent;
+  font-size: var(--type-base);
+  color: var(--sh-text);
+  outline: none;
+  font-family: inherit;
+}
+
+.scholar-search-box input::placeholder {
+  color: var(--sh-muted);
+}
+
+.scholar-search-box__kbd {
+  padding: 3px 8px;
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  border-radius: 6px;
+  font-family: ui-monospace, monospace;
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+}
+
+.scholar-filters-btn {
+  height: 56px;
+  padding: 0 22px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+  color: var(--sh-text);
+  font-size: var(--type-base);
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.scholar-filters-btn:hover {
+  background: var(--sh-soft);
+}
+
+.scholar-try-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 24px;
+}
+
+.scholar-try-chip {
+  padding: 8px 16px;
+  background: var(--sh-brand-soft);
+  color: var(--sh-pill-text, var(--sh-brand));
+  border: 1px solid var(--sh-border);
+  border-radius: 999px;
+  font-size: var(--type-sm);
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  display: inline-flex;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-try-chip {
+    transition:
+      transform 150ms ease-out,
+      box-shadow 150ms ease-out;
+  }
+  .scholar-try-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-sm);
+  }
+}
+
+/* ── Stats strip ───────────────────────────────────────────────────────── */
+
+.scholar-stats {
+  display: flex;
+  gap: 48px;
+  justify-content: center;
+  flex-wrap: wrap;
+  padding: 32px 0 0;
+}
+
+.scholar-stat {
+  text-align: center;
+}
+
+.scholar-stat__value {
+  font-family: var(--font-paper);
+  font-size: clamp(1.8rem, 1.4rem + 1.2vw, 2.8rem);
+  color: var(--sh-heading);
+  line-height: 1;
+  font-weight: 600;
+}
+
+.scholar-stat__label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sh-subtext);
+  font-size: var(--type-xs);
+  margin-top: 8px;
+}
+
+/* ── Section headers ───────────────────────────────────────────────────── */
+
+.scholar-section {
+  margin-top: clamp(48px, 6vw, 72px);
+}
+
+.scholar-section__head {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  margin-bottom: 24px;
+  gap: 16px;
+}
+
+.scholar-section__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  /* L4-HIGH-1: --sh-brand-accent (#7c3aed) on white at 11px uppercase fails
+     WCAG 4.5:1 floor. --sh-pill-text (#1d4ed8) gives 6.5:1. */
+  color: var(--sh-pill-text);
+  font-size: var(--type-xs);
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+
+.scholar-section__title {
+  font-family: var(--font-paper);
+  font-size: var(--type-xl);
+  color: var(--sh-heading);
+  margin: 0;
+  font-weight: 500;
+}
+
+.scholar-section__see-all {
+  color: var(--sh-brand);
+  text-decoration: none;
+  font-size: var(--type-sm);
+  font-weight: 500;
+}
+
+.scholar-section__see-all:hover {
+  text-decoration: underline;
+}
+
+/* ── Paper cards ───────────────────────────────────────────────────────── */
+
+.paper-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
+  gap: 20px;
+}
+
+.paper-card-grid--list {
+  grid-template-columns: 1fr;
+}
+
+.paper-card {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .paper-card {
+    transition:
+      transform 150ms ease-out,
+      box-shadow 150ms ease-out;
+  }
+  .paper-card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.paper-card__eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  /* L4-HIGH-1: contrast fix — see .scholar-section__eyebrow above. */
+  color: var(--sh-pill-text);
+  font-size: var(--type-xs);
+  font-weight: 600;
+}
+
+.paper-card__title {
+  font-family: var(--font-paper);
+  font-size: var(--type-md);
+  color: var(--sh-heading);
+  font-weight: 600;
+  line-height: 1.3;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+
+.paper-card:hover .paper-card__title {
+  text-decoration: underline;
+}
+
+.paper-card__authors {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.paper-card__author-stack {
+  display: flex;
+}
+
+.paper-card__author-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--sh-soft);
+  border: 2px solid var(--sh-surface);
+  margin-left: -8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: var(--sh-subtext);
+  font-weight: 600;
+}
+
+.paper-card__author-avatar:first-child {
+  margin-left: 0;
+}
+
+.paper-card__author-names {
+  font-size: var(--type-sm);
+  color: var(--sh-subtext);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.paper-card__venue {
+  font-size: var(--type-sm);
+  color: var(--sh-subtext);
+}
+
+.paper-card__abstract {
+  font-size: var(--type-sm);
+  color: var(--sh-subtext);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.paper-card__footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--sh-border);
+}
+
+.paper-card__cite-count {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+}
+
+.paper-card__oa {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: var(--sh-success-bg);
+  color: var(--sh-success-text);
+  border-radius: 999px;
+  font-size: var(--type-xs);
+  font-weight: 500;
+}
+
+.paper-card__sparkline {
+  margin-left: auto;
+}
+
+/* ── Topic chip cloud ──────────────────────────────────────────────────── */
+
+.topic-cloud {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.topic-chip {
+  display: inline-flex;
+  flex-direction: column;
+  padding: 12px 18px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+  text-decoration: none;
+  color: inherit;
+  box-shadow: var(--shadow-sm);
+  min-width: 180px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .topic-chip {
+    transition:
+      transform 150ms ease-out,
+      box-shadow 150ms ease-out;
+  }
+  .topic-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.topic-chip__label {
+  font-family: var(--font-paper);
+  font-size: var(--type-md);
+  color: var(--sh-heading);
+  font-weight: 500;
+}
+
+.topic-chip__count {
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+  margin-top: 4px;
+}
+
+/* ── Reader / paper page ──────────────────────────────────────────────── */
+
+.scholar-reader {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 32px;
+  padding-top: 24px;
+}
+
+@media (max-width: 1024px) {
+  .scholar-reader {
+    grid-template-columns: 1fr;
+  }
+}
+
+.scholar-reader__sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  /* L17-HIGH-4: actions wrap below the title at narrow widths instead of
+     overflowing. Sticky band keeps its 64px floor on desktop but grows to
+     auto so wrapped action rows don't break the visual seam. */
+  flex-wrap: wrap;
+  min-height: 64px;
+  height: auto;
+  padding: 12px 24px;
+  background: var(--sh-surface);
+  border-bottom: 1px solid var(--sh-border);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+@media (max-width: 1023px) {
+  .scholar-reader__sticky-head {
+    /* On tablets/phones the title takes its own row above the actions. */
+    align-items: flex-start;
+  }
+  .scholar-reader__title {
+    flex-basis: 100%;
+  }
+}
+
+.scholar-reader__title {
+  font-family: var(--font-paper);
+  font-weight: 600;
+  font-size: var(--type-base);
+  color: var(--sh-heading);
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scholar-reader__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.scholar-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 10px;
+  color: var(--sh-text);
+  font-size: var(--type-sm);
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  text-decoration: none;
+  min-height: 44px; /* tap target */
+  min-width: 44px;
+}
+
+.scholar-action-btn:hover {
+  background: var(--sh-soft);
+}
+
+.scholar-action-btn--primary {
+  background: linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent));
+  color: white;
+  border-color: transparent;
+}
+
+.scholar-action-btn--primary:hover {
+  filter: brightness(1.05);
+}
+
+.scholar-reader__viewer {
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+  padding: 24px;
+  min-height: 600px;
+}
+
+.scholar-reader__viewer-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.scholar-reader__abstract {
+  font-family: var(--font-paper);
+  font-size: var(--type-md);
+  line-height: 1.7;
+  color: var(--sh-text);
+  white-space: pre-wrap;
+}
+
+.scholar-reader__paywall-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 48px 32px;
+  max-width: 480px;
+  margin: 32px auto;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+}
+
+.scholar-reader__sidecar {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+  padding: 20px;
+  align-self: start;
+  position: sticky;
+  top: 80px;
+}
+
+.scholar-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 1px solid var(--sh-border);
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+
+.scholar-tab {
+  padding: 10px 16px;
+  border: 0;
+  background: transparent;
+  color: var(--sh-subtext);
+  font-size: var(--type-sm);
+  font-weight: 500;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  font-family: inherit;
+  white-space: nowrap;
+  min-height: 44px;
+}
+
+.scholar-tab[aria-selected='true'] {
+  color: var(--sh-brand);
+  border-bottom-color: var(--sh-brand);
+}
+
+.scholar-tab:hover:not([aria-selected='true']) {
+  color: var(--sh-text);
+}
+
+/* ── Sparkline (decorative svg) ───────────────────────────────────────── */
+
+.scholar-sparkline {
+  width: 64px;
+  height: 24px;
+}
+
+.scholar-sparkline path {
+  stroke: var(--sh-brand-accent);
+  stroke-width: 1.5;
+  fill: none;
+}
+
+/* ── Skip links (a11y per L4-MED-5) ───────────────────────────────────── */
+
+.scholar-skip-link {
+  position: absolute;
+  left: -9999px;
+  top: 8px;
+  padding: 8px 12px;
+  background: var(--sh-brand);
+  color: white;
+  border-radius: 6px;
+  z-index: 100;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.scholar-skip-link:focus {
+  left: 8px;
+}
+
+/* ── Discussion thread ─────────────────────────────────────────────────── */
+
+.discussion-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.discussion-post {
+  padding: 12px 14px;
+  background: var(--sh-soft);
+  border-radius: 10px;
+}
+
+.discussion-post[data-reply='true'] {
+  margin-left: 32px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+}
+
+.discussion-post__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: var(--type-sm);
+}
+
+.discussion-post__author {
+  font-weight: 600;
+  color: var(--sh-text);
+}
+
+.discussion-post__time {
+  color: var(--sh-subtext);
+  font-size: var(--type-xs);
+}
+
+.discussion-post__body {
+  font-size: var(--type-sm);
+  color: var(--sh-text);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+
+.discussion-post__deleted {
+  font-style: italic;
+  color: var(--sh-muted);
+}
+
+/* ── Annotation toolbar ───────────────────────────────────────────────── */
+
+.annotation-toolbar {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 999px;
+  box-shadow: var(--shadow-md);
+  z-index: 20;
+}
+
+.annotation-toolbar__color {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.annotation-toolbar__color[aria-pressed='true'] {
+  outline: 2px solid var(--sh-text);
+  outline-offset: 1px;
+}
+
+/* L17-HIGH-5: Scholar topic page two-column layout. Collapses to single
+   column below 1024px to prevent horizontal scroll on tablets. */
+.scholar-topic__layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 32px;
+}
+@media (max-width: 1023px) {
+  .scholar-topic__layout {
+    grid-template-columns: 1fr;
+  }
+}

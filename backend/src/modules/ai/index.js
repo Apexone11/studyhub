@@ -6,9 +6,11 @@
 const express = require('express')
 const aiRoutes = require('./ai.routes')
 const suggestionRoutes = require('./ai.suggestions.routes')
+const attachmentsRoutes = require('./attachments/attachments.routes')
 
 const router = express.Router()
 router.use('/', aiRoutes)
 router.use('/suggestions', suggestionRoutes)
+router.use('/attachments', attachmentsRoutes)
 
 module.exports = router

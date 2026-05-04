@@ -1,4 +1,9 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+/* Scholar editorial serif + non-Latin script fallbacks (founder decision §24.8 #2).
+   Applied via `font-family: var(--font-paper)` only on Scholar paper-rendering
+   surfaces — paper titles, hero headlines, abstracts. UI chrome continues to
+   use --font (Plus Jakarta Sans) and reading body uses --font-reading (Inter). */
+@import url('https://fonts.googleapis.com/css2?family=Noto+Serif:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600&family=Noto+Sans+Arabic:wght@400;500;600&family=Noto+Sans+Devanagari:wght@400;500;600&display=swap');
 
 *,
 *::before,
@@ -17,6 +22,12 @@
   /* ── Typography ──────────────────────────────────────────────────── */
   --font: 'Plus Jakarta Sans', sans-serif;
   --font-reading: 'Inter', sans-serif;
+  /* Scholar editorial serif. Order: editorial Latin serif → CJK
+     fallback (Simplified Chinese; covers Traditional too via SC fonts) →
+     Arabic → Devanagari (Hindi/Sanskrit) → system serifs. */
+  --font-paper:
+    'Noto Serif', 'Noto Sans SC', 'Noto Sans Arabic', 'Noto Sans Devanagari', Georgia,
+    'Source Serif Pro', 'Iowan Old Style', serif;
   --type-xs: clamp(0.72rem, 0.7rem + 0.12vw, 0.8rem);
   --type-sm: clamp(0.82rem, 0.78rem + 0.18vw, 0.92rem);
   --type-base: clamp(0.94rem, 0.9rem + 0.2vw, 1.06rem);
@@ -3947,6 +3958,37 @@ textarea.sh-input {
 html[data-reduced-motion='on'] [style*='sh-ai-thinking'] {
   animation: none !important;
   opacity: 0.7;
+}
+
+/* AiBubble streaming-active glow pulse — gated behind both the OS
+   preference AND the in-app data-reduced-motion override. L4-LOW-1
+   moves this from inline style to CSS class so the gate is honored. */
+@keyframes sh-ai-bubble-pulse {
+  0%,
+  100% {
+    box-shadow: var(--sh-ai-glow, 0 10px 30px rgba(124, 58, 237, 0.35));
+  }
+  50% {
+    box-shadow:
+      0 0 0 6px rgba(124, 58, 237, 0.18),
+      var(--sh-ai-glow, 0 10px 30px rgba(124, 58, 237, 0.35));
+  }
+}
+@media (prefers-reduced-motion: no-preference) {
+  html:not([data-reduced-motion='on']) .sh-ai-bubble-streaming {
+    animation: sh-ai-bubble-pulse 1500ms ease-in-out infinite;
+  }
+}
+
+/* Forced-colors mode (Windows High Contrast) — gradient text loses
+   meaning with -webkit-text-fill-color: transparent. Restore a system
+   color so the headline remains visible. L4-MED-6. */
+@media (forced-colors: active) {
+  .sh-gradient-text {
+    background: none !important;
+    -webkit-text-fill-color: initial !important;
+    color: LinkText !important;
+  }
 }
 
 /* ── Focus ring styles (keyboard accessibility) ──────────────────── */

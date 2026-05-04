@@ -754,6 +754,58 @@ const createAiMessageLimiter = (rpmLimit) =>
     message: { error: 'Too many AI requests. Please wait a moment.' },
   })
 
+/**
+ * Hub AI v2 — POST /api/ai/attachments. 10 uploads per minute per
+ * authenticated user. The optional chain (`req.user?.userId`) is
+ * mandatory per CLAUDE.md A7 even though requireAuth precedes the
+ * limiter today; reordering middleware later must not crash boot.
+ */
+const aiAttachmentUploadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai-attach-upload-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many uploads. Please wait a moment.' },
+})
+
+/**
+ * Hub AI v2 — DELETE /api/ai/attachments/:id. 30 per minute per user.
+ * Looser than upload because soft-delete is cheap and users may bulk-clean.
+ */
+const aiAttachmentDeleteLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai-attach-delete-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many delete requests. Please slow down.' },
+})
+
+/**
+ * Hub AI v2 — POST /api/ai/attachments/:id/pin. 30 per minute per user.
+ */
+const aiAttachmentPinLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai-attach-pin-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many pin requests. Please slow down.' },
+})
+
+/**
+ * Hub AI v2 — GET /api/ai/attachments. 60 per minute per user.
+ */
+const aiAttachmentReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `ai-attach-read-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many requests. Please slow down.' },
+})
+
 // ── CATEGORY: Sheet Activity / Readme ─────────────────────────────────────
 
 /**
@@ -1172,6 +1224,119 @@ const libraryReadLimiter = rateLimit({
   message: { error: 'Too many library searches. Please slow down.' },
 })
 
+// ── CATEGORY: Scholar Module ───────────────────────────────────────────────
+
+/**
+ * Scholar read endpoints — search, paper detail, citations, references,
+ * topic feeds. 200 reads / minute / IP. Default IP keying (no custom
+ * keyGenerator) keeps express-rate-limit's IPv6 normalization safe per
+ * A7. Adapter-level token buckets in `modules/scholar/rateBucket.js`
+ * are the per-source defenses; this limiter throttles a single client.
+ */
+const scholarReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many Scholar reads. Please slow down.' },
+})
+
+/**
+ * Scholar annotation writes — create / update / delete a highlight or
+ * margin note. 60 writes / minute / authenticated user. Auth required
+ * upstream so the `'anon'` fallback never fires (A7 belt-and-suspenders).
+ */
+const scholarAnnotationLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `scholar-annotation-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many annotation writes. Please slow down.' },
+})
+
+/**
+ * Scholar discussion writes — peer-review thread posts. 30 / minute /
+ * authenticated user. Tighter than annotation writes because each post
+ * fans out to school-scoped notifications.
+ */
+const scholarDiscussionLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `scholar-discussion-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many discussion posts. Please slow down.' },
+})
+
+/**
+ * Scholar search — 30 searches / minute / authenticated user. Search
+ * fan-outs to 4 upstream APIs each, so we throttle hard at the user
+ * level. Auth precedes the limiter so the 'anon' fallback never fires.
+ */
+const scholarSearchLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `scholar-search-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many Scholar searches. Please slow down.' },
+})
+
+/**
+ * Scholar save / unsave — 30 writes / minute / authenticated user.
+ */
+const scholarSaveLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `scholar-save-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many save actions. Please slow down.' },
+})
+
+/**
+ * Scholar citation export — 60 / minute / authenticated user. Cite is
+ * read-only on the DB but counts as a POST because the body carries
+ * paperId + style.
+ */
+const scholarCiteLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `scholar-cite-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many citation exports. Please slow down.' },
+})
+
+/**
+ * Scholar AI summarize — 5 / 5 minutes / authenticated user. The
+ * endpoint itself only prepares a prompt; real AI billing happens when
+ * the client posts the prompt to /api/ai/messages.
+ */
+const scholarAiSummarizeLimiter = rateLimit({
+  windowMs: WINDOW_5_MIN,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `scholar-ai-summarize-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many AI summary requests. Please slow down.' },
+})
+
+/**
+ * Scholar AI generate-sheet — 5 / 5 minutes / authenticated user. Counts
+ * as 5 messages against the AI quota when the client actually fires the
+ * downstream /api/ai/messages call (master plan §18.7 / L5-MED-6).
+ */
+const scholarAiSheetLimiter = rateLimit({
+  windowMs: WINDOW_5_MIN,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `scholar-ai-sheet-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many AI sheet-generation requests. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -1271,6 +1436,10 @@ module.exports = {
 
   // AI module
   createAiMessageLimiter,
+  aiAttachmentUploadLimiter,
+  aiAttachmentDeleteLimiter,
+  aiAttachmentPinLimiter,
+  aiAttachmentReadLimiter,
 
   // Library module
   libraryWriteLimiter,
@@ -1334,4 +1503,14 @@ module.exports = {
 
   // Library module
   libraryReadLimiter,
+
+  // Scholar module
+  scholarReadLimiter,
+  scholarAnnotationLimiter,
+  scholarDiscussionLimiter,
+  scholarSearchLimiter,
+  scholarSaveLimiter,
+  scholarCiteLimiter,
+  scholarAiSummarizeLimiter,
+  scholarAiSheetLimiter,
 }

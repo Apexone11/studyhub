@@ -5,6 +5,10 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useLocation } from 'react-router-dom'
 import * as aiService from './aiService'
+import {
+  startStreaming as markStreamActive,
+  stopStreaming as markStreamInactive,
+} from './streamState'
 
 /**
  * Create an SSE parser that buffers partial chunks across reads.
@@ -86,6 +90,29 @@ export function useAiChat() {
     loadUsage()
   }, [loadConversations, loadUsage])
 
+  // L16-HIGH-3: unmount cleanup. If the provider tears down mid-stream
+  // (route change to /login, error boundary reset, hot reload), abort the
+  // SSE controller and decrement the streamState refcount so the rest of
+  // the app's polling does NOT stay suppressed for 5 minutes waiting on
+  // the watchdog.
+  useEffect(() => {
+    return () => {
+      if (abortRef.current) {
+        try {
+          abortRef.current.abort()
+        } catch {
+          // ignore — we're tearing down
+        }
+        abortRef.current = null
+        try {
+          markStreamInactive()
+        } catch {
+          // ignore — refcount is already at 0
+        }
+      }
+    }
+  }, [])
+
   // ── Select a conversation and load its messages ──────────────────
   const selectConversation = useCallback(
     async (id) => {
@@ -153,6 +180,7 @@ export function useAiChat() {
         setMessages((prev) => [...prev, userMsg])
       }
       setStreaming(true)
+      markStreamActive()
       setStreamingText('')
       setError(null)
       setTruncated(false)
@@ -239,6 +267,7 @@ export function useAiChat() {
         setStreamingText('')
       } finally {
         setStreaming(false)
+        markStreamInactive()
         abortRef.current = null
         // Bump the conversation to the top of the list.
         setConversations((prev) => {
@@ -306,6 +335,7 @@ export function useAiChat() {
       }
       abortRef.current = null
       setStreaming(false)
+      markStreamInactive()
       // Keep whatever text has streamed so far as the final message.
       if (streamingText) {
         setMessages((prev) => [

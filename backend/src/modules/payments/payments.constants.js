@@ -2,6 +2,20 @@
  * payments.constants.js — Subscription tiers, plan definitions, and Stripe config.
  */
 
+// Read a plan-tier byte/page cap from env with a fallback. Hub AI v2
+// doc caps (master plan §4.1) are env-overridable so a Railway
+// operator can tighten limits during cost incidents without a redeploy.
+function parseDocBytes(envKey, fallback) {
+  const raw = Number.parseInt(process.env[envKey] || '', 10)
+  if (Number.isInteger(raw) && raw > 0) return raw
+  return fallback
+}
+function parseDocPages(envKey, fallback) {
+  const raw = Number.parseInt(process.env[envKey] || '', 10)
+  if (Number.isInteger(raw) && raw > 0) return raw
+  return fallback
+}
+
 const PLANS = {
   free: {
     name: 'Free',
@@ -24,6 +38,14 @@ const PLANS = {
     customThemes: false,
     prioritySupport: false,
     proBadge: false,
+    // Hub AI v2 document caps (master plan §4.1, calibrated May 2026).
+    // Free-tier 40 pages reflects L1-HIGH-1 raise from 20 → 40.
+    aiDocumentsPerDay: 3,
+    aiDocumentMaxPages: parseDocPages('AI_DOC_MAX_PAGES_FREE', 40),
+    aiDocumentMaxBytes: parseDocBytes('AI_DOC_MAX_BYTES_FREE', 5 * 1024 * 1024),
+    aiDocumentDailyTokenSubcap: 50_000,
+    aiDocumentRetentionMaxDays: 0, // free cannot pin
+    aiDocumentTotalStorageMaxBytes: 100 * 1024 * 1024,
   },
   donor: {
     name: 'Supporter',
@@ -39,6 +61,12 @@ const PLANS = {
     prioritySupport: false,
     proBadge: false,
     donorBadge: true,
+    aiDocumentsPerDay: 5,
+    aiDocumentMaxPages: parseDocPages('AI_DOC_MAX_PAGES_VERIFIED', 60),
+    aiDocumentMaxBytes: parseDocBytes('AI_DOC_MAX_BYTES_VERIFIED', 15 * 1024 * 1024),
+    aiDocumentDailyTokenSubcap: 200_000,
+    aiDocumentRetentionMaxDays: 7,
+    aiDocumentTotalStorageMaxBytes: 1024 * 1024 * 1024,
   },
   pro_monthly: {
     name: 'Pro (Monthly)',
@@ -54,6 +82,12 @@ const PLANS = {
     customThemes: true,
     prioritySupport: true,
     proBadge: true,
+    aiDocumentsPerDay: 20,
+    aiDocumentMaxPages: parseDocPages('AI_DOC_MAX_PAGES_PRO', 100),
+    aiDocumentMaxBytes: parseDocBytes('AI_DOC_MAX_BYTES_PRO', 30 * 1024 * 1024),
+    aiDocumentDailyTokenSubcap: 500_000,
+    aiDocumentRetentionMaxDays: 30,
+    aiDocumentTotalStorageMaxBytes: 5 * 1024 * 1024 * 1024,
   },
   pro_yearly: {
     name: 'Pro (Yearly)',
@@ -69,6 +103,12 @@ const PLANS = {
     customThemes: true,
     prioritySupport: true,
     proBadge: true,
+    aiDocumentsPerDay: 20,
+    aiDocumentMaxPages: parseDocPages('AI_DOC_MAX_PAGES_PRO', 100),
+    aiDocumentMaxBytes: parseDocBytes('AI_DOC_MAX_BYTES_PRO', 30 * 1024 * 1024),
+    aiDocumentDailyTokenSubcap: 500_000,
+    aiDocumentRetentionMaxDays: 30,
+    aiDocumentTotalStorageMaxBytes: 5 * 1024 * 1024 * 1024,
   },
 }
 

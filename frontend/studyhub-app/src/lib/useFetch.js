@@ -1,10 +1,17 @@
 /**
- * useFetch -- shared data-fetching hook that eliminates boilerplate.
+ * useFetch -- shared data-fetching hook with SWR keepPreviousData semantics.
+ *
+ * `loading` is true only when there is no data to display (initial fetch).
+ * Background revalidations expose progress via `isValidating` instead, so
+ * `if (loading) return <Skeleton />` callers never flicker on revalidate.
+ * This matches Vercel SWR's `keepPreviousData` and React Query's
+ * `placeholderData: keepPreviousData` patterns.
+ *
+ * Focus revalidation skips while an AI stream is active (see streamState.js).
  *
  * Usage:
  *   const { data, loading, error, refetch } = useFetch('/api/users/me/streak')
- *   const { data, loading, error } = useFetch(url, { skip: !userId })
- *   const { data, loading, error } = useFetch('/api/courses', { swr: 5 * 60 * 1000 })
+ *   const { data, loading, error, isValidating } = useFetch(url, { swr: 5*60*1000 })
  *
  * Options:
  *   - skip: boolean - Skip fetching (default: false)
@@ -13,12 +20,11 @@
  *   - swr: number - Stale-while-revalidate time in ms (default: 0, no caching)
  *   - cacheKey: string - Custom cache key (default: path)
  *   - revalidateOnFocus: boolean - Refetch when the tab regains focus
- *     (default: true when `swr > 0`, false otherwise). Throttled to at
- *     most one refetch per `FOCUS_REVALIDATE_THROTTLE_MS` per cacheKey
- *     so rapid tab-switching doesn't hammer the backend.
+ *     (default: true when `swr > 0`, false otherwise). Throttled per cacheKey.
  */
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { API } from '../config'
+import { isStreamingActive } from './streamState'
 
 // Module-level in-memory cache: { data, timestamp }
 export const cache = new Map()
@@ -85,8 +91,14 @@ export default function useFetch(path, options = {}) {
     typeof revalidateOnFocus === 'boolean' ? revalidateOnFocus : swr > 0
   const [data, setData] = useState(initialData)
   const [loading, setLoading] = useState(!skip)
+  const [isValidating, setIsValidating] = useState(false)
   const [error, setError] = useState(null)
   const mountedRef = useRef(true)
+  // Tracks whether at least one fetch has populated `data`. SWR
+  // keepPreviousData uses this to keep the previous value painted while
+  // a background revalidate is in flight, so consumers never see a
+  // skeleton flash on refetch.
+  const hasFetchedRef = useRef(false)
 
   // Use a ref for the transform function so it never triggers re-fetches.
   // Inline arrow functions create a new reference every render; putting
@@ -96,7 +108,11 @@ export default function useFetch(path, options = {}) {
 
   const fetchData = useCallback(async () => {
     if (skip) return
-    setLoading(true)
+    // SWR keepPreviousData: only flip `loading` when there is no fetched
+    // data to keep painted. Background revalidations expose progress via
+    // `isValidating` so `if (loading) return <Skeleton />` never flashes.
+    if (!hasFetchedRef.current) setLoading(true)
+    setIsValidating(true)
     setError(null)
     try {
       const res = await fetch(`${API}${path}`, { credentials: 'include' })
@@ -108,6 +124,7 @@ export default function useFetch(path, options = {}) {
       if (transformRef.current) result = transformRef.current(result)
       if (mountedRef.current) {
         setData(result)
+        hasFetchedRef.current = true
         setError(null)
         // Update cache if SWR is enabled
         if (swr > 0) {
@@ -119,7 +136,10 @@ export default function useFetch(path, options = {}) {
         setError(err.message || 'Request failed')
       }
     } finally {
-      if (mountedRef.current) setLoading(false)
+      if (mountedRef.current) {
+        setLoading(false)
+        setIsValidating(false)
+      }
     }
   }, [path, skip, swr, cacheKeyToUse])
 
@@ -134,6 +154,7 @@ export default function useFetch(path, options = {}) {
         ensureSweepRunning()
         // Return cached data immediately (fresh or stale), revalidate in background
         setData(cached.data)
+        hasFetchedRef.current = true
         setError(null)
         setLoading(false)
         fetchData()
@@ -161,6 +182,10 @@ export default function useFetch(path, options = {}) {
     function handleFocus() {
       if (!mountedRef.current) return
       if (typeof document !== 'undefined' && document.visibilityState !== 'visible') return
+      // Skip revalidation while an AI stream is active. Without this guard,
+      // every visibilitychange fires a wave of refetches that flash skeleton
+      // placeholders behind the streaming response.
+      if (isStreamingActive()) return
       const last = lastFocusRefetchAt.get(cacheKeyToUse) || 0
       if (Date.now() - last < FOCUS_REVALIDATE_THROTTLE_MS) return
       lastFocusRefetchAt.set(cacheKeyToUse, Date.now())
@@ -179,5 +204,5 @@ export default function useFetch(path, options = {}) {
     }
   }, [fetchData, skip, shouldRevalidateOnFocus, cacheKeyToUse])
 
-  return { data, loading, error, refetch: fetchData }
+  return { data, loading, error, refetch: fetchData, isValidating }
 }
