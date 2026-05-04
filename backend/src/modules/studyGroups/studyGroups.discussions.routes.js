@@ -123,7 +123,14 @@ router.patch('/:postId/approve', writeLimiter, requireAuth, async (req, res) => 
 
     const post = await prisma.groupDiscussionPost.findUnique({
       where: { id: postId },
-      select: { id: true, groupId: true, status: true, userId: true, title: true },
+      select: {
+        id: true,
+        groupId: true,
+        status: true,
+        userId: true,
+        title: true,
+        content: true,
+      },
     })
     if (!post || post.groupId !== groupId) return res.status(404).json({ error: 'Post not found.' })
     if (post.status !== 'pending_approval') {
@@ -134,6 +141,55 @@ router.patch('/:postId/approve', writeLimiter, requireAuth, async (req, res) => 
       where: { id: postId },
       data: { status: 'published' },
     })
+
+    // Now that the post is public, fire the fan-out + mention notifications
+    // that the create handler suppressed for pending posts (Copilot review
+    // #3 + #4, 2026-05-03 — moderation gate must hold until approval).
+    try {
+      const groupData = await prisma.studyGroup.findUnique({
+        where: { id: groupId },
+        select: { name: true },
+      })
+      const members = await prisma.studyGroupMember.findMany({
+        where: { groupId, status: 'active', userId: { not: post.userId } },
+        select: { userId: true },
+      })
+      const author = await prisma.user.findUnique({
+        where: { id: post.userId },
+        select: { username: true },
+      })
+      const authorName = author?.username || `user-${post.userId}`
+      const { createNotifications, createNotification } = require('../../lib/notify')
+
+      if (members.length > 0 && groupData) {
+        await createNotifications(
+          prisma,
+          members.map((member) => ({
+            userId: member.userId,
+            type: 'group_post',
+            message: `${authorName} posted in ${groupData.name}: ${post.title}`,
+            actorId: post.userId,
+            linkPath: `/study-groups/${groupId}?tab=discussions&post=${post.id}`,
+          })),
+        )
+      }
+
+      const memberAllowlist = members.map((m) => m.userId)
+      const { notifyMentionedUsers } = require('../../lib/mentions')
+      await notifyMentionedUsers(prisma, {
+        text: post.content || '',
+        actorId: post.userId,
+        actorUsername: authorName,
+        linkPath: `/study-groups/${groupId}?tab=discussions&post=${post.id}`,
+        restrictToUserIds: memberAllowlist,
+      })
+      // Reference createNotification so eslint doesn't trip on the
+      // destructured-but-unused name; it's pulled from the module
+      // alongside createNotifications for the author-notify call below.
+      void createNotification
+    } catch {
+      /* fan-out is best-effort; the approval itself is the source of truth */
+    }
 
     await writeAuditLog({
       groupId,
@@ -220,7 +276,11 @@ router.patch('/:postId/reject', writeLimiter, requireAuth, async (req, res) => {
           type: 'group_post_rejected',
           message: `Your post "${updated.title}" was rejected by a moderator`,
           actorId: req.user.userId,
-          linkPath: `/study-groups/${groupId}?tab=discussions&post=${postId}`,
+          // Drop the post= deep link — the rejected thread is hidden from
+          // the author by listDiscussions/getDiscussion, so a deep link
+          // would 404 (Copilot review #2, 2026-05-03). Land them on the
+          // discussions tab so they can post a corrected version.
+          linkPath: `/study-groups/${groupId}?tab=discussions`,
         })
       } catch {
         /* fire-and-forget */

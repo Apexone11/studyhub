@@ -259,7 +259,16 @@ async function createDiscussion(req, res) {
         select: { userId: true },
       })
 
-      if (members.length > 0 && groupData) {
+      // Suppress fan-out for posts that haven't been approved yet —
+      // pending_approval threads are hidden from non-moderators by
+      // listDiscussions/getDiscussion, so notifying every member with the
+      // post title + a deep link would leak content the moderation gate
+      // is supposed to hide (Copilot review #3 + #4, 2026-05-03). Once
+      // a moderator approves the post, the approve handler is responsible
+      // for firing the appropriate notification.
+      const isPublic = postStatus === 'published'
+
+      if (isPublic && members.length > 0 && groupData) {
         await createNotifications(
           prisma,
           members.map((member) => ({
@@ -280,16 +289,20 @@ async function createDiscussion(req, res) {
       // style it differently. Restrict to active group members so an
       // @username from a private group cannot ping a non-member
       // (Codex P2 finding 2026-05-03 — group membership IS the
-      // privacy boundary for mention pings).
-      const memberAllowlist = members.map((m) => m.userId)
-      const { notifyMentionedUsers } = require('../../lib/mentions')
-      await notifyMentionedUsers(prisma, {
-        text: strippedContent,
-        actorId: req.user.userId,
-        actorUsername: req.user.username,
-        linkPath: `/study-groups/${groupId}?tab=discussions&post=${post.id}`,
-        restrictToUserIds: memberAllowlist,
-      })
+      // privacy boundary for mention pings). Also gated by isPublic
+      // so a non-moderator can't bypass the moderation queue by
+      // @-mentioning specific people (Copilot review #4, 2026-05-03).
+      if (isPublic) {
+        const memberAllowlist = members.map((m) => m.userId)
+        const { notifyMentionedUsers } = require('../../lib/mentions')
+        await notifyMentionedUsers(prisma, {
+          text: strippedContent,
+          actorId: req.user.userId,
+          actorUsername: req.user.username,
+          linkPath: `/study-groups/${groupId}?tab=discussions&post=${post.id}`,
+          restrictToUserIds: memberAllowlist,
+        })
+      }
     } catch (notifErr) {
       // Fire-and-forget: don't fail the request
       log.warn(

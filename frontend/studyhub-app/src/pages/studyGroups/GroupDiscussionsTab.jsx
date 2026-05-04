@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import MediaComposer from './MediaComposer'
 import UserAvatar from '../../components/UserAvatar'
@@ -389,6 +389,16 @@ export function GroupDiscussionsTab({
   // click (`?tab=discussions&post=42`) lands the user with that thread
   // already expanded on first render. Subsequent toggles work normally.
   const [expandedPostId, setExpandedPostId] = useState(() => initialFocusedPostId)
+  // Re-apply the focus when the prop changes (parent updates it on
+  // same-route notification clicks per Copilot review #1, 2026-05-03).
+  // Without this the thread the second notification refers to never
+  // auto-expands because lazy-init only fires once.
+  useEffect(() => {
+    if (initialFocusedPostId && initialFocusedPostId !== expandedPostId) {
+      setExpandedPostId(initialFocusedPostId)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialFocusedPostId])
   const [typeFilter, setTypeFilter] = useState('all')
   // New 2026-05-03 features: client-side search across title/body/author,
   // and pinned-thread sort. Search is debounced via the input itself
