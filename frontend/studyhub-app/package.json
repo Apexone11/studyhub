@@ -54,7 +54,7 @@
     "@tiptap/extension-table-row": "^2.27.2",
     "@tiptap/extension-underline": "^2.11.5",
     "@tiptap/pm": "^2.27.2",
-    "@tiptap/react": "^2.11.5",
+    "@tiptap/react": "^3.22.5",
     "@tiptap/starter-kit": "^2.11.5",
     "animejs": "^4.4.1",
     "codemirror": "^6.0.2",
