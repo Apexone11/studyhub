@@ -164,12 +164,23 @@ function recordEmptyPageHit(query, filters, page) {
   const key = lastReachableKey(query, filters)
   const existing = LAST_REACHABLE_PAGE.get(key)
   const lastReachable = page - 1
-  if (existing && existing.lastReachable === lastReachable) {
-    // Second consecutive empty for the same boundary — confirm the cap and
-    // emit observability for first-time-confirmed entries.
+  // Two-strike confirmation: a single empty 200 OK can be a transient
+  // Google partial-index window, so the first hit only TENTATIVELY records
+  // a cap. The second hit confirms the cap.
+  //
+  // Naive "same lastReachable twice" never fires during forward pagination
+  // because clicking page 11 then page 12 produces lastReachable=10 then
+  // lastReachable=11 — different values (Copilot review, 2026-05-03).
+  // Fix: confirm whenever a tentative entry already exists for this query,
+  // even if at a different boundary. Two separate empty pages > 1 are
+  // strong evidence the cap is real, and the smaller of the two is the
+  // honest answer (Google may serve up to N items but not page N+1, so the
+  // earlier empty page wins).
+  if (existing) {
+    const cap = Math.min(existing.lastReachable, lastReachable)
     if (!existing.confirmed) {
       LAST_REACHABLE_PAGE.set(key, {
-        lastReachable,
+        lastReachable: cap,
         recordedAt: Date.now(),
         confirmed: true,
       })
@@ -180,13 +191,22 @@ function recordEmptyPageHit(query, filters, page) {
             event: 'library.cap_discovered',
             query: query || null,
             filters: filters || null,
-            cap: lastReachable,
+            cap,
           },
           'Library deep-paging cap discovered',
         )
       } catch {
         /* logger optional */
       }
+    } else if (lastReachable < existing.lastReachable) {
+      // Already confirmed, but a new empty page tightened the cap — adopt
+      // the smaller value so the user does not bounce to a page we now
+      // know is empty.
+      LAST_REACHABLE_PAGE.set(key, {
+        lastReachable: cap,
+        recordedAt: Date.now(),
+        confirmed: true,
+      })
     }
     return true
   }

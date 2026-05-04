@@ -188,22 +188,29 @@ export default function GroupDetailView({ groupId }) {
   // "Loading…" because `members` is `[]`. This fires the same loader
   // the Members tab uses, so by the time the user clicks Members the
   // data is already cached.
+  //
+  // No `members.length === 0` short-circuit: it leaks stale data
+  // across groups (Copilot review 2026-05-03). When the user switches
+  // from Group A to Group B with the Discussions tab active, A's
+  // `members` array would still be non-empty and the prefetch would
+  // skip B's load. The loader is cheap and the discussions tab is
+  // the only call site, so re-firing is acceptable.
   useEffect(() => {
-    if (activeTab === 'discussions' && activeGroup?.isMember && members.length === 0) {
+    if (activeTab === 'discussions' && activeGroup?.isMember) {
       loadMembers(groupId)
     }
-  }, [activeTab, groupId, activeGroup, members.length, loadMembers])
+  }, [activeTab, groupId, activeGroup, loadMembers])
 
   // Same prefetch for the right-rail "Recent activity" card. Without
   // this, opening Discussions before ever visiting Overview leaves
   // the activity card on "No activity yet." even though there's
-  // plenty of data — `activities` is just unfetched. (Copilot
-  // 2026-05-03 finding.)
+  // plenty of data — `activities` is just unfetched. Same stale-data
+  // fix as the members prefetch above (Copilot review 2026-05-03).
   useEffect(() => {
-    if (activeTab === 'discussions' && activeGroup?.isMember && activities.length === 0) {
+    if (activeTab === 'discussions' && activeGroup?.isMember) {
       loadActivity(groupId)
     }
-  }, [activeTab, groupId, activeGroup, activities.length, loadActivity])
+  }, [activeTab, groupId, activeGroup, loadActivity])
 
   if (activeGroupLoading) {
     return (
