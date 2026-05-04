@@ -229,7 +229,10 @@ function DiscussionPostItem({
             {/* Phase 5: Approve/Reject buttons for posts in the approval queue */}
             {isPendingApproval && isAdminOrMod && onApprove && (
               <button
-                onClick={() => onApprove(post.id)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onApprove(post.id)
+                }}
                 style={{
                   ...styles.button,
                   ...styles.buttonSmall,
@@ -242,7 +245,10 @@ function DiscussionPostItem({
             )}
             {isPendingApproval && isAdminOrMod && onReject && (
               <button
-                onClick={() => onReject(post.id)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onReject(post.id)
+                }}
                 style={{
                   ...styles.button,
                   ...styles.buttonSmall,
@@ -256,7 +262,10 @@ function DiscussionPostItem({
 
             {(isAuthor || isAdminOrMod) && post.type === 'question' && (
               <button
-                onClick={() => onResolve(post.id)}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  onResolve(post.id)
+                }}
                 style={{
                   ...styles.button,
                   ...styles.buttonSmall,
@@ -274,7 +283,13 @@ function DiscussionPostItem({
                 — same field the backend serializes). */}
             {isAdminOrMod && onTogglePin && (
               <button
-                onClick={() => onTogglePin(post.id, !post.pinned)}
+                onClick={(e) => {
+                  // Stop propagation so the parent card's onToggleExpanded
+                  // doesn't fire — clicking Pin should not also collapse
+                  // or expand the thread (Copilot review #5, 2026-05-03).
+                  e.stopPropagation()
+                  onTogglePin(post.id, !post.pinned)
+                }}
                 style={{
                   ...styles.button,
                   ...styles.buttonSmall,

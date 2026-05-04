@@ -23,11 +23,30 @@ export default function TestsPage() {
     >
       {/* Page header with tab bar */}
       <div style={{ marginBottom: 18 }}>
-        <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)', marginBottom: 4 }}>
-          Practice Tests
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 4 }}>
+          <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--sh-heading)', margin: 0 }}>
+            Practice Tests
+          </h1>
+          <span
+            style={{
+              fontSize: 11,
+              fontWeight: 700,
+              padding: '3px 8px',
+              borderRadius: 999,
+              background: 'var(--sh-warning-bg)',
+              color: 'var(--sh-warning-text)',
+              border: '1px solid var(--sh-warning-border)',
+              letterSpacing: '0.04em',
+              textTransform: 'uppercase',
+            }}
+          >
+            Coming Soon
+          </span>
+        </div>
         <p style={{ fontSize: 13, color: 'var(--sh-muted)', marginBottom: 14 }}>
-          Course-linked tests with instant scoring. Planned for Version 2.
+          Course-linked tests with instant scoring are planned for Version 2. The cards below are a
+          preview of the layout — they aren't live yet. Until then, use Hub AI to generate practice
+          questions from any of your study sheets.
         </p>
         <div style={{ display: 'flex', gap: 6 }}>
           {[

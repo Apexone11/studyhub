@@ -41,8 +41,9 @@ export const FEATURES = [
   {
     Icon: IconTests,
     title: 'Practice Tests',
-    desc: 'Take student-made tests right in your browser. Download anytime for offline use.',
+    desc: 'Course-linked practice tests with instant scoring. Planned for Version 3 — preview the layout today.',
     toneClass: 'home-feature--green',
+    badge: 'Coming Soon',
   },
   {
     Icon: IconAnnouncements,

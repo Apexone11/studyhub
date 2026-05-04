@@ -89,7 +89,12 @@ export function useGroupDiscussions(activeGroupId) {
       }
 
       const updatedPost = await response.json()
-      setDiscussions((prev) => prev.map((p) => (p.id === postId ? updatedPost : p)))
+      // Merge into the existing row rather than replacing it. The PATCH
+      // response intentionally doesn't include `replies` (that's a
+      // potentially-large nested list); a replace would wipe an expanded
+      // thread's loaded replies on every edit / pin / unpin (Copilot
+      // review #3, 2026-05-03).
+      setDiscussions((prev) => prev.map((p) => (p.id === postId ? { ...p, ...updatedPost } : p)))
       showToast('Post updated successfully', 'success')
       return updatedPost
     } catch (error) {
@@ -176,7 +181,8 @@ export function useGroupDiscussions(activeGroupId) {
       }
 
       const resolvedPost = await response.json()
-      setDiscussions((prev) => prev.map((p) => (p.id === postId ? resolvedPost : p)))
+      // Merge — same reason as updatePost above (Copilot review #4).
+      setDiscussions((prev) => prev.map((p) => (p.id === postId ? { ...p, ...resolvedPost } : p)))
       showToast('Post resolved successfully', 'success')
       return resolvedPost
     } catch (error) {

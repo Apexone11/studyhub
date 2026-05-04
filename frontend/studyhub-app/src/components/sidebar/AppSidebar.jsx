@@ -218,6 +218,23 @@ export default function AppSidebar({ mode = 'fixed' }) {
                   >
                     <Icon size={15} />
                     {link.label}
+                    {link.comingSoon && (
+                      <span
+                        style={{
+                          marginLeft: 'auto',
+                          fontSize: 10,
+                          fontWeight: 600,
+                          padding: '2px 6px',
+                          borderRadius: 999,
+                          background: 'var(--sh-warning-bg)',
+                          color: 'var(--sh-warning-text)',
+                          border: '1px solid var(--sh-warning-border)',
+                          letterSpacing: '0.02em',
+                        }}
+                      >
+                        Soon
+                      </span>
+                    )}
                   </Link>
                 )
               })}
@@ -250,6 +267,23 @@ export default function AppSidebar({ mode = 'fixed' }) {
               >
                 <Icon size={15} />
                 {link.label}
+                {link.comingSoon && (
+                  <span
+                    style={{
+                      marginLeft: 'auto',
+                      fontSize: 10,
+                      fontWeight: 600,
+                      padding: '2px 6px',
+                      borderRadius: 999,
+                      background: 'var(--sh-warning-bg)',
+                      color: 'var(--sh-warning-text)',
+                      border: '1px solid var(--sh-warning-border)',
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    Soon
+                  </span>
+                )}
               </Link>
             )
           })}

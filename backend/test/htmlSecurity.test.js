@@ -224,13 +224,16 @@ describe('htmlSecurity', () => {
       expect(result.tier).toBe(RISK_TIER.FLAGGED)
     })
 
-    it('does NOT escalate atob() alone to Tier 2 — but eval() does', () => {
-      const benign = classifyHtmlRisk('<script>const data = atob("aGVsbG8=");</script>')
-      // atob is now Tier 2 (real risk — base64 decode is canonical encoded
-      // payload prep). Founder may revisit if user reports false positives.
-      expect(benign.tier).toBe(RISK_TIER.HIGH_RISK)
-      const evil = classifyHtmlRisk('<script>eval("alert(1)");</script>')
-      expect(evil.tier).toBe(RISK_TIER.HIGH_RISK)
+    it('escalates atob() and eval() to Tier 2 (canonical exploit primitives)', () => {
+      // atob is Tier 2 because it's the canonical first step of "decode
+      // an obfuscated payload then run it" — combined with eval/Function
+      // it's the standard malware-loader pattern. Founder may revisit
+      // if a benign use case (e.g. legit base64 image decoding in a
+      // study sheet) produces false positives.
+      const atobOnly = classifyHtmlRisk('<script>const data = atob("aGVsbG8=");</script>')
+      expect(atobOnly.tier).toBe(RISK_TIER.HIGH_RISK)
+      const evalOnly = classifyHtmlRisk('<script>eval("alert(1)");</script>')
+      expect(evalOnly.tier).toBe(RISK_TIER.HIGH_RISK)
     })
 
     it('includes a summary string', () => {

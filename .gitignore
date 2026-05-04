@@ -3,6 +3,9 @@ node_modules/
 **/node_modules/
 frontend/studyhub-app/dist/
 
+# Private marketing kit (scripts, bios, Fiverr brief, brand assets) — never committed
+marketing-kit/
+
 # Environment files
 .env
 .env.*
