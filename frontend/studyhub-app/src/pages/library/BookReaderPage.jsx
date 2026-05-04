@@ -6,7 +6,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useParams, useNavigate } from 'react-router-dom'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { IconArrowLeft } from '../../components/Icons'
 import { Skeleton } from '../../components/Skeleton'
@@ -56,19 +56,31 @@ export default function BookReaderPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book, volumeId])
 
-  // Save progress periodically while reading
+  // Save progress periodically while reading. The interval reads the
+  // CURRENT progress through a ref so the timer is created exactly once
+  // per (book, iframeLoaded) pair. Earlier version listed `progress` in
+  // deps, which tore down + recreated the interval on every progress
+  // update (saveProgress mutated progress, dep changed, interval reset),
+  // so the 60s save NEVER actually fired in practice.
+  // (Bug audit 2026-05-03, HIGH #1.)
+  const progressRef = useRef(progress)
   useEffect(() => {
-    if (!iframeLoaded || !book) return
+    progressRef.current = progress
+  }, [progress])
+
+  useEffect(() => {
+    if (!iframeLoaded || !book) return undefined
 
     const interval = setInterval(() => {
-      const currentPct = progress?.percentage || 0
+      const currentPct = progressRef.current?.percentage || 0
       if (currentPct < 100) {
         saveProgress('viewer', Math.min(currentPct + 2, 100))
       }
     }, 60000)
 
     return () => clearInterval(interval)
-  }, [iframeLoaded, book, progress, saveProgress])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iframeLoaded, book])
 
   const handleIframeLoad = useCallback(() => setIframeLoaded(true), [])
   const handleIframeError = useCallback(() => setIframeError(true), [])

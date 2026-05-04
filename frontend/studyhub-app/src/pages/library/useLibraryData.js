@@ -15,6 +15,7 @@ export default function useLibraryData() {
   const [totalCount, setTotalCount] = useState(0)
   const [usingCache, setUsingCache] = useState(false)
   const [unavailable, setUnavailable] = useState(false)
+  const [endOfResults, setEndOfResults] = useState(false)
 
   // Extract query params
   const search = searchParams.get('search') || ''
@@ -40,6 +41,7 @@ export default function useLibraryData() {
       if (cached && cached.data) {
         setBooks(cached.data.books || [])
         setTotalCount(cached.data.totalCount || 0)
+        setEndOfResults(Boolean(cached.data.endOfResults))
         setError('')
 
         const age = Date.now() - cached.timestamp
@@ -83,9 +85,16 @@ export default function useLibraryData() {
         setTotalCount(data.totalCount || 0)
         setUsingCache(data.source === 'cache')
         setUnavailable(data.unavailable === true)
+        setEndOfResults(data.endOfResults === true)
         setError('')
 
-        swrCache.set(cacheKey, { data, timestamp: Date.now() })
+        // Don't cache the empty end-of-results page — when the upstream cap
+        // shifts (e.g. Google Books surfaces deeper results next week) we
+        // want a stale cache entry to revalidate rather than gaslight the
+        // user into thinking the catalog is permanently empty here.
+        if (!data.endOfResults) {
+          swrCache.set(cacheKey, { data, timestamp: Date.now() })
+        }
       } catch (err) {
         if (!isBackground) {
           const msg = getApiErrorMessage(err)
@@ -101,8 +110,9 @@ export default function useLibraryData() {
     fetchBooks()
   }, [search, category, sort, page, language])
 
-  // Prefetch next page
+  // Prefetch next page (only when we don't already know it's empty)
   useEffect(() => {
+    if (endOfResults) return undefined
     const nextPage = page + 1
     const params = new URLSearchParams()
     if (search) params.append('search', search)
@@ -122,7 +132,10 @@ export default function useLibraryData() {
         })
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
-            if (data) {
+            // Don't cache `endOfResults` responses — they'd suppress a real
+            // retry once the upstream catalog grows. Mirror the rule in
+            // fetchFromApi above.
+            if (data && !data.endOfResults) {
               swrCache.set(cacheKey, { data, timestamp: Date.now() })
             }
           })
@@ -131,7 +144,8 @@ export default function useLibraryData() {
 
       return () => clearTimeout(timer)
     }
-  }, [search, category, sort, page, language])
+    return undefined
+  }, [search, category, sort, page, language, endOfResults])
 
   // Helper functions to update query params
   const setSearch = useCallback(
@@ -194,6 +208,7 @@ export default function useLibraryData() {
     error,
     usingCache,
     unavailable,
+    endOfResults,
     page,
     totalCount,
     search,

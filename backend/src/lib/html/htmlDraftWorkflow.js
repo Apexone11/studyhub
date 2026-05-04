@@ -12,7 +12,8 @@ const {
   generateTierExplanation,
   groupFindingsByCategory,
 } = require('./htmlSecurity')
-const { sendHighRiskSheetAlert } = require('../email/email')
+// sendHighRiskSheetAlert moved to sheetReviewer.service.js (escalate branch
+// only) per the AI-first review policy 2026-05-03.
 const { createNotification } = require('../notify')
 const { reviewSheetAndUpdateStatus, isAiReviewEnabled } = require('../../modules/sheetReviewer')
 
@@ -182,16 +183,28 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
   const scan = await runHtmlScanNow(prisma, { sheetId })
   const tier = scan.tier
 
-  // Route by tier
+  // Route by tier (2026-05-03 AI-first review model):
+  //   Tier 0 → auto-publish.
+  //   Tier 1 → auto-publish after user acks the findings.
+  //   Tier 2 → status='pending_review', AI reviewer runs immediately and
+  //            either approves (→ published), rejects (→ rejected), or
+  //            escalates (stays pending_review for human admin). Admins
+  //            are notified ONLY for the escalation path so the queue
+  //            stays small ("special cases" only).
+  //   Tier 3 → AUTO-REJECT immediately. Critical findings (credential
+  //            capture, miner+obfuscation, 3+ high-risk categories) are
+  //            unambiguous malware patterns; quarantine→admin-queue is
+  //            unnecessary because admins will reject these anyway. The
+  //            user is notified with the AI-readable reason via the
+  //            `sheet_rejected` notification fan-out.
   let nextStatus
+  let rejectReason = null
   switch (tier) {
     case RISK_TIER.CLEAN:
-      // Tier 0: auto-publish
       nextStatus = 'published'
       break
 
     case RISK_TIER.FLAGGED:
-      // Tier 1: auto-publish but require acknowledgement
       if (!sheet.htmlScanAcknowledgedAt) {
         const error = new Error(
           'This sheet contains flagged HTML features. Acknowledge the findings before publishing.',
@@ -205,53 +218,59 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
       break
 
     case RISK_TIER.HIGH_RISK:
-      // Tier 2: pending admin review
+      // AI reviewer fires below as fire-and-forget. Until it returns,
+      // the sheet sits in pending_review. The vast majority resolve in
+      // <30s without admin involvement.
       nextStatus = 'pending_review'
       break
 
-    case RISK_TIER.QUARANTINED:
-      // Tier 3: quarantined
-      nextStatus = 'quarantined'
+    case RISK_TIER.QUARANTINED: {
+      // Auto-reject. The categorization that produced Tier 3 is the
+      // safety review — there is nothing for an admin to add by re-
+      // reviewing it. Critical-severity findings (e.g. credential
+      // capture) are explicit malware patterns.
+      nextStatus = 'rejected'
+      const criticalFinding = scan.findings.find((f) => f.severity === 'critical')
+      rejectReason = criticalFinding
+        ? `Auto-rejected: ${criticalFinding.message}`
+        : 'Auto-rejected: multiple high-risk patterns detected.'
       break
+    }
 
     default:
       nextStatus = 'published'
   }
 
-  // Notify admins for Tier 2+
-  if (tier >= RISK_TIER.HIGH_RISK) {
-    const username = sheet.author?.username || user.username || `User #${user.userId}`
-    sendHighRiskSheetAlert({
-      sheetId,
-      sheetTitle: sheet.title,
-      username,
-      flags: scan.findings.map((f) => f.message),
-    }).catch((err) =>
-      console.error('[htmlDraftWorkflow] Failed to send high-risk alert:', err.message),
-    )
+  // Tier 2: do NOT page admins on every submission. The AI reviewer
+  // (sheetReviewer.service.reviewSheetAndUpdateStatus) runs fire-and-forget
+  // below and emits the admin alert + notification ONLY when the AI
+  // escalates (low-confidence cases the model couldn't resolve). This is
+  // the AI-first model the founder approved 2026-05-03 — admins should
+  // see "special cases" only, not the full Tier 2 firehose. The
+  // sendHighRiskSheetAlert + admin notification fan-out lives in
+  // sheetReviewer.service.js's escalation branch (Copilot review #4).
 
-    prisma.user
-      .findMany({ where: { role: 'admin' }, select: { id: true } })
-      .then((admins) => {
-        for (const admin of admins) {
-          createNotification(prisma, {
-            userId: admin.id,
-            type: 'moderation',
-            message: `High-risk HTML sheet "${sheet.title || 'Untitled'}" submitted by ${username} — review required.`,
-            actorId: user.userId,
-            sheetId,
-            linkPath: '/admin?tab=sheets',
-            priority: 'high',
-          }).catch(() => {})
-        }
-      })
-      .catch((err) => console.error('[htmlDraftWorkflow] Failed to notify admins:', err.message))
+  // Tier 3 — notify the AUTHOR that their sheet was auto-rejected with the
+  // reason so they can fix it and resubmit. CLAUDE.md ESSENTIAL list
+  // includes 'sheet_rejected' so this bypasses block filters.
+  if (tier === RISK_TIER.QUARANTINED) {
+    createNotification(prisma, {
+      userId: user.userId,
+      type: 'sheet_rejected',
+      message:
+        rejectReason ||
+        `Your sheet "${sheet.title || 'Untitled'}" was auto-rejected by the safety scanner.`,
+      sheetId,
+      linkPath: `/sheets/${sheetId}/lab`,
+      priority: 'high',
+    }).catch(() => {})
   }
 
   const updated = await prisma.studySheet.update({
     where: { id: sheetId },
     data: {
       status: nextStatus,
+      ...(rejectReason ? { reviewReason: rejectReason } : {}),
     },
     include: {
       author: { select: { id: true, username: true } },

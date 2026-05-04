@@ -57,6 +57,8 @@ export const CLARITY_PROJECT_ID =
 export const GOOGLE_CLIENT_ID =
   runtimeConfig.GOOGLE_CLIENT_ID || import.meta.env.VITE_GOOGLE_CLIENT_ID || ''
 
-export const TENOR_API_KEY = runtimeConfig.TENOR_API_KEY || import.meta.env.VITE_TENOR_API_KEY || ''
+// TENOR_API_KEY is intentionally NOT exported. GIF search now proxies through
+// the backend at /api/gifs/search so the Tenor key never ships in the client
+// bundle. Provision the key as `TENOR_API_KEY` on the backend.
 
 export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`

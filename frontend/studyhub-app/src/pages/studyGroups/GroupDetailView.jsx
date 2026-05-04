@@ -5,7 +5,7 @@
  * Discussions, and Members. Handles editing, deletion, joining, and leaving.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { useSession } from '../../lib/session-context'
 import { useStudyGroupsData } from './useStudyGroupsData'
@@ -26,6 +26,34 @@ import ReportGroupModal from './ReportGroupModal'
 import { styles } from './studyGroupsStyles'
 import { IconPen, IconFlag, IconLock } from '../../components/Icons'
 
+function RailCard({ title, children }) {
+  return (
+    <section
+      style={{
+        background: 'var(--sh-surface)',
+        border: '1px solid var(--sh-border)',
+        borderRadius: 14,
+        padding: '14px 16px',
+        boxShadow: '0 2px 10px rgba(15,23,42,0.04)',
+      }}
+    >
+      <h3
+        style={{
+          margin: '0 0 10px',
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          color: 'var(--sh-muted)',
+        }}
+      >
+        {title}
+      </h3>
+      <div style={{ display: 'grid', gap: 10, fontSize: 13, lineHeight: 1.5 }}>{children}</div>
+    </section>
+  )
+}
+
 export default function GroupDetailView({ groupId }) {
   const navigate = useNavigate()
   const { user } = useSession()
@@ -33,7 +61,35 @@ export default function GroupDetailView({ groupId }) {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [backgroundPickerOpen, setBackgroundPickerOpen] = useState(false)
   const [reportModalOpen, setReportModalOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState('overview')
+  // Tab + post-id deep-link via `?tab=discussions&post=<id>`. Notifications
+  // emit this URL shape so a click on a "post approved" / "replied to your
+  // post" / "pinned" notification lands the user directly on the affected
+  // thread instead of the Overview tab (Copilot finding 2026-05-03).
+  const [searchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const postParam = Number.parseInt(searchParams.get('post') || '', 10)
+  const VALID_TABS = ['overview', 'discussions', 'resources', 'sessions', 'members']
+  const [activeTab, setActiveTab] = useState(VALID_TABS.includes(tabParam) ? tabParam : 'overview')
+  const [focusedPostId, setFocusedPostId] = useState(
+    Number.isInteger(postParam) && postParam > 0 ? postParam : null,
+  )
+
+  // Re-sync state when the user navigates from one notification to another
+  // on the SAME route (React Router updates search params without
+  // remounting). Without this, a second notification click strands the
+  // user on the previous tab/post (Copilot review #1, 2026-05-03).
+  useEffect(() => {
+    if (VALID_TABS.includes(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam)
+    }
+    const nextPost = Number.isInteger(postParam) && postParam > 0 ? postParam : null
+    if (nextPost !== focusedPostId) {
+      setFocusedPostId(nextPost)
+    }
+    // VALID_TABS is a stable literal; tabParam/postParam are the inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam, postParam])
+  const initialFocusedPostId = focusedPostId
 
   const {
     activeGroup,
@@ -73,6 +129,7 @@ export default function GroupDetailView({ groupId }) {
     discussionsLoading,
     loadDiscussions,
     createPost,
+    updatePost,
     addReply,
     resolvePost,
     deletePost,
@@ -111,6 +168,49 @@ export default function GroupDetailView({ groupId }) {
       loadMembers(groupId)
     }
   }, [activeTab, groupId, loadMembers])
+
+  // Load discussions when the Discussions tab is active. Sibling tabs
+  // already had their own loaders (resources at line 131, members at
+  // line 138) but the discussions equivalent was missing, so the
+  // Discussions tab rendered an empty list on first visit and only
+  // populated via Socket.io push events. Combined with the response-
+  // key fix in useGroupDiscussions.js this gets the tab to actually
+  // show data on initial mount.
+  useEffect(() => {
+    if (activeTab === 'discussions' && activeGroup?.isMember) {
+      loadDiscussions(groupId)
+    }
+  }, [activeTab, groupId, activeGroup, loadDiscussions])
+
+  // Light prefetch of members for the right rail "Members online now"
+  // card on the Discussions tab. Without this, opening Discussions
+  // before ever visiting Members leaves the rail card stuck on
+  // "Loading…" because `members` is `[]`. This fires the same loader
+  // the Members tab uses, so by the time the user clicks Members the
+  // data is already cached.
+  //
+  // No `members.length === 0` short-circuit: it leaks stale data
+  // across groups (Copilot review 2026-05-03). When the user switches
+  // from Group A to Group B with the Discussions tab active, A's
+  // `members` array would still be non-empty and the prefetch would
+  // skip B's load. The loader is cheap and the discussions tab is
+  // the only call site, so re-firing is acceptable.
+  useEffect(() => {
+    if (activeTab === 'discussions' && activeGroup?.isMember) {
+      loadMembers(groupId)
+    }
+  }, [activeTab, groupId, activeGroup, loadMembers])
+
+  // Same prefetch for the right-rail "Recent activity" card. Without
+  // this, opening Discussions before ever visiting Overview leaves
+  // the activity card on "No activity yet." even though there's
+  // plenty of data — `activities` is just unfetched. Same stale-data
+  // fix as the members prefetch above (Copilot review 2026-05-03).
+  useEffect(() => {
+    if (activeTab === 'discussions' && activeGroup?.isMember) {
+      loadActivity(groupId)
+    }
+  }, [activeTab, groupId, activeGroup, loadActivity])
 
   if (activeGroupLoading) {
     return (
@@ -635,14 +735,20 @@ export default function GroupDetailView({ groupId }) {
               {tab.label}
               {tab.count > 0 && (
                 <span
+                  aria-hidden
                   style={{
-                    marginLeft: 5,
                     fontSize: 11,
                     fontWeight: 700,
-                    padding: '1px 6px',
-                    borderRadius: 8,
+                    padding: '2px 8px',
+                    borderRadius: 999,
                     background: activeTab === tab.key ? 'var(--sh-brand)' : 'var(--sh-soft)',
                     color: activeTab === tab.key ? '#fff' : 'var(--sh-muted)',
+                    minWidth: 22,
+                    textAlign: 'center',
+                    border:
+                      activeTab === tab.key
+                        ? '1px solid var(--sh-brand)'
+                        : '1px solid var(--sh-border)',
                   }}
                 >
                   {tab.count}
@@ -687,22 +793,131 @@ export default function GroupDetailView({ groupId }) {
             />
           )}
           {activeTab === 'discussions' && (
-            <GroupDiscussionsTab
-              groupId={groupId}
-              discussions={discussions}
-              loading={discussionsLoading}
-              loadDiscussions={loadDiscussions}
-              onCreatePost={createPost}
-              onAddReply={addReply}
-              onResolve={resolvePost}
-              onDeletePost={deletePost}
-              onUpvote={(postId) => toggleUpvote(groupId, postId)}
-              onApprovePost={(postId) => approvePost(groupId, postId)}
-              onRejectPost={(postId) => rejectPost(groupId, postId)}
-              isMember={isMember}
-              isAdminOrMod={isAdminOrMod}
-              userId={currentUserId}
-            />
+            <div className="sh-group-discussions-layout" style={styles.discussionsLayout}>
+              <div style={{ minWidth: 0 }}>
+                <GroupDiscussionsTab
+                  groupId={groupId}
+                  discussions={discussions}
+                  loading={discussionsLoading}
+                  loadDiscussions={loadDiscussions}
+                  initialFocusedPostId={initialFocusedPostId}
+                  // Every callback below MUST close over `groupId` because the
+                  // child components call them with only the post-scoped args
+                  // (`postId`, etc.). Wiring `onDeletePost={deletePost}` raw
+                  // made `deletePost(postId)` resolve to
+                  // `deletePost(groupId=postId, postId=undefined)` and the URL
+                  // became `/api/study-groups/<postId>/discussions/undefined`
+                  // which 400'd with "Invalid group ID." Same shape was
+                  // broken on create, reply, and resolve — fixed in one pass
+                  // here by wrapping all of them.
+                  onCreatePost={(postData) => createPost(groupId, postData)}
+                  onAddReply={(postId, replyData) => addReply(groupId, postId, replyData)}
+                  onResolve={(postId) => resolvePost(groupId, postId)}
+                  onDeletePost={(postId) => deletePost(groupId, postId)}
+                  onTogglePin={(postId, nextPinned) =>
+                    updatePost(groupId, postId, { pinned: nextPinned })
+                  }
+                  onUpvote={(postId) => toggleUpvote(groupId, postId)}
+                  onApprovePost={(postId) => approvePost(groupId, postId)}
+                  onRejectPost={(postId) => rejectPost(groupId, postId)}
+                  isMember={isMember}
+                  isAdminOrMod={isAdminOrMod}
+                  userId={currentUserId}
+                />
+              </div>
+              {/* Right rail (320px wide, hidden under 1024px via the
+                  matching @media query in studyGroupsStyles.js). */}
+              <aside
+                className="sh-group-discussions-rail"
+                style={styles.discussionsRail}
+                aria-label="Group sidebar"
+              >
+                <RailCard title="Upcoming sessions">
+                  {upcomingSessionsPreview && upcomingSessionsPreview.length > 0 ? (
+                    upcomingSessionsPreview.slice(0, 3).map((s) => (
+                      <div key={s.id} style={styles.railRow}>
+                        <div style={{ fontWeight: 700, color: 'var(--sh-heading)' }}>
+                          {s.title || 'Untitled session'}
+                        </div>
+                        <div style={{ fontSize: 12, color: 'var(--sh-muted)' }}>
+                          {s.startsAt
+                            ? new Date(s.startsAt).toLocaleString(undefined, {
+                                weekday: 'short',
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              })
+                            : 'TBD'}
+                          {s.location ? ` · ${s.location}` : ''}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div style={styles.railEmpty}>No sessions scheduled.</div>
+                  )}
+                </RailCard>
+                <RailCard title="Recent activity">
+                  {Array.isArray(activities) && activities.length > 0 ? (
+                    activities.slice(0, 5).map((a, idx) => (
+                      <div key={a.id ?? idx} style={styles.railRow}>
+                        <span style={{ color: 'var(--sh-text)' }}>
+                          {a.actorUsername ? <strong>{a.actorUsername}</strong> : 'Someone'}{' '}
+                          {a.summary || a.action || 'made an update'}
+                        </span>
+                        {a.createdAt ? (
+                          <span style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                            {' · '}
+                            {new Date(a.createdAt).toLocaleDateString(undefined, {
+                              month: 'short',
+                              day: 'numeric',
+                            })}
+                          </span>
+                        ) : null}
+                      </div>
+                    ))
+                  ) : (
+                    <div style={styles.railEmpty}>No activity yet.</div>
+                  )}
+                </RailCard>
+                <RailCard title="Members">
+                  {Array.isArray(members) && members.length > 0 ? (
+                    members.slice(0, 6).map((m) => (
+                      <div
+                        key={m.id || m.userId}
+                        style={{
+                          ...styles.railRow,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                        }}
+                      >
+                        <span
+                          aria-hidden
+                          style={{
+                            width: 8,
+                            height: 8,
+                            borderRadius: '50%',
+                            background: 'var(--sh-success)',
+                            flexShrink: 0,
+                          }}
+                        />
+                        <span style={{ color: 'var(--sh-text)' }}>
+                          {m.user?.username || m.username || 'Member'}
+                        </span>
+                      </div>
+                    ))
+                  ) : (
+                    // Honest copy: there's no real online-presence wire
+                    // yet, and members may not be loaded if the user
+                    // hasn't visited the Members tab. Point them at
+                    // that tab instead of pretending a fetch is in
+                    // flight forever.
+                    <div style={styles.railEmpty}>
+                      Open the Members tab to see who&rsquo;s here.
+                    </div>
+                  )}
+                </RailCard>
+              </aside>
+            </div>
           )}
           {activeTab === 'members' && (
             <GroupMembersTab

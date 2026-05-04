@@ -11,6 +11,7 @@ const path = require('node:path')
 const crypto = require('node:crypto')
 const multer = require('multer')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { readLimiter, writeLimiter, groupMediaUploadLimiter } = require('../../lib/rateLimiters')
@@ -33,6 +34,10 @@ const {
 const { checkUrl } = require('../../lib/linkSafety')
 
 const router = express.Router({ mergeParams: true })
+
+// CLAUDE.md A11 — defense in depth on every resource write
+// (POST/PATCH/DELETE incl. multipart upload). Short-circuits GETs.
+router.use(originAllowlist())
 
 /* ── Multer config for group media uploads ─────────────────────────────
  * Local dev pushes files to backend/uploads/group-media via diskStorage.

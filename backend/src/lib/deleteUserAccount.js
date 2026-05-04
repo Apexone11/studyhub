@@ -299,7 +299,14 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
     await tx.video.deleteMany({ where: { userId } })
 
     // ── Messaging cleanup (Conversation.createdById has no cascade) ──
-    // Delete messages sent by this user (soft-delete reactions/attachments cascade)
+    // Delete messages sent by this user (soft-delete reactions/attachments cascade).
+    //
+    // Order matters: Message.sender has NO `onDelete` directive in
+    // schema.prisma, so Prisma 6 defaults to Restrict. Deleting the user
+    // FIRST would crash with a foreign-key constraint violation. This
+    // delete-messages-then-user ordering is the contract — do not reorder
+    // without first migrating the schema to `onDelete: SetNull` (audit
+    // 2026-05-03).
     await tx.messageReaction.deleteMany({ where: { userId } })
     await tx.message.deleteMany({ where: { senderId: userId } })
     // Remove user from all conversations as participant

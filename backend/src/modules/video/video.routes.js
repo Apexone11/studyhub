@@ -314,12 +314,12 @@ router.post('/upload/chunk', requireAuth, videoUploadChunkLimiter, async (req, r
       return res.status(400).json({ error: 'Missing required upload headers.' })
     }
 
-    // Validate chunk size
-    if (
-      req.headers['content-length'] &&
-      parseInt(req.headers['content-length']) > CHUNK_SIZE + 1024
-    ) {
-      return res.status(413).json({ error: 'Chunk exceeds maximum size.' })
+    // Validate chunk size (A12: explicit radix + integer guard).
+    if (req.headers['content-length']) {
+      const contentLen = Number.parseInt(req.headers['content-length'], 10)
+      if (!Number.isFinite(contentLen) || contentLen > CHUNK_SIZE + 1024) {
+        return res.status(413).json({ error: 'Chunk exceeds maximum size.' })
+      }
     }
 
     // Verify ownership

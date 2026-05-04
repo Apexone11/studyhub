@@ -18,6 +18,7 @@ import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { useSocket } from '../../lib/useSocket'
+import { showToast } from '../../lib/toast'
 import { SOCKET_EVENTS } from '../../lib/socketEvents'
 import {
   getNotificationIcon,
@@ -35,6 +36,8 @@ const FILTERS = [
   { id: 'social', label: NOTIFICATION_GROUP_LABELS.social },
   { id: 'content', label: NOTIFICATION_GROUP_LABELS.content },
   { id: 'groups', label: NOTIFICATION_GROUP_LABELS.groups },
+  { id: 'sheets', label: NOTIFICATION_GROUP_LABELS.sheets },
+  { id: 'ai', label: NOTIFICATION_GROUP_LABELS.ai },
   { id: 'system', label: NOTIFICATION_GROUP_LABELS.system },
 ]
 
@@ -51,18 +54,12 @@ export default function NotificationsPage() {
   const [sessionExpired, setSessionExpired] = useState(false)
   const [loadError, setLoadError] = useState(false)
 
-  /* eslint-disable react-hooks/set-state-in-effect --
-   * Re-enable polling when the user re-authenticates in another tab and the
-   * session context delivers a fresh user object. Without this, a single 401
-   * permanently wedges the page until a hard refresh. There is no external
-   * system to sync with — this is the simplest correct pattern. */
   useEffect(() => {
     if (user) {
       setSessionExpired(false)
       setLoadError(false)
     }
   }, [user])
-  /* eslint-enable react-hooks/set-state-in-effect */
 
   async function refresh({ signal, startTransition } = {}) {
     if (!user) return
@@ -128,35 +125,84 @@ export default function NotificationsPage() {
     return notifications.filter((n) => allowedTypes.includes(n.type))
   }, [filter, notifications])
 
+  // CLAUDE.md A4 + Copilot review 2026-05-03: optimistic updates with
+  // PER-ROW rollback. The earlier "snapshot the whole array, restore on
+  // failure" pattern dropped notifications that arrived via socket push
+  // or polling while the request was in flight. Each handler below now
+  // mutates ONLY the rows its action touches (target row by id, or all
+  // rows that were unread at the time of the call), so unrelated newly-
+  // arrived rows survive rollback intact.
   async function markAllRead() {
     if (unreadCount === 0) return
-    await fetch(`${API}/api/notifications/read-all`, {
-      method: 'PATCH',
-      ...authHeaders(),
-      credentials: 'include',
-    }).catch(() => {})
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
-    setUnreadCount(0)
+    // Capture which row IDs were unread when the user clicked. On
+    // failure we re-mark exactly those rows as unread; rows that arrived
+    // mid-request (still unread, not in the snapshot) are left alone.
+    const previouslyUnreadIds = new Set(notifications.filter((n) => !n.read).map((n) => n.id))
+    const prevUnread = unreadCount
+    setNotifications((prev) =>
+      prev.map((n) => (previouslyUnreadIds.has(n.id) ? { ...n, read: true } : n)),
+    )
+    setUnreadCount((current) => Math.max(0, current - previouslyUnreadIds.size))
+    try {
+      const res = await fetch(`${API}/api/notifications/read-all`, {
+        method: 'PATCH',
+        ...authHeaders(),
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    } catch {
+      setNotifications((prev) =>
+        prev.map((n) => (previouslyUnreadIds.has(n.id) ? { ...n, read: false } : n)),
+      )
+      setUnreadCount(prevUnread)
+      showToast('Could not mark all as read. Try again.', 'error')
+    }
   }
 
   async function clearRead() {
-    await fetch(`${API}/api/notifications/read`, {
-      method: 'DELETE',
-      ...authHeaders(),
-      credentials: 'include',
-    }).catch(() => {})
-    setNotifications((prev) => prev.filter((n) => !n.read))
+    // Snapshot only the rows we're about to remove. On failure, re-insert
+    // them while preserving any rows that arrived during the request.
+    const removed = notifications.filter((n) => n.read)
+    if (removed.length === 0) return
+    const removedIds = new Set(removed.map((n) => n.id))
+    setNotifications((prev) => prev.filter((n) => !removedIds.has(n.id)))
+    try {
+      const res = await fetch(`${API}/api/notifications/read`, {
+        method: 'DELETE',
+        ...authHeaders(),
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    } catch {
+      setNotifications((prev) => {
+        const have = new Set(prev.map((n) => n.id))
+        const restored = removed.filter((r) => !have.has(r.id))
+        // Restore by createdAt order so the list stays sorted.
+        return [...prev, ...restored].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      })
+      showToast('Could not clear read notifications.', 'error')
+    }
   }
 
   async function markOneRead(notif) {
     if (!notif.read && user) {
-      fetch(`${API}/api/notifications/${notif.id}/read`, {
-        method: 'PATCH',
-        ...authHeaders(),
-        credentials: 'include',
-      }).catch(() => {})
       setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)))
       setUnreadCount((c) => Math.max(0, c - 1))
+      try {
+        const res = await fetch(`${API}/api/notifications/${notif.id}/read`, {
+          method: 'PATCH',
+          ...authHeaders(),
+          credentials: 'include',
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      } catch {
+        // Per-row rollback: only touch THIS notification, preserving
+        // socket pushes that landed during the in-flight request.
+        setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: false } : n)))
+        setUnreadCount((c) => c + 1)
+        // Silent on this one — the user already navigated, a toast on a
+        // background mark-read failure would be more confusing than helpful.
+      }
     }
     if (typeof notif.linkPath === 'string' && notif.linkPath.startsWith('/')) {
       navigate(notif.linkPath)
@@ -169,16 +215,27 @@ export default function NotificationsPage() {
 
   async function deleteOne(e, notifId) {
     e.stopPropagation()
-    fetch(`${API}/api/notifications/${notifId}`, {
-      method: 'DELETE',
-      ...authHeaders(),
-      credentials: 'include',
-    }).catch(() => {})
-    setNotifications((prev) => {
-      const removed = prev.find((n) => n.id === notifId)
-      if (removed && !removed.read) setUnreadCount((c) => Math.max(0, c - 1))
-      return prev.filter((n) => n.id !== notifId)
-    })
+    // Snapshot just the one row so rollback re-inserts it without
+    // touching any other notifications that arrived since.
+    const removed = notifications.find((n) => n.id === notifId)
+    if (!removed) return
+    setNotifications((prev) => prev.filter((n) => n.id !== notifId))
+    if (!removed.read) setUnreadCount((c) => Math.max(0, c - 1))
+    try {
+      const res = await fetch(`${API}/api/notifications/${notifId}`, {
+        method: 'DELETE',
+        ...authHeaders(),
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    } catch {
+      setNotifications((prev) => {
+        if (prev.some((n) => n.id === notifId)) return prev
+        return [...prev, removed].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+      })
+      if (!removed.read) setUnreadCount((c) => c + 1)
+      showToast('Could not delete notification.', 'error')
+    }
   }
 
   if (!user) return null

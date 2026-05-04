@@ -6,6 +6,7 @@
 const Anthropic = require('@anthropic-ai/sdk')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
+const { createNotification } = require('../../lib/notify')
 const { buildContext, redactPII } = require('./ai.context')
 const {
   DEFAULT_MODEL,
@@ -33,34 +34,39 @@ function getClient() {
 
 // ── Rate-limit helpers ─────────────────────────────────────────────
 
+// Single source of truth for plan + active subscription. Encapsulates the
+// `currentPeriodEnd` expiry check (gift subscriptions) and the
+// `past_due → free` cutoff (no more 3-week free Pro after card decline).
+const { getUserPlan, isPro } = require('../../lib/getUserPlan')
+
 /**
  * Get the daily message limit for a user.
  */
 async function getDailyLimit(user) {
   if (user.role === 'admin') return DAILY_LIMITS.admin
 
-  // Check subscription plan
+  const userId = user.id || user.userId
+  // Route through getUserPlan so the same expiry + past_due rules the rest
+  // of the app uses also apply to AI quota (Copilot review #1, 2026-05-03).
+  // Previously this had its own ['active','trialing','past_due'] copy and
+  // skipped currentPeriodEnd, so a Pro user whose card had declined kept
+  // 120/day for the entire 3-week Stripe retry chain.
   try {
-    const sub = await prisma.subscription.findUnique({
-      where: { userId: user.id || user.userId },
-      select: { plan: true, status: true },
-    })
-    if (sub && ['active', 'trialing', 'past_due'].includes(sub.status) && sub.plan !== 'free') {
-      return DAILY_LIMITS.pro
-    }
+    const plan = await getUserPlan(userId)
+    if (isPro(plan)) return DAILY_LIMITS.pro
   } catch {
-    // Subscription table may not exist yet — graceful degradation
+    /* graceful degradation */
   }
 
-  // Check donor status (donors get elevated limits)
+  // Donor status (donors get elevated limits even without an active sub)
   try {
     const donation = await prisma.donation.findFirst({
-      where: { userId: user.id || user.userId, status: 'completed' },
+      where: { userId, status: 'completed' },
       select: { id: true },
     })
     if (donation) return DAILY_LIMITS.donor
   } catch {
-    // Graceful degradation
+    /* graceful degradation */
   }
 
   if (user.isStaffVerified || user.emailVerified) return DAILY_LIMITS.verified
@@ -106,20 +112,18 @@ async function incrementUsage(userId, tokens = 0) {
  */
 async function getWeeklyLimit(user) {
   if (user.role === 'admin') return WEEKLY_LIMITS.admin
+  const userId = user.id || user.userId
+  // Same getUserPlan routing as getDailyLimit — past_due no longer grants
+  // Pro, and gift subs respect currentPeriodEnd (Copilot review #1).
   try {
-    const sub = await prisma.subscription.findUnique({
-      where: { userId: user.id || user.userId },
-      select: { plan: true, status: true },
-    })
-    if (sub && ['active', 'trialing', 'past_due'].includes(sub.status) && sub.plan !== 'free') {
-      return WEEKLY_LIMITS.pro
-    }
+    const plan = await getUserPlan(userId)
+    if (isPro(plan)) return WEEKLY_LIMITS.pro
   } catch {
     /* graceful degradation */
   }
   try {
     const donation = await prisma.donation.findFirst({
-      where: { userId: user.id || user.userId, status: 'completed' },
+      where: { userId, status: 'completed' },
       select: { id: true },
     })
     if (donation) return WEEKLY_LIMITS.donor
@@ -333,6 +337,19 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   const usage = await getOrCreateUsage(userId)
   const limit = await getDailyLimit(user)
   if (usage.messageCount >= limit) {
+    // Persist a once-per-day inbox record so a user who runs out mid-flow
+    // has a durable signal + upgrade path, not just an SSE toast that
+    // disappears on reload. Deduped by UTC date so multiple hits in the
+    // same day collapse to one notification.
+    const today = new Date().toISOString().slice(0, 10)
+    createNotification(prisma, {
+      userId,
+      type: 'ai_quota_reached',
+      message: `You've used all ${limit} AI messages today. Upgrade to Pro for 4× the daily quota, or come back tomorrow.`,
+      linkPath: '/pricing',
+      priority: 'medium',
+      dedupKey: `ai_quota_reached:${userId}:daily:${today}`,
+    }).catch(() => {})
     sendSSE(res, {
       type: 'error',
       message: `Daily limit reached (${limit} messages). Resets at midnight UTC.`,
@@ -349,6 +366,29 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     const now = new Date()
     const dayOfWeek = now.getUTCDay()
     const daysUntilMonday = (8 - dayOfWeek) % 7 || 7
+    // Once-per-week inbox record. True ISO 8601 week label so the dedup
+    // key rolls over on Monday and handles the year-boundary edge case
+    // (2026-01-01 is ISO 2025-W53, etc.). Algorithm: take the Thursday of
+    // the current week (ISO weeks are anchored on Thursday), then count
+    // weeks from the first Thursday of that Thursday's year.
+    function isoWeekLabel(d) {
+      const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+      // Shift to Thursday of the current ISO week (ISO day 1=Mon..7=Sun).
+      const isoDay = dt.getUTCDay() || 7
+      dt.setUTCDate(dt.getUTCDate() + 4 - isoDay)
+      const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1))
+      const week = Math.ceil(((dt - yearStart) / 86400000 + 1) / 7)
+      return `${dt.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
+    }
+    const isoWeek = isoWeekLabel(now)
+    createNotification(prisma, {
+      userId,
+      type: 'ai_quota_reached',
+      message: `You've reached your weekly AI limit (${weeklyLimit} messages). Resets in ${daysUntilMonday} day${daysUntilMonday !== 1 ? 's' : ''}. Upgrade to Pro for a higher cap.`,
+      linkPath: '/pricing',
+      priority: 'medium',
+      dedupKey: `ai_quota_reached:${userId}:weekly:${isoWeek}`,
+    }).catch(() => {})
     sendSSE(res, {
       type: 'error',
       message: `Weekly limit reached (${weeklyLimit} messages). Resets in ${daysUntilMonday} day${daysUntilMonday !== 1 ? 's' : ''}.`,

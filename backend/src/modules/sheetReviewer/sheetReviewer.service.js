@@ -6,6 +6,9 @@
 const Anthropic = require('@anthropic-ai/sdk')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
+const { sendHighRiskSheetAlert } = require('../../lib/email/email')
+const { createNotification } = require('../../lib/notify')
+const { RISK_TIER } = require('../../lib/html/htmlSecurity')
 const {
   REVIEWER_MODEL,
   MAX_REVIEW_TOKENS,
@@ -222,6 +225,53 @@ async function reviewSheetAndUpdateStatus(
         inputTier: tier,
       },
     })
+
+    // AI-first review (2026-05-03 policy): admins are paged ONLY when the
+    // AI escalates a Tier-2 sheet. Approves and rejects resolve without
+    // human attention. Tier 1 escalations don't reach admins either —
+    // those are auto-published with the warning banner.
+    if (result.decision === REVIEW_DECISIONS.ESCALATE && tier >= RISK_TIER.HIGH_RISK) {
+      try {
+        const sheetRow = await prisma.studySheet.findUnique({
+          where: { id: sheetId },
+          select: {
+            id: true,
+            title: true,
+            userId: true,
+            author: { select: { username: true } },
+          },
+        })
+        if (sheetRow) {
+          const username = sheetRow.author?.username || `User #${sheetRow.userId}`
+          sendHighRiskSheetAlert({
+            sheetId,
+            sheetTitle: sheetRow.title,
+            username,
+            flags: (Array.isArray(scanFindings) ? scanFindings : []).map((f) =>
+              typeof f === 'string' ? f : f?.message || '',
+            ),
+          }).catch(() => {})
+
+          const admins = await prisma.user.findMany({
+            where: { role: 'admin' },
+            select: { id: true },
+          })
+          for (const admin of admins) {
+            createNotification(prisma, {
+              userId: admin.id,
+              type: 'moderation',
+              message: `AI escalated "${sheetRow.title || 'Untitled'}" by ${username} — admin review needed (low confidence).`,
+              actorId: sheetRow.userId,
+              sheetId,
+              linkPath: '/admin?tab=sheets',
+              priority: 'high',
+            }).catch(() => {})
+          }
+        }
+      } catch (alertErr) {
+        captureError(alertErr, { tags: { module: 'sheetReviewer.escalate' }, extra: { sheetId } })
+      }
+    }
   } catch (err) {
     captureError(err, { tags: { module: 'sheetReviewer' }, extra: { sheetId, tier } })
   }

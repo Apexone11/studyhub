@@ -534,6 +534,25 @@ async function handleSubscriptionDeleted(subscription) {
   })
 
   log.info({ userId, subscriptionId: subscription.id }, 'Subscription canceled')
+
+  // Notify the user so they aren't surprised when Pro features stop
+  // working. Stripe fires this for both voluntary cancels (user clicks
+  // "Cancel" in the portal) and involuntary ones (card expired, all
+  // retries exhausted) — both are equally important to surface.
+  try {
+    await createNotification(prisma, {
+      userId,
+      type: 'subscription_canceled',
+      message:
+        'Your StudyHub Pro subscription has ended. You can resubscribe anytime from Settings → Subscription.',
+      linkPath: '/settings?tab=subscription',
+    })
+  } catch (notifErr) {
+    log.warn(
+      { event: 'payments.subscription_canceled.notify_failed', userId, err: notifErr.message },
+      'Failed to send subscription_canceled notification',
+    )
+  }
 }
 
 /**

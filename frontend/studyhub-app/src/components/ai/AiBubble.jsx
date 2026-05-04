@@ -143,7 +143,11 @@ function AiBubbleInner() {
 
   const bubble = (
     <>
-      {/* Floating Button */}
+      {/* Floating Button — Figma 2026-05-03 redesign:
+          56px circle, AI gradient, violet glow drop-shadow, hover
+          scale 1.04. Streaming state adds a small pulsing dot at the
+          top-right of the FAB so the user knows a response is in
+          progress even after they close the popover. */}
       <button
         onClick={toggle}
         aria-label={isOpen ? 'Close Hub AI' : 'Open Hub AI'}
@@ -151,8 +155,8 @@ function AiBubbleInner() {
           position: 'fixed',
           bottom: 24,
           right: 24,
-          width: 52,
-          height: 52,
+          width: 56,
+          height: 56,
           borderRadius: '50%',
           background: 'var(--sh-ai-gradient)',
           color: '#fff',
@@ -161,14 +165,41 @@ function AiBubbleInner() {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          boxShadow: '0 4px 20px rgba(0,0,0,0.2)',
+          boxShadow: 'var(--sh-ai-glow, 0 10px 30px rgba(124, 58, 237, 0.35))',
           zIndex: 9998,
-          transition: 'transform 0.2s',
+          transition: 'transform 0.2s, box-shadow 0.2s',
         }}
-        onMouseEnter={(e) => (e.currentTarget.style.transform = 'scale(1.08)')}
-        onMouseLeave={(e) => (e.currentTarget.style.transform = 'scale(1)')}
+        onMouseEnter={(e) => {
+          e.currentTarget.style.transform = 'scale(1.04)'
+          e.currentTarget.style.boxShadow = '0 14px 36px rgba(124, 58, 237, 0.5)'
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.transform = 'scale(1)'
+          e.currentTarget.style.boxShadow =
+            'var(--sh-ai-glow, 0 10px 30px rgba(124, 58, 237, 0.35))'
+        }}
       >
         {isOpen ? <IconX size={22} /> : <IconSpark size={24} />}
+        {/* Streaming presence dot — only when the bubble is closed AND
+            an SSE stream is in flight. `chat.streaming` lives on the
+            shared chat hook used by both AiPage and AiBubble. */}
+        {!isOpen && chat?.streaming ? (
+          <span
+            aria-hidden
+            style={{
+              position: 'absolute',
+              top: 4,
+              right: 4,
+              width: 12,
+              height: 12,
+              borderRadius: '50%',
+              background: '#fff',
+              border: '2px solid #7c3aed',
+              boxShadow: '0 0 0 3px rgba(124, 58, 237, 0.35)',
+              animation: 'sh-ai-thinking 1.2s ease-in-out infinite',
+            }}
+          />
+        ) : null}
       </button>
 
       {/* Chat Window */}

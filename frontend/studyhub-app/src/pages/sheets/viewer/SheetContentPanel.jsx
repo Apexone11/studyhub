@@ -537,11 +537,32 @@ export default function SheetContentPanel({
                   >
                     Interactive
                   </button>
+                  <Link
+                    to={`/sheets/preview/html/${sheet.id}${viewerInteractive ? '?interactive=1' : ''}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{
+                      padding: '4px 12px',
+                      borderLeft: '1px solid var(--sh-border)',
+                      fontSize: 11,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      fontFamily: FONT,
+                      background: 'var(--sh-soft)',
+                      color: 'var(--sh-subtext)',
+                      textDecoration: 'none',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                    }}
+                    title="Open the full sandbox preview in a new tab"
+                  >
+                    Sandbox ↗
+                  </Link>
                 </div>
                 <span style={{ fontSize: 10, color: 'var(--sh-muted)', lineHeight: 1.3 }}>
                   {viewerInteractive
-                    ? 'Scripts enabled in a locked sandbox — no access to your account or network.'
-                    : 'Scripts disabled for maximum security.'}
+                    ? 'Click, type, and run scripts inside the sheet — the sandbox keeps it isolated from your account and network.'
+                    : 'Scripts disabled for maximum security. Switch to Interactive to use the sheet.'}
                 </span>
               </div>
             ) : null}

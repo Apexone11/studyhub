@@ -84,10 +84,18 @@ function startInactiveSessionScheduler() {
   }
 
   // Run once ~60s after boot so migrations have settled, then every 24h.
-  sweepTimeout = setTimeout(runSweep, 60_000)
+  // Wrapped in runWithHeartbeat (CLAUDE.md A10) so a hung sweep emits
+  // job.start / job.success / job.failure events to pino + Sentry. The
+  // sweep deletes from the Session table so a silent stall would mean
+  // expired sessions never get revoked.
+  const { runWithHeartbeat } = require('./jobs/heartbeat')
+  const wrappedSweep = () =>
+    runWithHeartbeat('session.inactive_sweep', runSweep, { slaMs: 5 * 60_000 })
+
+  sweepTimeout = setTimeout(wrappedSweep, 60_000)
   if (typeof sweepTimeout.unref === 'function') sweepTimeout.unref()
 
-  sweepInterval = setInterval(runSweep, intervalMs)
+  sweepInterval = setInterval(wrappedSweep, intervalMs)
   if (typeof sweepInterval.unref === 'function') sweepInterval.unref()
 }
 

@@ -632,7 +632,14 @@ function AppRoutes() {
                       </PrivateRoute>
                     }
                   />
-                  <Route path="/notes/:id" element={<NoteViewerPage />} />
+                  <Route
+                    path="/notes/:id"
+                    element={
+                      <PrivateRoute>
+                        <NoteViewerPage />
+                      </PrivateRoute>
+                    }
+                  />
                   <Route
                     path="/announcements"
                     element={

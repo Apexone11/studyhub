@@ -86,6 +86,7 @@ const sectionsRoutes = require('./modules/sections')
 const materialsRoutes = require('./modules/materials')
 const creatorAuditRoutes = require('./modules/creatorAudit')
 const achievementsRoutes = require('./modules/achievements')
+const gifsRoutes = require('./modules/gifs')
 const crypto = require('node:crypto')
 const log = require('./lib/logger')
 const { httpLogger } = require('./lib/httpLogger')
@@ -705,6 +706,7 @@ app.use('/api/payments', paymentsRoutes)
 
 // Reviews module endpoints under /api/reviews.
 app.use('/api/reviews', reviewsRoutes)
+app.use('/api/gifs', gifsRoutes)
 
 // Phase 4: Plagiarism detection user-facing endpoints.
 app.use('/api/plagiarism', plagiarismRoutes)

@@ -452,10 +452,23 @@ export const styles = {
     background: 'var(--sh-surface)',
     padding: '0 var(--card-pad)',
     fontFamily: PAGE_FONT,
+    // Sticky tab bar from the Figma — keeps tabs reachable while
+    // scrolling long discussion lists. The 56px row sits below the
+    // global navbar (which is also sticky), so we offset by the
+    // navbar height (var(--nav-height) falls back to 0 if absent).
+    position: 'sticky',
+    top: 'var(--nav-height, 56px)',
+    zIndex: 5,
+    overflowX: 'auto',
+    minHeight: 56,
+    alignItems: 'stretch',
   },
 
   tabButton: {
-    padding: '12px 16px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: 6,
+    padding: '14px 18px',
     border: 'none',
     background: 'transparent',
     color: 'var(--sh-muted)',
@@ -464,7 +477,8 @@ export const styles = {
     cursor: 'pointer',
     fontFamily: PAGE_FONT,
     borderBottom: '2px solid transparent',
-    transition: 'all 0.12s',
+    transition: 'color 0.12s, border-color 0.12s',
+    whiteSpace: 'nowrap',
   },
 
   tabButtonActive: {
@@ -486,6 +500,38 @@ export const styles = {
     textAlign: 'center',
     color: 'var(--sh-muted)',
     fontSize: 'var(--type-base)',
+  },
+
+  // Discussions tab gets a 2-column layout when the viewport has room
+  // (matches the Figma right rail: 320px wide, hidden under 1024px).
+  // Below 1024px the rail collapses below the main column. Implemented
+  // via CSS `clamp` so the main column never gets narrower than 360px.
+  discussionsLayout: {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr) 320px',
+    gap: 'var(--space-6, 20px)',
+    alignItems: 'flex-start',
+  },
+
+  discussionsRail: {
+    display: 'grid',
+    gap: 14,
+    position: 'sticky',
+    top: 'calc(var(--nav-height, 56px) + 72px)',
+    alignSelf: 'flex-start',
+    fontFamily: PAGE_FONT,
+  },
+
+  railRow: {
+    fontSize: 13,
+    color: 'var(--sh-text)',
+    lineHeight: 1.5,
+  },
+
+  railEmpty: {
+    fontSize: 12,
+    color: 'var(--sh-muted)',
+    fontStyle: 'italic',
   },
 
   loadingPlaceholder: {

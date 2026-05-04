@@ -137,8 +137,14 @@ router.get('/html', async (req, res) => {
       )
     }
 
-    // Tier 2 (high risk): only serve if allowUnpublished (admin/owner)
-    if (effectiveTier >= RISK_TIER.HIGH_RISK && !allowUnpublished) {
+    // Tier 2 (high risk): allow if either an admin/owner is viewing
+    // (allowUnpublished) OR the sheet is in the PUBLISHED state (admin
+    // already approved it for the public). This matches the runtime gate
+    // in /api/sheets/:id/html-runtime — the admin's publish IS the safety
+    // review and lets the sheet behave like a real interactive sheet for
+    // anyone who can already read it.
+    const isPublished = sheet.status === 'published'
+    if (effectiveTier >= RISK_TIER.HIGH_RISK && !allowUnpublished && !isPublished) {
       return sendError(
         res,
         403,
@@ -149,12 +155,20 @@ router.get('/html', async (req, res) => {
 
     const isRuntime = tokenType === 'html-runtime'
 
-    // Tier 2+: always use safe preview (scripts stripped, never interactive)
+    // Tier 2 + safe-preview token: still strip scripts (the safe view).
+    // Tier 2 + runtime token: serve the interactive document — same isolation
+    // sandbox as Tier 0/1 (allow-scripts allow-forms, no allow-same-origin),
+    // CSP `script-src 'unsafe-inline'`, no network/connect.
     if (effectiveTier >= RISK_TIER.HIGH_RISK) {
-      const outputHtml = buildPreviewDocument({ title: sheet.title, html: sheet.content })
+      const outputHtml = isRuntime
+        ? buildInteractiveDocument({ title: sheet.title, html: sheet.content })
+        : buildPreviewDocument({ title: sheet.title, html: sheet.content })
       res.setHeader('Cache-Control', 'private, no-store, max-age=0')
       res.setHeader('Content-Type', 'text/html; charset=utf-8')
-      res.setHeader('Content-Security-Policy', buildPreviewCsp(SAFE_PREVIEW_DIRECTIVES, res))
+      res.setHeader(
+        'Content-Security-Policy',
+        buildPreviewCsp(isRuntime ? RUNTIME_DIRECTIVES : SAFE_PREVIEW_DIRECTIVES, res),
+      )
       return res.status(200).send(outputHtml)
     }
 

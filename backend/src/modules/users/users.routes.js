@@ -1,7 +1,12 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const optionalAuth = require('../../core/auth/optionalAuth')
-const { readLimiter, usersFollowLimiter, roleChangeLimiter } = require('../../lib/rateLimiters')
+const {
+  readLimiter,
+  writeLimiter,
+  usersFollowLimiter,
+  roleChangeLimiter,
+} = require('../../lib/rateLimiters')
 const usersController = require('./users.controller')
 
 const router = express.Router()
@@ -83,12 +88,17 @@ router.get('/me/role-status', requireAuth, usersController.getAccountTypeStatus)
 router.get('/me/learning-goal', requireAuth, usersController.getLearningGoal)
 
 // ── PUT /api/users/me/learning-goal ────────────────────────────
-router.put('/me/learning-goal', requireAuth, usersController.setLearningGoal)
+router.put('/me/learning-goal', requireAuth, writeLimiter, usersController.setLearningGoal)
 
 // ── Multi-goal collection (UserProfilePage Goals widget) ───────
+// writeLimiter on POST + DELETE prevents an authenticated user from
+// hammering the goals endpoint in a tight create/delete loop. The
+// `if (req.method === 'GET') return readLimiter(...)` shim at the top
+// of this router skips writeLimiter on the GET, so the read path
+// stays on the higher read-tier budget.
 router.get('/me/goals', requireAuth, usersController.listGoals)
-router.post('/me/goals', requireAuth, usersController.createGoal)
-router.delete('/me/goals/:goalId', requireAuth, usersController.deleteGoal)
+router.post('/me/goals', requireAuth, writeLimiter, usersController.createGoal)
+router.delete('/me/goals/:goalId', requireAuth, writeLimiter, usersController.deleteGoal)
 
 // ── GET /api/users/me/onboarding-state ─────────────────────────
 // Per-role Getting Started checklist state (Design Refresh v2 Week 2).

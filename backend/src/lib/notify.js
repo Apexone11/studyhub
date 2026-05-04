@@ -45,7 +45,27 @@ const ESSENTIAL_NOTIFICATION_TYPES = new Set([
   'legal_acceptance_required',
   'moderation',
   'payment_failed',
+  'subscription_canceled',
+  // 2026-05-03: user-initiated cancel — durable record so user can prove
+  // they canceled even if Stripe's period-end webhook fires weeks later.
+  'subscription_will_cancel',
+  // Quota-hit notifications are essential — silent 403s let users believe
+  // the app was broken instead of seeing the upgrade path.
+  'upload_quota_reached',
+  'ai_quota_reached',
+  // Plagiarism flag affects the user's own content; never drop on block.
+  'plagiarism_flagged',
   'video_copy_detected',
+  // Sheet review outcomes are essential — the user actively waits for
+  // these and the moderation surface is built around timely review.
+  'sheet_approved',
+  'sheet_rejected',
+  // Removed-from-group is a moderation event the user MUST see.
+  'group_removed',
+  // Pending-approval lifecycle (post approved / rejected) is also
+  // essential — the user submitted and is waiting for the outcome.
+  'group_post_approved',
+  'group_post_rejected',
 ])
 
 // Notification types that suffer viral fan-out (one popular post → many
@@ -70,6 +90,13 @@ const OPTIONAL_EMAIL_PREFERENCE_BY_TYPE = Object.freeze({
   group_invite: 'emailStudyGroups',
   group_session: 'emailStudyGroups',
   group_post: 'emailStudyGroups',
+  // 2026-05-03 — new group discussion types from the Study Groups
+  // redesign + notification audit. Pin / reply use the same opt-out
+  // hook as the rest of the group surface; approve/reject/removed are
+  // essential per the set above and don't read this map.
+  group_reply: 'emailStudyGroups',
+  group_post_pinned: 'emailStudyGroups',
+  contribution_comment: 'emailContributions',
 })
 const OPTIONAL_IN_APP_PREFERENCE_BY_TYPE = Object.freeze({
   mention: 'inAppMentions',
@@ -87,6 +114,9 @@ const OPTIONAL_IN_APP_PREFERENCE_BY_TYPE = Object.freeze({
   group_invite: 'inAppStudyGroups',
   group_session: 'inAppStudyGroups',
   group_post: 'inAppStudyGroups',
+  group_reply: 'inAppStudyGroups',
+  group_post_pinned: 'inAppStudyGroups',
+  contribution_comment: 'inAppContributions',
   // Achievements V2 (loop-3 finding F-F): register the new type so the
   // notify pipeline routes its in-app preference correctly. The lookup
   // already defaults to `return true` for unknown types so this is
@@ -111,6 +141,15 @@ const EMAIL_TYPE_LABELS = Object.freeze({
   group_invite: 'Study Group Invitation',
   group_session: 'Study Group Session',
   group_post: 'Study Group Discussion',
+  group_reply: 'New Reply in Your Discussion',
+  group_post_pinned: 'Your Post Was Pinned',
+  group_post_approved: 'Your Post Was Approved',
+  group_post_rejected: 'Your Post Was Rejected',
+  group_removed: 'Removed from Study Group',
+  contribution_comment: 'New Contribution Comment',
+  sheet_approved: 'Your Sheet Was Approved',
+  sheet_rejected: 'Your Sheet Was Rejected',
+  subscription_canceled: 'Subscription Canceled',
   legal_acceptance_required: 'Legal Reminder',
   moderation: 'Moderation Notice',
   payment_failed: 'Payment Update',
@@ -237,7 +276,14 @@ async function createNotification(
   // can fail (table missing during migration); on error we fail open and let
   // the notification through, matching the policy used elsewhere in the
   // module per CLAUDE.md "Block/Mute System".
-  if (actorId && actorId !== userId) {
+  if (actorId && actorId !== userId && !ESSENTIAL_NOTIFICATION_TYPES.has(type)) {
+    // Essential types bypass the block gate — sheet-review outcomes,
+    // payment failures, group-post approvals, "you were removed from
+    // this group" all have to reach the recipient even if they've
+    // blocked the moderator/admin actor. Without this carve-out a user
+    // who blocked a mod could miss their own ban / approval / refund
+    // notice (Copilot finding 2026-05-03). Non-essential actor-based
+    // notifications still respect the block both directions.
     try {
       const { isBlockedEitherWay } = require('./social/blockFilter')
       const blocked = await isBlockedEitherWay(prisma, userId, actorId)
@@ -320,12 +366,56 @@ async function createNotification(
     }
   }
 
+  // In-app dedup gate. When a caller passes `dedupKey`, suppress duplicate
+  // ROWS — not just duplicate emails — for the same key within the dedup
+  // window. Without this, a user who hammers a rate-limited endpoint
+  // (AI quota, upload quota) accumulates one notification row per attempt.
+  //
+  // The DB cross-check matches against the dedupKey itself (substring of
+  // `message`), NOT just (userId, type). Earlier (userId, type)-only check
+  // collapsed semantically distinct events — daily and weekly
+  // ai_quota_reached share the same type and would suppress each other
+  // inside the same hour (Copilot review #3, 2026-05-03).
+  let dedupMessageMarker = null
+  if (dedupKey) {
+    if (_isDuplicate(userId, type, dedupKey)) {
+      return null
+    }
+    // Embed a stable marker derived from the dedupKey into the persisted
+    // message so the DB query can find prior rows for the SAME key. The
+    // marker is invisible-ish but discoverable by `contains:` filtering.
+    dedupMessageMarker = `[dedup:${dedupKey}]`
+    try {
+      const since = new Date(Date.now() - DEDUP_WINDOW_MS)
+      const recent = await prisma.notification.findFirst({
+        where: {
+          userId,
+          type,
+          message: { contains: dedupMessageMarker },
+          createdAt: { gte: since },
+        },
+        select: { id: true },
+      })
+      if (recent) {
+        _recordSent(userId, type, dedupKey)
+        return null
+      }
+    } catch {
+      /* table missing during migration — fail open */
+    }
+  }
+
+  // Append the dedup marker to the END of the persisted message — the
+  // frontend strips `[dedup:...]` for display (see notificationsHelpers /
+  // serializer), so users see only the human-readable text.
+  const persistedMessage = dedupMessageMarker ? `${message} ${dedupMessageMarker}` : message
+
   try {
     const notif = await prisma.notification.create({
       data: {
         userId,
         type,
-        message,
+        message: persistedMessage,
         priority: safePriority,
         actorId: actorId || null,
         sheetId: sheetId || null,
@@ -337,6 +427,8 @@ async function createNotification(
         },
       },
     })
+
+    if (dedupKey) _recordSent(userId, type, dedupKey)
 
     // Real-time push: emit to the user's personal socket room so any open tab
     // surfaces the notification immediately instead of waiting up to 30s for

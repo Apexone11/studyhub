@@ -7,7 +7,7 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const optionalAuth = require('../../core/auth/optionalAuth')
-const { libraryWriteLimiter } = require('../../lib/rateLimiters')
+const { libraryWriteLimiter, libraryReadLimiter } = require('../../lib/rateLimiters')
 
 const {
   searchBooksHandler,
@@ -36,13 +36,13 @@ const router = express.Router()
  * Search and browse books from Google Books API.
  * Query params: search, category, page, sort, language
  */
-router.get('/search', optionalAuth, searchBooksHandler)
+router.get('/search', libraryReadLimiter, optionalAuth, searchBooksHandler)
 
 /**
  * GET /api/library/books/:volumeId
  * Get detailed information about a specific book from Google Books.
  */
-router.get('/books/:volumeId', optionalAuth, getBookDetailsHandler)
+router.get('/books/:volumeId', libraryReadLimiter, optionalAuth, getBookDetailsHandler)
 
 // ── ADMIN OPERATIONS ───────────────────────────────────────────────────────
 

@@ -49,11 +49,13 @@ const FLAG_NAMES = {
   sheetsGrid: 'design_v2_sheets_grid',
   // Week 2 of v2 refresh — see
   // docs/internal/design-refresh-v2-week2-to-week5-execution.md
-  teachMaterials: 'design_v2_teach_materials',
-  docsPublic: 'design_v2_docs_public',
-  groupsPolish: 'design_v2_groups_polish',
-  roleChecklist: 'design_v2_role_checklist',
-  weeklyFocus: 'design_v2_weekly_focus',
+  //
+  // Removed 2026-05-03: teachMaterials, docsPublic, groupsPolish,
+  // roleChecklist, weeklyFocus. They had no UI consumers in the app
+  // (verified by grep) and no seed rows in scripts/seedFeatureFlags.js,
+  // so each one fired an HTTP fetch on every page load with zero effect.
+  // Re-add only when a real consumer ships AND the flag is added to
+  // SHIPPED_DESIGN_V2_FLAGS in the seed script.
   // Week 3 — Section-aware publishing (Sections + Materials + bulk assign).
   // See docs/internal/design-refresh-v2-week2-to-week5-execution.md §W3.
   teachSections: 'design_v2_teach_sections',

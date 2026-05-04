@@ -16,10 +16,12 @@
  */
 
 const prisma = require('../../lib/prisma')
+const log = require('../../lib/logger')
 const { captureError } = require('../../monitoring/sentry')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { createNotification } = require('../../lib/notify')
 const { getUserPlan, isPro } = require('../../lib/getUserPlan')
+const { getPlanConfig } = require('../payments/payments.constants')
 
 const {
   parseId,
@@ -158,12 +160,16 @@ async function createGroup(req, res) {
           where: { createdById: req.user.userId, privacy: { in: ['private', 'invite_only'] } },
         })
 
-        const maxGroups = isPro(userPlan) ? 10 : 2
+        // Derive limit from PLANS so the cap, the pricing page bullet,
+        // and the error message track one value. PLANS[userPlan] may be
+        // undefined for grandfathered/unknown plan names; fall back to free.
+        const planConfig = getPlanConfig(userPlan)
+        const maxGroups = planConfig.privateGroups
         if (groupCount >= maxGroups) {
           return res.status(403).json({
             error: isPro(userPlan)
-              ? 'You have reached the maximum of 10 private study groups.'
-              : 'Free plan allows up to 2 private study groups. Upgrade to Pro for more.',
+              ? `You have reached the maximum of ${maxGroups} private study groups.`
+              : `Free plan allows up to ${maxGroups} private study groups. Upgrade to Pro for more.`,
             code: 'GROUP_LIMIT',
           })
         }
@@ -385,7 +391,6 @@ async function updateGroup(req, res) {
       // Check private group limit when changing from public to private/invite_only
       if ((privacy === 'private' || privacy === 'invite_only') && group.privacy === 'public') {
         try {
-          const { getUserPlan, isPro } = require('../../lib/getUserPlan')
           const userPlan = await getUserPlan(req.user.userId)
           if (!isPro(userPlan)) {
             const privateCount = await prisma.studyGroup.count({
@@ -394,7 +399,8 @@ async function updateGroup(req, res) {
                 privacy: { in: ['private', 'invite_only'] },
               },
             })
-            const limit = isPro(userPlan) ? 10 : 2
+            const planConfig = getPlanConfig(userPlan)
+            const limit = planConfig.privateGroups
             if (privateCount >= limit) {
               return res.status(403).json({
                 error: `You have reached your private group limit (${limit}). Upgrade to Pro for more.`,
@@ -886,7 +892,10 @@ async function updateMember(req, res) {
         })
       } catch (notifErr) {
         // Fire-and-forget: don't fail the request
-        console.error('Failed to create notification:', notifErr.message)
+        log.warn(
+          { event: 'studyGroups.notify_failed', err: notifErr.message },
+          'Failed to create study-group notification',
+        )
       }
     }
 
@@ -950,6 +959,30 @@ async function removeMember(req, res) {
     await prisma.studyGroupMember.delete({
       where: { id: targetMember.id },
     })
+
+    // Notify the removed user so they aren't left wondering why the
+    // group disappeared from their list. Skip if a user removed
+    // themselves (that's a leave, not a kick).
+    if (targetMember.userId !== req.user.userId) {
+      try {
+        const groupName = await prisma.studyGroup.findUnique({
+          where: { id: groupId },
+          select: { name: true },
+        })
+        await createNotification(prisma, {
+          userId: targetMember.userId,
+          type: 'group_removed',
+          message: `You were removed from ${groupName?.name || 'a study group'}.`,
+          actorId: req.user.userId,
+          linkPath: '/study-groups',
+        })
+      } catch (notifErr) {
+        log.warn(
+          { event: 'studyGroups.member_removed_notify_failed', err: notifErr.message },
+          'Failed to notify removed group member',
+        )
+      }
+    }
 
     res.status(204).send()
   } catch (err) {
@@ -1075,7 +1108,10 @@ async function inviteUser(req, res) {
       })
     } catch (notifErr) {
       // Fire-and-forget: don't fail the request
-      console.error('Failed to create notification:', notifErr.message)
+      log.warn(
+        { event: 'studyGroups.notify_failed', err: notifErr.message },
+        'Failed to create study-group notification',
+      )
     }
 
     res.status(201).json({

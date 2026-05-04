@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
@@ -22,12 +22,19 @@ function panelStyle() {
 
 export default function SheetHtmlPreviewPage() {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
+  const wantsInteractiveOnLoad = searchParams.get('interactive') === '1'
   const sheetId = Number.parseInt(id, 10)
   const [state, setState] = useState({ loading: true, error: '', preview: null })
   const [isFullscreen, setIsFullscreen] = useState(false)
   const [interactive, setInteractive] = useState(false)
   const [runtimeUrl, setRuntimeUrl] = useState('')
   const [runtimeLoading, setRuntimeLoading] = useState(false)
+  const [runtimeError, setRuntimeError] = useState('')
+  // Auto-try latch for the ?interactive=1 deep link. Hoisted to the
+  // top-level state block (was declared further down) so the sheetId-
+  // change effect can reset it without a TDZ error.
+  const [interactiveAutoTried, setInteractiveAutoTried] = useState(false)
 
   // Escape key exits fullscreen. Only bound while fullscreen is active so
   // the handler does not fight with modals or dropdowns on the normal view.
@@ -94,22 +101,40 @@ export default function SheetHtmlPreviewPage() {
     setState({ loading: true, error: '', preview: null })
     setInteractive(false)
     setRuntimeUrl('')
+    // Reset the auto-try latch so a same-route navigation to a NEW sheet
+    // (e.g. /sheets/preview/html/42 → /sheets/preview/html/43?interactive=1)
+    // honors the new ?interactive=1 param. Without this reset, only the
+    // FIRST sheet visited per session ever auto-opens interactive mode.
+    // (Copilot review 2026-05-03.)
+    setInteractiveAutoTried(false)
     void loadPreview()
   }, [loadPreview])
 
   const loadRuntime = useCallback(async () => {
     if (!Number.isInteger(sheetId) || runtimeUrl) return
     setRuntimeLoading(true)
+    setRuntimeError('')
     try {
       const response = await fetch(`${API}/api/sheets/${sheetId}/html-runtime`, {
         headers: authHeaders(),
         credentials: 'include',
       })
       const data = await readJsonSafely(response, {})
-      if (data?.runtimeUrl) setRuntimeUrl(data.runtimeUrl)
-      else throw new Error(getApiErrorMessage(data, 'Could not load interactive preview.'))
-    } catch {
+      if (!response.ok) {
+        // Surface the server message (403 for high-risk drafts, 404 missing,
+        // etc.) instead of silently snapping the toggle back. Prior behavior
+        // hid the failure entirely, so the user just saw the toggle un-click.
+        throw new Error(
+          getApiErrorMessage(data, `Could not load interactive preview (HTTP ${response.status}).`),
+        )
+      }
+      if (!data?.runtimeUrl) {
+        throw new Error('Interactive preview is not available for this sheet.')
+      }
+      setRuntimeUrl(data.runtimeUrl)
+    } catch (error) {
       setInteractive(false)
+      setRuntimeError(error?.message || 'Could not load interactive preview.')
     } finally {
       setRuntimeLoading(false)
     }
@@ -118,11 +143,37 @@ export default function SheetHtmlPreviewPage() {
   const toggleInteractive = useCallback(() => {
     if (interactive) {
       setInteractive(false)
+      setRuntimeError('')
     } else {
       setInteractive(true)
       if (!runtimeUrl) loadRuntime()
     }
   }, [interactive, runtimeUrl, loadRuntime])
+
+  // Honor `?interactive=1` deep-link from the in-page Sandbox button. Only
+  // attempt to flip on once the preview has loaded and the policy field
+  // `canInteract` is true — otherwise the runtime fetch will 403 and show
+  // the error banner uselessly. Tracked via the auto-try latch declared
+  // at the top of the component (reset on sheetId change).
+  useEffect(() => {
+    if (
+      !interactiveAutoTried &&
+      wantsInteractiveOnLoad &&
+      state.preview?.canInteract &&
+      !interactive
+    ) {
+      setInteractiveAutoTried(true)
+      setInteractive(true)
+      if (!runtimeUrl) loadRuntime()
+    }
+  }, [
+    interactiveAutoTried,
+    wantsInteractiveOnLoad,
+    state.preview?.canInteract,
+    interactive,
+    runtimeUrl,
+    loadRuntime,
+  ])
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}>
@@ -242,9 +293,30 @@ export default function SheetHtmlPreviewPage() {
                     </div>
                     <span style={{ fontSize: 11, color: 'var(--sh-muted)', lineHeight: 1.4 }}>
                       {interactive
-                        ? 'Scripts enabled in a locked sandbox — no access to your account or network.'
+                        ? 'Click, type, and run scripts inside the sheet — the sandbox keeps it isolated from your account and network.'
                         : 'Scripts disabled for maximum security.'}
                     </span>
+                  </div>
+                </section>
+              ) : null}
+
+              {runtimeError ? (
+                <section
+                  role="alert"
+                  style={{
+                    ...panelStyle(),
+                    borderColor: 'var(--sh-warning-border)',
+                    background: 'var(--sh-warning-bg)',
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: 12,
+                      color: 'var(--sh-warning-dark-text)',
+                      lineHeight: 1.5,
+                    }}
+                  >
+                    {runtimeError} Showing the safe preview instead.
                   </div>
                 </section>
               ) : null}

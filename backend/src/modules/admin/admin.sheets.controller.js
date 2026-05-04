@@ -254,6 +254,28 @@ router.patch('/sheets/:id/review', async (req, res) => {
       },
     })
 
+    // Notify the sheet author when their pending review lands. Without
+    // this the user has to refresh the page and check status manually.
+    // Skip when admin == author (self-review of their own sheet — rare
+    // but the notification would just be noise).
+    if (updated.author && updated.author.id !== req.user.userId) {
+      try {
+        const { createNotification } = require('../../lib/notify')
+        await createNotification(prisma, {
+          userId: updated.author.id,
+          type: action === 'approve' ? 'sheet_approved' : 'sheet_rejected',
+          message:
+            action === 'approve'
+              ? `Your sheet "${updated.title}" was approved and published.`
+              : `Your sheet "${updated.title}" was rejected by an admin.`,
+          actorId: req.user.userId,
+          linkPath: `/sheets/${updated.id}`,
+        })
+      } catch {
+        /* fire-and-forget — admin action is the source of truth */
+      }
+    }
+
     res.json({
       message: action === 'approve' ? 'Sheet approved and published.' : 'Sheet rejected.',
       sheet: updated,
@@ -272,7 +294,43 @@ router.delete('/sheets/:id', async (req, res) => {
     if (!Number.isInteger(id) || id < 1) {
       return res.status(400).json({ error: 'Invalid sheet id.' })
     }
+    // Capture author + title BEFORE delete so the notification can be
+    // composed once the row is gone. Without the read-before-delete, the
+    // user wakes up to a missing sheet with no explanation.
+    const sheet = await prisma.studySheet.findUnique({
+      where: { id },
+      select: { id: true, title: true, userId: true },
+    })
+    if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+
+    const reason =
+      typeof req.body?.reason === 'string' && req.body.reason.trim()
+        ? req.body.reason.trim().slice(0, 500)
+        : ''
+
     await prisma.studySheet.delete({ where: { id } })
+
+    if (sheet.userId && sheet.userId !== req.user.userId) {
+      try {
+        const { createNotification } = require('../../lib/notify')
+        await createNotification(prisma, {
+          userId: sheet.userId,
+          type: 'moderation',
+          message: reason
+            ? `Your sheet "${sheet.title || 'Untitled'}" was removed by an admin: ${reason}`
+            : `Your sheet "${sheet.title || 'Untitled'}" was removed by an admin for a content policy violation.`,
+          actorId: req.user.userId,
+          // Link to the user's own sheets list — the sheet itself no
+          // longer exists, and routing to the actor's profile would be
+          // confusing per the feature-loop finding 2026-05-03.
+          linkPath: '/sheets?mine=1',
+          priority: 'high',
+        })
+      } catch {
+        /* fire-and-forget — delete is the source of truth */
+      }
+    }
+
     res.json({ message: 'Sheet deleted.' })
   } catch (err) {
     if (err.code === 'P2025') return res.status(404).json({ error: 'Sheet not found.' })

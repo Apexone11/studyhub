@@ -3904,6 +3904,51 @@ textarea.sh-input {
   }
 }
 
+/* ── Study Groups detail — Figma redesign 2026-05-03 ─────────────── */
+/* Right rail collapses below the main column under 1024px so phones
+   and small tablets get a single-column flow without the Upcoming /
+   Activity / Online cards stealing horizontal space from the post
+   list. The desktop 320px rail width lives in studyGroupsStyles.js. */
+@media (max-width: 1023px) {
+  .sh-group-discussions-layout {
+    grid-template-columns: 1fr !important;
+  }
+  .sh-group-discussions-rail {
+    position: static !important;
+  }
+}
+
+/* Sticky tab-bar offset variable. The global navbar exposes its
+   height via this token (set on :root in the navbar's own CSS); we
+   default to 56px so the tab bar stays correctly placed even before
+   the navbar mounts. */
+:root {
+  --nav-height: 56px;
+  /* AI surface accent — Hub AI page, AiBubble FAB, AI gradient pills,
+     send-button gradient. Reserved exclusively for AI surfaces; do
+     NOT use for non-AI accents (those stay --sh-brand blue). */
+  --sh-ai-gradient: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%);
+  --sh-ai-glow: 0 10px 30px rgba(124, 58, 237, 0.35);
+}
+
+/* Three-dot pulsing thinking indicator on the Hub AI header. */
+@keyframes sh-ai-thinking {
+  0%,
+  80%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.85);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+html[data-reduced-motion='on'] [style*='sh-ai-thinking'] {
+  animation: none !important;
+  opacity: 0.7;
+}
+
 /* ── Focus ring styles (keyboard accessibility) ──────────────────── */
 /* Default: ring is shown for keyboard users via :focus-visible. The
    Accessibility settings toggle flips html[data-focus-ring="off"] which

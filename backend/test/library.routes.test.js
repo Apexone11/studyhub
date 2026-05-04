@@ -62,6 +62,7 @@ const mocks = vi.hoisted(() => {
     },
     rateLimiters: {
       libraryWriteLimiter: (_req, _res, next) => next(),
+      libraryReadLimiter: (_req, _res, next) => next(),
     },
     blockFilter: {
       getBlockedUserIds: vi.fn().mockResolvedValue([]),
@@ -85,7 +86,6 @@ const mocks = vi.hoisted(() => {
       CACHE_TTL: { SEARCH: 3600000, BOOK_DETAIL: 86400000, COVER: 604800000 },
       DEFAULT_PAGE_SIZE: 20,
       MAX_SHELVES_PER_USER: 20,
-      MAX_BOOKMARKS_PER_USER_FREE: 50,
       CATEGORIES: ['Fiction', 'Science'],
     },
   }
@@ -143,7 +143,14 @@ beforeEach(() => {
 describe('GET /shelves', () => {
   it('returns user shelves', async () => {
     const shelves = [
-      { id: 1, name: 'Favorites', userId: 42, visibility: 'private', _count: { books: 3 }, createdAt: new Date() },
+      {
+        id: 1,
+        name: 'Favorites',
+        userId: 42,
+        visibility: 'private',
+        _count: { books: 3 },
+        createdAt: new Date(),
+      },
     ]
     mocks.prisma.bookShelf.findMany.mockResolvedValue(shelves)
 
@@ -172,7 +179,9 @@ describe('POST /shelves', () => {
       createdAt: new Date(),
     })
 
-    const res = await request(app).post('/shelves').send({ name: 'My Shelf', visibility: 'profile' })
+    const res = await request(app)
+      .post('/shelves')
+      .send({ name: 'My Shelf', visibility: 'profile' })
     expect(res.status).toBe(201)
     expect(res.body.name).toBe('My Shelf')
     expect(res.body.visibility).toBe('profile')
@@ -198,8 +207,17 @@ describe('POST /shelves', () => {
 
 describe('PATCH /shelves/:id', () => {
   it('updates shelf visibility for the owner', async () => {
-    mocks.prisma.bookShelf.findUnique.mockResolvedValue({ id: 1, userId: 42, visibility: 'private' })
-    mocks.prisma.bookShelf.update.mockResolvedValue({ id: 1, userId: 42, visibility: 'profile', name: 'Favorites' })
+    mocks.prisma.bookShelf.findUnique.mockResolvedValue({
+      id: 1,
+      userId: 42,
+      visibility: 'private',
+    })
+    mocks.prisma.bookShelf.update.mockResolvedValue({
+      id: 1,
+      userId: 42,
+      visibility: 'profile',
+      name: 'Favorites',
+    })
 
     const res = await request(app).patch('/shelves/1').send({ visibility: 'profile' })
 
@@ -209,7 +227,7 @@ describe('PATCH /shelves/:id', () => {
       expect.objectContaining({
         where: { id: 1 },
         data: expect.objectContaining({ visibility: 'profile' }),
-      })
+      }),
     )
   })
 

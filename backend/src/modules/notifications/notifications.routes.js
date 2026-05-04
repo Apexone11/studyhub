@@ -8,6 +8,19 @@ const prisma = require('../../lib/prisma')
 
 const router = express.Router()
 
+// Strip the trailing `[dedup:...]` marker that notify.js embeds into the
+// persisted message so the in-app dedup query can match repeat events.
+// Users should never see the marker in the inbox.
+function stripDedupMarker(message) {
+  if (typeof message !== 'string') return message
+  return message.replace(/\s*\[dedup:[^\]]*\]\s*$/, '')
+}
+
+function serializeNotification(notif) {
+  if (!notif) return notif
+  return { ...notif, message: stripDedupMarker(notif.message) }
+}
+
 // All notification routes require auth. Reads use the generous read limiter;
 // every mutation hits the stricter write limiter so a compromised session
 // can't burn through 200 mark-all-read calls per minute.
@@ -29,7 +42,13 @@ router.get('/', readLimiter, async (req, res) => {
       prisma.notification.count({ where: { userId: req.user.userId } }),
       prisma.notification.count({ where: { userId: req.user.userId, read: false } }),
     ])
-    res.json({ notifications, total, unreadCount, limit, offset })
+    res.json({
+      notifications: notifications.map(serializeNotification),
+      total,
+      unreadCount,
+      limit,
+      offset,
+    })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)

@@ -35,6 +35,7 @@ export default function LibraryPage() {
     error,
     usingCache,
     unavailable,
+    endOfResults,
     page,
     totalCount,
     search,
@@ -185,7 +186,29 @@ export default function LibraryPage() {
   const parsedPage = Number.parseInt(page || '1', 10)
   const pageNumber = Number.isInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1
   const totalPages = Math.ceil(totalCount / booksPerPage)
-  const hasNextPage = pageNumber < totalPages
+  // hasNextPage is suppressed when the backend signaled `endOfResults` for
+  // this query. Google Books reports inflated totalItems but caps deep
+  // pagination around startIndex 200-400 for category-only queries; the
+  // backend memo records the actual reachable cap so the UI stops offering
+  // pages it knows are empty.
+  const hasNextPage = !endOfResults && pageNumber < totalPages
+
+  // Auto-recover when the user lands on (or paginates to) a page beyond the
+  // discovered cap. e.g. a deep-link bookmarked at ?page=11 should not show
+  // a permanent "No books found" — bounce them back to the last reachable
+  // page so they see content immediately and explain why.
+  useEffect(() => {
+    if (!loading && endOfResults && pageNumber > 1 && books.length === 0) {
+      const lastReachable = Math.max(1, totalPages || pageNumber - 1)
+      if (lastReachable !== pageNumber) {
+        showToast(
+          `Reached the end of available results — taking you to page ${lastReachable}.`,
+          'info',
+        )
+        setPage(String(lastReachable))
+      }
+    }
+  }, [loading, endOfResults, pageNumber, books.length, totalPages, setPage])
 
   return (
     <>
@@ -460,6 +483,7 @@ export default function LibraryPage() {
 
                 <span className="library-pagination__info">
                   Page {pageNumber} of {totalPages || 1}
+                  {endOfResults ? ' (end of results)' : ''}
                 </span>
 
                 <button

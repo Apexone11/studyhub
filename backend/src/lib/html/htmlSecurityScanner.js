@@ -121,24 +121,29 @@ function detectHighRiskBehaviors(html) {
     })
   }
 
-  // Hidden redirects: window.location manipulation
+  // Hidden redirects: window.location manipulation. Tier 1 informational —
+  // the sandbox does not allow top-navigation, so the redirect cannot escape
+  // the iframe. Recorded for transparency.
   if (
     /\b(?:window\s*\.\s*)?location\s*\.\s*(?:href|replace|assign)\s*=/gi.test(value) ||
     /\bwindow\s*\.\s*location\s*=/gi.test(value)
   ) {
     behaviors.push({
       category: 'redirect',
-      severity: 'high',
+      severity: 'medium',
       message: 'Page redirect detected (window.location assignment).',
     })
   }
 
-  // Form exfiltration: <form> posting to external domains
+  // Form exfiltration: <form> posting to external domains. Tier 1
+  // informational — the sandbox CSP `form-action 'none'` blocks submission
+  // regardless of where the action attribute points. Recorded so reviewers
+  // can see the intent.
   if (/<form[^>]+action\s*=\s*["']?\s*https?:\/\//gi.test(value)) {
     behaviors.push({
       category: 'exfiltration',
-      severity: 'high',
-      message: 'Form posts to external URL detected — possible data exfiltration.',
+      severity: 'medium',
+      message: 'Form posts to external URL detected (sandbox blocks the actual submission).',
     })
   }
 
@@ -230,31 +235,55 @@ function classifyHtmlRisk(html) {
     findings.push(behavior)
   }
 
-  // Phase 3: inline JS risk scan (feeds into Tier 2)
+  // Phase 3: inline JS risk scan. Scanner relaxation 2026-05-03 splits
+  // these into severity buckets — `medium` flags (sandbox-blocked network
+  // primitives, document.cookie/domain) become Tier 1 informational rather
+  // than escalating to Tier 2. `high` flags (eval/Function/string-arg
+  // timers/atob) still elevate to Tier 2.
   const jsRisk = scanInlineJsRisk(html)
-  if (jsRisk.highRisk) {
-    for (const flag of jsRisk.flags) {
-      findings.push({
-        category: 'js-risk',
-        severity: 'high',
-        message: flag,
-      })
-    }
+  for (const flag of jsRisk.flags) {
+    findings.push({
+      category: flag.severity === 'high' ? 'js-risk' : 'js-info',
+      severity: flag.severity,
+      message: flag.label,
+    })
   }
+  const jsHasHighRisk = jsRisk.flags.some((f) => f.severity === 'high')
+  const jsHasInfo = jsRisk.flags.some((f) => f.severity === 'medium')
 
-  // Determine tier: validation issues (empty/too-long) are Tier 1 since they
-  // are not behavioral. Behavioral patterns elevate to Tier 2.
-  // Critical findings or 3+ distinct high-risk categories escalate to Tier 3.
-  const hasBehaviors = behaviors.length > 0 || jsRisk.highRisk
+  // Determine tier:
+  //   Tier 0 (CLEAN): no findings.
+  //   Tier 1 (FLAGGED): suspicious but defanged-by-sandbox features —
+  //     scripts, iframes, inline handlers, dangerous URLs, network calls,
+  //     redirects (sandbox blocks top-nav), external form actions (sandbox
+  //     CSP `form-action 'none'` blocks submit), document.cookie/domain
+  //     (no parent cookie in iframe origin).
+  //   Tier 2 (HIGH_RISK): real exploit primitives that the sandbox does
+  //     NOT automatically defang — keylogging-with-network-exfil,
+  //     crypto-miner, heavy obfuscation, eval/Function/string-arg timers.
+  //   Tier 3 (QUARANTINED): critical findings (credential capture),
+  //     3+ distinct high-risk categories, or coordinated miner+obfuscation.
+  //
+  // Tier 1 informational behaviors (redirect, exfiltration-form) do NOT
+  // count toward tier escalation here — they're recorded as findings for
+  // transparency but the sandbox already neutralizes them.
+  const TIER_1_INFO_BEHAVIORS = new Set(['redirect', 'exfiltration'])
+  const tier2Behaviors = behaviors.filter((b) => !TIER_1_INFO_BEHAVIORS.has(b.category))
+  const hasTier2Behaviors = tier2Behaviors.length > 0 || jsHasHighRisk
+  const hasTier1Behaviors =
+    behaviors.some((b) => TIER_1_INFO_BEHAVIORS.has(b.category)) || jsHasInfo
   const hasFeatures = features.some((f) => f.category !== 'validation')
   const hasValidationOnly = features.length > 0 && !hasFeatures
   const hasCritical = findings.some((f) => f.severity === 'critical')
 
-  // Count distinct high-severity behavior categories for combination escalation
+  // Count distinct high-severity Tier 2 behavior categories for combination
+  // escalation. Tier 1 informational behaviors are excluded — combining a
+  // fetch() and a window.location should not auto-quarantine.
   const highCategories = new Set()
-  for (const b of behaviors) {
+  for (const b of tier2Behaviors) {
     if (b.severity === 'high' || b.severity === 'critical') highCategories.add(b.category)
   }
+  if (jsHasHighRisk) highCategories.add('js-risk')
   // crypto-miner + obfuscation = coordinated malicious payload
   const hasMinerWithObfuscation =
     highCategories.has('crypto-miner') && highCategories.has('obfuscation')
@@ -262,9 +291,9 @@ function classifyHtmlRisk(html) {
   let tier = RISK_TIER.CLEAN
   if (hasCritical || highCategories.size >= 3 || hasMinerWithObfuscation) {
     tier = RISK_TIER.QUARANTINED
-  } else if (hasBehaviors) {
+  } else if (hasTier2Behaviors) {
     tier = RISK_TIER.HIGH_RISK
-  } else if (hasFeatures) {
+  } else if (hasFeatures || hasTier1Behaviors) {
     tier = RISK_TIER.FLAGGED
   } else if (hasValidationOnly) {
     tier = RISK_TIER.FLAGGED

@@ -4,6 +4,7 @@
  */
 
 const prisma = require('../../lib/prisma')
+const log = require('../../lib/logger')
 
 /**
  * Build the dynamic context string that gets appended to the system prompt.
@@ -49,7 +50,10 @@ ${courseList}
       }
     }
   } catch (error) {
-    console.warn('[AI Context] Failed to load user profile:', error?.message || error)
+    log.warn(
+      { event: 'ai.context.user_profile_failed', err: error?.message || String(error) },
+      'Failed to load AI context: user profile',
+    )
   }
 
   // ── 2. Current page context ──────────────────────────────────────
@@ -85,7 +89,10 @@ ${content}
 </current_sheet>`)
         }
       } catch (error) {
-        console.warn('[AI Context] Failed to load sheet context:', error?.message || error)
+        log.warn(
+          { event: 'ai.context.sheet_failed', err: error?.message || String(error) },
+          'Failed to load AI context: current sheet',
+        )
       }
     }
 
@@ -111,7 +118,10 @@ ${content}
 </current_note>`)
         }
       } catch (error) {
-        console.warn('[AI Context] Failed to load note context:', error?.message || error)
+        log.warn(
+          { event: 'ai.context.note_failed', err: error?.message || String(error) },
+          'Failed to load AI context: current note',
+        )
       }
     }
 
@@ -151,7 +161,10 @@ ${list}
 </user_recent_sheets>`)
     }
   } catch (error) {
-    console.warn('[AI Context] Failed to load recent sheets:', error?.message || error)
+    log.warn(
+      { event: 'ai.context.recent_sheets_failed', err: error?.message || String(error) },
+      'Failed to load AI context: recent sheets',
+    )
   }
 
   try {
@@ -170,7 +183,10 @@ ${list}
 </user_recent_notes>`)
     }
   } catch (error) {
-    console.warn('[AI Context] Failed to load recent notes:', error?.message || error)
+    log.warn(
+      { event: 'ai.context.recent_notes_failed', err: error?.message || String(error) },
+      'Failed to load AI context: recent notes',
+    )
   }
 
   if (sections.length === 0) return ''

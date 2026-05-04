@@ -33,13 +33,19 @@ export default function AiPage() {
 
   const chat = useSharedAiChat()
 
-  // If URL has ?conversation=id, select it on mount.
+  // If URL has ?conversation=id, select it. Re-runs when the search-param
+  // changes so a same-route notification click (?conversation=1 →
+  // ?conversation=2) actually flips the active conversation. Earlier
+  // version had `[]` deps and only fired on mount, so clicking a second
+  // notification while the AI page was already open did nothing.
+  // (Bug audit 2026-05-03, HIGH #2.)
   useEffect(() => {
     const convId = Number.parseInt(searchParams.get('conversation'), 10)
     if (Number.isInteger(convId) && convId > 0) {
       chat.selectConversation(convId)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   // ?prompt=... is the hand-off used by the AI Suggestion card and
   // other landing-CTAs that want to drop the user into Hub AI with a
@@ -102,7 +108,7 @@ export default function AiPage() {
     // empty value, so the cascade is bounded by user navigation, not
     // by render frequency. eslint's set-state-in-effect rule is right
     // for the common cases but this is the documented escape hatch.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setChatAreaKey((k) => k + 1)
   }, [promptParam])
 
@@ -217,6 +223,22 @@ export default function AiPage() {
 /* ═══════════════════════════════════════════════════════════════════════════
  * Conversation Sidebar
  * ═══════════════════════════════════════════════════════════════════════════ */
+// Three-dot pulsing "Thinking" indicator — staggered animation-delay
+// so each dot lights up sequentially. Falls back to a static dim dot
+// under prefers-reduced-motion / data-reduced-motion (already handled
+// globally in index.css).
+function pulseDotStyle(delayMs) {
+  return {
+    width: 5,
+    height: 5,
+    borderRadius: '50%',
+    background: 'var(--sh-ai-gradient, linear-gradient(135deg,#7c3aed,#2563eb))',
+    animation: 'sh-ai-thinking 1s ease-in-out infinite',
+    animationDelay: `${delayMs}ms`,
+    display: 'inline-block',
+  }
+}
+
 function ConversationSidebar({
   conversations,
   activeId,
@@ -321,10 +343,13 @@ function ConversationSidebar({
         {conversations.map((conv) => (
           <div
             key={conv.id}
-            onClick={() => editingId !== conv.id && onSelect(conv.id)}
+            // Outer wrapper is a non-interactive container so the
+            // <button> activator + <button>(Rename) + <button>(Delete)
+            // are siblings, not nested interactive elements (HTML
+            // forbids interactive-in-interactive nesting; screen
+            // readers were getting confused). Copilot a11y finding
+            // 2026-05-03.
             style={{
-              padding: '10px 16px',
-              cursor: 'pointer',
               background: conv.id === activeId ? 'var(--sh-soft)' : 'transparent',
               borderLeft:
                 conv.id === activeId ? '3px solid var(--sh-brand)' : '3px solid transparent',
@@ -343,7 +368,7 @@ function ConversationSidebar({
                   e.preventDefault()
                   submitRename()
                 }}
-                style={{ display: 'flex', gap: 6 }}
+                style={{ display: 'flex', gap: 6, padding: '10px 16px' }}
               >
                 <input
                   autoFocus
@@ -363,54 +388,79 @@ function ConversationSidebar({
                 />
               </form>
             ) : (
-              <>
-                <div
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr auto',
+                  alignItems: 'center',
+                  columnGap: 6,
+                  padding: '10px 16px',
+                }}
+              >
+                <button
+                  type="button"
+                  onClick={() => onSelect(conv.id)}
+                  aria-current={conv.id === activeId ? 'page' : undefined}
+                  aria-label={`Open conversation: ${conv.title || 'New conversation'}`}
                   style={{
-                    fontSize: 13,
-                    fontWeight: 600,
-                    color: 'var(--sh-text)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    marginBottom: 2,
+                    display: 'block',
+                    width: '100%',
+                    background: 'none',
+                    border: 'none',
+                    padding: 0,
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    color: 'inherit',
+                    font: 'inherit',
                   }}
                 >
-                  {conv.title || 'New conversation'}
-                </div>
-                <div
-                  style={{
-                    fontSize: 11,
-                    color: 'var(--sh-muted)',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <span>{conv._count?.messages || 0} messages</span>
-                  <span style={{ display: 'flex', gap: 4, opacity: conv.id === activeId ? 1 : 0 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: 'var(--sh-text)',
+                      whiteSpace: 'nowrap',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      marginBottom: 2,
+                    }}
+                  >
+                    {conv.title || 'New conversation'}
+                  </div>
+                  <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                    {conv._count?.messages || 0} messages
+                  </div>
+                </button>
+                {/* Actions are only meaningful for the active conversation.
+                    Hiding via opacity left them keyboard-reachable on
+                    inactive rows — Copilot finding 2026-05-03. Switch to
+                    `visibility: hidden` (also removes from tab order)
+                    and add an explicit tabIndex/aria-hidden pair so the
+                    inactive-row buttons can't be focused, clicked by
+                    keyboard, or read by a screen reader. */}
+                {conv.id === activeId ? (
+                  <span style={{ display: 'flex', gap: 4 }}>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        handleRename(conv)
-                      }}
+                      type="button"
+                      onClick={() => handleRename(conv)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                      aria-label="Rename conversation"
                       title="Rename"
                     >
                       <IconPen size={12} style={{ color: 'var(--sh-muted)' }} />
                     </button>
                     <button
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDelete(conv.id)
-                      }}
+                      type="button"
+                      onClick={() => onDelete(conv.id)}
                       style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                      aria-label="Delete conversation"
                       title="Delete"
                     >
                       <IconX size={12} style={{ color: 'var(--sh-danger-text)' }} />
                     </button>
                   </span>
-                </div>
-              </>
+                ) : null}
+              </div>
             )}
           </div>
         ))}
@@ -634,14 +684,21 @@ function ChatArea({
 
   return (
     <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
-      {/* Header */}
+      {/* Header — Figma 2026-05-03 redesign:
+          - Title left
+          - Gradient-bordered model pill ("CLAUDE SONNET 4.5") right of title
+          - Streaming indicator pinned to the right via marginLeft: auto */}
       <div
         style={{
-          padding: '12px 16px',
+          padding: '14px 18px',
           borderBottom: '1px solid var(--sh-border)',
           display: 'flex',
           alignItems: 'center',
-          gap: 10,
+          gap: 12,
+          background: 'var(--sh-surface)',
+          position: 'sticky',
+          top: 0,
+          zIndex: 2,
         }}
       >
         {onBack && (
@@ -659,19 +716,70 @@ function ChatArea({
             Back
           </button>
         )}
-        <IconSpark size={16} style={{ color: 'var(--sh-brand)' }} />
-        <span style={{ fontSize: 14, fontWeight: 600, color: 'var(--sh-heading)' }}>Hub AI</span>
+        <IconSpark size={18} style={{ color: 'var(--sh-brand)' }} />
+        <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)' }}>Hub AI</span>
+        {/* Model pill — gradient border via padding-box / border-box trick
+            so the pill stays text-readable instead of solid-fill gradient.
+            Hardcoded to the active model since AI service exposes one. */}
+        <span
+          aria-label="Active AI model"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '4px 10px',
+            borderRadius: 999,
+            fontSize: 10,
+            fontWeight: 800,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase',
+            color: 'var(--sh-heading)',
+            background:
+              'linear-gradient(var(--sh-surface), var(--sh-surface)) padding-box, var(--sh-ai-gradient, linear-gradient(135deg,#7c3aed,#2563eb)) border-box',
+            border: '1.5px solid transparent',
+          }}
+        >
+          <span
+            aria-hidden
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'var(--sh-ai-gradient, linear-gradient(135deg,#7c3aed,#2563eb))',
+            }}
+          />
+          Claude Sonnet 4
+        </span>
         {streaming && (
           <span
-            style={{ fontSize: 11, color: 'var(--sh-brand)', fontWeight: 500, marginLeft: 'auto' }}
+            style={{
+              fontSize: 11,
+              color: 'var(--sh-brand)',
+              fontWeight: 600,
+              marginLeft: 'auto',
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+            }}
           >
-            Thinking...
+            <span aria-hidden style={pulseDotStyle(0)} />
+            <span aria-hidden style={pulseDotStyle(150)} />
+            <span aria-hidden style={pulseDotStyle(300)} />
+            Thinking
           </span>
         )}
       </div>
 
-      {/* Messages */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}>
+      {/* Messages — role="log" + aria-live="polite" so screen-reader users
+          are told when a streaming response is appended. WCAG 2.1 SC 4.1.3
+          (Status Messages, Level AA). */}
+      <div
+        role="log"
+        aria-live="polite"
+        aria-relevant="additions text"
+        aria-label="Hub AI conversation"
+        style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}
+      >
         {loading && (
           <div style={{ textAlign: 'center', padding: 40, color: 'var(--sh-muted)' }}>
             <IconSpinner size={24} style={{ animation: 'spin 1s linear infinite' }} />
@@ -877,29 +985,37 @@ function ChatArea({
               Stop
             </button>
           ) : (
-            <button
-              onClick={handleSend}
-              disabled={!input.trim() || input.length > MAX_MESSAGE_LENGTH}
-              style={{
-                background:
-                  input.trim() && input.length <= MAX_MESSAGE_LENGTH
-                    ? 'var(--sh-brand)'
-                    : 'var(--sh-soft)',
-                color:
-                  input.trim() && input.length <= MAX_MESSAGE_LENGTH ? '#fff' : 'var(--sh-muted)',
-                border: 'none',
-                borderRadius: 10,
-                padding: '10px 16px',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor:
-                  input.trim() && input.length <= MAX_MESSAGE_LENGTH ? 'pointer' : 'not-allowed',
-                whiteSpace: 'nowrap',
-                transition: 'all 0.15s',
-              }}
-            >
-              Send
-            </button>
+            (() => {
+              const canSend = input.trim() && input.length <= MAX_MESSAGE_LENGTH
+              return (
+                <button
+                  onClick={handleSend}
+                  disabled={!canSend}
+                  aria-label="Send message"
+                  style={{
+                    // Figma 2026-05-03: send button switches to AI gradient
+                    // when ready to fire, falls back to muted soft when
+                    // disabled. Slight box-shadow gives the button a small
+                    // amount of lift to match the Figma's elevated CTA.
+                    background: canSend
+                      ? 'var(--sh-ai-gradient, linear-gradient(135deg,#7c3aed,#2563eb))'
+                      : 'var(--sh-soft)',
+                    color: canSend ? '#fff' : 'var(--sh-muted)',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '10px 18px',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    cursor: canSend ? 'pointer' : 'not-allowed',
+                    whiteSpace: 'nowrap',
+                    transition: 'all 0.15s',
+                    boxShadow: canSend ? '0 4px 14px rgba(124,58,237,0.25)' : 'none',
+                  }}
+                >
+                  Send
+                </button>
+              )
+            })()
           )}
         </div>
         <div

@@ -19,6 +19,10 @@ const RECOMMENDED = [
   { key: 'STRIPE_WEBHOOK_SECRET', description: 'Stripe webhook signature verification' },
   { key: 'SENTRY_DSN', description: 'Error monitoring' },
   { key: 'FRONTEND_URL', description: 'Frontend origin for CORS + redirects' },
+  {
+    key: 'TENOR_API_KEY',
+    description: 'Tenor GIF search proxy (server-side); GIFs disabled when missing',
+  },
 ]
 
 /* Required only when NODE_ENV === 'production'. Missing → hard exit at boot.

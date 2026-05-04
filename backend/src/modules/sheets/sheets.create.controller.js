@@ -8,6 +8,7 @@ const { scanHtmlContentForPersistence } = require('../../lib/html/htmlDraftValid
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const { updateFingerprint } = require('../../lib/plagiarismService')
 const { findSimilarSheets } = require('../../lib/plagiarism')
+const { createNotification } = require('../../lib/notify')
 const { runPlagiarismScan } = require('../plagiarism/plagiarism.service')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
@@ -65,6 +66,17 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
         })
 
         if (monthlyCount >= limit) {
+          // Notify the user with a durable record + upsell link. Dedupe
+          // by the calendar month so a user who hits the cap multiple
+          // times in the same month only gets one notification.
+          createNotification(prisma, {
+            userId: req.user.userId,
+            type: 'upload_quota_reached',
+            message: `You've used all ${limit} sheet uploads this month. Upgrade to Pro for unlimited uploads.`,
+            linkPath: '/pricing',
+            priority: 'medium',
+            dedupKey: `upload_quota_reached:${req.user.userId}:${startOfMonth.getFullYear()}-${startOfMonth.getMonth() + 1}`,
+          }).catch(() => {})
           return sendError(
             res,
             403,

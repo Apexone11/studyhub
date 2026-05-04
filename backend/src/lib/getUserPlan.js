@@ -5,15 +5,28 @@
  */
 const prisma = require('./prisma')
 
-const ACTIVE_STATUSES = ['active', 'trialing', 'past_due']
+// Active statuses that grant Pro access. `past_due` is intentionally NOT
+// here as of 2026-05-03: previously a payment failure granted up to 3
+// weeks of free Pro while Stripe's smart retry chain ran. Now we treat
+// past_due as a hard cutoff — the UI shows a "fix payment" banner but the
+// quotas drop to free. The user can restore Pro by updating their card via
+// the Stripe Customer Portal.
+const ACTIVE_STATUSES = ['active', 'trialing']
 
 async function getUserPlan(userId) {
   try {
     const sub = await prisma.subscription.findUnique({
       where: { userId },
-      select: { plan: true, status: true },
+      select: { plan: true, status: true, currentPeriodEnd: true },
     })
     if (sub && ACTIVE_STATUSES.includes(sub.status)) {
+      // Gift subscriptions and one-off Pro grants set status='active' with
+      // a hard `currentPeriodEnd` date and no Stripe webhook to flip them
+      // to 'canceled' afterwards. Without this expiry check, a 30-day gift
+      // would confer Pro forever. Treat any expired period as free.
+      if (sub.currentPeriodEnd && new Date(sub.currentPeriodEnd) <= new Date()) {
+        return 'free'
+      }
       return sub.plan || 'free'
     }
   } catch {

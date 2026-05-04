@@ -28,6 +28,7 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { readLimiter, writeLimiter, groupJoinLimiter } = require('../../lib/rateLimiters')
 
 // Import controller
@@ -53,6 +54,12 @@ const activityRouter = require('./studyGroups.activity.routes')
 const reportsRouter = require('./studyGroups.reports.routes')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — defense in depth on every Group CRUD + membership
+// write (create/update/delete/join/leave/invite/member-role-change).
+// originAllowlist short-circuits GET/HEAD/OPTIONS so applying it at
+// the router level is safe for the mixed read+write surface.
+router.use(originAllowlist())
 
 // ===== GROUP CRUD & MEMBERSHIP =====
 
