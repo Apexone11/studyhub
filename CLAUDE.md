@@ -715,6 +715,34 @@ Founder-approved design refresh in progress. Context for any agent picking up th
     3. If neither option works, follow the "Allowed when it is the ONLY viable path" checklist above and log the exception.
   - **`package-lock.json` rules specifically:** never hand-edit. Only regenerate via `npm install`. If `package-lock.json` changes because of a legitimate install, commit it with the matching `package.json` change in the same commit so bisect stays clean.
 
+### Workspace lockfile sync — non-negotiable (added 2026-05-04)
+
+This repo is an **npm workspaces** project (root `package.json` declares `workspaces: ["backend", "frontend/studyhub-app"]`). That setup has one quirk that has bitten us: **the ROOT `package-lock.json` is the lockfile CI and Cloudflare Pages use, not the per-workspace lockfiles.** Local dev tooling sometimes regenerates `backend/package-lock.json` or `frontend/studyhub-app/package-lock.json` independently, and the standalone files can drift out of sync with the root.
+
+**The exact failure mode:** if you run `npm --prefix backend install` after editing `backend/package.json`, the backend lockfile updates but the **root `package-lock.json` does NOT**. Cloudflare Pages and Railway deploy by running `npm clean-install` from the repo root. `npm ci` is strict — if any workspace `package.json` declares a version the root lock doesn't reflect, the build fails with `EUSAGE: lock file's X@1.2.3 does not satisfy X@2.0.0`. Production deploy stops. Real example (2026-05-04, commit d3eb22d5): bumped `@anthropic-ai/sdk` in `backend/package.json` only, root lockfile stayed at the old version, Cloudflare deploy failed.
+
+**Hard rules — every dependency change MUST follow these:**
+
+1. **Run `npm install` at the REPO ROOT, not in a workspace prefix.** A root install regenerates the root `package-lock.json` AND the workspace lockfiles in one pass, keeping all three in sync. Never run `npm --prefix backend install` or `npm --prefix frontend/studyhub-app install` as your only install step — those commands only update their own lockfile and leave the root drifting.
+
+2. **Commit ALL three lockfiles in the same commit as the `package.json` change.** That's `package-lock.json` (root), `backend/package-lock.json`, and `frontend/studyhub-app/package-lock.json`. Skipping any of them poisons future bisects and risks the same EUSAGE failure on the next deploy.
+
+3. **Before pushing a dependency commit, verify the root lockfile is in sync.** Run:
+
+   ```powershell
+   git status package-lock.json backend/package-lock.json frontend/studyhub-app/package-lock.json
+   ```
+
+   If the root lockfile is NOT in the diff after a `package.json` change, the root is out of sync — go back and run `npm install` at the root before committing.
+
+4. **CI and Cloudflare Pages run `npm clean-install` (`npm ci`), which fails closed on lockfile drift.** This is the intended behaviour — silent drift would let prod deploy a different dependency tree than was tested locally. Treat any `npm ci` "lock file does not satisfy" error as a P0 deploy block.
+
+5. **Never delete `backend/package-lock.json` or `frontend/studyhub-app/package-lock.json` to "fix" drift.** The root lockfile alone is not enough for `npm --prefix <ws> ci` to work in CI sub-steps. Keep all three; sync them via root `npm install`.
+
+6. **The "v2.1 dependency exception" §1 above already says you can run `npm install` at a workspace root** to sync `node_modules`. That exception still stands for local dev convenience, but for any commit that lands on `main`, the **root** `npm install` is the canonical command — every other invocation must be followed by it before commit.
+
+If you skip rule #1, your commit lands on `main`, Cloudflare or Railway deploys, and the deploy fails with `EUSAGE`. The fix is always: `npm install` at root → commit the regenerated root lockfile → push. Don't try to hand-merge the lockfiles.
+
 ## Feature Expansion Plan (post-Phase-2)
 
 Founder-approved 2026-04-24. Live plan for all forward feature work beyond the 8-phase master plan. Every new feature slots into this plan before code starts.
