@@ -12,7 +12,8 @@ const {
   generateTierExplanation,
   groupFindingsByCategory,
 } = require('./htmlSecurity')
-const { sendHighRiskSheetAlert } = require('../email/email')
+// sendHighRiskSheetAlert moved to sheetReviewer.service.js (escalate branch
+// only) per the AI-first review policy 2026-05-03.
 const { createNotification } = require('../notify')
 const { reviewSheetAndUpdateStatus, isAiReviewEnabled } = require('../../modules/sheetReviewer')
 
@@ -240,36 +241,14 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
       nextStatus = 'published'
   }
 
-  // Tier 2 only — page admins for human escalations the AI couldn't
-  // resolve. Tier 3 is now auto-rejected and never enters the admin queue.
-  if (tier === RISK_TIER.HIGH_RISK) {
-    const username = sheet.author?.username || user.username || `User #${user.userId}`
-    sendHighRiskSheetAlert({
-      sheetId,
-      sheetTitle: sheet.title,
-      username,
-      flags: scan.findings.map((f) => f.message),
-    }).catch((err) =>
-      console.error('[htmlDraftWorkflow] Failed to send high-risk alert:', err.message),
-    )
-
-    prisma.user
-      .findMany({ where: { role: 'admin' }, select: { id: true } })
-      .then((admins) => {
-        for (const admin of admins) {
-          createNotification(prisma, {
-            userId: admin.id,
-            type: 'moderation',
-            message: `High-risk HTML sheet "${sheet.title || 'Untitled'}" submitted by ${username} — AI review pending; admin attention if escalated.`,
-            actorId: user.userId,
-            sheetId,
-            linkPath: '/admin?tab=sheets',
-            priority: 'high',
-          }).catch(() => {})
-        }
-      })
-      .catch((err) => console.error('[htmlDraftWorkflow] Failed to notify admins:', err.message))
-  }
+  // Tier 2: do NOT page admins on every submission. The AI reviewer
+  // (sheetReviewer.service.reviewSheetAndUpdateStatus) runs fire-and-forget
+  // below and emits the admin alert + notification ONLY when the AI
+  // escalates (low-confidence cases the model couldn't resolve). This is
+  // the AI-first model the founder approved 2026-05-03 — admins should
+  // see "special cases" only, not the full Tier 2 firehose. The
+  // sendHighRiskSheetAlert + admin notification fan-out lives in
+  // sheetReviewer.service.js's escalation branch (Copilot review #4).
 
   // Tier 3 — notify the AUTHOR that their sheet was auto-rejected with the
   // reason so they can fix it and resubmit. CLAUDE.md ESSENTIAL list

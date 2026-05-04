@@ -36,6 +36,7 @@ const FILTERS = [
   { id: 'content', label: NOTIFICATION_GROUP_LABELS.content },
   { id: 'groups', label: NOTIFICATION_GROUP_LABELS.groups },
   { id: 'sheets', label: NOTIFICATION_GROUP_LABELS.sheets },
+  { id: 'ai', label: NOTIFICATION_GROUP_LABELS.ai },
   { id: 'system', label: NOTIFICATION_GROUP_LABELS.system },
 ]
 

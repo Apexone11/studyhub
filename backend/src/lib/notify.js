@@ -370,22 +370,30 @@ async function createNotification(
   // ROWS — not just duplicate emails — for the same key within the dedup
   // window. Without this, a user who hammers a rate-limited endpoint
   // (AI quota, upload quota) accumulates one notification row per attempt.
-  // We pattern-match the message prefix so the lookup doesn't need a
-  // dedicated DB column; the dedupKey is woven into the message-or-skipped
-  // shape via the in-memory _emailDedup map (process-scoped) backed by the
-  // Notification table for cross-process safety.
+  //
+  // The DB cross-check matches against the dedupKey itself (substring of
+  // `message`), NOT just (userId, type). Earlier (userId, type)-only check
+  // collapsed semantically distinct events — daily and weekly
+  // ai_quota_reached share the same type and would suppress each other
+  // inside the same hour (Copilot review #3, 2026-05-03).
+  let dedupMessageMarker = null
   if (dedupKey) {
     if (_isDuplicate(userId, type, dedupKey)) {
       return null
     }
-    // DB cross-check for multi-process deployments — the in-memory map
-    // resets on dyno restart, so check the table for a recent row of the
-    // same (user, type, message) inside the dedup window. Cheap query
-    // with the existing (userId, type) index.
+    // Embed a stable marker derived from the dedupKey into the persisted
+    // message so the DB query can find prior rows for the SAME key. The
+    // marker is invisible-ish but discoverable by `contains:` filtering.
+    dedupMessageMarker = `[dedup:${dedupKey}]`
     try {
       const since = new Date(Date.now() - DEDUP_WINDOW_MS)
       const recent = await prisma.notification.findFirst({
-        where: { userId, type, createdAt: { gte: since } },
+        where: {
+          userId,
+          type,
+          message: { contains: dedupMessageMarker },
+          createdAt: { gte: since },
+        },
         select: { id: true },
       })
       if (recent) {
@@ -397,12 +405,17 @@ async function createNotification(
     }
   }
 
+  // Append the dedup marker to the END of the persisted message — the
+  // frontend strips `[dedup:...]` for display (see notificationsHelpers /
+  // serializer), so users see only the human-readable text.
+  const persistedMessage = dedupMessageMarker ? `${message} ${dedupMessageMarker}` : message
+
   try {
     const notif = await prisma.notification.create({
       data: {
         userId,
         type,
-        message,
+        message: persistedMessage,
         priority: safePriority,
         actorId: actorId || null,
         sheetId: sheetId || null,

@@ -66,14 +66,30 @@ export default function GroupDetailView({ groupId }) {
   // post" / "pinned" notification lands the user directly on the affected
   // thread instead of the Overview tab (Copilot finding 2026-05-03).
   const [searchParams] = useSearchParams()
-  const initialTabParam = searchParams.get('tab')
-  const initialPostParam = Number.parseInt(searchParams.get('post') || '', 10)
+  const tabParam = searchParams.get('tab')
+  const postParam = Number.parseInt(searchParams.get('post') || '', 10)
   const VALID_TABS = ['overview', 'discussions', 'resources', 'sessions', 'members']
-  const [activeTab, setActiveTab] = useState(
-    VALID_TABS.includes(initialTabParam) ? initialTabParam : 'overview',
+  const [activeTab, setActiveTab] = useState(VALID_TABS.includes(tabParam) ? tabParam : 'overview')
+  const [focusedPostId, setFocusedPostId] = useState(
+    Number.isInteger(postParam) && postParam > 0 ? postParam : null,
   )
-  const initialFocusedPostId =
-    Number.isInteger(initialPostParam) && initialPostParam > 0 ? initialPostParam : null
+
+  // Re-sync state when the user navigates from one notification to another
+  // on the SAME route (React Router updates search params without
+  // remounting). Without this, a second notification click strands the
+  // user on the previous tab/post (Copilot review #1, 2026-05-03).
+  useEffect(() => {
+    if (VALID_TABS.includes(tabParam) && tabParam !== activeTab) {
+      setActiveTab(tabParam)
+    }
+    const nextPost = Number.isInteger(postParam) && postParam > 0 ? postParam : null
+    if (nextPost !== focusedPostId) {
+      setFocusedPostId(nextPost)
+    }
+    // VALID_TABS is a stable literal; tabParam/postParam are the inputs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tabParam, postParam])
+  const initialFocusedPostId = focusedPostId
 
   const {
     activeGroup,
