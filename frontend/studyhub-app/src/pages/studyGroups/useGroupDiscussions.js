@@ -18,6 +18,10 @@ export function useGroupDiscussions(activeGroupId) {
    * Load discussions for active group
    */
   const loadDiscussions = useCallback(async (groupId) => {
+    // Reset BEFORE the fetch so switching groups (A → B) doesn't leave
+    // group A's discussion list visible during the loading window.
+    // Cross-group data leak window (Bug audit 2026-05-03, HIGH #6).
+    setDiscussions([])
     setDiscussionsLoading(true)
     try {
       const response = await fetch(`${API}/api/study-groups/${groupId}/discussions`, {

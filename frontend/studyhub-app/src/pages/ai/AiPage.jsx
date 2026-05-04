@@ -33,13 +33,19 @@ export default function AiPage() {
 
   const chat = useSharedAiChat()
 
-  // If URL has ?conversation=id, select it on mount.
+  // If URL has ?conversation=id, select it. Re-runs when the search-param
+  // changes so a same-route notification click (?conversation=1 →
+  // ?conversation=2) actually flips the active conversation. Earlier
+  // version had `[]` deps and only fired on mount, so clicking a second
+  // notification while the AI page was already open did nothing.
+  // (Bug audit 2026-05-03, HIGH #2.)
   useEffect(() => {
     const convId = Number.parseInt(searchParams.get('conversation'), 10)
     if (Number.isInteger(convId) && convId > 0) {
       chat.selectConversation(convId)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   // ?prompt=... is the hand-off used by the AI Suggestion card and
   // other landing-CTAs that want to drop the user into Hub AI with a
@@ -102,7 +108,7 @@ export default function AiPage() {
     // empty value, so the cascade is bounded by user navigation, not
     // by render frequency. eslint's set-state-in-effect rule is right
     // for the common cases but this is the documented escape hatch.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     setChatAreaKey((k) => k + 1)
   }, [promptParam])
 

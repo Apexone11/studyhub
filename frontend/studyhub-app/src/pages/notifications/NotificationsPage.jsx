@@ -18,6 +18,7 @@ import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { useLivePolling } from '../../lib/useLivePolling'
 import { useSocket } from '../../lib/useSocket'
+import { showToast } from '../../lib/toast'
 import { SOCKET_EVENTS } from '../../lib/socketEvents'
 import {
   getNotificationIcon,
@@ -53,18 +54,14 @@ export default function NotificationsPage() {
   const [sessionExpired, setSessionExpired] = useState(false)
   const [loadError, setLoadError] = useState(false)
 
-  /* eslint-disable react-hooks/set-state-in-effect --
-   * Re-enable polling when the user re-authenticates in another tab and the
-   * session context delivers a fresh user object. Without this, a single 401
-   * permanently wedges the page until a hard refresh. There is no external
-   * system to sync with — this is the simplest correct pattern. */
+   
   useEffect(() => {
     if (user) {
       setSessionExpired(false)
       setLoadError(false)
     }
   }, [user])
-  /* eslint-enable react-hooks/set-state-in-effect */
+   
 
   async function refresh({ signal, startTransition } = {}) {
     if (!user) return
@@ -130,35 +127,67 @@ export default function NotificationsPage() {
     return notifications.filter((n) => allowedTypes.includes(n.type))
   }, [filter, notifications])
 
+  // CLAUDE.md A4: never optimistically toggle state without awaiting the
+  // server. The previous version of these handlers fired the PATCH/DELETE
+  // and immediately set state, ignoring failures. A failed PATCH would
+  // leave the UI green while the server still had unread rows; the next
+  // polling cycle re-flipped them and the user thought the app was stuck.
+  // Now: optimistic update for UX speed, ROLLBACK + toast on failure.
   async function markAllRead() {
     if (unreadCount === 0) return
-    await fetch(`${API}/api/notifications/read-all`, {
-      method: 'PATCH',
-      ...authHeaders(),
-      credentials: 'include',
-    }).catch(() => {})
+    const snapshot = notifications
+    const prevUnread = unreadCount
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })))
     setUnreadCount(0)
+    try {
+      const res = await fetch(`${API}/api/notifications/read-all`, {
+        method: 'PATCH',
+        ...authHeaders(),
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    } catch {
+      setNotifications(snapshot)
+      setUnreadCount(prevUnread)
+      showToast('Could not mark all as read. Try again.', 'error')
+    }
   }
 
   async function clearRead() {
-    await fetch(`${API}/api/notifications/read`, {
-      method: 'DELETE',
-      ...authHeaders(),
-      credentials: 'include',
-    }).catch(() => {})
+    const snapshot = notifications
     setNotifications((prev) => prev.filter((n) => !n.read))
+    try {
+      const res = await fetch(`${API}/api/notifications/read`, {
+        method: 'DELETE',
+        ...authHeaders(),
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    } catch {
+      setNotifications(snapshot)
+      showToast('Could not clear read notifications.', 'error')
+    }
   }
 
   async function markOneRead(notif) {
     if (!notif.read && user) {
-      fetch(`${API}/api/notifications/${notif.id}/read`, {
-        method: 'PATCH',
-        ...authHeaders(),
-        credentials: 'include',
-      }).catch(() => {})
+      const snapshot = notifications
+      const prevUnread = unreadCount
       setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)))
       setUnreadCount((c) => Math.max(0, c - 1))
+      try {
+        const res = await fetch(`${API}/api/notifications/${notif.id}/read`, {
+          method: 'PATCH',
+          ...authHeaders(),
+          credentials: 'include',
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      } catch {
+        setNotifications(snapshot)
+        setUnreadCount(prevUnread)
+        // Silent on this one — the user already navigated, a toast on a
+        // background mark-read failure would be more confusing than helpful.
+      }
     }
     if (typeof notif.linkPath === 'string' && notif.linkPath.startsWith('/')) {
       navigate(notif.linkPath)
@@ -171,16 +200,25 @@ export default function NotificationsPage() {
 
   async function deleteOne(e, notifId) {
     e.stopPropagation()
-    fetch(`${API}/api/notifications/${notifId}`, {
-      method: 'DELETE',
-      ...authHeaders(),
-      credentials: 'include',
-    }).catch(() => {})
+    const snapshot = notifications
+    const prevUnread = unreadCount
     setNotifications((prev) => {
       const removed = prev.find((n) => n.id === notifId)
       if (removed && !removed.read) setUnreadCount((c) => Math.max(0, c - 1))
       return prev.filter((n) => n.id !== notifId)
     })
+    try {
+      const res = await fetch(`${API}/api/notifications/${notifId}`, {
+        method: 'DELETE',
+        ...authHeaders(),
+        credentials: 'include',
+      })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    } catch {
+      setNotifications(snapshot)
+      setUnreadCount(prevUnread)
+      showToast('Could not delete notification.', 'error')
+    }
   }
 
   if (!user) return null
