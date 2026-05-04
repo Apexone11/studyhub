@@ -5,6 +5,7 @@ import MentionText from '../../components/MentionText'
 import UserAvatar from '../../components/UserAvatar'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
+import { resolveImageUrl } from '../../lib/imageUrls'
 import {
   authHeaders,
   timeAgo,
@@ -407,33 +408,41 @@ function ReplyInput({ user, onReply }) {
         ) : null}
         {attachments.length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {attachments.map((att, i) => (
-              <div key={i} style={composerGifCardStyle}>
-                <img src={att.url} alt={att.name || 'GIF preview'} style={composerGifImageStyle} />
-                <button
-                  type="button"
-                  onClick={handleRemoveAttachment}
-                  style={{
-                    position: 'absolute',
-                    top: 6,
-                    right: 6,
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    background: 'rgba(0,0,0,0.6)',
-                    color: 'white',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  X
-                </button>
-              </div>
-            ))}
+            {attachments.map((att, i) => {
+              const resolvedUrl = resolveImageUrl(att.url)
+              if (!resolvedUrl) return null
+              return (
+                <div key={i} style={composerGifCardStyle}>
+                  <img
+                    src={resolvedUrl}
+                    alt={att.name || 'GIF preview'}
+                    style={composerGifImageStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveAttachment}
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      right: 6,
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      background: 'rgba(0,0,0,0.6)',
+                      color: 'white',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    X
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
         <div style={commentInputFooterStyle}>
@@ -584,33 +593,41 @@ function CommentInput({
         ) : null}
         {displayAttachments && displayAttachments.length > 0 && (
           <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-            {displayAttachments.map((att, i) => (
-              <div key={i} style={composerGifCardStyle}>
-                <img src={att.url} alt={att.name || 'GIF preview'} style={composerGifImageStyle} />
-                <button
-                  type="button"
-                  onClick={handleRemoveAttachment}
-                  style={{
-                    position: 'absolute',
-                    top: 6,
-                    right: 6,
-                    width: 24,
-                    height: 24,
-                    borderRadius: '50%',
-                    background: 'rgba(0,0,0,0.6)',
-                    color: 'white',
-                    border: 'none',
-                    cursor: 'pointer',
-                    fontSize: '12px',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                  }}
-                >
-                  X
-                </button>
-              </div>
-            ))}
+            {displayAttachments.map((att, i) => {
+              const resolvedUrl = resolveImageUrl(att.url)
+              if (!resolvedUrl) return null
+              return (
+                <div key={i} style={composerGifCardStyle}>
+                  <img
+                    src={resolvedUrl}
+                    alt={att.name || 'GIF preview'}
+                    style={composerGifImageStyle}
+                  />
+                  <button
+                    type="button"
+                    onClick={handleRemoveAttachment}
+                    style={{
+                      position: 'absolute',
+                      top: 6,
+                      right: 6,
+                      width: 24,
+                      height: 24,
+                      borderRadius: '50%',
+                      background: 'rgba(0,0,0,0.6)',
+                      color: 'white',
+                      border: 'none',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    X
+                  </button>
+                </div>
+              )
+            })}
           </div>
         )}
         <div style={commentInputFooterStyle}>
@@ -858,14 +875,18 @@ function CommentItem({
             {/* Attachments inside bubble */}
             {!editing && comment.attachments && comment.attachments.length > 0 && (
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '8px' }}>
-                {comment.attachments.map((att) => (
-                  <img
-                    key={att.id}
-                    src={att.url}
-                    alt={att.name || 'Comment GIF'}
-                    style={postedGifImageStyle}
-                  />
-                ))}
+                {comment.attachments.map((att) => {
+                  const resolvedUrl = resolveImageUrl(att.url)
+                  if (!resolvedUrl) return null
+                  return (
+                    <img
+                      key={att.id}
+                      src={resolvedUrl}
+                      alt={att.name || 'Comment GIF'}
+                      style={postedGifImageStyle}
+                    />
+                  )
+                })}
               </div>
             )}
           </div>

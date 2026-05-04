@@ -49,7 +49,13 @@ export default function ForYouSection({ onSwitchToAll }) {
     loadForYouData()
   }, [])
 
-  if (loading) {
+  const hasAnyData =
+    data.sheets.length > 0 ||
+    data.groups.length > 0 ||
+    data.people.length > 0 ||
+    data.trending.length > 0
+
+  if (loading && !hasAnyData) {
     return (
       <div style={{ display: 'grid', gap: 28 }}>
         {[

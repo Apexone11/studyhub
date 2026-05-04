@@ -4,6 +4,7 @@ import GifSearchPanel from '../../../components/GifSearchPanel'
 import MentionText from '../../../components/MentionText'
 import { SkeletonCard } from '../../../components/Skeleton'
 import UserAvatar from '../../../components/UserAvatar'
+import { resolveImageUrl } from '../../../lib/imageUrls'
 import { FONT, panelStyle, timeAgo } from './sheetViewerConstants'
 
 const composerGifCardStyle = {
@@ -169,37 +170,41 @@ export default function SheetCommentsPanel({
                 ) : null}
                 {commentAttachments.length > 0 ? (
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-                    {commentAttachments.map((attachment) => (
-                      <div key={attachment.url} style={composerGifCardStyle}>
-                        <img
-                          src={attachment.url}
-                          alt={attachment.name || 'GIF preview'}
-                          style={composerGifImageStyle}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setCommentAttachments([])}
-                          style={{
-                            position: 'absolute',
-                            top: 6,
-                            right: 6,
-                            width: 24,
-                            height: 24,
-                            borderRadius: '50%',
-                            background: 'rgba(0, 0, 0, 0.6)',
-                            color: '#fff',
-                            border: 'none',
-                            cursor: 'pointer',
-                            fontSize: 12,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}
-                        >
-                          X
-                        </button>
-                      </div>
-                    ))}
+                    {commentAttachments.map((attachment) => {
+                      const resolvedUrl = resolveImageUrl(attachment.url)
+                      if (!resolvedUrl) return null
+                      return (
+                        <div key={attachment.url} style={composerGifCardStyle}>
+                          <img
+                            src={resolvedUrl}
+                            alt={attachment.name || 'GIF preview'}
+                            style={composerGifImageStyle}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setCommentAttachments([])}
+                            style={{
+                              position: 'absolute',
+                              top: 6,
+                              right: 6,
+                              width: 24,
+                              height: 24,
+                              borderRadius: '50%',
+                              background: 'rgba(0, 0, 0, 0.6)',
+                              color: '#fff',
+                              border: 'none',
+                              cursor: 'pointer',
+                              fontSize: 12,
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'center',
+                            }}
+                          >
+                            X
+                          </button>
+                        </div>
+                      )
+                    })}
                   </div>
                 ) : null}
                 <div>
@@ -370,14 +375,18 @@ export default function SheetCommentsPanel({
                       </div>
                       {comment.attachments && comment.attachments.length > 0 ? (
                         <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-                          {comment.attachments.map((attachment) => (
-                            <img
-                              key={attachment.id || attachment.url}
-                              src={attachment.url}
-                              alt={attachment.name || 'Comment GIF'}
-                              style={postedGifImageStyle}
-                            />
-                          ))}
+                          {comment.attachments.map((attachment) => {
+                            const resolvedUrl = resolveImageUrl(attachment.url)
+                            if (!resolvedUrl) return null
+                            return (
+                              <img
+                                key={attachment.id || attachment.url}
+                                src={resolvedUrl}
+                                alt={attachment.name || 'Comment GIF'}
+                                style={postedGifImageStyle}
+                              />
+                            )
+                          })}
                         </div>
                       ) : null}
                     </div>

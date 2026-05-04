@@ -73,6 +73,8 @@ model User {
   studySheets                StudySheet[]
   enrollments                Enrollment[]
   schoolEnrollments          UserSchoolEnrollment[]
+  scholarAnnotations         ScholarAnnotation[]    @relation("UserScholarAnnotations")
+  scholarDiscussionThreads   ScholarDiscussionThread[] @relation("UserScholarDiscussionThreads")
   comments                   Comment[]
   starredSheets              StarredSheet[]
   passwordResetToken         PasswordResetToken?
@@ -150,6 +152,8 @@ model User {
   aiMessages                 AiMessage[]               @relation("AiMessageUser")
   aiUsageLogs                AiUsageLog[]
   aiSuggestions              AiSuggestion[]
+  aiAttachments              AiAttachment[]
+  aiStorageQuota             UserAiStorageQuota?
   bookShelves                BookShelf[]
   readingProgress            ReadingProgress[]
   bookBookmarks              BookBookmark[]
@@ -1727,8 +1731,9 @@ model AiConversation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  user     User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  messages AiMessage[]
+  user        User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages    AiMessage[]
+  attachments AiAttachment[]
 
   @@index([userId, updatedAt(sort: Desc)])
 }
@@ -1743,6 +1748,9 @@ model AiMessage {
   tokenCount       Int?
   model            String?
   metadata         Json?
+  // Snapshot of attached AiAttachment metadata at send time so a
+  // conversation rehydrates without re-querying after reload.
+  attachments      Json?
   // User-reported abuse flag. Set when a user clicks "report this
   // response" on an assistant message. Admin reviews via the AI
   // moderation queue. Reason is one of: 'harmful', 'inaccurate',
@@ -1762,11 +1770,19 @@ model AiMessage {
 }
 
 model AiUsageLog {
-  id           Int      @id @default(autoincrement())
-  userId       Int
-  date         DateTime @db.Date
-  messageCount Int      @default(0)
-  tokenCount   Int      @default(0)
+  id             Int      @id @default(autoincrement())
+  userId         Int
+  date           DateTime @db.Date
+  messageCount   Int      @default(0)
+  tokenCount     Int      @default(0)
+  // Hub AI v2 — per-user daily document uploads + cost split. Powers
+  // per-tier admin reporting and the per-user daily token sub-cap
+  // (50K free, 200K verified, 500K pro; admin uncapped).
+  documentCount  Int      @default(0)
+  tokensIn       Int      @default(0)
+  tokensOut      Int      @default(0)
+  documentTokens Int      @default(0)
+  costUsdCents   Int      @default(0)
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -1794,6 +1810,101 @@ model AiSuggestion {
   @@index([userId, dismissedAt])
 }
 
+// ── Hub AI v2: document uploads, storage cap, spend ceiling, idempotency ──
+
+// AiAttachment stores upload metadata only; the file itself lives in
+// the private R2 bucket keyed by `r2Key`. The two-phase sweeper
+// (mark deletedAt → drain to R2) lives in lib/jobs/aiAttachmentSweeper.js.
+// fileNameHash = sha256(fileName).slice(-8) for log correlation; the
+// raw fileName is stored for display but never written to logs (A8).
+model AiAttachment {
+  id             Int       @id @default(autoincrement())
+  userId         Int
+  conversationId Int?
+  messageId      Int?
+  r2Key          String    @unique
+  r2Etag         String?
+  mimeType       String
+  fileName       String
+  fileNameHash   String
+  bytes          Int
+  pageCount      Int?
+  expiresAt      DateTime
+  pinnedUntil    DateTime?
+  // null for PDF native (Anthropic document block path); populated
+  // for DOCX / TXT / MD / code after parse + NFKC normalize.
+  extractedText  String?
+  extractedAt    DateTime?
+  // Soft-delete first; sweeper hard-deletes R2 then row.
+  deletedAt      DateTime?
+  createdAt      DateTime  @default(now())
+
+  user         User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation AiConversation? @relation(fields: [conversationId], references: [id], onDelete: SetNull)
+
+  @@index([userId, expiresAt])
+  @@index([conversationId])
+  @@index([deletedAt, expiresAt])
+}
+
+// Per-user rolling storage cap. The service does an atomic
+// UPDATE WHERE totalBytes + $bytes <= cap to defeat race conditions
+// (master plan L3-HIGH-3).
+model UserAiStorageQuota {
+  userId     Int      @id
+  totalBytes BigInt   @default(0)
+  cap        BigInt
+  updatedAt  DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// One row per UTC date. Pre-flight atomic increment-and-compare on
+// every Anthropic call enforces the daily spend ceiling
+// (master plan L5-CRIT-1). Admin tier bypasses this check entirely.
+model AiGlobalSpendDay {
+  date           DateTime @id @db.Date
+  tokensIn       BigInt   @default(0)
+  tokensOut      BigInt   @default(0)
+  documentTokens BigInt   @default(0)
+  costUsdCents   Int      @default(0)
+  requestCount   Int      @default(0)
+}
+
+// Stripe-style idempotency for POST /api/ai/attachments.
+// Client supplies an Idempotency-Key header; the service first looks
+// up this table and returns the existing AiAttachment if a row is
+// present and unexpired.
+model AiUploadIdempotency {
+  key          String   @id
+  userId       Int
+  attachmentId Int?
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime
+
+  @@index([expiresAt])
+}
+
+// LibrarySyncState drives the weekly Google Books corpus sync.
+// One row per canonical query string; the job picks the 5 oldest
+// queries (lastRunAt < NOW() - 28 days OR lastRunAt IS NULL),
+// fetches the next page from `lastStartIndex`, and advances.
+// `capDiscovered` = true when upstream returned <DEFAULT_PAGE_SIZE
+// rows; the query then waits for `resetAt` before being re-eligible.
+model LibrarySyncState {
+  id             Int       @id @default(autoincrement())
+  queryKey       String    @unique
+  lastRunAt      DateTime?
+  lastStartIndex Int       @default(0)
+  totalFetched   Int       @default(0)
+  capDiscovered  Boolean   @default(false)
+  resetAt        DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  @@index([lastRunAt])
+}
+
 // ── Library / BookHub models ──────────────────────────────────
 
 model BookShelf {
@@ -1814,18 +1925,23 @@ model BookShelf {
 }
 
 model ShelfBook {
-  id       Int      @id @default(autoincrement())
-  shelfId  Int
-  volumeId String
-  title    String
-  author   String
-  coverUrl String?
-  addedAt  DateTime @default(now())
+  id         Int      @id @default(autoincrement())
+  shelfId    Int
+  volumeId   String
+  title      String
+  author     String
+  coverUrl   String?
+  addedAt    DateTime @default(now())
+  // Scholar v1: ShelfBook now backs both Library books and Scholar papers.
+  // sourceType ∈ {book, paper}; paperId points at ScholarPaper.id when set.
+  sourceType String   @default("book")
+  paperId    String?
 
   shelf BookShelf @relation(fields: [shelfId], references: [id], onDelete: Cascade)
 
   @@unique([shelfId, volumeId])
   @@index([shelfId])
+  @@index([paperId])
 }
 
 model ReadingProgress {
@@ -1855,6 +1971,125 @@ model BookBookmark {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId, volumeId])
+}
+
+// ── Scholar v1 + v1.5 ────────────────────────────────────────
+//
+// Scholar is a literature workspace: search, read, save, annotate, and
+// peer-review academic papers. Implementation slots in alongside the
+// Library / Books surface (scholarly articles vs general books).
+//
+// v1 = ScholarPaper cache + search + reader (implemented incrementally
+// across Week 4 + Week 5; this Week 5 PR introduces v1.5 schema and the
+// minimum v1 ScholarPaper cache row used by the v1.5 feature wiring).
+// v1.5 = ScholarAnnotation + ScholarDiscussionThread (this PR).
+//
+// Migration: 20260504000002_scholar_v15. All statements use `IF NOT
+// EXISTS` / `DO $$` guards so re-running prisma migrate deploy is safe.
+
+/// ScholarPaper — denormalized cache of an academic paper across all
+/// adapters (Semantic Scholar, OpenAlex, CrossRef, arXiv, Unpaywall,
+/// CORE, PubMed). The `id` is a stable cross-source identifier with a
+/// scheme prefix: `doi:10.1234/abc`, `arxiv:2401.12345`, `ss:abc123…`.
+/// `staleAt` drives lazy refresh; popular papers refresh daily, others
+/// every 30 days.
+model ScholarPaper {
+  id                String    @id // doi:… | arxiv:… | ss:…
+  title             String
+  abstract          String?   @db.Text
+  authorsJson       Json      @default("[]")
+  venue             String?
+  publishedAt       DateTime?
+  doi               String?   @unique
+  arxivId           String?
+  semanticScholarId String?
+  openAlexId        String?
+  pubmedId          String?
+  license           String?
+  openAccess        Boolean   @default(false)
+  pdfCachedKey      String?
+  pdfExternalUrl    String?
+  citationCount     Int       @default(0)
+  topicsJson        Json      @default("[]")
+  viewCount         Int       @default(0)
+  fetchedAt         DateTime  @default(now())
+  staleAt           DateTime
+
+  annotations ScholarAnnotation[]
+  discussions ScholarDiscussionThread[]
+
+  @@index([staleAt])
+  @@index([citationCount])
+  @@index([publishedAt])
+}
+
+/// ScholarPaperSearchCache — keyed sha256(query+filters+source) blob of
+/// adapter results, 1h TTL. Defends Semantic Scholar's 1 req/sec ceiling
+/// under search-burst load (loop-5 CRIT-3).
+model ScholarPaperSearchCache {
+  cacheKey    String   @id // sha256 of query+filters+source
+  source      String
+  resultsJson Json
+  fetchedAt   DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([expiresAt])
+  @@index([source])
+}
+
+/// ScholarAnnotation (v1.5) — highlight / margin note tied to a paper.
+/// `rangeJson` is a PDF.js text-layer offset map (anchor + focus + page).
+/// `visibility` allowlist: `private` | `school` | `public`. Server
+/// serializer strips body/userId/rangeJson for non-allowed viewers
+/// (loop-3 LOW-4 + CLAUDE.md A6).
+model ScholarAnnotation {
+  id         Int      @id @default(autoincrement())
+  userId     Int
+  paperId    String
+  rangeJson  Json
+  body       String?  @db.Text
+  color      String   @default("yellow")
+  visibility String   @default("private")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  paper ScholarPaper @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  // Loop-2-CRIT: required for the `user: { enrollments: { some } }` filter
+  // in the school-visibility clause (scholar.annotation.controller.js).
+  // Cascade-on-delete matches the deleteUserAccount erasure flow.
+  user  User         @relation("UserScholarAnnotations", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([paperId, visibility])
+  @@index([userId])
+}
+
+/// ScholarDiscussionThread (v1.5) — school-scoped peer-review thread.
+/// Soft-deleted via `deletedAt` so reply trees stay intact. `parentId`
+/// is null for root posts. `schoolId` null = global discussion (rare;
+/// most threads are school-scoped). Visibility filter applied at the
+/// route layer + block-filter wraps `getBlockedUserIds` per CLAUDE.md.
+model ScholarDiscussionThread {
+  id        Int       @id @default(autoincrement())
+  paperId   String
+  schoolId  Int?
+  authorId  Int
+  body      String    @db.Text
+  parentId  Int?
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  paper   ScholarPaper              @relation(fields: [paperId], references: [id], onDelete: Cascade)
+  parent  ScholarDiscussionThread?  @relation("ScholarDiscussionParent", fields: [parentId], references: [id], onDelete: SetNull)
+  replies ScholarDiscussionThread[] @relation("ScholarDiscussionParent")
+  // Loop-6-HIGH: User back-relation so controllers can `include: { author }`
+  // and so deleting a User doesn't orphan thread rows. Cascade-on-delete
+  // mirrors the soft-delete + erasure flow in deleteUserAccount.js.
+  author  User                      @relation("UserScholarDiscussionThreads", fields: [authorId], references: [id], onDelete: Cascade)
+
+  @@index([paperId, schoolId, createdAt])
+  @@index([parentId])
+  @@index([authorId])
 }
 
 // ── Waitlist ─────────────────────────────────────────────────

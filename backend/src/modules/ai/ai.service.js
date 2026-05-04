@@ -11,12 +11,20 @@ const { buildContext, redactPII } = require('./ai.context')
 const {
   DEFAULT_MODEL,
   SYSTEM_PROMPT,
+  DOCUMENT_TRUST_CLAUSE,
   DAILY_LIMITS,
   WEEKLY_LIMITS,
   CONVERSATION_HISTORY_LIMIT,
   MAX_OUTPUT_TOKENS_QA,
   MAX_OUTPUT_TOKENS_SHEET,
 } = require('./ai.constants')
+const attachmentsService = require('./attachments/attachments.service')
+const {
+  reserveSpend,
+  refundSpendDelta,
+  checkUserTokenSubcap,
+  recordActualUsage,
+} = require('./ai.spendCeiling')
 
 // ── Anthropic client (lazy-initialized) ────────────────────────────
 
@@ -319,7 +327,16 @@ function emitRedactedDelta(res, nextSafeResponse, previousSafeResponse) {
  * @param {Array}  [params.images]    - Array of { base64, mediaType } image objects.
  * @param {object} params.res         - Express response object (for SSE).
  */
-async function streamMessage({ user, conversationId, content, currentPage, images, res, signal }) {
+async function streamMessage({
+  user,
+  conversationId,
+  content,
+  currentPage,
+  images,
+  attachmentIds,
+  res,
+  signal,
+}) {
   const userId = user.id || user.userId
   const safeContent = redactPII(content)
 
@@ -406,10 +423,20 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     const { sanitizeAiInput } = require('./ai.inputSanitizer')
     const scan = sanitizeAiInput(content)
     if (scan.flagged) {
-      captureError(new Error(`AI prompt injection attempt: ${scan.reason}`), {
-        userId,
-        conversationId,
-        contentPreview: safeContent.slice(0, 200),
+      // L10-CRIT-1: previously included `contentPreview: safeContent.slice(0,200)`
+      // which leaked the user's message body to Sentry. Replaced with
+      // length + sha256-prefix for correlation without PII (CLAUDE.md A8).
+      const crypto = require('node:crypto')
+      const contentSha8 = crypto.createHash('sha256').update(content).digest('hex').slice(0, 8)
+      captureError(new Error('AI prompt injection attempt'), {
+        tags: { module: 'ai', action: 'prompt_injection_detected' },
+        extra: {
+          userId,
+          conversationId,
+          reasonCode: scan.reason,
+          contentLength: content.length,
+          contentSha8,
+        },
       })
     }
   } catch {
@@ -451,11 +478,60 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     sendSSE(res, { type: 'title', title: autoTitle })
   }
 
+  // 4b. Hub AI v2: Resolve attachments + per-user token sub-cap.
+  // Attachments are owner-checked here (`userId === req.user.userId`,
+  // not soft-deleted). Anything missing is dropped silently.
+  let resolvedAttachments = []
+  if (Array.isArray(attachmentIds) && attachmentIds.length > 0) {
+    try {
+      const safeIds = attachmentIds
+        .map((x) => Number.parseInt(x, 10))
+        .filter((n) => Number.isInteger(n) && n > 0)
+      if (safeIds.length > 0) {
+        resolvedAttachments = await prisma.aiAttachment.findMany({
+          where: {
+            id: { in: safeIds },
+            userId,
+            deletedAt: null,
+          },
+        })
+      }
+    } catch {
+      /* graceful degradation — attachments table may be unavailable */
+    }
+  }
+
+  // 4c. Per-user daily token sub-cap (master plan L5-CRIT-1). Admin
+  // tier bypasses (founder-locked 2026-05-04).
+  const subcap = await checkUserTokenSubcap({ user })
+  if (!subcap.ok) {
+    sendSSE(res, {
+      type: 'error',
+      message: `Daily token cap reached (${subcap.cap.toLocaleString()}). Resets at midnight UTC.`,
+      code: 'RATE_LIMITED',
+    })
+    res.end()
+    return
+  }
+
   // 5. Build context and conversation history for Claude.
   const contextBlock = await buildContext(userId, { currentPage })
   // Decision #17 requires PII to be stripped at the model boundary;
   // context can include note/sheet titles that users typed months ago.
-  const fullSystemPrompt = redactPII(SYSTEM_PROMPT + contextBlock)
+  const hasAttachments = resolvedAttachments.length > 0
+  const trustClause = hasAttachments ? DOCUMENT_TRUST_CLAUSE : ''
+  const fullSystemPromptText = redactPII(SYSTEM_PROMPT + contextBlock + trustClause)
+  // Master plan L1-CRIT-2: cache_control=ephemeral ttl=1h on the
+  // system prompt so the prompt-cache hit rate stays > 60%. Anthropic
+  // SDK accepts an array system prompt with cache_control on each
+  // block; we emit one cached block.
+  const fullSystemPrompt = [
+    {
+      type: 'text',
+      text: fullSystemPromptText,
+      cache_control: { type: 'ephemeral', ttl: '1h' },
+    },
+  ]
 
   // Fetch the most recent conversation history (descending, then reverse
   // to chronological order). This ensures we always send the latest context
@@ -475,16 +551,41 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     content: redactPII(msg.content),
   }))
 
-  // If images were uploaded, replace the last user message content with
-  // a multi-part content block (text + images).
-  if (images && images.length > 0) {
+  // If images were uploaded (legacy v1 path) OR attachments resolved
+  // (v2 path), replace the last user message content with a multi-part
+  // content block (text + images + documents).
+  if ((images && images.length > 0) || hasAttachments) {
     const lastIdx = claudeMessages.length - 1
     const contentParts = [{ type: 'text', text: safeContent }]
-    for (const img of images) {
-      contentParts.push({
-        type: 'image',
-        source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
-      })
+    if (images && images.length > 0) {
+      for (const img of images) {
+        contentParts.push({
+          type: 'image',
+          source: { type: 'base64', media_type: img.mediaType, data: img.base64 },
+        })
+      }
+    }
+    if (hasAttachments) {
+      try {
+        const blocks = await attachmentsService.buildAnthropicContentBlocks({
+          attachments: resolvedAttachments,
+          conversationId,
+          includeTextWrapper: true,
+        })
+        contentParts.push(...blocks)
+      } catch (err) {
+        captureError(err, {
+          tags: { module: 'ai', action: 'buildAttachmentBlocks' },
+          extra: { attachmentCount: resolvedAttachments.length },
+        })
+        sendSSE(res, {
+          type: 'error',
+          message: 'Failed to load uploaded documents.',
+          code: 'INTERNAL',
+        })
+        res.end()
+        return
+      }
     }
     claudeMessages[lastIdx].content = contentParts
   }
@@ -496,12 +597,38 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     )
   const maxTokens = isSheetRequest ? MAX_OUTPUT_TOKENS_SHEET : MAX_OUTPUT_TOKENS_QA
 
+  // 5b. Daily Anthropic spend ceiling pre-flight (master plan L5-CRIT-1).
+  // Estimate input tokens from prompt size + uploaded doc bytes
+  // (~250 tokens per page for a typical PDF); the value is loose, so
+  // we take a conservative upper bound.
+  const promptCharCount = JSON.stringify(claudeMessages).length + fullSystemPromptText.length
+  const docPageEst = resolvedAttachments
+    .filter((a) => a.mimeType === 'application/pdf')
+    .reduce((sum, a) => sum + (a.pageCount || 0), 0)
+  const inputTokensEst = Math.ceil(promptCharCount / 3.5) + docPageEst * 250
+  const spendReservation = await reserveSpend({
+    user,
+    inputTokensEst,
+    maxOutputTokens: isSheetRequest ? MAX_OUTPUT_TOKENS_SHEET : MAX_OUTPUT_TOKENS_QA,
+  })
+  if (!spendReservation.ok) {
+    sendSSE(res, {
+      type: 'error',
+      message: 'AI spend ceiling reached for today. Please try again tomorrow.',
+      code: 'RATE_LIMITED',
+    })
+    res.end()
+    return
+  }
+
   // 6. Stream from Claude.
   let fullResponse = ''
   let safeResponse = ''
   let streamedRawLength = 0
   let totalInputTokens = 0
   let totalOutputTokens = 0
+  let cacheReadInputTokens = 0
+  let cacheCreationInputTokens = 0
   let wasTruncated = false
 
   const ttftStart = performance.now()
@@ -569,6 +696,8 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     const finalMessage = await stream.finalMessage()
     totalInputTokens = finalMessage?.usage?.input_tokens || 0
     totalOutputTokens = finalMessage?.usage?.output_tokens || 0
+    cacheReadInputTokens = finalMessage?.usage?.cache_read_input_tokens || 0
+    cacheCreationInputTokens = finalMessage?.usage?.cache_creation_input_tokens || 0
 
     // Detect truncation: Claude stopped because it hit the token limit.
     if (finalMessage?.stop_reason === 'max_tokens') {
@@ -599,6 +728,15 @@ async function streamMessage({ user, conversationId, content, currentPage, image
           ...(wasTruncated ? { truncated: true } : {}),
         }
       : undefined
+  const assistantAttachmentsSnapshot = hasAttachments
+    ? resolvedAttachments.map((a) => ({
+        id: a.id,
+        mimeType: a.mimeType,
+        fileName: a.fileName,
+        bytes: a.bytes,
+        pageCount: a.pageCount,
+      }))
+    : null
   const assistantMsg = await prisma.aiMessage.create({
     data: {
       conversation: { connect: { id: conversationId } },
@@ -607,6 +745,7 @@ async function streamMessage({ user, conversationId, content, currentPage, image
       tokenCount: totalTokens,
       model: conversation.model || DEFAULT_MODEL,
       metadata: msgMetadata,
+      attachments: assistantAttachmentsSnapshot,
     },
   })
 
@@ -616,8 +755,38 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     data: { updatedAt: new Date() },
   })
 
-  // 8. Increment usage.
+  // 8. Increment usage. The legacy AiUsageLog row stays the source of
+  // truth for daily/weekly limit display; the new ai.spendCeiling
+  // module adds the cost-cents tracking on top.
   await incrementUsage(userId, totalTokens)
+  // Record the actual numbers (not just the estimate) on the global
+  // spend row + per-user row. Cost rate matches Anthropic Sonnet 4
+  // pricing in attachments.constants.js.
+  const {
+    COST_PER_1K_INPUT_CENTS,
+    COST_PER_1K_OUTPUT_CENTS,
+  } = require('./attachments/attachments.constants')
+  const actualCostCents = Math.ceil(
+    (totalInputTokens / 1000) * COST_PER_1K_INPUT_CENTS +
+      (totalOutputTokens / 1000) * COST_PER_1K_OUTPUT_CENTS,
+  )
+  await recordActualUsage({
+    userId,
+    tokensIn: totalInputTokens,
+    tokensOut: totalOutputTokens,
+    documentTokens: docPageEst * 250,
+    costCents: actualCostCents,
+    documentCount: hasAttachments ? resolvedAttachments.length : 0,
+    cacheReadInputTokens,
+    cacheCreationInputTokens,
+  })
+  // Refund the over-estimate back into the global daily budget.
+  if (spendReservation.costEstCents > actualCostCents) {
+    await refundSpendDelta({
+      estCents: spendReservation.costEstCents,
+      actualCents: actualCostCents,
+    })
+  }
 
   // 9. Send completion event.
   sendSSE(res, {

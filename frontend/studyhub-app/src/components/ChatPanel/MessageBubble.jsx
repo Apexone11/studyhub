@@ -1,3 +1,5 @@
+import { resolveImageUrl } from '../../lib/imageUrls'
+
 const PAGE_FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
 function truncate(text, max = 50) {
@@ -59,11 +61,18 @@ export default function MessageBubble({ msg, currentUserId, onReply, isHovered, 
           {/* Inline attachments */}
           {!isDeleted && Array.isArray(msg.attachments) && msg.attachments.length > 0 && (
             <div style={{ marginTop: 4, display: 'flex', flexDirection: 'column', gap: 3 }}>
-              {msg.attachments.map((att, idx) =>
-                att.type === 'image' ? (
-                  <a key={att.id || idx} href={att.url} target="_blank" rel="noopener noreferrer">
+              {msg.attachments.map((att, idx) => {
+                const resolvedUrl = resolveImageUrl(att.url)
+                if (!resolvedUrl) return null
+                return att.type === 'image' ? (
+                  <a
+                    key={att.id || idx}
+                    href={resolvedUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
                     <img
-                      src={att.url}
+                      src={resolvedUrl}
                       alt={att.fileName || 'Image'}
                       style={{
                         maxWidth: '100%',
@@ -79,7 +88,7 @@ export default function MessageBubble({ msg, currentUserId, onReply, isHovered, 
                 ) : (
                   <a
                     key={att.id || idx}
-                    href={att.url}
+                    href={resolvedUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     style={{
@@ -109,8 +118,8 @@ export default function MessageBubble({ msg, currentUserId, onReply, isHovered, 
                     {att.fileName || 'Download'}
                     {att.fileSize ? ` (${Math.round(att.fileSize / 1024)}KB)` : ''}
                   </a>
-                ),
-              )}
+                )
+              })}
             </div>
           )}
 

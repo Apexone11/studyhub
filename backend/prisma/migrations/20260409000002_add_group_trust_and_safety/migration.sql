@@ -1,65 +1,65 @@
 -- Phase 5: Study group trust & safety
 --
--- One migration covers every Phase 5 schema change so we don't end up
--- with a dozen tiny migration folders. All ALTER TABLE statements are
--- additive and backfill with safe defaults; existing rows keep working.
+-- One migration covers every Phase 5 schema change. Every statement is
+-- idempotency-guarded per CLAUDE.md A5: ADD COLUMN uses IF NOT EXISTS,
+-- ADD CONSTRAINT wraps in DO $$ EXCEPTION WHEN duplicate_object, indexes
+-- use IF NOT EXISTS, tables use CREATE TABLE IF NOT EXISTS. Re-running
+-- this migration on a partially-applied or fully-applied database is a
+-- no-op rather than an error.
 
 -- ─────────────────────────────────────────────────────────────────
 -- StudyGroup: moderation columns + per-group feature toggles
 -- ─────────────────────────────────────────────────────────────────
-ALTER TABLE "StudyGroup"
-    ADD COLUMN "moderationStatus" TEXT NOT NULL DEFAULT 'active';
-ALTER TABLE "StudyGroup" ADD COLUMN "warnedUntil" TIMESTAMP(3);
-ALTER TABLE "StudyGroup" ADD COLUMN "lockedAt" TIMESTAMP(3);
-ALTER TABLE "StudyGroup" ADD COLUMN "deletedAt" TIMESTAMP(3);
-ALTER TABLE "StudyGroup" ADD COLUMN "deletedById" INTEGER;
-ALTER TABLE "StudyGroup"
-    ADD COLUMN "memberListPrivate" BOOLEAN NOT NULL DEFAULT false;
-ALTER TABLE "StudyGroup"
-    ADD COLUMN "requirePostApproval" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "StudyGroup" ADD COLUMN IF NOT EXISTS "moderationStatus" TEXT NOT NULL DEFAULT 'active';
+ALTER TABLE "StudyGroup" ADD COLUMN IF NOT EXISTS "warnedUntil" TIMESTAMP(3);
+ALTER TABLE "StudyGroup" ADD COLUMN IF NOT EXISTS "lockedAt" TIMESTAMP(3);
+ALTER TABLE "StudyGroup" ADD COLUMN IF NOT EXISTS "deletedAt" TIMESTAMP(3);
+ALTER TABLE "StudyGroup" ADD COLUMN IF NOT EXISTS "deletedById" INTEGER;
+ALTER TABLE "StudyGroup" ADD COLUMN IF NOT EXISTS "memberListPrivate" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "StudyGroup" ADD COLUMN IF NOT EXISTS "requirePostApproval" BOOLEAN NOT NULL DEFAULT false;
 
-ALTER TABLE "StudyGroup"
-    ADD CONSTRAINT "StudyGroup_deletedById_fkey"
-    FOREIGN KEY ("deletedById") REFERENCES "User"("id")
-    ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "StudyGroup"
+        ADD CONSTRAINT "StudyGroup_deletedById_fkey"
+        FOREIGN KEY ("deletedById") REFERENCES "User"("id")
+        ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE INDEX "StudyGroup_moderationStatus_idx"
+CREATE INDEX IF NOT EXISTS "StudyGroup_moderationStatus_idx"
     ON "StudyGroup"("moderationStatus");
-CREATE INDEX "StudyGroup_deletedAt_idx" ON "StudyGroup"("deletedAt");
+CREATE INDEX IF NOT EXISTS "StudyGroup_deletedAt_idx" ON "StudyGroup"("deletedAt");
 
 -- ─────────────────────────────────────────────────────────────────
 -- StudyGroupMember: join-gate message, mute window, strike counter
 -- ─────────────────────────────────────────────────────────────────
-ALTER TABLE "StudyGroupMember"
-    ADD COLUMN "joinMessage" TEXT NOT NULL DEFAULT '';
-ALTER TABLE "StudyGroupMember" ADD COLUMN "mutedUntil" TIMESTAMP(3);
-ALTER TABLE "StudyGroupMember"
-    ADD COLUMN "mutedReason" TEXT NOT NULL DEFAULT '';
-ALTER TABLE "StudyGroupMember" ADD COLUMN "mutedById" INTEGER;
-ALTER TABLE "StudyGroupMember" ADD COLUMN "lastStrikeAt" TIMESTAMP(3);
-ALTER TABLE "StudyGroupMember"
-    ADD COLUMN "strikeCount" INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE "StudyGroupMember" ADD COLUMN IF NOT EXISTS "joinMessage" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "StudyGroupMember" ADD COLUMN IF NOT EXISTS "mutedUntil" TIMESTAMP(3);
+ALTER TABLE "StudyGroupMember" ADD COLUMN IF NOT EXISTS "mutedReason" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "StudyGroupMember" ADD COLUMN IF NOT EXISTS "mutedById" INTEGER;
+ALTER TABLE "StudyGroupMember" ADD COLUMN IF NOT EXISTS "lastStrikeAt" TIMESTAMP(3);
+ALTER TABLE "StudyGroupMember" ADD COLUMN IF NOT EXISTS "strikeCount" INTEGER NOT NULL DEFAULT 0;
 
-ALTER TABLE "StudyGroupMember"
-    ADD CONSTRAINT "StudyGroupMember_mutedById_fkey"
-    FOREIGN KEY ("mutedById") REFERENCES "User"("id")
-    ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "StudyGroupMember"
+        ADD CONSTRAINT "StudyGroupMember_mutedById_fkey"
+        FOREIGN KEY ("mutedById") REFERENCES "User"("id")
+        ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-CREATE INDEX "StudyGroupMember_mutedUntil_idx"
+CREATE INDEX IF NOT EXISTS "StudyGroupMember_mutedUntil_idx"
     ON "StudyGroupMember"("mutedUntil");
 
 -- ─────────────────────────────────────────────────────────────────
 -- GroupDiscussionPost: moderation status + removal columns
 -- ─────────────────────────────────────────────────────────────────
-ALTER TABLE "GroupDiscussionPost"
-    ADD COLUMN "status" TEXT NOT NULL DEFAULT 'published';
-ALTER TABLE "GroupDiscussionPost" ADD COLUMN "removedAt" TIMESTAMP(3);
-ALTER TABLE "GroupDiscussionPost" ADD COLUMN "removedById" INTEGER;
+ALTER TABLE "GroupDiscussionPost" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT 'published';
+ALTER TABLE "GroupDiscussionPost" ADD COLUMN IF NOT EXISTS "removedAt" TIMESTAMP(3);
+ALTER TABLE "GroupDiscussionPost" ADD COLUMN IF NOT EXISTS "removedById" INTEGER;
 
 -- ─────────────────────────────────────────────────────────────────
 -- GroupReport
 -- ─────────────────────────────────────────────────────────────────
-CREATE TABLE "GroupReport" (
+CREATE TABLE IF NOT EXISTS "GroupReport" (
     "id" SERIAL NOT NULL,
     "groupId" INTEGER NOT NULL,
     "reporterId" INTEGER NOT NULL,
@@ -76,34 +76,40 @@ CREATE TABLE "GroupReport" (
     CONSTRAINT "GroupReport_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "GroupReport_groupId_reporterId_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "GroupReport_groupId_reporterId_key"
     ON "GroupReport"("groupId", "reporterId");
-CREATE INDEX "GroupReport_status_createdAt_idx"
+CREATE INDEX IF NOT EXISTS "GroupReport_status_createdAt_idx"
     ON "GroupReport"("status", "createdAt");
-CREATE INDEX "GroupReport_groupId_status_idx"
+CREATE INDEX IF NOT EXISTS "GroupReport_groupId_status_idx"
     ON "GroupReport"("groupId", "status");
-CREATE INDEX "GroupReport_reporterId_status_idx"
+CREATE INDEX IF NOT EXISTS "GroupReport_reporterId_status_idx"
     ON "GroupReport"("reporterId", "status");
 
-ALTER TABLE "GroupReport"
-    ADD CONSTRAINT "GroupReport_groupId_fkey"
-    FOREIGN KEY ("groupId") REFERENCES "StudyGroup"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "GroupReport"
+        ADD CONSTRAINT "GroupReport_groupId_fkey"
+        FOREIGN KEY ("groupId") REFERENCES "StudyGroup"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-ALTER TABLE "GroupReport"
-    ADD CONSTRAINT "GroupReport_reporterId_fkey"
-    FOREIGN KEY ("reporterId") REFERENCES "User"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "GroupReport"
+        ADD CONSTRAINT "GroupReport_reporterId_fkey"
+        FOREIGN KEY ("reporterId") REFERENCES "User"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-ALTER TABLE "GroupReport"
-    ADD CONSTRAINT "GroupReport_resolvedById_fkey"
-    FOREIGN KEY ("resolvedById") REFERENCES "User"("id")
-    ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "GroupReport"
+        ADD CONSTRAINT "GroupReport_resolvedById_fkey"
+        FOREIGN KEY ("resolvedById") REFERENCES "User"("id")
+        ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─────────────────────────────────────────────────────────────────
 -- GroupAppeal
 -- ─────────────────────────────────────────────────────────────────
-CREATE TABLE "GroupAppeal" (
+CREATE TABLE IF NOT EXISTS "GroupAppeal" (
     "id" SERIAL NOT NULL,
     "groupId" INTEGER NOT NULL,
     "appealerId" INTEGER NOT NULL,
@@ -119,30 +125,36 @@ CREATE TABLE "GroupAppeal" (
     CONSTRAINT "GroupAppeal_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "GroupAppeal_groupId_appealerId_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "GroupAppeal_groupId_appealerId_key"
     ON "GroupAppeal"("groupId", "appealerId");
-CREATE INDEX "GroupAppeal_status_createdAt_idx"
+CREATE INDEX IF NOT EXISTS "GroupAppeal_status_createdAt_idx"
     ON "GroupAppeal"("status", "createdAt");
 
-ALTER TABLE "GroupAppeal"
-    ADD CONSTRAINT "GroupAppeal_groupId_fkey"
-    FOREIGN KEY ("groupId") REFERENCES "StudyGroup"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "GroupAppeal"
+        ADD CONSTRAINT "GroupAppeal_groupId_fkey"
+        FOREIGN KEY ("groupId") REFERENCES "StudyGroup"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-ALTER TABLE "GroupAppeal"
-    ADD CONSTRAINT "GroupAppeal_appealerId_fkey"
-    FOREIGN KEY ("appealerId") REFERENCES "User"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "GroupAppeal"
+        ADD CONSTRAINT "GroupAppeal_appealerId_fkey"
+        FOREIGN KEY ("appealerId") REFERENCES "User"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-ALTER TABLE "GroupAppeal"
-    ADD CONSTRAINT "GroupAppeal_resolvedById_fkey"
-    FOREIGN KEY ("resolvedById") REFERENCES "User"("id")
-    ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "GroupAppeal"
+        ADD CONSTRAINT "GroupAppeal_resolvedById_fkey"
+        FOREIGN KEY ("resolvedById") REFERENCES "User"("id")
+        ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─────────────────────────────────────────────────────────────────
 -- GroupAuditLog
 -- ─────────────────────────────────────────────────────────────────
-CREATE TABLE "GroupAuditLog" (
+CREATE TABLE IF NOT EXISTS "GroupAuditLog" (
     "id" SERIAL NOT NULL,
     "groupId" INTEGER NOT NULL,
     "actorId" INTEGER NOT NULL,
@@ -157,26 +169,30 @@ CREATE TABLE "GroupAuditLog" (
     CONSTRAINT "GroupAuditLog_pkey" PRIMARY KEY ("id")
 );
 
-CREATE INDEX "GroupAuditLog_groupId_createdAt_idx"
+CREATE INDEX IF NOT EXISTS "GroupAuditLog_groupId_createdAt_idx"
     ON "GroupAuditLog"("groupId", "createdAt" DESC);
-CREATE INDEX "GroupAuditLog_actorId_createdAt_idx"
+CREATE INDEX IF NOT EXISTS "GroupAuditLog_actorId_createdAt_idx"
     ON "GroupAuditLog"("actorId", "createdAt" DESC);
-CREATE INDEX "GroupAuditLog_action_idx" ON "GroupAuditLog"("action");
+CREATE INDEX IF NOT EXISTS "GroupAuditLog_action_idx" ON "GroupAuditLog"("action");
 
-ALTER TABLE "GroupAuditLog"
-    ADD CONSTRAINT "GroupAuditLog_groupId_fkey"
-    FOREIGN KEY ("groupId") REFERENCES "StudyGroup"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "GroupAuditLog"
+        ADD CONSTRAINT "GroupAuditLog_groupId_fkey"
+        FOREIGN KEY ("groupId") REFERENCES "StudyGroup"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-ALTER TABLE "GroupAuditLog"
-    ADD CONSTRAINT "GroupAuditLog_actorId_fkey"
-    FOREIGN KEY ("actorId") REFERENCES "User"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "GroupAuditLog"
+        ADD CONSTRAINT "GroupAuditLog_actorId_fkey"
+        FOREIGN KEY ("actorId") REFERENCES "User"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
 -- ─────────────────────────────────────────────────────────────────
 -- GroupBlock
 -- ─────────────────────────────────────────────────────────────────
-CREATE TABLE "GroupBlock" (
+CREATE TABLE IF NOT EXISTS "GroupBlock" (
     "id" SERIAL NOT NULL,
     "groupId" INTEGER NOT NULL,
     "userId" INTEGER NOT NULL,
@@ -187,21 +203,27 @@ CREATE TABLE "GroupBlock" (
     CONSTRAINT "GroupBlock_pkey" PRIMARY KEY ("id")
 );
 
-CREATE UNIQUE INDEX "GroupBlock_groupId_userId_key"
+CREATE UNIQUE INDEX IF NOT EXISTS "GroupBlock_groupId_userId_key"
     ON "GroupBlock"("groupId", "userId");
-CREATE INDEX "GroupBlock_userId_idx" ON "GroupBlock"("userId");
+CREATE INDEX IF NOT EXISTS "GroupBlock_userId_idx" ON "GroupBlock"("userId");
 
-ALTER TABLE "GroupBlock"
-    ADD CONSTRAINT "GroupBlock_groupId_fkey"
-    FOREIGN KEY ("groupId") REFERENCES "StudyGroup"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "GroupBlock"
+        ADD CONSTRAINT "GroupBlock_groupId_fkey"
+        FOREIGN KEY ("groupId") REFERENCES "StudyGroup"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-ALTER TABLE "GroupBlock"
-    ADD CONSTRAINT "GroupBlock_userId_fkey"
-    FOREIGN KEY ("userId") REFERENCES "User"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "GroupBlock"
+        ADD CONSTRAINT "GroupBlock_userId_fkey"
+        FOREIGN KEY ("userId") REFERENCES "User"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 
-ALTER TABLE "GroupBlock"
-    ADD CONSTRAINT "GroupBlock_blockedById_fkey"
-    FOREIGN KEY ("blockedById") REFERENCES "User"("id")
-    ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+    ALTER TABLE "GroupBlock"
+        ADD CONSTRAINT "GroupBlock_blockedById_fkey"
+        FOREIGN KEY ("blockedById") REFERENCES "User"("id")
+        ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL; END $$;

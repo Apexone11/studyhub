@@ -4,6 +4,7 @@ import MediaComposer from './MediaComposer'
 import UserAvatar from '../../components/UserAvatar'
 import AttachmentPreview from '../../components/AttachmentPreview'
 import MentionText from '../../components/MentionText'
+import { resolveImageUrl } from '../../lib/imageUrls'
 import { formatRelativeTime, getPostTypeLabel } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 
@@ -185,11 +186,13 @@ function DiscussionPostItem({
               {post.attachments.map((att, idx) => {
                 const name =
                   att.name || (att.url ? att.url.split('/').pop() : `attachment-${idx + 1}`)
-                if (att.kind === 'image' && att.url) {
+                const resolvedUrl = resolveImageUrl(att.url)
+                if (!resolvedUrl) return null
+                if (att.kind === 'image') {
                   return (
                     <AttachmentPreview
                       key={`${att.url}-${idx}`}
-                      attachment={{ url: att.url, name, type: att.mime, kind: 'image' }}
+                      attachment={{ url: resolvedUrl, name, type: att.mime, kind: 'image' }}
                       triggerStyle={{
                         padding: 0,
                         border: '1px solid var(--sh-border)',
@@ -200,7 +203,7 @@ function DiscussionPostItem({
                       }}
                     >
                       <img
-                        src={att.url}
+                        src={resolvedUrl}
                         alt={name}
                         loading="lazy"
                         style={{ display: 'block', width: '100%', height: 110, objectFit: 'cover' }}
@@ -211,7 +214,7 @@ function DiscussionPostItem({
                 return (
                   <AttachmentPreview
                     key={`${att.url}-${idx}`}
-                    attachment={{ url: att.url, name, type: att.mime, kind: att.kind }}
+                    attachment={{ url: resolvedUrl, name, type: att.mime, kind: att.kind }}
                   />
                 )
               })}
@@ -339,11 +342,13 @@ function DiscussionPostItem({
                       {reply.attachments.map((att, idx) => {
                         const name =
                           att.name || (att.url ? att.url.split('/').pop() : `attachment-${idx + 1}`)
+                        const resolvedUrl = resolveImageUrl(att.url)
+                        if (!resolvedUrl) return null
                         return (
                           <AttachmentPreview
                             key={`${att.url}-${idx}`}
                             attachment={{
-                              url: att.url,
+                              url: resolvedUrl,
                               name,
                               type: att.mime,
                               kind: att.kind,

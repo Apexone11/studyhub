@@ -21,7 +21,10 @@ import { extractHtmlFromMessage } from './aiSheetPreviewHelpers'
 import { useSharedAiChat } from '../../lib/aiChatContext'
 import { useAiContext } from '../../lib/useAiContext'
 import { useChatPanel } from '../../lib/chatPanelContext.js'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 import { PAGE_FONT } from '../../pages/shared/pageUtils'
+
+const MOBILE_BREAKPOINT_PX = 768
 
 /* ── Isolated error boundary for the bubble ───────────────────────────────
  * If AiBubble crashes, this catches it silently and renders nothing,
@@ -76,6 +79,16 @@ function AiBubbleInner() {
   const inputRef = useRef(null)
   const messagesEndRef = useRef(null)
   const [input, setInput] = useState('')
+  // Focus trap for the mini-chat panel (L4-CRIT-1). The hook returns a
+  // ref the consumer must attach to the trapped container; on close it
+  // restores focus to the previously focused element (the bubble button).
+  const trapRef = useFocusTrap({
+    active: isOpen,
+    onClose: () => setIsOpen(false),
+    escapeCloses: true,
+    lockScroll: false,
+    initialFocusRef: inputRef,
+  })
 
   // Close bubble on Escape key (global).
   useEffect(() => {
@@ -111,10 +124,18 @@ function AiBubbleInner() {
   if (chatPanelOpen) return null
 
   const toggle = () => {
-    setIsOpen((prev) => !prev)
-    if (!isOpen) {
-      setTimeout(() => inputRef.current?.focus(), 200)
+    // Mobile (< 768px viewport): the mini-chat is too cramped for the v2
+    // composer, so the bubble redirects to /ai full page instead. Founder
+    // §24.8 decision.
+    if (typeof window !== 'undefined' && window.innerWidth < MOBILE_BREAKPOINT_PX && !isOpen) {
+      const convParam = chat.activeConversationId
+        ? `?conversation=${chat.activeConversationId}`
+        : ''
+      navigate(`/ai${convParam}`)
+      return
     }
+    setIsOpen((prev) => !prev)
+    // Initial focus is handled by useFocusTrap; no setTimeout needed.
   }
 
   const MAX_MSG_LEN = 5000
@@ -151,6 +172,10 @@ function AiBubbleInner() {
       <button
         onClick={toggle}
         aria-label={isOpen ? 'Close Hub AI' : 'Open Hub AI'}
+        // L4-LOW-1: streaming pulse moves to a CSS class wrapped in a
+        // (prefers-reduced-motion: no-preference) media query so the OS
+        // and in-app reduced-motion preferences are both honored.
+        className={!isOpen && chat?.streaming ? 'sh-ai-bubble-streaming' : undefined}
         style={{
           position: 'fixed',
           bottom: 24,
@@ -180,9 +205,6 @@ function AiBubbleInner() {
         }}
       >
         {isOpen ? <IconX size={22} /> : <IconSpark size={24} />}
-        {/* Streaming presence dot — only when the bubble is closed AND
-            an SSE stream is in flight. `chat.streaming` lives on the
-            shared chat hook used by both AiPage and AiBubble. */}
         {!isOpen && chat?.streaming ? (
           <span
             aria-hidden
@@ -190,27 +212,29 @@ function AiBubbleInner() {
               position: 'absolute',
               top: 4,
               right: 4,
-              width: 12,
-              height: 12,
+              width: 10,
+              height: 10,
               borderRadius: '50%',
               background: '#fff',
               border: '2px solid #7c3aed',
-              boxShadow: '0 0 0 3px rgba(124, 58, 237, 0.35)',
-              animation: 'sh-ai-thinking 1.2s ease-in-out infinite',
             }}
           />
         ) : null}
       </button>
 
-      {/* Chat Window */}
+      {/* Chat Window — trapped focus + ARIA dialog (L4-CRIT-1) */}
       {isOpen && (
         <div
+          ref={trapRef}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Hub AI mini chat"
           style={{
             position: 'fixed',
             bottom: 88,
             right: 24,
             width: 'min(380px, calc(100vw - 48px))',
-            height: 520,
+            height: 560,
             maxHeight: 'calc(100vh - 120px)',
             background: 'var(--sh-surface)',
             borderRadius: 16,
@@ -309,7 +333,7 @@ function AiBubbleInner() {
                 <div
                   style={{
                     fontSize: 12,
-                    color: 'var(--sh-muted)',
+                    color: 'var(--sh-subtext)',
                     lineHeight: 1.5,
                     marginBottom: 14,
                   }}
@@ -605,7 +629,7 @@ function AiQuotaBar({ label, used, limit }) {
         style={{
           display: 'flex',
           justifyContent: 'space-between',
-          color: isExhausted ? 'var(--sh-danger)' : 'var(--sh-muted)',
+          color: isExhausted ? 'var(--sh-danger)' : 'var(--sh-subtext)',
           fontSize: 10,
           fontWeight: 600,
           marginBottom: 2,

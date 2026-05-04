@@ -31,6 +31,12 @@ const ERROR_CODES = Object.freeze({
   UPLOAD_SAVE_FAILED: 'UPLOAD_SAVE_FAILED',
   UPLOAD_SIGNATURE_MISMATCH: 'UPLOAD_SIGNATURE_MISMATCH',
 
+  // ── Quotas ─────────────────────────────────────────────────────────────
+  QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
+  // FORBIDDEN is declared once at the top of this object (HTTP-mapped 403);
+  // the parallel scholar/ai work re-referenced it here. Removed to satisfy
+  // no-dupe-keys lint while preserving the canonical mapping.
+
   // ── Account state ──────────────────────────────────────────────────────
   EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',
   ACCOUNT_RESTRICTED: 'ACCOUNT_RESTRICTED',
@@ -41,6 +47,10 @@ const ERROR_CODES = Object.freeze({
   NOTE_PAYLOAD_TOO_LARGE: 'NOTE_PAYLOAD_TOO_LARGE',
   NOTE_CHUNK_OUT_OF_ORDER: 'NOTE_CHUNK_OUT_OF_ORDER',
   NOTE_VERSION_NOT_FOUND: 'NOTE_VERSION_NOT_FOUND',
+
+  // ── Service availability ───────────────────────────────────────────────
+  SERVICE_UNAVAILABLE: 'SERVICE_UNAVAILABLE',
+  GATEWAY_TIMEOUT: 'GATEWAY_TIMEOUT',
 
   // ── Legacy (alias kept for backward compat) ────────────────────────────
   SERVER_ERROR: 'SERVER_ERROR',

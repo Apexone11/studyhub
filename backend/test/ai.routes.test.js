@@ -68,6 +68,13 @@ const mockTargets = new Map([
       aiSuggestionsReadLimiter: fakeRateLimiter,
       aiSuggestionsRefreshLimiter: fakeRateLimiter,
       aiSuggestionsDismissLimiter: fakeRateLimiter,
+      // Hub AI v2 — attachments sub-router is mounted via the AI
+      // barrel, so its limiter exports must be stubbed too or
+      // require() fails with "argument handler must be a function."
+      aiAttachmentUploadLimiter: fakeRateLimiter,
+      aiAttachmentDeleteLimiter: fakeRateLimiter,
+      aiAttachmentPinLimiter: fakeRateLimiter,
+      aiAttachmentReadLimiter: fakeRateLimiter,
     },
   ],
   [require.resolve('express-rate-limit'), () => fakeRateLimiter],

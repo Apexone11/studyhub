@@ -89,7 +89,7 @@ export const FEATURES = [
   },
   {
     Icon: IconStar,
-    title: 'BookHub Library',
+    title: 'Library',
     desc: 'Browse Google Books-powered titles, open available previews, save shelves, and keep your place with bookmarks while you study.',
     toneClass: 'home-feature--indigo',
   },

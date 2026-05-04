@@ -8,6 +8,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { API } from '../../config'
+import { Skeleton } from '../../components/Skeleton'
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
 export default function TrendingSection({ period = '7d', limit = 8 }) {
@@ -22,11 +23,15 @@ export default function TrendingSection({ period = '7d', limit = 8 }) {
       .finally(() => setLoading(false))
   }, [period, limit])
 
-  if (loading) {
+  if (loading && sheets.length === 0) {
     return (
       <div style={containerStyle}>
         <h3 style={headingStyle}>Trending</h3>
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading...</div>
+        <div style={{ display: 'grid', gap: 8 }}>
+          <Skeleton height={48} />
+          <Skeleton height={48} />
+          <Skeleton height={48} />
+        </div>
       </div>
     )
   }

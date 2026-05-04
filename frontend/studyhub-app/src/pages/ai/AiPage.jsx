@@ -10,7 +10,11 @@ import AppSidebar from '../../components/sidebar/AppSidebar'
 import AiMarkdown from '../../components/ai/AiMarkdown'
 import { SheetPreviewBar } from '../../components/ai/AiSheetPreview'
 import { extractHtmlFromMessage } from '../../components/ai/aiSheetPreviewHelpers'
-import { ImageUploadButton, ImagePreviewStrip } from '../../components/ai/AiImageUpload'
+import AiComposer from '../../components/ai/AiComposer'
+import AiDensityToggle from '../../components/ai/AiDensityToggle'
+import { loadDensity } from '../../components/ai/aiDensityStorage'
+import AiStreamAnnouncer from '../../components/ai/AiStreamAnnouncer'
+import AiSaveToNotesButton from '../../components/ai/AiSaveToNotesButton'
 import { IconSpark, IconPlus, IconX, IconPen, IconSpinner } from '../../components/Icons'
 import AiThinkingDots from '../../components/ai/AiThinkingDots'
 import { useProtectedPage } from '../../lib/useProtectedPage'
@@ -19,6 +23,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { useSharedAiChat } from '../../lib/aiChatContext'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { pageShell } from '../../lib/ui'
+import { API as API_BASE } from '../../config'
 import { useState, useRef, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 
@@ -108,9 +113,74 @@ export default function AiPage() {
     // empty value, so the cascade is bounded by user navigation, not
     // by render frequency. eslint's set-state-in-effect rule is right
     // for the common cases but this is the documented escape hatch.
-     
+
     setChatAreaKey((k) => k + 1)
   }, [promptParam])
+
+  // ── Scholar deep-link: ?paperId=<canonical-id> ──────────────────────
+  // When the user clicks "Ask AI about this paper" on a Scholar reader,
+  // the URL arrives as /ai?paperId=doi:10.1234/foo (or arxiv:.../ss:...).
+  // We validate the regex BEFORE fetching (Loop-3 LOW-5), then call
+  // /api/scholar/paper/:id to attach metadata as a virtual chip in the
+  // composer + seed a starter prompt. The actual AI request is the
+  // user's choice — this just primes the surface.
+  const paperIdParam = searchParams.get('paperId') || ''
+  const [paperContext, setPaperContext] = useState(null)
+  const [paperContextError, setPaperContextError] = useState(null)
+  // Mirror the backend's CANONICAL_ID_RE: doi: | arxiv: | ss: prefixes
+  // with explicit DOI suffix allowlist. Validate before fetching.
+  const PAPER_ID_REGEX =
+    /^(doi:10\.\d{4,9}\/[A-Za-z0-9._\-/:;()<>+]{1,200}|arxiv:\d{4}\.\d{4,5}(v\d+)?|ss:[a-f0-9]{32,64})$/i
+  useEffect(() => {
+    if (!paperIdParam) return
+    if (!PAPER_ID_REGEX.test(paperIdParam) || paperIdParam.length > 256) {
+      setPaperContextError('Invalid paper id')
+      // Strip the bad param so a refresh doesn't loop the error.
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('paperId')
+          return next
+        },
+        { replace: true },
+      )
+      return
+    }
+    let aborted = false
+    fetch(`${API_BASE}/api/scholar/paper/${encodeURIComponent(paperIdParam)}`, {
+      credentials: 'include',
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Could not load paper (${res.status})`)
+        return res.json()
+      })
+      .then((json) => {
+        if (aborted) return
+        if (json.paper) {
+          setPaperContext(json.paper)
+          setPaperContextError(null)
+        }
+      })
+      .catch(() => {
+        if (aborted) return
+        setPaperContextError('Could not load paper context')
+      })
+    return () => {
+      aborted = true
+    }
+    // PAPER_ID_REGEX is a const; setSearchParams is stable.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [paperIdParam])
+
+  // All hooks MUST run before any early return (rules-of-hooks).
+  const [density, setDensity] = useState(() => loadDensity())
+  // Stopped flag — flips on Stop click so the announcer says "Streaming
+  // stopped" instead of "Response complete". Resets when streaming starts
+  // again.
+  const [stopped, setStopped] = useState(false)
+  useEffect(() => {
+    if (chat.streaming) setStopped(false)
+  }, [chat.streaming])
 
   if (authStatus !== 'ready') {
     return (
@@ -125,7 +195,7 @@ export default function AiPage() {
               minHeight: 400,
             }}
           >
-            <div style={{ textAlign: 'center', color: 'var(--sh-muted)' }}>
+            <div style={{ textAlign: 'center', color: 'var(--sh-subtext)' }}>
               <IconSpinner
                 size={28}
                 style={{ animation: 'spin 1s linear infinite', marginBottom: 12 }}
@@ -149,6 +219,7 @@ export default function AiPage() {
         overflowX: 'hidden',
       }}
     >
+      <AiStreamAnnouncer streaming={chat.streaming} error={chat.error} stopped={stopped} />
       <Navbar />
       <div style={pageShell('app')}>
         <div
@@ -191,6 +262,63 @@ export default function AiPage() {
                 />
               )}
 
+              {/* Scholar paper-context banner: shows when /ai?paperId=... was
+                  used to land here. The metadata is informational; clicking
+                  the chip clears the banner without affecting the conversation. */}
+              {(paperContext || paperContextError) && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  style={{
+                    margin: '12px 16px',
+                    padding: '12px 14px',
+                    background: paperContextError ? 'var(--sh-warning-bg)' : 'var(--sh-brand-soft)',
+                    color: paperContextError
+                      ? 'var(--sh-warning-text)'
+                      : 'var(--sh-pill-text, var(--sh-brand))',
+                    border: '1px solid var(--sh-border)',
+                    borderRadius: 10,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    fontSize: 'var(--type-sm)',
+                  }}
+                >
+                  <strong style={{ fontWeight: 600 }}>
+                    {paperContextError ? 'Paper context unavailable.' : 'Attached paper:'}
+                  </strong>
+                  <span
+                    style={{
+                      flex: 1,
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {paperContextError || paperContext?.title || ''}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaperContext(null)
+                      setPaperContextError(null)
+                    }}
+                    aria-label="Dismiss paper context"
+                    style={{
+                      background: 'transparent',
+                      border: 0,
+                      cursor: 'pointer',
+                      color: 'inherit',
+                      padding: 4,
+                      minWidth: 32,
+                      minHeight: 32,
+                    }}
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+
               {/* Chat Area — `key={chatAreaKey}` lets a fresh ?prompt=
                   arrival reset internal state cleanly without any
                   setState-during-render workaround inside ChatArea. */}
@@ -203,13 +331,19 @@ export default function AiPage() {
                   truncated={chat.truncated}
                   loading={chat.loading}
                   error={chat.error}
+                  usage={chat.usage}
                   onSend={chat.sendMessage}
-                  onStop={chat.stopStreaming}
+                  onStop={() => {
+                    setStopped(true)
+                    chat.stopStreaming()
+                  }}
                   onContinue={chat.continueGeneration}
                   onBack={isCompact ? () => chat.selectConversation(null) : null}
                   activeConversationId={chat.activeConversationId}
                   onNewChat={chat.startNewConversation}
                   initialPrompt={initialPrompt}
+                  density={density}
+                  onDensityChange={setDensity}
                 />
               )}
             </div>
@@ -317,7 +451,7 @@ function ConversationSidebar({
             style={{
               padding: '24px 16px',
               textAlign: 'center',
-              color: 'var(--sh-muted)',
+              color: 'var(--sh-subtext)',
               fontSize: 13,
             }}
           >
@@ -333,7 +467,7 @@ function ConversationSidebar({
             style={{
               padding: '24px 16px',
               textAlign: 'center',
-              color: 'var(--sh-muted)',
+              color: 'var(--sh-subtext)',
               fontSize: 13,
             }}
           >
@@ -427,7 +561,7 @@ function ConversationSidebar({
                   >
                     {conv.title || 'New conversation'}
                   </div>
-                  <div style={{ fontSize: 11, color: 'var(--sh-muted)' }}>
+                  <div style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>
                     {conv._count?.messages || 0} messages
                   </div>
                 </button>
@@ -473,7 +607,7 @@ function ConversationSidebar({
             padding: '10px 16px',
             borderTop: '1px solid var(--sh-border)',
             fontSize: 11,
-            color: 'var(--sh-muted)',
+            color: 'var(--sh-subtext)',
             display: 'grid',
             gap: 6,
           }}
@@ -521,6 +655,7 @@ function ChatArea({
   truncated,
   loading,
   error,
+  usage,
   onSend,
   onStop,
   onContinue,
@@ -528,72 +663,17 @@ function ChatArea({
   activeConversationId,
   onNewChat,
   initialPrompt,
+  density,
+  onDensityChange,
 }) {
-  // Lazy-initialize from the inbound ?prompt= so the suggestion text
-  // shows up in the textarea on first paint. The prompt is a starting
-  // point the user can edit, not a forced submission — we intentionally
-  // don't auto-send.
-  //
-  // Mid-mount re-seeding (e.g. user clicks the AI Suggestion CTA while
-  // already on /ai) is handled by AiPage bumping a `key` on ChatArea,
-  // which unmounts and remounts this component with the new
-  // initialPrompt. That keeps this file free of any setState-during-
-  // render workarounds and means initialPrompt is effectively a
-  // constant from this component's perspective.
-  const [input, setInput] = useState(() => (typeof initialPrompt === 'string' ? initialPrompt : ''))
-  const [pendingImages, setPendingImages] = useState([])
   const messagesEndRef = useRef(null)
-  const inputRef = useRef(null)
+  // initialPrompt is consumed on mount by AiComposer; the parent resets
+  // ChatArea via `key` so a fresh prompt arrival re-mounts cleanly.
 
   // Auto-scroll to bottom on new messages.
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, streamingText])
-
-  // When this instance was seeded with a non-empty initialPrompt,
-  // focus the textarea and place the caret at the end so the user
-  // can keep typing immediately. Mount-only — initialPrompt is a
-  // per-instance constant (parent's `key` reset unmounts+remounts
-  // when the prompt changes), so no re-runs are needed and the
-  // user's typed input can never be clobbered by a stale prompt.
-  useEffect(() => {
-    if (typeof initialPrompt !== 'string' || !initialPrompt) return
-    const handle = setTimeout(() => {
-      const el = inputRef.current
-      if (!el) return
-      el.focus()
-      try {
-        el.setSelectionRange(initialPrompt.length, initialPrompt.length)
-      } catch {
-        /* selectionRange isn't supported on some textarea polyfills; safe to ignore */
-      }
-    }, 120)
-    return () => clearTimeout(handle)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Focus input when conversation changes.
-  useEffect(() => {
-    if (activeConversationId) {
-      setTimeout(() => inputRef.current?.focus(), 100)
-    }
-  }, [activeConversationId])
-
-  const MAX_MESSAGE_LENGTH = 5000
-
-  const handleSend = () => {
-    if (!input.trim() || streaming || input.length > MAX_MESSAGE_LENGTH) return
-    const opts = pendingImages.length > 0 ? { images: pendingImages } : {}
-    onSend(input, opts)
-    setInput('')
-    setPendingImages([])
-  }
-
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSend()
-    }
-  }
 
   // Empty state (no conversation selected).
   if (!activeConversationId) {
@@ -628,7 +708,7 @@ function ChatArea({
         <p
           style={{
             fontSize: 14,
-            color: 'var(--sh-muted)',
+            color: 'var(--sh-subtext)',
             textAlign: 'center',
             maxWidth: 400,
             lineHeight: 1.6,
@@ -649,8 +729,18 @@ function ChatArea({
               key={suggestion.label}
               onClick={async () => {
                 await onNewChat()
-                setInput(suggestion.prompt)
-                setTimeout(() => inputRef.current?.focus(), 150)
+                // The new conversation flow re-mounts ChatArea via key so
+                // the prompt seed needs to come from URL ?prompt= path.
+                // For the empty-state suggestion clicks we just navigate
+                // to the prompt by setting URL query — handled at the
+                // page level.
+                if (typeof window !== 'undefined') {
+                  const url = new URL(window.location.href)
+                  url.searchParams.set('prompt', suggestion.prompt)
+                  window.history.replaceState({}, '', url.toString())
+                  // Trigger a re-render via a storage-like event:
+                  window.dispatchEvent(new PopStateEvent('popstate'))
+                }
               }}
               style={{
                 background: 'var(--sh-soft)',
@@ -709,7 +799,7 @@ function ChatArea({
               border: 'none',
               cursor: 'pointer',
               padding: 4,
-              color: 'var(--sh-muted)',
+              color: 'var(--sh-subtext)',
               fontSize: 14,
             }}
           >
@@ -750,24 +840,28 @@ function ChatArea({
           />
           Claude Sonnet 4
         </span>
-        {streaming && (
-          <span
-            style={{
-              fontSize: 11,
-              color: 'var(--sh-brand)',
-              fontWeight: 600,
-              marginLeft: 'auto',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-            }}
-          >
-            <span aria-hidden style={pulseDotStyle(0)} />
-            <span aria-hidden style={pulseDotStyle(150)} />
-            <span aria-hidden style={pulseDotStyle(300)} />
-            Thinking
-          </span>
-        )}
+        <div style={{ marginLeft: 'auto', display: 'inline-flex', alignItems: 'center', gap: 12 }}>
+          {streaming && (
+            <span
+              style={{
+                fontSize: 11,
+                color: 'var(--sh-brand)',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+              }}
+            >
+              <span aria-hidden style={pulseDotStyle(0)} />
+              <span aria-hidden style={pulseDotStyle(150)} />
+              <span aria-hidden style={pulseDotStyle(300)} />
+              Thinking
+            </span>
+          )}
+          {typeof onDensityChange === 'function' ? (
+            <AiDensityToggle value={density || 'comfortable'} onChange={onDensityChange} />
+          ) : null}
+        </div>
       </div>
 
       {/* Messages — role="log" + aria-live="polite" so screen-reader users
@@ -781,7 +875,7 @@ function ChatArea({
         style={{ flex: 1, overflowY: 'auto', padding: '16px 20px' }}
       >
         {loading && (
-          <div style={{ textAlign: 'center', padding: 40, color: 'var(--sh-muted)' }}>
+          <div style={{ textAlign: 'center', padding: 40, color: 'var(--sh-subtext)' }}>
             <IconSpinner size={24} style={{ animation: 'spin 1s linear infinite' }} />
           </div>
         )}
@@ -916,119 +1010,23 @@ function ChatArea({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input Area */}
+      {/* Composer card — owns attachment chips, slash + mention popovers,
+          stop button, quota banner, and footer hints. */}
       <div
         style={{
-          padding: '12px 16px',
+          padding: '12px 16px 16px',
           borderTop: '1px solid var(--sh-border)',
           background: 'var(--sh-surface)',
         }}
       >
-        <ImagePreviewStrip
-          images={pendingImages}
-          onRemove={(idx) => setPendingImages((prev) => prev.filter((_, i) => i !== idx))}
+        <AiComposer
+          onSend={onSend}
+          onStop={onStop}
+          streaming={streaming}
+          usage={usage}
+          initialPrompt={initialPrompt}
+          density={density}
         />
-        <div
-          style={{
-            display: 'flex',
-            gap: 10,
-            alignItems: 'flex-end',
-          }}
-        >
-          <ImageUploadButton
-            images={pendingImages}
-            onImagesChange={setPendingImages}
-            disabled={streaming}
-          />
-          <textarea
-            ref={inputRef}
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder="Ask Hub AI anything..."
-            rows={1}
-            style={{
-              flex: 1,
-              resize: 'none',
-              border: '1px solid var(--sh-border)',
-              borderRadius: 12,
-              padding: '10px 14px',
-              fontSize: 14,
-              fontFamily: PAGE_FONT,
-              color: 'var(--sh-text)',
-              background: 'var(--sh-bg)',
-              outline: 'none',
-              minHeight: 42,
-              maxHeight: 120,
-              lineHeight: 1.5,
-            }}
-            onInput={(e) => {
-              e.target.style.height = 'auto'
-              e.target.style.height = Math.min(e.target.scrollHeight, 120) + 'px'
-            }}
-          />
-          {streaming ? (
-            <button
-              onClick={onStop}
-              style={{
-                background: 'var(--sh-danger)',
-                color: '#fff',
-                border: 'none',
-                borderRadius: 10,
-                padding: '10px 16px',
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: 'pointer',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              Stop
-            </button>
-          ) : (
-            (() => {
-              const canSend = input.trim() && input.length <= MAX_MESSAGE_LENGTH
-              return (
-                <button
-                  onClick={handleSend}
-                  disabled={!canSend}
-                  aria-label="Send message"
-                  style={{
-                    // Figma 2026-05-03: send button switches to AI gradient
-                    // when ready to fire, falls back to muted soft when
-                    // disabled. Slight box-shadow gives the button a small
-                    // amount of lift to match the Figma's elevated CTA.
-                    background: canSend
-                      ? 'var(--sh-ai-gradient, linear-gradient(135deg,#7c3aed,#2563eb))'
-                      : 'var(--sh-soft)',
-                    color: canSend ? '#fff' : 'var(--sh-muted)',
-                    border: 'none',
-                    borderRadius: 10,
-                    padding: '10px 18px',
-                    fontSize: 13,
-                    fontWeight: 700,
-                    cursor: canSend ? 'pointer' : 'not-allowed',
-                    whiteSpace: 'nowrap',
-                    transition: 'all 0.15s',
-                    boxShadow: canSend ? '0 4px 14px rgba(124,58,237,0.25)' : 'none',
-                  }}
-                >
-                  Send
-                </button>
-              )
-            })()
-          )}
-        </div>
-        <div
-          style={{
-            fontSize: 11,
-            color: input.length > MAX_MESSAGE_LENGTH ? 'var(--sh-danger-text)' : 'var(--sh-muted)',
-            marginTop: 6,
-            textAlign: 'right',
-          }}
-        >
-          {input.length > 0 && `${input.length} / ${MAX_MESSAGE_LENGTH}`}
-          {input.length === 0 && 'Shift+Enter for new line'}
-        </div>
       </div>
     </div>
   )
@@ -1095,6 +1093,9 @@ function MessageBubble({ message }) {
               const html = extractHtmlFromMessage(message.content)
               return html ? <SheetPreviewBar html={html} conversationTitle={null} /> : null
             })()}
+            <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+              <AiSaveToNotesButton messageId={message.id} content={message.content} />
+            </div>
           </>
         )}
       </div>
@@ -1117,7 +1118,7 @@ function QuotaRow({ label, used, limit }) {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
         <span
-          style={{ fontWeight: 600, color: isExhausted ? 'var(--sh-danger)' : 'var(--sh-muted)' }}
+          style={{ fontWeight: 600, color: isExhausted ? 'var(--sh-danger)' : 'var(--sh-subtext)' }}
         >
           {used}/{limit} {label}
         </span>
@@ -1127,7 +1128,7 @@ function QuotaRow({ label, used, limit }) {
               ? 'var(--sh-danger)'
               : isWarning
                 ? 'var(--sh-warning)'
-                : 'var(--sh-muted)',
+                : 'var(--sh-subtext)',
           }}
         >
           {isExhausted ? 'Limit reached' : `${limit - used} left`}

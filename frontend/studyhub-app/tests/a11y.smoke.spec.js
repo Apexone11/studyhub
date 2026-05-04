@@ -31,6 +31,14 @@ const PUBLIC_PAGES = [
   { path: '/data-request', name: 'data-request' },
   { path: '/about', name: 'about' },
   { path: '/pricing', name: 'pricing' },
+  // L4-LOW-4 + L8: Hub AI + Scholar landings include public-facing
+  // surfaces (sign-in modal, marketing copy) that pre-auth users hit
+  // when navigating from the marketing site. The live pages 302 to
+  // /login when un-authenticated, so axe scans the login surface here
+  // — we still want WCAG-clean unauth states.
+  { path: '/ai', name: 'ai-public' },
+  { path: '/scholar', name: 'scholar-public' },
+  { path: '/library', name: 'library-public' },
 ]
 
 for (const page of PUBLIC_PAGES) {

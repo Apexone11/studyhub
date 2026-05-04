@@ -74,6 +74,17 @@ const SHIPPED_DESIGN_V2_FLAGS = [
   // destructive. Run the backfill AFTER and they unblock on next
   // page load.
   'design_v2_creator_audit',
+  // Hub AI v2 attachments — shipped 2026-05-04. Document upload pipeline
+  // (mammoth DOCX, file-type stage-2 MIME, Anthropic native PDF blocks,
+  // R2_BUCKET_AI_ATTACHMENTS, retention sweeper). Functional kill switch
+  // per L20-CRIT-1: setting this flag's row to `enabled: false` blocks
+  // every POST /api/ai/attachments at the route guard without redeploy.
+  'flag_hub_ai_attachments',
+  // Scholar v1 + v1.5 — shipped 2026-05-04. Search fan-out, paper reader,
+  // saved shelves, topic feeds, annotations, peer-review threads. Per
+  // L20-CRIT-2: setting this flag's row to `enabled: false` returns 503
+  // on every /api/scholar/* request via the route guard.
+  'flag_scholar_enabled',
 ]
 
 /**

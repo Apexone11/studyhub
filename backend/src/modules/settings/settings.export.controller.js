@@ -44,6 +44,10 @@ router.get('/export', exportDataLimiter, async (req, res) => {
       preferences,
       conversations,
       studyGroupMemberships,
+      aiAttachments,
+      aiUsage,
+      scholarAnnotations,
+      scholarDiscussions,
     ] = await Promise.all([
       // Profile
       prisma.user.findUnique({
@@ -192,6 +196,71 @@ router.get('/export', exportDataLimiter, async (req, res) => {
           },
         })
         .catch(() => []),
+
+      // L13-HIGH-2: Hub AI v2 + Scholar — GDPR Art. 15 / Art. 20 portability.
+      // Each block is `.catch(() => [])` so a missing table or schema-drift
+      // never breaks the export for the rest of the user's data.
+      prisma.aiAttachment
+        .findMany({
+          where: { userId, deletedAt: null },
+          select: {
+            id: true,
+            mimeType: true,
+            fileName: true,
+            bytes: true,
+            pageCount: true,
+            createdAt: true,
+            expiresAt: true,
+            pinnedUntil: true,
+          },
+        })
+        .catch(() => []),
+
+      prisma.aiUsageLog
+        .findMany({
+          where: { userId },
+          select: {
+            id: true,
+            date: true,
+            messageCount: true,
+            documentCount: true,
+            tokensIn: true,
+            tokensOut: true,
+            documentTokens: true,
+            costUsdCents: true,
+          },
+        })
+        .catch(() => []),
+
+      prisma.scholarAnnotation
+        .findMany({
+          where: { userId },
+          select: {
+            id: true,
+            paperId: true,
+            color: true,
+            visibility: true,
+            body: true,
+            rangeJson: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        })
+        .catch(() => []),
+
+      prisma.scholarDiscussionThread
+        .findMany({
+          where: { authorId: userId },
+          select: {
+            id: true,
+            paperId: true,
+            schoolId: true,
+            body: true,
+            createdAt: true,
+            deletedAt: true,
+          },
+        })
+        .catch(() => []),
     ])
 
     const exportData = {
@@ -216,6 +285,14 @@ router.get('/export', exportDataLimiter, async (req, res) => {
         role: m.role,
         joinedAt: m.joinedAt,
       })),
+      hubAi: {
+        attachments: aiAttachments,
+        usageDaily: aiUsage,
+      },
+      scholar: {
+        annotations: scholarAnnotations,
+        discussions: scholarDiscussions,
+      },
     }
 
     // Set headers for file download
