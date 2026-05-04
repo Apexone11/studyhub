@@ -44,7 +44,7 @@ const PDF_FETCH_ALLOWLIST = Object.freeze([
 // (RFC 3986 unreserved + sub-delims + a few service-friendly extras like
 // `:`, `;`, `(`, `)`, `<`, `>`).
 const CANONICAL_ID_RE =
-  /^(doi:10\.\d{4,9}\/[A-Za-z0-9._\-/:;()<>+]{1,200}|arxiv:\d{4}\.\d{4,5}(v\d+)?|ss:[a-f0-9]{32,64})$/i
+  /^(doi:10\.\d{4,9}\/[A-Za-z0-9._\-/:;()<>+]{1,200}|arxiv:\d{4}\.\d{4,5}(v\d+)?|ss:[a-f0-9]{32,64}|oa:W\d{4,12})$/i
 
 // Standalone DOI without prefix (used inside JSON payloads). Same
 // printable-ASCII allowlist as above.

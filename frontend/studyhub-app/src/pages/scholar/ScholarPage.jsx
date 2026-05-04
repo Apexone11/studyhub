@@ -179,7 +179,10 @@ export default function ScholarPage() {
               <div className="scholar-section__eyebrow">Featured this week</div>
               <h2 className="scholar-section__title">Trending in your field</h2>
             </div>
-            <Link className="scholar-section__see-all" to="/scholar/search?sort=trending">
+            {/* Copilot fix: search backend keys off ?q= only (no sort param).
+                Use the same seed query the section is populated with so
+                "See all" lands on a populated page. */}
+            <Link className="scholar-section__see-all" to="/scholar/search?q=machine+learning">
               See all →
             </Link>
           </div>

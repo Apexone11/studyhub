@@ -7,7 +7,7 @@
  * Lists shelves the user owns + paper rows in a list/grid toggle.
  */
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { API } from '../../config'
@@ -16,8 +16,14 @@ import './ScholarPage.css'
 
 export default function ScholarSavedPage() {
   usePageTitle('Saved papers')
+  // Copilot fix: deep-link `/scholar/shelf/:id` now seeds activeShelfId
+  // so navigating directly to a shelf URL filters correctly.
+  const { id: shelfIdParam } = useParams()
+  const initialShelfId = shelfIdParam ? Number.parseInt(shelfIdParam, 10) : null
   const [shelves, setShelves] = useState([])
-  const [activeShelfId, setActiveShelfId] = useState(null)
+  const [activeShelfId, setActiveShelfId] = useState(
+    Number.isInteger(initialShelfId) && initialShelfId > 0 ? initialShelfId : null,
+  )
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [view, setView] = useState('list')
@@ -26,7 +32,10 @@ export default function ScholarSavedPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`${API}/api/library/shelves`, {
+      // Copilot fix: must request includeBooks=true — listShelvesHandler
+      // omits the `books` array unless asked. Without this, every shelf
+      // appeared empty.
+      const res = await fetch(`${API}/api/library/shelves?includeBooks=true`, {
         credentials: 'include',
         headers: authHeaders(),
       })
@@ -43,6 +52,15 @@ export default function ScholarSavedPage() {
   useEffect(() => {
     fetchShelves()
   }, [fetchShelves])
+
+  // Sync route param changes (deep-link navigation between shelves)
+  // back into local state.
+  useEffect(() => {
+    if (shelfIdParam) {
+      const parsed = Number.parseInt(shelfIdParam, 10)
+      if (Number.isInteger(parsed) && parsed > 0) setActiveShelfId(parsed)
+    }
+  }, [shelfIdParam])
 
   const allPaperRows = shelves.flatMap((shelf) =>
     (shelf.books || [])

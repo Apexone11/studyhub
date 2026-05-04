@@ -29,7 +29,23 @@ export default function AiCitationFootnote({ index, citation, onOpen }) {
       >
         [{index + 1}]
       </button>
-      <span id={describedBy} style={{ display: 'none' }}>
+      <span
+        id={describedBy}
+        // Copilot fix: visually hidden but kept in the accessibility tree
+        // so aria-describedby actually announces. `display: none` would
+        // remove the element from the AT entirely.
+        style={{
+          position: 'absolute',
+          width: 1,
+          height: 1,
+          padding: 0,
+          margin: -1,
+          overflow: 'hidden',
+          clip: 'rect(0, 0, 0, 0)',
+          whiteSpace: 'nowrap',
+          border: 0,
+        }}
+      >
         {citation?.sourceTitle ? `Source: ${citation.sourceTitle}` : 'View source'}
         {citation?.page ? `, page ${citation.page}` : ''}
       </span>

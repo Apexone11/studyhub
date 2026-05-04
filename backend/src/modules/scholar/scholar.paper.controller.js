@@ -11,7 +11,15 @@ const { CANONICAL_ID_RE } = require('./scholar.constants')
 
 function _validateCanonicalId(raw) {
   if (typeof raw !== 'string' || !raw) return null
-  const decoded = decodeURIComponent(raw)
+  // Copilot fix: decodeURIComponent throws URIError on malformed
+  // percent-encoding (e.g. `%E0%A4`). Catch and treat as invalid id so
+  // the route surfaces 400 BAD_REQUEST rather than a 500.
+  let decoded
+  try {
+    decoded = decodeURIComponent(raw)
+  } catch {
+    return null
+  }
   if (decoded.length > 256) return null
   if (!CANONICAL_ID_RE.test(decoded)) return null
   return decoded

@@ -210,17 +210,35 @@ async function lookupIdempotency({ key, userId }) {
   return prisma.aiAttachment.findUnique({ where: { id: row.attachmentId } })
 }
 
-async function persistIdempotency({ key, userId, attachmentId }) {
+// Codex P1 fix: idempotent + safe across users. Replaces the prior bare
+// upsert which could rewire an existing row to a different user's
+// attachment when keys collide. lookupIdempotency treats foreign-user
+// key reuse as a miss; this helper ensures the underlying row's
+// userId/attachmentId pointer never drifts to a foreign owner.
+async function persistIdempotencyScoped({ key, userId, attachmentId }) {
   if (!key) return
-  await prisma.aiUploadIdempotency.upsert({
-    where: { key },
-    create: {
+  const existing = await prisma.aiUploadIdempotency.findUnique({ where: { key } })
+  if (existing) {
+    if (existing.userId !== userId) {
+      // Foreign user already owns this key. Do NOT rewire. Caller's
+      // upload still succeeded, but the idempotency row stays with the
+      // original owner. Future retries from the foreign user simply
+      // won't short-circuit.
+      return
+    }
+    await prisma.aiUploadIdempotency.update({
+      where: { key },
+      data: { attachmentId, expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS) },
+    })
+    return
+  }
+  await prisma.aiUploadIdempotency.create({
+    data: {
       key,
       userId,
       attachmentId,
       expiresAt: new Date(Date.now() + IDEMPOTENCY_TTL_MS),
     },
-    update: { attachmentId },
   })
 }
 
@@ -434,9 +452,11 @@ async function uploadAttachment({
       },
     })
 
-    // 9. Idempotency record + audit log.
+    // 9. Idempotency record + audit log. Codex P1 fix: use the scoped
+    // helper so a same-key collision from a different user can never
+    // overwrite the original owner's pointer.
     if (idempotencyKey) {
-      await persistIdempotency({
+      await persistIdempotencyScoped({
         key: idempotencyKey,
         userId,
         attachmentId: attachment.id,

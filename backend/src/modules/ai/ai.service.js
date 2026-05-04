@@ -755,10 +755,10 @@ async function streamMessage({
     data: { updatedAt: new Date() },
   })
 
-  // 8. Increment usage. The legacy AiUsageLog row stays the source of
-  // truth for daily/weekly limit display; the new ai.spendCeiling
-  // module adds the cost-cents tracking on top.
-  await incrementUsage(userId, totalTokens)
+  // 8. Increment usage. `recordActualUsage` upserts the same AiUsageLog
+  // row that `incrementUsage` used to write — counting both would double
+  // every messageCount and tokenCount, throttling users at half the cap
+  // (Codex P1 fix). recordActualUsage is now the single writer.
   // Record the actual numbers (not just the estimate) on the global
   // spend row + per-user row. Cost rate matches Anthropic Sonnet 4
   // pricing in attachments.constants.js.

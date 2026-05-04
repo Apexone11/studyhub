@@ -124,14 +124,21 @@ async function getTopicFeed(req, res) {
           ? [{ citationCount: 'desc' }]
           : [{ citationCount: 'desc' }, { publishedAt: 'desc' }] // trending
 
+    // Codex P2 + Copilot fix: previously `skip: offset` was applied to the
+    // unfiltered DB result, so paginating non-zero offsets returned an
+    // unrelated (often empty) window of slug-filtered rows. The slug
+    // filter is JS-side because `topicsJson` is a JSONB column without
+    // a slug index; we fetch a wider window, filter, then paginate the
+    // FILTERED set in JS. `take` scales with `offset + limit` so deep
+    // pagination still has data; capped to keep memory bounded.
+    const candidateWindow = Math.min(Math.max((offset + limit) * 4, 50), 500)
     const candidates = await prisma.scholarPaper.findMany({
       where: {
         ...(Object.keys(dateClause).length ? { publishedAt: dateClause } : {}),
         ...(openAccessOnly ? { openAccess: true } : {}),
       },
       orderBy,
-      take: Math.max(limit * 4, 50), // fetch a wider window for slug filter
-      skip: offset,
+      take: candidateWindow,
     })
     const matched = candidates.filter((row) => {
       const topics = Array.isArray(row.topicsJson) ? row.topicsJson : []
@@ -140,7 +147,7 @@ async function getTopicFeed(req, res) {
         return name.toLowerCase().includes(slug)
       })
     })
-    const sliced = matched.slice(0, limit)
+    const sliced = matched.slice(offset, offset + limit)
     const totalEstimate = matched.length
 
     res.json({

@@ -18,11 +18,10 @@ function _normalize(p) {
   if (!p || typeof p !== 'object') return null
   const doi = (p.doi || '').replace(/^https?:\/\/doi\.org\//i, '') || null
   const oaId = p.id ? p.id.replace(/^https?:\/\/openalex\.org\//i, '') : null
-  const id = doi
-    ? `doi:${doi.toLowerCase()}`
-    : oaId
-      ? `ss:${oaId.toLowerCase()}` // Use ss: namespace for OpenAlex-only IDs (placeholder until first-class id space)
-      : null
+  // Copilot fix: OpenAlex Work IDs are `W` + digits (e.g., W4231234567),
+  // NOT 32-64 hex. The earlier `ss:` reuse failed CANONICAL_ID_RE for
+  // every OpenAlex-only record. Use the dedicated `oa:` namespace.
+  const id = doi ? `doi:${doi.toLowerCase()}` : oaId ? `oa:${oaId}` : null
   if (!id) return null
 
   const authorships = Array.isArray(p.authorships) ? p.authorships : []
@@ -129,9 +128,14 @@ async function fetch(canonicalId) {
   let lookupPath = ''
   if (canonicalId.startsWith('doi:')) {
     lookupPath = `doi:${canonicalId.slice(4)}`
+  } else if (canonicalId.startsWith('oa:')) {
+    // OpenAlex Work IDs start with `W` + digits. New canonical namespace
+    // per Copilot fix; replaces the prior `ss:` reuse which collided
+    // with the Semantic Scholar id space.
+    lookupPath = canonicalId.slice(3)
   } else if (canonicalId.startsWith('ss:')) {
-    // OpenAlex Work IDs start with W; if the canonical id was a non-DOI
-    // OpenAlex id we stored it under ss: — peel that prefix back.
+    // Backward-compat for any rows persisted under the old namespace
+    // before the fix landed. New rows use `oa:`.
     lookupPath = canonicalId.slice(3)
   } else {
     return { source: SOURCE, paper: null, error: 'unsupported_id' }

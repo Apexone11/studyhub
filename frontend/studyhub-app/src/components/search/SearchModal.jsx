@@ -84,6 +84,13 @@ export default function SearchModal({ open, onClose }) {
         const j = await scholarRes.value.json()
         papers = Array.isArray(j.results) ? j.results.slice(0, 4) : []
       }
+      // Copilot fix: stale-result guard. If a newer search has started
+      // while we were awaiting JSON, abortRef has been swapped — the
+      // fresh request now owns the loading state and we must NOT
+      // overwrite its results with our older response.
+      if (abortRef.current !== controller || controller.signal.aborted) {
+        return
+      }
       const apiLatencyMs = Math.round(performance.now() - fetchStart)
       const totalResults =
         (data.results?.sheets?.length || 0) +
@@ -105,7 +112,10 @@ export default function SearchModal({ open, onClose }) {
     } catch (err) {
       if (err.name !== 'AbortError') console.error('[search]', err)
     } finally {
-      setLoading(false)
+      // Only flip loading off if WE are still the active request.
+      if (abortRef.current === controller) {
+        setLoading(false)
+      }
     }
   }, [])
 
