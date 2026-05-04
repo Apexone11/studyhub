@@ -43,12 +43,17 @@ const FA_BY_TYPE = {
   // Sheets
   sheet_approved: 'fas fa-circle-check',
   sheet_rejected: 'fas fa-circle-xmark',
+  upload_quota_reached: 'fas fa-bolt',
+
+  // Hub AI
+  ai_quota_reached: 'fas fa-bolt',
 
   // System / safety
   moderation: 'fas fa-shield-halved',
   legal_acceptance_required: 'fas fa-file-signature',
   payment_failed: 'fas fa-credit-card',
   subscription_canceled: 'fas fa-circle-xmark',
+  subscription_will_cancel: 'fas fa-clock',
   video_copy_detected: 'fas fa-circle-exclamation',
   plagiarism_flagged: 'fas fa-magnifying-glass',
   announcement: 'fas fa-bullhorn',
@@ -86,11 +91,15 @@ const TONE_BY_TYPE = {
 
   sheet_approved: 'success',
   sheet_rejected: 'warn',
+  upload_quota_reached: 'warn',
+
+  ai_quota_reached: 'warn',
 
   moderation: 'warn',
   legal_acceptance_required: 'warn',
   payment_failed: 'danger',
   subscription_canceled: 'warn',
+  subscription_will_cancel: 'warn',
   video_copy_detected: 'warn',
   plagiarism_flagged: 'warn',
   announcement: 'info',
@@ -139,12 +148,14 @@ export const NOTIFICATION_TYPE_GROUPS = {
     'group_auto_locked',
     'group_removed',
   ],
-  sheets: ['sheet_approved', 'sheet_rejected'],
+  sheets: ['sheet_approved', 'sheet_rejected', 'upload_quota_reached'],
+  ai: ['ai_quota_reached'],
   system: [
     'moderation',
     'legal_acceptance_required',
     'payment_failed',
     'subscription_canceled',
+    'subscription_will_cancel',
     'video_copy_detected',
     'plagiarism_flagged',
     'announcement',
@@ -157,5 +168,6 @@ export const NOTIFICATION_GROUP_LABELS = {
   content: 'Content & comments',
   groups: 'Study groups',
   sheets: 'Sheets',
+  ai: 'Hub AI',
   system: 'System & safety',
 }

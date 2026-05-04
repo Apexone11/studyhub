@@ -360,28 +360,47 @@ function validateHtmlForRuntime(html) {
 }
 
 /**
- * Scan inline JS for high-risk patterns.
- * Returns { highRisk: boolean, flags: string[] }
+ * Scan inline JS for risk patterns.
  *
- * High risk = network attempt keywords OR eval/obfuscation patterns.
- * This runs at publish/submit time for reporting — it does NOT block.
+ * Severity model (2026-05-03 relaxation):
+ *   - "high"   → genuine malware/exploit primitives (eval/Function/string-arg
+ *                timers, base64 decode chained with eval, deep-escape
+ *                obfuscation). These elevate to Tier 2 (admin review).
+ *   - "medium" → modern app primitives that are SANDBOX-BLOCKED at runtime
+ *                anyway: fetch/XHR/WebSocket/sendBeacon/EventSource (CSP
+ *                `connect-src 'none'` blocks every outbound), document.cookie
+ *                (no parent cookie in iframe), document.domain (opaque
+ *                origin), redirects (top-nav blocked). These stay at Tier 1
+ *                informational so legit sheets that call `fetch` to a public
+ *                API don't get queued for human review.
+ *
+ * Returns { flags: [{ label, severity }], highRisk: boolean (any 'high'
+ * severity flag) }.
+ *
+ * Runs at publish/submit time for reporting — never blocks submission.
  */
 function scanInlineJsRisk(html) {
   const value = String(html || '')
   const flags = []
 
-  // Network attempt keywords
-  const networkPatterns = [
+  // Tier 1 (informational): sandbox-neutralized network/info primitives.
+  const informationalPatterns = [
     { pattern: /\bfetch\s*\(/gi, label: 'fetch() call detected' },
     { pattern: /\bXMLHttpRequest\b/gi, label: 'XMLHttpRequest usage detected' },
     { pattern: /\bnew\s+WebSocket\b/gi, label: 'WebSocket usage detected' },
     { pattern: /\bnavigator\s*\.\s*sendBeacon\b/gi, label: 'sendBeacon() usage detected' },
     { pattern: /\bEventSource\b/gi, label: 'EventSource usage detected' },
     { pattern: /\bimportScripts\b/gi, label: 'importScripts() usage detected' },
+    { pattern: /document\s*\.\s*cookie/gi, label: 'document.cookie access detected' },
+    { pattern: /document\s*\.\s*domain/gi, label: 'document.domain access detected' },
   ]
 
-  // Eval / obfuscation patterns
-  const evalPatterns = [
+  // Tier 2 (real risk): exploit primitives that the sandbox does NOT
+  // automatically defang. eval/Function constructor execute attacker-
+  // supplied strings; string-arg timers are an old eval-equivalent;
+  // atob+eval is the canonical "decode and run" pattern; heavy escapes
+  // (already counted >=10 in detectHighRiskBehaviors but flag any here).
+  const highRiskPatterns = [
     { pattern: /\beval\s*\(/gi, label: 'eval() call detected' },
     { pattern: /\bFunction\s*\(/gi, label: 'Function() constructor detected' },
     { pattern: /\bsetTimeout\s*\(\s*["'`]/gi, label: 'setTimeout() with string argument detected' },
@@ -390,22 +409,18 @@ function scanInlineJsRisk(html) {
       label: 'setInterval() with string argument detected',
     },
     { pattern: /\batob\s*\(/gi, label: 'atob() (base64 decode) detected' },
-    { pattern: /\\x[0-9a-f]{2}/gi, label: 'Hex-encoded string escape detected' },
-    { pattern: /\\u00[0-9a-f]{2}/gi, label: 'Unicode escape obfuscation detected' },
-    { pattern: /document\s*\.\s*cookie/gi, label: 'document.cookie access detected' },
-    { pattern: /document\s*\.\s*domain/gi, label: 'document.domain access detected' },
   ]
 
-  for (const { pattern, label } of networkPatterns) {
-    if (pattern.test(value)) flags.push(label)
+  for (const { pattern, label } of informationalPatterns) {
+    if (pattern.test(value)) flags.push({ label, severity: 'medium' })
   }
-  for (const { pattern, label } of evalPatterns) {
-    if (pattern.test(value)) flags.push(label)
+  for (const { pattern, label } of highRiskPatterns) {
+    if (pattern.test(value)) flags.push({ label, severity: 'high' })
   }
 
   return {
-    highRisk: flags.length > 0,
     flags,
+    highRisk: flags.some((f) => f.severity === 'high'),
   }
 }
 

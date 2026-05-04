@@ -267,7 +267,9 @@ async function createDiscussion(req, res) {
             type: 'group_post',
             message: `${req.user.username} posted in ${groupData.name}: ${validTitle}`,
             actorId: req.user.userId,
-            linkPath: `/study-groups/${groupId}`,
+            // Deep-link straight to the discussion thread the user is
+            // being notified about (Copilot finding 2026-05-03).
+            linkPath: `/study-groups/${groupId}?tab=discussions&post=${post.id}`,
           })),
         )
       }
@@ -285,7 +287,7 @@ async function createDiscussion(req, res) {
         text: strippedContent,
         actorId: req.user.userId,
         actorUsername: req.user.username,
-        linkPath: `/study-groups/${groupId}`,
+        linkPath: `/study-groups/${groupId}?tab=discussions&post=${post.id}`,
         restrictToUserIds: memberAllowlist,
       })
     } catch (notifErr) {
@@ -500,6 +502,7 @@ async function updateDiscussion(req, res) {
       data: updates,
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
+        upvotes: { select: { userId: true } },
         _count: { select: { replies: true } },
       },
     })
@@ -522,7 +525,7 @@ async function updateDiscussion(req, res) {
             ? `A moderator pinned your post "${updated.title}"`
             : `Your post "${updated.title}" was unpinned`,
           actorId: req.user.userId,
-          linkPath: `/study-groups/${groupId}`,
+          linkPath: `/study-groups/${groupId}?tab=discussions&post=${updated.id}`,
         })
       } catch (notifErr) {
         log.warn(
@@ -532,6 +535,10 @@ async function updateDiscussion(req, res) {
       }
     }
 
+    // Match the listDiscussions serializer shape exactly so the hook can
+    // replace the local post wholesale without losing the moderation
+    // badges (`status`), the user's upvote state, or the reply count
+    // — Copilot finding 2026-05-03.
     res.json({
       id: updated.id,
       groupId: updated.groupId,
@@ -542,13 +549,13 @@ async function updateDiscussion(req, res) {
       type: updated.type,
       pinned: updated.pinned,
       resolved: updated.resolved,
+      status: updated.status || 'published',
       attachments: updated.attachments || null,
-      // Use the real reply count from Prisma's _count include. The
-      // hook (`useGroupDiscussions.updatePost`) replaces the post in
-      // local state with whatever the server returns, so a hardcoded 0
-      // here would wipe the visible reply count from the UI on every
-      // pin / edit. Same fix applied below in resolveDiscussion.
       replyCount: updated._count?.replies ?? 0,
+      upvoteCount: updated.upvotes?.length ?? 0,
+      userHasUpvoted: Array.isArray(updated.upvotes)
+        ? updated.upvotes.some((u) => u.userId === req.user.userId)
+        : false,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     })
@@ -758,7 +765,7 @@ async function createReply(req, res) {
           type: 'group_reply',
           message: `${req.user.username} replied to "${post.title}"`,
           actorId: req.user.userId,
-          linkPath: `/study-groups/${groupId}`,
+          linkPath: `/study-groups/${groupId}?tab=discussions&post=${post.id}`,
         })
       }
       // Same membership-restricted mention pipeline as createDiscussion
@@ -773,7 +780,7 @@ async function createReply(req, res) {
         text: strippedContent,
         actorId: req.user.userId,
         actorUsername: req.user.username,
-        linkPath: `/study-groups/${groupId}`,
+        linkPath: `/study-groups/${groupId}?tab=discussions&post=${post.id}`,
         restrictToUserIds: replyMembers.map((m) => m.userId),
       })
     } catch (notifErr) {
@@ -967,10 +974,15 @@ async function resolveDiscussion(req, res) {
       },
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
+        upvotes: { select: { userId: true } },
         _count: { select: { replies: true } },
       },
     })
 
+    // Match the listDiscussions serializer shape exactly. Without
+    // status / upvoteCount / userHasUpvoted the hook's local-state
+    // replacement strips the moderation badges and vote counter from
+    // the resolved question card (Copilot finding 2026-05-03).
     res.json({
       id: updated.id,
       groupId: updated.groupId,
@@ -981,8 +993,13 @@ async function resolveDiscussion(req, res) {
       type: updated.type,
       pinned: updated.pinned,
       resolved: updated.resolved,
+      status: updated.status || 'published',
       attachments: updated.attachments || null,
       replyCount: updated._count?.replies ?? 0,
+      upvoteCount: updated.upvotes?.length ?? 0,
+      userHasUpvoted: Array.isArray(updated.upvotes)
+        ? updated.upvotes.some((u) => u.userId === req.user.userId)
+        : false,
       createdAt: updated.createdAt,
       updatedAt: updated.updatedAt,
     })

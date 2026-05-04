@@ -182,16 +182,28 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
   const scan = await runHtmlScanNow(prisma, { sheetId })
   const tier = scan.tier
 
-  // Route by tier
+  // Route by tier (2026-05-03 AI-first review model):
+  //   Tier 0 → auto-publish.
+  //   Tier 1 → auto-publish after user acks the findings.
+  //   Tier 2 → status='pending_review', AI reviewer runs immediately and
+  //            either approves (→ published), rejects (→ rejected), or
+  //            escalates (stays pending_review for human admin). Admins
+  //            are notified ONLY for the escalation path so the queue
+  //            stays small ("special cases" only).
+  //   Tier 3 → AUTO-REJECT immediately. Critical findings (credential
+  //            capture, miner+obfuscation, 3+ high-risk categories) are
+  //            unambiguous malware patterns; quarantine→admin-queue is
+  //            unnecessary because admins will reject these anyway. The
+  //            user is notified with the AI-readable reason via the
+  //            `sheet_rejected` notification fan-out.
   let nextStatus
+  let rejectReason = null
   switch (tier) {
     case RISK_TIER.CLEAN:
-      // Tier 0: auto-publish
       nextStatus = 'published'
       break
 
     case RISK_TIER.FLAGGED:
-      // Tier 1: auto-publish but require acknowledgement
       if (!sheet.htmlScanAcknowledgedAt) {
         const error = new Error(
           'This sheet contains flagged HTML features. Acknowledge the findings before publishing.',
@@ -205,21 +217,32 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
       break
 
     case RISK_TIER.HIGH_RISK:
-      // Tier 2: pending admin review
+      // AI reviewer fires below as fire-and-forget. Until it returns,
+      // the sheet sits in pending_review. The vast majority resolve in
+      // <30s without admin involvement.
       nextStatus = 'pending_review'
       break
 
-    case RISK_TIER.QUARANTINED:
-      // Tier 3: quarantined
-      nextStatus = 'quarantined'
+    case RISK_TIER.QUARANTINED: {
+      // Auto-reject. The categorization that produced Tier 3 is the
+      // safety review — there is nothing for an admin to add by re-
+      // reviewing it. Critical-severity findings (e.g. credential
+      // capture) are explicit malware patterns.
+      nextStatus = 'rejected'
+      const criticalFinding = scan.findings.find((f) => f.severity === 'critical')
+      rejectReason = criticalFinding
+        ? `Auto-rejected: ${criticalFinding.message}`
+        : 'Auto-rejected: multiple high-risk patterns detected.'
       break
+    }
 
     default:
       nextStatus = 'published'
   }
 
-  // Notify admins for Tier 2+
-  if (tier >= RISK_TIER.HIGH_RISK) {
+  // Tier 2 only — page admins for human escalations the AI couldn't
+  // resolve. Tier 3 is now auto-rejected and never enters the admin queue.
+  if (tier === RISK_TIER.HIGH_RISK) {
     const username = sheet.author?.username || user.username || `User #${user.userId}`
     sendHighRiskSheetAlert({
       sheetId,
@@ -237,7 +260,7 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
           createNotification(prisma, {
             userId: admin.id,
             type: 'moderation',
-            message: `High-risk HTML sheet "${sheet.title || 'Untitled'}" submitted by ${username} — review required.`,
+            message: `High-risk HTML sheet "${sheet.title || 'Untitled'}" submitted by ${username} — AI review pending; admin attention if escalated.`,
             actorId: user.userId,
             sheetId,
             linkPath: '/admin?tab=sheets',
@@ -248,10 +271,27 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
       .catch((err) => console.error('[htmlDraftWorkflow] Failed to notify admins:', err.message))
   }
 
+  // Tier 3 — notify the AUTHOR that their sheet was auto-rejected with the
+  // reason so they can fix it and resubmit. CLAUDE.md ESSENTIAL list
+  // includes 'sheet_rejected' so this bypasses block filters.
+  if (tier === RISK_TIER.QUARANTINED) {
+    createNotification(prisma, {
+      userId: user.userId,
+      type: 'sheet_rejected',
+      message:
+        rejectReason ||
+        `Your sheet "${sheet.title || 'Untitled'}" was auto-rejected by the safety scanner.`,
+      sheetId,
+      linkPath: `/sheets/${sheetId}/lab`,
+      priority: 'high',
+    }).catch(() => {})
+  }
+
   const updated = await prisma.studySheet.update({
     where: { id: sheetId },
     data: {
       status: nextStatus,
+      ...(rejectReason ? { reviewReason: rejectReason } : {}),
     },
     include: {
       author: { select: { id: true, username: true } },

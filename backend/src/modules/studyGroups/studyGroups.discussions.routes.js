@@ -154,7 +154,10 @@ router.patch('/:postId/approve', writeLimiter, requireAuth, async (req, res) => 
           type: 'group_post_approved',
           message: `Your post "${post.title}" was approved`,
           actorId: req.user.userId,
-          linkPath: `/study-groups/${groupId}`,
+          // Deep-link to Discussions tab + the specific post so the
+          // notification click lands on the actual content the user is
+          // being notified about (Copilot finding 2026-05-03).
+          linkPath: `/study-groups/${groupId}?tab=discussions&post=${postId}`,
         })
       } catch {
         /* fire-and-forget */
@@ -217,7 +220,7 @@ router.patch('/:postId/reject', writeLimiter, requireAuth, async (req, res) => {
           type: 'group_post_rejected',
           message: `Your post "${updated.title}" was rejected by a moderator`,
           actorId: req.user.userId,
-          linkPath: `/study-groups/${groupId}`,
+          linkPath: `/study-groups/${groupId}?tab=discussions&post=${postId}`,
         })
       } catch {
         /* fire-and-forget */

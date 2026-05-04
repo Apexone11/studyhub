@@ -41,20 +41,15 @@ const FREE_FEATURES = [
   '30-minute video uploads',
   '50 library bookmarks',
   '2 private study groups',
-  '3 playground projects',
 ]
 
 const PRO_FEATURES = [
   'Everything in Free, plus:',
   'Unlimited uploads',
   '120 AI messages per day',
-  'Upload PDFs and code to AI',
   '60-minute video uploads',
-  '5 GB storage',
   'Unlimited library bookmarks',
   '10 private study groups',
-  '25 playground projects',
-  'Custom themes',
   'Priority support',
 ]
 
@@ -63,7 +58,6 @@ const INSTITUTION_FEATURES = [
   '200 AI messages per day',
   'Upload files up to 50MB',
   'Unlimited study groups',
-  'Unlimited playground projects',
   'LMS integration',
   'SSO support',
   'Org-wide analytics',

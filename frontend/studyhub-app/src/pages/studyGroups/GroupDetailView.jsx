@@ -5,7 +5,7 @@
  * Discussions, and Members. Handles editing, deletion, joining, and leaving.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { createPortal } from 'react-dom'
 import { useSession } from '../../lib/session-context'
 import { useStudyGroupsData } from './useStudyGroupsData'
@@ -61,7 +61,19 @@ export default function GroupDetailView({ groupId }) {
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [backgroundPickerOpen, setBackgroundPickerOpen] = useState(false)
   const [reportModalOpen, setReportModalOpen] = useState(false)
-  const [activeTab, setActiveTab] = useState('overview')
+  // Tab + post-id deep-link via `?tab=discussions&post=<id>`. Notifications
+  // emit this URL shape so a click on a "post approved" / "replied to your
+  // post" / "pinned" notification lands the user directly on the affected
+  // thread instead of the Overview tab (Copilot finding 2026-05-03).
+  const [searchParams] = useSearchParams()
+  const initialTabParam = searchParams.get('tab')
+  const initialPostParam = Number.parseInt(searchParams.get('post') || '', 10)
+  const VALID_TABS = ['overview', 'discussions', 'resources', 'sessions', 'members']
+  const [activeTab, setActiveTab] = useState(
+    VALID_TABS.includes(initialTabParam) ? initialTabParam : 'overview',
+  )
+  const initialFocusedPostId =
+    Number.isInteger(initialPostParam) && initialPostParam > 0 ? initialPostParam : null
 
   const {
     activeGroup,
@@ -765,6 +777,7 @@ export default function GroupDetailView({ groupId }) {
                   discussions={discussions}
                   loading={discussionsLoading}
                   loadDiscussions={loadDiscussions}
+                  initialFocusedPostId={initialFocusedPostId}
                   // Every callback below MUST close over `groupId` because the
                   // child components call them with only the post-scoped args
                   // (`postId`, etc.). Wiring `onDeletePost={deletePost}` raw

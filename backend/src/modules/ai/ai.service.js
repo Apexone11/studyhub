@@ -6,6 +6,7 @@
 const Anthropic = require('@anthropic-ai/sdk')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
+const { createNotification } = require('../../lib/notify')
 const { buildContext, redactPII } = require('./ai.context')
 const {
   DEFAULT_MODEL,
@@ -333,6 +334,19 @@ async function streamMessage({ user, conversationId, content, currentPage, image
   const usage = await getOrCreateUsage(userId)
   const limit = await getDailyLimit(user)
   if (usage.messageCount >= limit) {
+    // Persist a once-per-day inbox record so a user who runs out mid-flow
+    // has a durable signal + upgrade path, not just an SSE toast that
+    // disappears on reload. Deduped by UTC date so multiple hits in the
+    // same day collapse to one notification.
+    const today = new Date().toISOString().slice(0, 10)
+    createNotification(prisma, {
+      userId,
+      type: 'ai_quota_reached',
+      message: `You've used all ${limit} AI messages today. Upgrade to Pro for 4× the daily quota, or come back tomorrow.`,
+      linkPath: '/pricing',
+      priority: 'medium',
+      dedupKey: `ai_quota_reached:${userId}:daily:${today}`,
+    }).catch(() => {})
     sendSSE(res, {
       type: 'error',
       message: `Daily limit reached (${limit} messages). Resets at midnight UTC.`,
@@ -349,6 +363,29 @@ async function streamMessage({ user, conversationId, content, currentPage, image
     const now = new Date()
     const dayOfWeek = now.getUTCDay()
     const daysUntilMonday = (8 - dayOfWeek) % 7 || 7
+    // Once-per-week inbox record. True ISO 8601 week label so the dedup
+    // key rolls over on Monday and handles the year-boundary edge case
+    // (2026-01-01 is ISO 2025-W53, etc.). Algorithm: take the Thursday of
+    // the current week (ISO weeks are anchored on Thursday), then count
+    // weeks from the first Thursday of that Thursday's year.
+    function isoWeekLabel(d) {
+      const dt = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
+      // Shift to Thursday of the current ISO week (ISO day 1=Mon..7=Sun).
+      const isoDay = dt.getUTCDay() || 7
+      dt.setUTCDate(dt.getUTCDate() + 4 - isoDay)
+      const yearStart = new Date(Date.UTC(dt.getUTCFullYear(), 0, 1))
+      const week = Math.ceil(((dt - yearStart) / 86400000 + 1) / 7)
+      return `${dt.getUTCFullYear()}-W${String(week).padStart(2, '0')}`
+    }
+    const isoWeek = isoWeekLabel(now)
+    createNotification(prisma, {
+      userId,
+      type: 'ai_quota_reached',
+      message: `You've reached your weekly AI limit (${weeklyLimit} messages). Resets in ${daysUntilMonday} day${daysUntilMonday !== 1 ? 's' : ''}. Upgrade to Pro for a higher cap.`,
+      linkPath: '/pricing',
+      priority: 'medium',
+      dedupKey: `ai_quota_reached:${userId}:weekly:${isoWeek}`,
+    }).catch(() => {})
     sendSSE(res, {
       type: 'error',
       message: `Weekly limit reached (${weeklyLimit} messages). Resets in ${daysUntilMonday} day${daysUntilMonday !== 1 ? 's' : ''}.`,

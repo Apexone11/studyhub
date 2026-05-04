@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { TENOR_API_KEY } from '../config'
+import { API } from '../config'
 
 const PAGE_FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
@@ -13,41 +13,55 @@ export default function GifSearchPanel({
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
+  const [unavailable, setUnavailable] = useState(false)
   const timerRef = useRef(null)
 
   const trimmedQuery = query.trim()
-  const hasTenorApiKey = Boolean(String(TENOR_API_KEY || '').trim())
-  const displayResults = hasTenorApiKey && trimmedQuery ? results : []
-  const displayLoading = hasTenorApiKey && trimmedQuery ? loading : false
+  // Empty query: render zero results without setting state in an effect.
+  // Effect only runs when there's actually a query to fetch.
+  const displayResults = !trimmedQuery || unavailable ? [] : results
+  const displayLoading = !trimmedQuery || unavailable ? false : loading
 
   useEffect(() => {
     if (!trimmedQuery) return undefined
-    if (!hasTenorApiKey) return undefined
 
     let cancelled = false
+    const controller = new AbortController()
     if (timerRef.current) clearTimeout(timerRef.current)
 
     timerRef.current = setTimeout(async () => {
       if (cancelled) return
       setLoading(true)
+      // Always start from "available" — a prior 503 must not stick across
+      // searches so a key rotation or recovery is visible to the user. We
+      // call the setter unconditionally; React no-ops if value is already
+      // false. Avoids a stale-closure read on `unavailable` in the effect.
+      setUnavailable(false)
 
       try {
         const response = await fetch(
-          `https://tenor.googleapis.com/v2/search?q=${encodeURIComponent(trimmedQuery)}&key=${encodeURIComponent(TENOR_API_KEY)}&client_key=studyhub&limit=12&media_filter=tinygif,gif`,
+          `${API}/api/gifs/search?q=${encodeURIComponent(trimmedQuery)}&limit=12`,
+          { credentials: 'include', signal: controller.signal },
         )
 
-        if (response.ok && !cancelled) {
-          const data = await response.json()
-          const gifs = (data.results || []).map((item) => ({
-            id: item.id,
-            preview: item.media_formats?.tinygif?.url || item.media_formats?.gif?.url || '',
-            full: item.media_formats?.gif?.url || item.media_formats?.tinygif?.url || '',
-            title: item.content_description || 'GIF',
-          }))
+        if (response.status === 503) {
+          if (!cancelled) {
+            setUnavailable(true)
+            setResults([])
+          }
+        } else if (response.ok && !cancelled) {
+          const data = await response.json().catch(() => ({}))
+          const gifs = Array.isArray(data?.results) ? data.results : []
           setResults(gifs)
+          setUnavailable(false)
+        } else if (!cancelled) {
+          // Non-OK + non-503: keep the picker usable, drop stale results.
+          setResults([])
         }
-      } catch {
-        // Silent network failure: leave the picker usable for another search.
+      } catch (error) {
+        if (error?.name === 'AbortError') return
+        // Network blip: clear results so the user can retry.
+        if (!cancelled) setResults([])
       }
 
       if (!cancelled) setLoading(false)
@@ -55,9 +69,10 @@ export default function GifSearchPanel({
 
     return () => {
       cancelled = true
+      controller.abort()
       if (timerRef.current) clearTimeout(timerRef.current)
     }
-  }, [hasTenorApiKey, trimmedQuery])
+  }, [trimmedQuery])
 
   return (
     <div
@@ -145,7 +160,7 @@ export default function GifSearchPanel({
           </div>
         ) : null}
 
-        {!hasTenorApiKey && trimmedQuery ? (
+        {unavailable && trimmedQuery ? (
           <div
             style={{
               gridColumn: '1 / -1',
@@ -159,7 +174,7 @@ export default function GifSearchPanel({
           </div>
         ) : null}
 
-        {hasTenorApiKey && !displayLoading && displayResults.length === 0 && trimmedQuery ? (
+        {!unavailable && !displayLoading && displayResults.length === 0 && trimmedQuery ? (
           <div
             style={{
               gridColumn: '1 / -1',

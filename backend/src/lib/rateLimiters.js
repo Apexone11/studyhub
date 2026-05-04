@@ -1142,6 +1142,36 @@ const achievementShareLimiter = rateLimit({
   message: { error: 'Daily share limit reached. Try again tomorrow.' },
 })
 
+/**
+ * GIF search proxy — 60 lookups per minute per authenticated user.
+ * Tenor enforces a daily request quota across the whole app key, so the
+ * limiter exists primarily to stop a single user from burning that quota.
+ */
+const gifSearchLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `gif-search-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many GIF searches. Please slow down.' },
+})
+
+/**
+ * Library read endpoints — 120 reads / minute / IP. The /search route
+ * proxies to Google Books and writes a per-query memo; without a per-route
+ * limiter, the global 1000 / 15min floor is the only ceiling, which is too
+ * generous for a route that triggers external API calls + memory writes.
+ * Default IP keying (no custom keyGenerator) keeps express-rate-limit's
+ * IPv6 normalization safe per A7.
+ */
+const libraryReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many library searches. Please slow down.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -1298,4 +1328,10 @@ module.exports = {
 
   // Achievements V2
   achievementShareLimiter,
+
+  // GIFs module
+  gifSearchLimiter,
+
+  // Library module
+  libraryReadLimiter,
 }

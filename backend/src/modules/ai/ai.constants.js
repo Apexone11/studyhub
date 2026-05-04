@@ -8,12 +8,17 @@ const DEFAULT_MODEL = 'claude-sonnet-4-20250514'
 /** Cheaper model for simple queries (future use). */
 const FAST_MODEL = 'claude-haiku-4-5-20251001'
 
-/** Daily message limits by user status. Matches plan tiers in payments.constants.js. */
+/**
+ * Daily message limits by user status. Derived from PLANS so the AI
+ * service and the pricing page can never drift apart. `admin` is
+ * platform-internal and not represented in the plan table — kept here.
+ */
+const { PLANS } = require('../payments/payments.constants')
 const DAILY_LIMITS = {
-  default: 30,
-  verified: 60,
-  donor: 60,
-  pro: 120,
+  default: PLANS.free.aiMessagesPerDay,
+  verified: PLANS.free.aiMessagesPerDayVerified,
+  donor: PLANS.donor.aiMessagesPerDay,
+  pro: PLANS.pro_monthly.aiMessagesPerDay,
   admin: 200,
 }
 

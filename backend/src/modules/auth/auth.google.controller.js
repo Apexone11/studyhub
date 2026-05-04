@@ -220,6 +220,25 @@ router.post('/google/complete', googleCompleteLimiter, async (req, res) => {
         ERROR_CODES.VALIDATION,
       )
     }
+    // HIBP breach check — required at every hash site per the
+    // industry-standard practices section of CLAUDE.md and the patterns
+    // already used in /register and /reset-password. Loop F1 finding
+    // HIGH #1, 2026-05-03. Fail-OPEN if HIBP is unreachable so a
+    // transient outage doesn't block legit signups.
+    try {
+      const { checkPasswordBreach } = require('../../lib/passwordSafety')
+      const breach = await checkPasswordBreach(requestedPassword)
+      if (breach.breached) {
+        return sendError(
+          res,
+          400,
+          `This password has appeared in ${breach.count.toLocaleString()} data breaches. Please choose a different password.`,
+          'BREACHED_PASSWORD',
+        )
+      }
+    } catch {
+      /* HIBP unreachable — allow signup to proceed */
+    }
     userSuppliedPassword = requestedPassword
   }
 

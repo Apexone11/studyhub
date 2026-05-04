@@ -93,8 +93,25 @@ const DONATION_MAX_CENTS = 100000 // $1,000.00
 // Max message length for donation messages
 const DONATION_MESSAGE_MAX_LENGTH = 500
 
+// Defense in depth (security review 2026-05-03): freeze the plan table so
+// no caller can mutate live limits at runtime, and expose an explicit
+// allowlist for `PLANS[userPlan]` lookups. Bracket access is currently
+// safe because `getUserPlan()` only returns canonical strings, but a
+// future regression would otherwise let an attacker reach prototype keys
+// like `__proto__` or `toString`.
+Object.freeze(PLANS)
+for (const key of Object.keys(PLANS)) Object.freeze(PLANS[key])
+
+const KNOWN_PLANS = new Set(Object.keys(PLANS))
+
+function getPlanConfig(planName) {
+  return KNOWN_PLANS.has(planName) ? PLANS[planName] : PLANS.free
+}
+
 module.exports = {
   PLANS,
+  KNOWN_PLANS,
+  getPlanConfig,
   DONATION_PRICE_ID,
   DONATION_MIN_CENTS,
   DONATION_MAX_CENTS,

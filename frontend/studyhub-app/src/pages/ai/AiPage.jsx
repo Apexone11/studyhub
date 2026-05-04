@@ -425,26 +425,35 @@ function ConversationSidebar({
                     {conv._count?.messages || 0} messages
                   </div>
                 </button>
-                <span style={{ display: 'flex', gap: 4, opacity: conv.id === activeId ? 1 : 0 }}>
-                  <button
-                    type="button"
-                    onClick={() => handleRename(conv)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
-                    aria-label="Rename conversation"
-                    title="Rename"
-                  >
-                    <IconPen size={12} style={{ color: 'var(--sh-muted)' }} />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => onDelete(conv.id)}
-                    style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
-                    aria-label="Delete conversation"
-                    title="Delete"
-                  >
-                    <IconX size={12} style={{ color: 'var(--sh-danger-text)' }} />
-                  </button>
-                </span>
+                {/* Actions are only meaningful for the active conversation.
+                    Hiding via opacity left them keyboard-reachable on
+                    inactive rows — Copilot finding 2026-05-03. Switch to
+                    `visibility: hidden` (also removes from tab order)
+                    and add an explicit tabIndex/aria-hidden pair so the
+                    inactive-row buttons can't be focused, clicked by
+                    keyboard, or read by a screen reader. */}
+                {conv.id === activeId ? (
+                  <span style={{ display: 'flex', gap: 4 }}>
+                    <button
+                      type="button"
+                      onClick={() => handleRename(conv)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                      aria-label="Rename conversation"
+                      title="Rename"
+                    >
+                      <IconPen size={12} style={{ color: 'var(--sh-muted)' }} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onDelete(conv.id)}
+                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
+                      aria-label="Delete conversation"
+                      title="Delete"
+                    >
+                      <IconX size={12} style={{ color: 'var(--sh-danger-text)' }} />
+                    </button>
+                  </span>
+                ) : null}
               </div>
             )}
           </div>

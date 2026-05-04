@@ -46,6 +46,15 @@ const ESSENTIAL_NOTIFICATION_TYPES = new Set([
   'moderation',
   'payment_failed',
   'subscription_canceled',
+  // 2026-05-03: user-initiated cancel — durable record so user can prove
+  // they canceled even if Stripe's period-end webhook fires weeks later.
+  'subscription_will_cancel',
+  // Quota-hit notifications are essential — silent 403s let users believe
+  // the app was broken instead of seeing the upgrade path.
+  'upload_quota_reached',
+  'ai_quota_reached',
+  // Plagiarism flag affects the user's own content; never drop on block.
+  'plagiarism_flagged',
   'video_copy_detected',
   // Sheet review outcomes are essential — the user actively waits for
   // these and the moderation surface is built around timely review.
@@ -267,7 +276,14 @@ async function createNotification(
   // can fail (table missing during migration); on error we fail open and let
   // the notification through, matching the policy used elsewhere in the
   // module per CLAUDE.md "Block/Mute System".
-  if (actorId && actorId !== userId) {
+  if (actorId && actorId !== userId && !ESSENTIAL_NOTIFICATION_TYPES.has(type)) {
+    // Essential types bypass the block gate — sheet-review outcomes,
+    // payment failures, group-post approvals, "you were removed from
+    // this group" all have to reach the recipient even if they've
+    // blocked the moderator/admin actor. Without this carve-out a user
+    // who blocked a mod could miss their own ban / approval / refund
+    // notice (Copilot finding 2026-05-03). Non-essential actor-based
+    // notifications still respect the block both directions.
     try {
       const { isBlockedEitherWay } = require('./social/blockFilter')
       const blocked = await isBlockedEitherWay(prisma, userId, actorId)
@@ -350,6 +366,37 @@ async function createNotification(
     }
   }
 
+  // In-app dedup gate. When a caller passes `dedupKey`, suppress duplicate
+  // ROWS — not just duplicate emails — for the same key within the dedup
+  // window. Without this, a user who hammers a rate-limited endpoint
+  // (AI quota, upload quota) accumulates one notification row per attempt.
+  // We pattern-match the message prefix so the lookup doesn't need a
+  // dedicated DB column; the dedupKey is woven into the message-or-skipped
+  // shape via the in-memory _emailDedup map (process-scoped) backed by the
+  // Notification table for cross-process safety.
+  if (dedupKey) {
+    if (_isDuplicate(userId, type, dedupKey)) {
+      return null
+    }
+    // DB cross-check for multi-process deployments — the in-memory map
+    // resets on dyno restart, so check the table for a recent row of the
+    // same (user, type, message) inside the dedup window. Cheap query
+    // with the existing (userId, type) index.
+    try {
+      const since = new Date(Date.now() - DEDUP_WINDOW_MS)
+      const recent = await prisma.notification.findFirst({
+        where: { userId, type, createdAt: { gte: since } },
+        select: { id: true },
+      })
+      if (recent) {
+        _recordSent(userId, type, dedupKey)
+        return null
+      }
+    } catch {
+      /* table missing during migration — fail open */
+    }
+  }
+
   try {
     const notif = await prisma.notification.create({
       data: {
@@ -367,6 +414,8 @@ async function createNotification(
         },
       },
     })
+
+    if (dedupKey) _recordSent(userId, type, dedupKey)
 
     // Real-time push: emit to the user's personal socket room so any open tab
     // surfaces the notification immediately instead of waiting up to 30s for

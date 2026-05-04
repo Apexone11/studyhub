@@ -102,16 +102,24 @@ router.get('/:id/html-preview', requireAuth, async (req, res) => {
       sanitized: issues.length > 0,
       issues,
       // Interactive Preview availability:
-      //   - Tier 0 (CLEAN) and Tier 1 (FLAGGED) are both publish-and-show
-      //     per the documented HTML risk policy ("Tier 0 publishes, Tier 1
-      //     publishes with warning"). The sandboxed iframe runs scripts in
+      //   - Tier 0 (CLEAN) and Tier 1 (FLAGGED) are publish-and-show per the
+      //     documented HTML risk policy. The sandboxed iframe runs scripts in
       //     `allow-scripts allow-forms` only — never `allow-same-origin` —
       //     so the parent app stays isolated regardless of tier.
-      //   - Tier 2 (HIGH_RISK) and Tier 3 (QUARANTINED) require owner /
-      //     admin to bypass the gate (Tier 2 normally never reaches a
-      //     non-owner anyway because canReadSheet rejects non-published).
+      //   - Tier 2 (HIGH_RISK) PUBLISHED: any authenticated viewer can
+      //     interact. The admin's publish IS the safety review (CLAUDE.md
+      //     HTML Security Policy). Sheets that look risky to the scanner
+      //     but were vetted by an admin must still feel like a real
+      //     interactive sheet — otherwise the safety net becomes the cage.
+      //   - Tier 2 unpublished (draft / pending-review / rejected): owner +
+      //     admin only.
+      //   - Tier 3 (QUARANTINED): always blocked — quarantine wins.
       canInteract:
-        Boolean(req.user) && (tier <= RISK_TIER.FLAGGED || canModerateOrOwnSheet(sheet, req.user)),
+        Boolean(req.user) &&
+        tier < RISK_TIER.QUARANTINED &&
+        (tier <= RISK_TIER.FLAGGED ||
+          sheet.status === 'published' ||
+          canModerateOrOwnSheet(sheet, req.user)),
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
@@ -146,24 +154,31 @@ router.get('/:id/html-runtime', requireAuth, async (req, res) => {
     }
 
     const tier = sheet.htmlRiskTier || 0
+    const isPublished = sheet.status === 'published'
 
-    // Interactive runtime gate (mirrors the canInteract calculation in
-    // /html-preview, keep them in sync). Tier 0 + Tier 1 are publish-and-show
-    // for any authenticated viewer — the sandboxed iframe (`allow-scripts
-    // allow-forms` with no `allow-same-origin` per CLAUDE.md A14) keeps the
-    // parent app isolated regardless of tier. Tier 2 (HIGH_RISK) is owner /
-    // admin only; Tier 3 (QUARANTINED) is blocked everywhere.
-    if (tier >= RISK_TIER.HIGH_RISK && !canModerateOrOwnSheet(sheet, req.user)) {
-      return res.status(403).json({
-        error:
-          'Interactive preview for high-risk sheets is only available to the sheet owner or an admin.',
-      })
-    }
-
+    // Interactive runtime gate. Tier 0 + Tier 1: any authenticated viewer.
+    // Tier 2 (HIGH_RISK): the scanner flagged behaviors but admin still chose
+    //   to publish — that publish IS the safety review (CLAUDE.md HTML
+    //   Security Policy: "Tier 2 goes to admin review"). When a Tier 2 sheet
+    //   is in the PUBLISHED state, treat the admin's approval as authorization
+    //   for any authenticated viewer to interact. Drafts / pending-review /
+    //   rejected Tier 2 sheets stay owner+admin only.
+    // Tier 3 (QUARANTINED): always blocked. Quarantine cannot be overridden by
+    //   publish status — that's the entire point of the tier.
+    // The sandboxed iframe (`allow-scripts allow-forms` with no
+    // `allow-same-origin` per CLAUDE.md A14) keeps the parent app isolated
+    // from any malicious script regardless of tier.
     if (tier >= RISK_TIER.QUARANTINED) {
       return res
         .status(403)
         .json({ error: 'This sheet has been quarantined. Preview is disabled.' })
+    }
+
+    if (tier >= RISK_TIER.HIGH_RISK && !isPublished && !canModerateOrOwnSheet(sheet, req.user)) {
+      return res.status(403).json({
+        error:
+          'Interactive preview for high-risk drafts is only available to the sheet owner or an admin.',
+      })
     }
 
     const runtimeVersion = sheet.updatedAt ? new Date(sheet.updatedAt).toISOString() : '0'

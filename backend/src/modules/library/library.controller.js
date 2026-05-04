@@ -7,8 +7,9 @@
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const { searchBooks, getBookDetail, syncPopularBooksToDB } = require('./library.service')
-const { MAX_SHELVES_PER_USER, MAX_BOOKMARKS_PER_USER_FREE } = require('./library.constants')
+const { MAX_SHELVES_PER_USER } = require('./library.constants')
 const { getUserPlan, isPro } = require('../../lib/getUserPlan')
+const { getPlanConfig } = require('../payments/payments.constants')
 
 const SHELF_VISIBILITY = new Set(['private', 'profile'])
 
@@ -34,7 +35,15 @@ async function searchBooksHandler(req, res) {
 
   try {
     const searchTerm = search || ''
-    const pageNum = Math.max(1, parseInt(page, 10) || 1)
+    // Clamp pageNum to a sane upper bound. Google Books soft-caps deep
+    // pagination around startIndex 200-400 anyway; without a cap, an
+    // attacker can bloat the cap-discovery memo with absurd page numbers
+    // (e.g. ?page=99999999) that never resolve to useful results.
+    // CLAUDE.md A12: Number.parseInt + Number.isInteger.
+    const MAX_PAGE_NUM = 200 // 200 * 20 = 4000 startIndex, well past any real cap
+    const parsedPage = Number.parseInt(page, 10)
+    const pageNum =
+      Number.isInteger(parsedPage) && parsedPage > 0 ? Math.min(parsedPage, MAX_PAGE_NUM) : 1
     const filters = {}
     if (category) filters.category = category
     if (sort) filters.sort = sort
@@ -48,6 +57,10 @@ async function searchBooksHandler(req, res) {
     }
     if (results._source === 'cache') response.source = 'cache'
     if (results._unavailable) response.unavailable = true
+    if (results.endOfResults) {
+      response.endOfResults = true
+      response.lastReachablePage = results.lastReachablePage
+    }
     res.json(response)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -478,7 +491,12 @@ async function createBookmarkHandler(req, res) {
   try {
     /* Check bookmark limit for free users (total across all books) */
     const userPlan = await getUserPlan(req.user.userId)
-    if (!isPro(userPlan)) {
+    // Derive limit from PLANS (Pro is `-1` = unlimited; free has a concrete
+    // ceiling). Single source of truth replaces the local
+    // MAX_BOOKMARKS_PER_USER_FREE constant.
+    const planConfig = getPlanConfig(userPlan)
+    const bookmarkLimit = planConfig.libraryBookmarks
+    if (bookmarkLimit !== -1 && !isPro(userPlan)) {
       try {
         const totalCount = await prisma.bookBookmark.count({
           where: {
@@ -486,9 +504,9 @@ async function createBookmarkHandler(req, res) {
           },
         })
 
-        if (totalCount >= MAX_BOOKMARKS_PER_USER_FREE) {
+        if (totalCount >= bookmarkLimit) {
           return res.status(403).json({
-            error: `Maximum of ${MAX_BOOKMARKS_PER_USER_FREE} bookmarks total allowed on free plan. Upgrade to Pro for unlimited bookmarks.`,
+            error: `Maximum of ${bookmarkLimit} bookmarks total allowed on your plan. Upgrade to Pro for unlimited bookmarks.`,
             code: 'BOOKMARK_LIMIT',
           })
         }

@@ -382,9 +382,13 @@ export function GroupDiscussionsTab({
   isAdminOrMod,
   isMember,
   userId,
+  initialFocusedPostId = null,
 }) {
   const [newPostModalOpen, setNewPostModalOpen] = useState(false)
-  const [expandedPostId, setExpandedPostId] = useState(null)
+  // Lazy-init expandedPostId from the URL deep-link so a notification
+  // click (`?tab=discussions&post=42`) lands the user with that thread
+  // already expanded on first render. Subsequent toggles work normally.
+  const [expandedPostId, setExpandedPostId] = useState(() => initialFocusedPostId)
   const [typeFilter, setTypeFilter] = useState('all')
   // New 2026-05-03 features: client-side search across title/body/author,
   // and pinned-thread sort. Search is debounced via the input itself

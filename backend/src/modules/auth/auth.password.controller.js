@@ -18,7 +18,7 @@ const requireTrustedOrigin = originAllowlist()
 
 const router = express.Router()
 
-router.post('/forgot-password', forgotLimiter, async (req, res) => {
+router.post('/forgot-password', requireTrustedOrigin, forgotLimiter, async (req, res) => {
   const body = req.body || {}
   // Accept either { identifier } (new) or { username } (legacy compat)
   const rawIdentifier =
@@ -64,7 +64,7 @@ router.post('/forgot-password', forgotLimiter, async (req, res) => {
   }
 })
 
-router.post('/reset-password', forgotLimiter, async (req, res) => {
+router.post('/reset-password', requireTrustedOrigin, forgotLimiter, async (req, res) => {
   const body = req.body || {}
   const token = typeof body.token === 'string' ? body.token.trim() : ''
   const newPassword = typeof body.newPassword === 'string' ? body.newPassword : ''

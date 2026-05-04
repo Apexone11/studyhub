@@ -18,6 +18,7 @@ const express = require('express')
 const optionalAuth = require('../../core/auth/optionalAuth')
 const { captureError } = require('../../monitoring/sentry')
 const log = require('../../lib/logger')
+const { createNotification } = require('../../lib/notify')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const {
   paymentCheckoutLimiter,
@@ -34,7 +35,7 @@ const {
 } = require('./payments.constants')
 const service = require('./payments.service')
 const prisma = require('../../lib/prisma')
-const { getUserPlan, isPro } = require('../../lib/getUserPlan')
+const { getUserPlan } = require('../../lib/getUserPlan')
 const requireAuth = require('../../middleware/auth')
 const originAllowlist = require('../../middleware/originAllowlist')
 
@@ -729,7 +730,6 @@ router.get('/usage', requireAuth, paymentReadLimiter, async (req, res) => {
   try {
     const plan = await getUserPlan(req.user.userId)
     const planDef = PLANS[plan] || PLANS.free
-    const pro = isPro(plan)
 
     // Count sheets this month
     const startOfMonth = new Date()
@@ -749,10 +749,10 @@ router.get('/usage', requireAuth, paymentReadLimiter, async (req, res) => {
       plan,
       usage: {
         uploadsThisMonth: sheetsThisMonth,
-        uploadsLimit: pro ? -1 : planDef.uploadsPerMonth,
+        uploadsLimit: planDef.uploadsPerMonth,
         privateGroups,
-        privateGroupsLimit: pro ? 10 : 2,
-        aiMessagesPerDay: pro ? 120 : planDef.aiMessagesPerDay || 30,
+        privateGroupsLimit: planDef.privateGroups,
+        aiMessagesPerDay: planDef.aiMessagesPerDay,
         storageMb: planDef.storageMb,
       },
     })
@@ -793,12 +793,29 @@ router.post('/subscription/cancel', paymentPortalLimiter, requireAuth, async (re
       },
     })
 
-    log.info({ userId: req.user.userId }, 'Subscription set to cancel at period end')
+    log.info(
+      { event: 'payments.cancel_queued', userId: req.user.userId },
+      'Subscription set to cancel at period end',
+    )
+
+    // Persist a notification immediately so the user has a durable record of
+    // their cancel action even if they navigate away before the toast lands.
+    // Stripe only fires `customer.subscription.deleted` at period end (could
+    // be 30 days later), so without this the user has no inbox proof for that
+    // entire window — refund disputes follow.
+    const periodEnd = new Date(updated.current_period_end * 1000)
+    createNotification(prisma, {
+      userId: req.user.userId,
+      type: 'subscription_will_cancel',
+      message: `Your Pro subscription will end on ${periodEnd.toLocaleDateString()}. You can reactivate any time before then.`,
+      linkPath: '/settings?tab=subscription',
+      priority: 'high',
+    }).catch(() => {})
 
     res.json({
       message: 'Subscription will be canceled at the end of your billing period.',
       cancelAtPeriodEnd: true,
-      currentPeriodEnd: new Date(updated.current_period_end * 1000),
+      currentPeriodEnd: periodEnd,
     })
   } catch (err) {
     captureError(err, { context: 'payments.cancel' })
