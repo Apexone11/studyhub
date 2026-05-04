@@ -34,34 +34,39 @@ function getClient() {
 
 // ── Rate-limit helpers ─────────────────────────────────────────────
 
+// Single source of truth for plan + active subscription. Encapsulates the
+// `currentPeriodEnd` expiry check (gift subscriptions) and the
+// `past_due → free` cutoff (no more 3-week free Pro after card decline).
+const { getUserPlan, isPro } = require('../../lib/getUserPlan')
+
 /**
  * Get the daily message limit for a user.
  */
 async function getDailyLimit(user) {
   if (user.role === 'admin') return DAILY_LIMITS.admin
 
-  // Check subscription plan
+  const userId = user.id || user.userId
+  // Route through getUserPlan so the same expiry + past_due rules the rest
+  // of the app uses also apply to AI quota (Copilot review #1, 2026-05-03).
+  // Previously this had its own ['active','trialing','past_due'] copy and
+  // skipped currentPeriodEnd, so a Pro user whose card had declined kept
+  // 120/day for the entire 3-week Stripe retry chain.
   try {
-    const sub = await prisma.subscription.findUnique({
-      where: { userId: user.id || user.userId },
-      select: { plan: true, status: true },
-    })
-    if (sub && ['active', 'trialing', 'past_due'].includes(sub.status) && sub.plan !== 'free') {
-      return DAILY_LIMITS.pro
-    }
+    const plan = await getUserPlan(userId)
+    if (isPro(plan)) return DAILY_LIMITS.pro
   } catch {
-    // Subscription table may not exist yet — graceful degradation
+    /* graceful degradation */
   }
 
-  // Check donor status (donors get elevated limits)
+  // Donor status (donors get elevated limits even without an active sub)
   try {
     const donation = await prisma.donation.findFirst({
-      where: { userId: user.id || user.userId, status: 'completed' },
+      where: { userId, status: 'completed' },
       select: { id: true },
     })
     if (donation) return DAILY_LIMITS.donor
   } catch {
-    // Graceful degradation
+    /* graceful degradation */
   }
 
   if (user.isStaffVerified || user.emailVerified) return DAILY_LIMITS.verified
@@ -107,20 +112,18 @@ async function incrementUsage(userId, tokens = 0) {
  */
 async function getWeeklyLimit(user) {
   if (user.role === 'admin') return WEEKLY_LIMITS.admin
+  const userId = user.id || user.userId
+  // Same getUserPlan routing as getDailyLimit — past_due no longer grants
+  // Pro, and gift subs respect currentPeriodEnd (Copilot review #1).
   try {
-    const sub = await prisma.subscription.findUnique({
-      where: { userId: user.id || user.userId },
-      select: { plan: true, status: true },
-    })
-    if (sub && ['active', 'trialing', 'past_due'].includes(sub.status) && sub.plan !== 'free') {
-      return WEEKLY_LIMITS.pro
-    }
+    const plan = await getUserPlan(userId)
+    if (isPro(plan)) return WEEKLY_LIMITS.pro
   } catch {
     /* graceful degradation */
   }
   try {
     const donation = await prisma.donation.findFirst({
-      where: { userId: user.id || user.userId, status: 'completed' },
+      where: { userId, status: 'completed' },
       select: { id: true },
     })
     if (donation) return WEEKLY_LIMITS.donor

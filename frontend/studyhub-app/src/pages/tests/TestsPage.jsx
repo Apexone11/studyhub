@@ -2,7 +2,7 @@
  * TestsPage.jsx — Practice tests landing with teaser cards
  *
  * Layout: PageShell (sidebar + main) with 2-column card grid on desktop,
- * single column on phone. Each card shows a "Version 2" badge indicating
+ * single column on phone. Each card shows a "Version 3" badge indicating
  * AI-generated tests are planned.
  *
  * Tab bar: All Tests | My Attempts | Leaderboard (UI only, not yet wired).
@@ -44,7 +44,7 @@ export default function TestsPage() {
           </span>
         </div>
         <p style={{ fontSize: 13, color: 'var(--sh-muted)', marginBottom: 14 }}>
-          Course-linked tests with instant scoring are planned for Version 2. The cards below are a
+          Course-linked tests with instant scoring are planned for Version 3. The cards below are a
           preview of the layout — they aren't live yet. Until then, use Hub AI to generate practice
           questions from any of your study sheets.
         </p>
@@ -106,7 +106,7 @@ export default function TestsPage() {
         />
       </div>
 
-      {/* Version 2 promo banner */}
+      {/* Version 3 promo banner */}
       <div
         style={{
           background: 'linear-gradient(135deg,#0f172a,#1e3a5f)',
@@ -117,7 +117,7 @@ export default function TestsPage() {
         }}
       >
         <div style={{ fontSize: 16, fontWeight: 700, color: '#fff', marginBottom: 8 }}>
-          AI-Generated Tests in Version 2
+          AI-Generated Tests in Version 3
         </div>
         <div
           style={{

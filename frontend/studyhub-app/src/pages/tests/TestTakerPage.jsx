@@ -35,7 +35,7 @@ export default function TestTakerPage() {
               marginBottom: 8,
             }}
           >
-            Test interface planned for Version 2
+            Test interface planned for Version 3
           </div>
           <div
             style={{
