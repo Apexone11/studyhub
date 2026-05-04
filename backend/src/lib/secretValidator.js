@@ -122,7 +122,7 @@ const OPTIONAL = [
   {
     key: 'CROSSREF_USER_AGENT',
     description:
-      'Override CrossRef polite User-Agent (default StudyHub/2.2 mailto:abdulrfornah@gmail.com).',
+      'Override CrossRef polite User-Agent (default StudyHub/2.2 mailto:support@getstudyhub.org).',
   },
   {
     key: 'R2_BUCKET_SCHOLAR_PAPERS',

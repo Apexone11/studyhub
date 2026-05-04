@@ -28,6 +28,12 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Copilot review follow-up — Scholar oa: namespace, AI upload StrictMode safety, CrossRef UA docs (2026-05-04)
+
+- **Frontend `PAPER_ID_REGEX` now mirrors backend `CANONICAL_ID_RE`.** Adds the `oa:W\d{4,12}` branch in `pages/scholar/scholarConstants.js` so OpenAlex-only paper deep links (`?paperId=oa:W…`) pass `isValidPaperId()` instead of being rejected client-side.
+- **`useAiAttachments.addFiles` no longer kicks off XHR uploads inside the `setAttachments` updater.** React 19 StrictMode invokes state updaters twice in dev, which would have fired duplicate uploads per file. Side effects moved out of the updater; the seed array captured in the closure is iterated after the state commit.
+- **CrossRef polite User-Agent docs corrected.** `secretValidator.js` description and `backend/.env.example` comment now show the actual default (`StudyHub/2.2 (mailto:support@getstudyhub.org)`), matching `DEFAULT_UA` in the CrossRef adapter.
+
 ### Hub AI v2 backend — Week 1 (2026-05-04)
 
 - **Hub AI document upload module shipped.** Adds `POST/GET/DELETE/POST-pin /api/ai/attachments` with multer + magic-byte stage-1 (file-type 19.x ESM) + structural stage-2 (PDF/DOCX/text) + PDF embedded-JS reject + per-plan (free 5MB/40p, verified 15MB/60p, pro 30MB/100p, admin uncapped) caps + atomic storage-quota race defense + Stripe-style `Idempotency-Key` (24h TTL) + opaque-key R2 upload to a NEW `R2_BUCKET_AI_ATTACHMENTS` private bucket + DOCX text via mammoth ≥ 1.11.0 (CVE-2025-11849 patched) wrapped in a 2-concurrency semaphore + 30s wallclock watchdog + NFKC normalize + invisible-Unicode strip + prompt-injection phrase scrubber + audit log with `hashFilename(name)` (never raw fileName per A8). New rate limiters `aiAttachmentUpload/Delete/Pin/ReadLimiter` keyed on `req.user?.userId`.

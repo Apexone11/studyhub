@@ -106,6 +106,7 @@ export function useAiAttachments() {
     const arr = Array.from(files || [])
     if (arr.length === 0) return
 
+    let seedsToUpload = []
     setAttachments((prev) => {
       const remaining = MAX_FILES - prev.length
       const toProcess = arr.slice(0, remaining).filter((f) => f.size <= MAX_BYTES_CLIENT)
@@ -119,40 +120,43 @@ export function useAiAttachments() {
         status: 'uploading',
         progress: 0,
       }))
-
-      // Kick off uploads outside of the state setter.
-      for (const seed of seeds) {
-        uploadOne(seed.file, (pct) => {
-          setAttachments((current) =>
-            current.map((a) => (a.localId === seed.localId ? { ...a, progress: pct } : a)),
-          )
-        })
-          .then((row) => {
-            setAttachments((current) =>
-              current.map((a) =>
-                a.localId === seed.localId
-                  ? {
-                      ...a,
-                      status: 'done',
-                      progress: 100,
-                      attachmentId: row.id ?? row.attachmentId,
-                      pageCount: row.pageCount,
-                    }
-                  : a,
-              ),
-            )
-          })
-          .catch((err) => {
-            setAttachments((current) =>
-              current.map((a) =>
-                a.localId === seed.localId ? { ...a, status: 'error', error: err.message } : a,
-              ),
-            )
-          })
-      }
-
+      seedsToUpload = seeds
       return [...prev, ...seeds]
     })
+
+    // React 19 StrictMode invokes state updaters twice in dev, so any side
+    // effect inside the updater would fire two XHRs per file. Kick off uploads
+    // here, after the updater has committed, using the seeds that ended up in
+    // state.
+    for (const seed of seedsToUpload) {
+      uploadOne(seed.file, (pct) => {
+        setAttachments((current) =>
+          current.map((a) => (a.localId === seed.localId ? { ...a, progress: pct } : a)),
+        )
+      })
+        .then((row) => {
+          setAttachments((current) =>
+            current.map((a) =>
+              a.localId === seed.localId
+                ? {
+                    ...a,
+                    status: 'done',
+                    progress: 100,
+                    attachmentId: row.id ?? row.attachmentId,
+                    pageCount: row.pageCount,
+                  }
+                : a,
+            ),
+          )
+        })
+        .catch((err) => {
+          setAttachments((current) =>
+            current.map((a) =>
+              a.localId === seed.localId ? { ...a, status: 'error', error: err.message } : a,
+            ),
+          )
+        })
+    }
   }, [])
 
   const removeAttachment = useCallback((localId) => {

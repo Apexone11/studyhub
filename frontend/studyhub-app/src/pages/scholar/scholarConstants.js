@@ -7,7 +7,7 @@
 // an explicit printable-ASCII allowlist (no `[^\s]`) to defend against
 // null-byte injection per Week 4's hardened regex.
 export const PAPER_ID_REGEX =
-  /^(doi:10\.\d{4,9}\/[A-Za-z0-9._\-/:;()<>+]{1,200}|arxiv:\d{4}\.\d{4,5}(v\d+)?|ss:[a-f0-9]{32,64})$/i
+  /^(doi:10\.\d{4,9}\/[A-Za-z0-9._\-/:;()<>+]{1,200}|arxiv:\d{4}\.\d{4,5}(v\d+)?|ss:[a-f0-9]{32,64}|oa:W\d{4,12})$/i
 
 export const TRY_CHIPS = [
   'transformer attention',
