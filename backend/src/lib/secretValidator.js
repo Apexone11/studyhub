@@ -20,8 +20,11 @@ const RECOMMENDED = [
   { key: 'SENTRY_DSN', description: 'Error monitoring' },
   { key: 'FRONTEND_URL', description: 'Frontend origin for CORS + redirects' },
   {
-    key: 'TENOR_API_KEY',
-    description: 'Tenor GIF search proxy (server-side); GIFs disabled when missing',
+    key: 'GIPHY_API_KEY',
+    description:
+      'GIPHY GIF search proxy (server-side); GIFs disabled when missing. ' +
+      'Reads TENOR_API_KEY as a legacy fallback for the rename window — ' +
+      'Tenor was sunset 2026-06-30, new deployments must use GIPHY_API_KEY.',
   },
 ]
 
