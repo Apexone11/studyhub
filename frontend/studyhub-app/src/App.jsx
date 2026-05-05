@@ -61,11 +61,6 @@ const AiPage = lazy(() => import('./pages/ai/AiPage'))
 const LibraryPage = lazy(() => import('./pages/library/LibraryPage'))
 const BookDetailPage = lazy(() => import('./pages/library/BookDetailPage'))
 const BookReaderPage = lazy(() => import('./pages/library/BookReaderPage'))
-const ScholarPage = lazy(() => import('./pages/scholar/ScholarPage'))
-const ScholarSearchPage = lazy(() => import('./pages/scholar/ScholarSearchPage'))
-const ScholarPaperPage = lazy(() => import('./pages/scholar/ScholarPaperPage'))
-const ScholarSavedPage = lazy(() => import('./pages/scholar/ScholarSavedPage'))
-const ScholarTopicPage = lazy(() => import('./pages/scholar/ScholarTopicPage'))
 const PlaygroundPage = lazy(() => import('./pages/playground/PlaygroundPage'))
 const ReviewPage = lazy(() => import('./pages/review/ReviewPage'))
 const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'))
@@ -165,9 +160,6 @@ const ROUTE_TITLES = {
   '/invite': 'Invite Classmates',
   '/pricing': 'Pricing',
   '/library': 'Library',
-  '/scholar': 'Scholar',
-  '/scholar/search': 'Scholar search',
-  '/scholar/saved': 'Saved papers',
   '/playground': 'Code Playground',
   '/review': 'Leave a Review',
   '/onboarding': 'Onboarding',
@@ -629,55 +621,6 @@ function AppRoutes() {
                     element={
                       <PrivateRoute>
                         <BookDetailPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  {/* Scholar v1 + v1.5 (master plan §18, Week 4-5) */}
-                  <Route
-                    path="/scholar"
-                    element={
-                      <PrivateRoute>
-                        <ScholarPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/scholar/search"
-                    element={
-                      <PrivateRoute>
-                        <ScholarSearchPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/scholar/saved"
-                    element={
-                      <PrivateRoute>
-                        <ScholarSavedPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/scholar/shelf/:id"
-                    element={
-                      <PrivateRoute>
-                        <ScholarSavedPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/scholar/topic/:slug"
-                    element={
-                      <PrivateRoute>
-                        <ScholarTopicPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/scholar/paper/:id"
-                    element={
-                      <PrivateRoute>
-                        <ScholarPaperPage />
                       </PrivateRoute>
                     }
                   />

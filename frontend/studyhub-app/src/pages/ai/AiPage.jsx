@@ -171,64 +171,27 @@ export default function AiPage() {
     setChatAreaKey((k) => k + 1)
   }, [promptParam])
 
-  // ── Scholar deep-link: ?paperId=<canonical-id> ──────────────────────
-  // When the user clicks "Ask AI about this paper" on a Scholar reader,
-  // the URL arrives as /ai?paperId=doi:10.1234/foo (or arxiv:.../ss:...).
-  // We validate the regex BEFORE fetching (Loop-3 LOW-5), then call
-  // /api/scholar/paper/:id to attach metadata as a virtual chip in the
-  // composer + seed a starter prompt. The actual AI request is the
-  // user's choice — this just primes the surface.
+  // ── Scholar deep-link support is disabled in production.
+  // If a stale /ai?paperId=... link arrives, we drop the parameter and
+  // do not call the removed /api/scholar backend surface.
   const paperIdParam = searchParams.get('paperId') || ''
   const [paperContext, setPaperContext] = useState(null)
   const [paperContextError, setPaperContextError] = useState(null)
-  // Mirror the backend's CANONICAL_ID_RE: doi: | arxiv: | ss: prefixes
-  // with explicit DOI suffix allowlist. Validate before fetching.
-  const PAPER_ID_REGEX =
-    /^(doi:10\.\d{4,9}\/[A-Za-z0-9._\-/:;()<>+]{1,200}|arxiv:\d{4}\.\d{4,5}(v\d+)?|ss:[a-f0-9]{32,64})$/i
   useEffect(() => {
     if (!paperIdParam) return
-    if (!PAPER_ID_REGEX.test(paperIdParam) || paperIdParam.length > 256) {
-      // Strip the bad param so a refresh doesn't loop the error. State
-      // mutations are deferred to a microtask so the rule about
-      // setState-in-effect isn't tripped on this validation branch.
-      queueMicrotask(() => {
-        setPaperContextError('Invalid paper id')
-        setSearchParams(
-          (prev) => {
-            const next = new URLSearchParams(prev)
-            next.delete('paperId')
-            return next
-          },
-          { replace: true },
-        )
-      })
-      return
-    }
-    let aborted = false
-    fetch(`${API_BASE}/api/scholar/paper/${encodeURIComponent(paperIdParam)}`, {
-      credentials: 'include',
+    queueMicrotask(() => {
+      setPaperContext(null)
+      setPaperContextError(null)
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.delete('paperId')
+          return next
+        },
+        { replace: true },
+      )
     })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Could not load paper (${res.status})`)
-        return res.json()
-      })
-      .then((json) => {
-        if (aborted) return
-        if (json.paper) {
-          setPaperContext(json.paper)
-          setPaperContextError(null)
-        }
-      })
-      .catch(() => {
-        if (aborted) return
-        setPaperContextError('Could not load paper context')
-      })
-    return () => {
-      aborted = true
-    }
-    // PAPER_ID_REGEX is a const; setSearchParams is stable.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [paperIdParam])
+  }, [paperIdParam, setSearchParams])
 
   // All hooks MUST run before any early return (rules-of-hooks).
   const [density, setDensity] = useState(() => loadDensity())

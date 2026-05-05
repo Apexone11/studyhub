@@ -30,6 +30,7 @@ internal log into this file when they describe user-visible behavior.
 
 ### Bot-review verification + Scholar sidebar parity (2026-05-04 night)
 
+- **Scholar runtime surfaces have been disabled in production.** Scholar backend routes and UI entry points have been removed so the feature no longer exposes `/api/scholar` or `/scholar` navigation paths in the live app.
 - **Scholar pages now render the AppSidebar.** New `ScholarShell` wrapper applies the standard navbar + 2-col grid + sticky AppSidebar pattern across `/scholar`, `/scholar/search`, `/scholar/saved`, `/scholar/topic/:slug`, `/scholar/paper/:id` so navigating into Scholar no longer drops the left-rail menu that every other authenticated page shows.
 - **ScholarPaperPage cache reset on paper change.** `pdfState`, `refsState`, and `citedByState` now reset when `validId` changes — previously the `ready/loading` and `items !== null` guards prevented refetching when the user navigated from paper A to paper B in the same component instance, leaving paper A's PDF link, references, and cited-by list visible under paper B.
 - **Feed ranked-mode pagination cap raised.** Candidate window now scales with offset (`Math.min(500, max(200, offset+limit+32))`) instead of a hardcoded 200, so deep infinite-scroll past page 10 (offset ≥ 200) actually returns rows. Recent-mode behavior unchanged.
