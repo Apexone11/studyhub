@@ -8,10 +8,10 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import Navbar from '../../components/navbar/Navbar'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
+import ScholarShell from './ScholarShell'
 import './ScholarPage.css'
 
 export default function ScholarSavedPage() {
@@ -28,6 +28,7 @@ export default function ScholarSavedPage() {
   const [error, setError] = useState(null)
   const [view, setView] = useState('list')
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const fetchShelves = useCallback(async () => {
     setLoading(true)
     setError(null)
@@ -50,6 +51,7 @@ export default function ScholarSavedPage() {
   }, [])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchShelves()
   }, [fetchShelves])
 
@@ -58,6 +60,7 @@ export default function ScholarSavedPage() {
   useEffect(() => {
     if (shelfIdParam) {
       const parsed = Number.parseInt(shelfIdParam, 10)
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (Number.isInteger(parsed) && parsed > 0) setActiveShelfId(parsed)
     }
   }, [shelfIdParam])
@@ -73,9 +76,8 @@ export default function ScholarSavedPage() {
     : allPaperRows
 
   return (
-    <div className="scholar-page">
-      <Navbar />
-      <main className="scholar-shell" style={{ paddingTop: 32 }}>
+    <ScholarShell mainId="scholar-saved-main">
+      <div className="scholar-shell" style={{ paddingTop: 0 }}>
         <header
           style={{
             display: 'flex',
@@ -224,7 +226,7 @@ export default function ScholarSavedPage() {
         >
           ← Back to Scholar
         </Link>
-      </main>
-    </div>
+      </div>
+    </ScholarShell>
   )
 }

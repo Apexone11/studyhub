@@ -16,12 +16,12 @@
  */
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
-import Navbar from '../../components/navbar/Navbar'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { API } from '../../config'
 import PaperCard from './paperCard/PaperCard'
 import { TRY_CHIPS, POPULAR_TOPICS, formatCount } from './scholarConstants'
 import ScholarFiltersDrawer from './ScholarFiltersDrawer'
+import ScholarShell from './ScholarShell'
 import './ScholarPage.css'
 
 // Stats cache: 1h TTL, surfaces instantly on remount instead of letting
@@ -129,12 +129,7 @@ export default function ScholarPage() {
   )
 
   return (
-    <div className="scholar-page">
-      <Navbar />
-      <a href="#scholar-main" className="scholar-skip-link">
-        Skip to main content
-      </a>
-
+    <ScholarShell mainId="scholar-main">
       <section className="scholar-hero" aria-labelledby="scholar-hero-title">
         <div className="scholar-hero__pill">Scholar · powered by Hub AI</div>
         <h1 id="scholar-hero-title" className="scholar-hero__title">
@@ -236,7 +231,7 @@ export default function ScholarPage() {
         </div>
       </section>
 
-      <main id="scholar-main" className="scholar-shell">
+      <div className="scholar-shell">
         {/* Featured this week */}
         <section className="scholar-section">
           <div className="scholar-section__head">
@@ -327,7 +322,7 @@ export default function ScholarPage() {
             ))}
           </div>
         </section>
-      </main>
-    </div>
+      </div>
+    </ScholarShell>
   )
 }

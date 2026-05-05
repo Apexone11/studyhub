@@ -1269,10 +1269,12 @@ function PaperContextBanner({ paperContext, paperContextError, onDismiss }) {
  * Delete Confirm Modal
  * ═══════════════════════════════════════════════════════════════════════════ */
 function DeleteConfirmModal({ title, onCancel, onConfirm }) {
-  // Close on Esc and trap focus on the destructive primary button so
-  // a keyboard user lands on Cancel-equivalent behavior by default
-  // (autoFocus on Delete would let an accidental Enter wipe data).
+  // Land initial focus on Cancel rather than Delete so an accidental Enter
+  // doesn't wipe data. Esc closes; backdrop click closes. (Full focus trap
+  // is tracked separately in docs/internal/audits/2026-04-30-deferred-plans.md.)
+  const cancelRef = useRef(null)
   useEffect(() => {
+    cancelRef.current?.focus()
     const onKey = (e) => {
       if (e.key === 'Escape') onCancel()
     }
@@ -1337,6 +1339,7 @@ function DeleteConfirmModal({ title, onCancel, onConfirm }) {
         </p>
         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
           <button
+            ref={cancelRef}
             type="button"
             onClick={onCancel}
             style={{

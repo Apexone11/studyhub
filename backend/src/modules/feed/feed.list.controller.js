@@ -84,13 +84,20 @@ router.get('/', async (req, res) => {
   const startedAt = Date.now()
   const limit = parsePositiveInt(req.query.limit, 20)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
-  // For `sort=ranked` we pull a wider candidate window (200 items) so the
-  // JS scorer has enough material to outrank a pure recency feed without
-  // pushing the SQL planner into per-table heavy plans. For `sort=recent`
-  // we keep the legacy behaviour: just enough rows to satisfy the page.
+  // For `sort=ranked` we pull a wider candidate window so the JS scorer
+  // has enough material to outrank a pure recency feed. The window must
+  // also scale with offset, otherwise infinite-scroll past the first ~10
+  // pages slices into an empty tail and breaks pagination silently.
+  // Capped at RANKED_MAX_CANDIDATES so a deep-page request can't issue
+  // unbounded per-section queries.
   const rawSort = typeof req.query.sort === 'string' ? req.query.sort : 'ranked'
   const sortMode = ALLOWED_SORT_MODES.has(rawSort) ? rawSort : 'ranked'
-  const candidateWindow = sortMode === 'ranked' ? 200 : limit + offset + 8
+  const RANKED_BASE_CANDIDATES = 200
+  const RANKED_MAX_CANDIDATES = 500
+  const candidateWindow =
+    sortMode === 'ranked'
+      ? Math.min(RANKED_MAX_CANDIDATES, Math.max(RANKED_BASE_CANDIDATES, offset + limit + 32))
+      : limit + offset + 8
   const take = candidateWindow
   const announcementTake = Math.min(6, Math.max(2, Math.ceil((limit + offset) / 3)))
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : ''

@@ -285,9 +285,11 @@ function _yearKey(p) {
 
 // ── Search fan-out ──────────────────────────────────────────────────────
 
-// All five known search-result-emitting adapters keyed by slug. Unpaywall
-// is enrichment-only and is intentionally not in this map (picking it
-// alone yields zero results — see scholar.constants.js note).
+// Search-result-emitting adapters keyed by slug. Unpaywall is enrichment-only
+// and is intentionally not in this map (its search() is a no-op). Any slug
+// not in this map is silently dropped from the fan-out — the frontend's
+// SCHOLAR_SOURCES list mirrors these four so users can't pick a slug that
+// resolves to zero results.
 const SEARCH_ADAPTERS_BY_SLUG = {
   semanticScholar,
   openAlex,
