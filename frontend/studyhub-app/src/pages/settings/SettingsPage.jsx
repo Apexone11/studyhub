@@ -65,7 +65,7 @@ const NAV_TABS = [
 export default function SettingsPage() {
   usePageTitle('Settings')
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user: sessionUser, setSessionUser, signOut, clearSession } = useSession()
 
   // Auto-switch to subscription tab if payment=success is in URL
@@ -77,10 +77,23 @@ export default function SettingsPage() {
   const tutorial = useTutorial('settings', SETTINGS_STEPS, { version: TUTORIAL_VERSIONS.settings })
   const tabContentRef = useRef(null)
 
-  /* Animate tab content on switch */
+  /* Animate tab content on switch + keep ?tab= in sync so reload / back-button
+     restore the same Settings tab. The earlier behavior only READ the param on
+     initial mount; switching tabs in-session lost the deep link. */
   useEffect(() => {
     if (tabContentRef.current) fadeInUp(tabContentRef.current, { duration: 350, y: 10 })
-  }, [tab])
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev)
+        if (tab && tab !== 'profile') next.set('tab', tab)
+        else next.delete('tab')
+        // Preserve payment=success while it's relevant; the settings page strips
+        // it implicitly on next interaction by leaving it untouched here.
+        return next
+      },
+      { replace: true },
+    )
+  }, [tab, setSearchParams])
   const [user, setUser] = useState(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState('')

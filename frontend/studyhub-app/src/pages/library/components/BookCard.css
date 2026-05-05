@@ -16,6 +16,20 @@
   transform: translateY(-4px);
 }
 
+.book-card:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+  border-color: var(--sh-brand);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .book-card,
+  .book-card:hover {
+    transition: none;
+    transform: none;
+  }
+}
+
 .book-card__image-container {
   position: relative;
   width: 100%;

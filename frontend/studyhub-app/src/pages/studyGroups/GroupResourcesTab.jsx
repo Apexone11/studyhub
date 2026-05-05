@@ -28,8 +28,24 @@ export function GroupResourcesTab({
 }) {
   const [addModalOpen, setAddModalOpen] = useState(false)
   const [detailResource, setDetailResource] = useState(null)
+  // Phase polish 2026-05-04: surface a search input once a group's
+  // resource list grows past 20 entries — scrolling becomes the primary
+  // UX cost beyond that. The filter is purely client-side over the
+  // already-loaded `resources` array (title + description + author).
+  const [searchQuery, setSearchQuery] = useState('')
+  const showSearch = (resources?.length || 0) > 20
 
   const handleAddClick = () => setAddModalOpen(true)
+
+  const q = searchQuery.trim().toLowerCase()
+  const filteredResources = q
+    ? (resources || []).filter((r) => {
+        const title = (r.title || '').toLowerCase()
+        const desc = (r.description || '').toLowerCase()
+        const author = (r.user?.username || r.addedBy || '').toLowerCase()
+        return title.includes(q) || desc.includes(q) || author.includes(q)
+      })
+    : resources || []
 
   if (!resources || resources.length === 0) {
     return (
@@ -72,8 +88,35 @@ export function GroupResourcesTab({
         </div>
       )}
 
+      {showSearch ? (
+        <div style={{ marginBottom: 'var(--space-4)' }}>
+          <input
+            type="search"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search resources by title, description, or author…"
+            aria-label="Search group resources"
+            style={{
+              width: '100%',
+              padding: '10px 14px',
+              borderRadius: 10,
+              border: '1px solid var(--sh-input-border)',
+              background: 'var(--sh-input-bg, var(--sh-surface))',
+              color: 'var(--sh-text)',
+              fontSize: 13,
+              fontFamily: 'inherit',
+            }}
+          />
+          {q && filteredResources.length === 0 ? (
+            <p style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 6 }}>
+              No resources match &ldquo;{searchQuery}&rdquo;.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       <div style={styles.section}>
-        {resources.map((resource) => (
+        {filteredResources.map((resource) => (
           <ResourceRow
             key={resource.id}
             resource={resource}

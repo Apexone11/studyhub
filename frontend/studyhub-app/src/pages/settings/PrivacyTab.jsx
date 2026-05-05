@@ -6,6 +6,7 @@ import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { showToast } from '../../lib/toast'
 import UserAvatar from '../../components/UserAvatar'
+import { Skeleton } from '../../components/Skeleton'
 
 function authHeaders() {
   return { 'Content-Type': 'application/json' }
@@ -67,7 +68,7 @@ function PrivateAccountToggle() {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    setIsPrivate(user?.isPrivate || false)
+    queueMicrotask(() => setIsPrivate(user?.isPrivate || false))
   }, [user?.isPrivate])
 
   async function handleToggle() {
@@ -156,7 +157,7 @@ function UserListSection({ title, subtitle, endpoint, emptyText, actionLabel, ac
   }, [endpoint])
 
   useEffect(() => {
-    load()
+    queueMicrotask(load)
   }, [load])
 
   async function handleRemove(user) {
@@ -187,7 +188,10 @@ function UserListSection({ title, subtitle, endpoint, emptyText, actionLabel, ac
   return (
     <SectionCard title={title} subtitle={subtitle}>
       {loading ? (
-        <div style={{ fontSize: 13, color: 'var(--sh-muted)', padding: '8px 0' }}>Loading...</div>
+        <div style={{ display: 'grid', gap: 8, padding: '4px 0' }}>
+          <Skeleton width="100%" height={48} borderRadius={10} />
+          <Skeleton width="100%" height={48} borderRadius={10} />
+        </div>
       ) : users.length === 0 ? (
         <div style={{ fontSize: 13, color: 'var(--sh-muted)', padding: '8px 0' }}>{emptyText}</div>
       ) : (
@@ -222,6 +226,7 @@ function UserListSection({ title, subtitle, endpoint, emptyText, actionLabel, ac
               <button
                 onClick={() => handleRemove(user)}
                 disabled={busyId === user.id}
+                aria-label={`${actionLabel} ${user.username}`}
                 style={{
                   padding: '6px 14px',
                   borderRadius: 8,
@@ -249,8 +254,12 @@ export default function PrivacyTab() {
 
   if (loading) {
     return (
-      <SectionCard title="Privacy">
-        <div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div>
+      <SectionCard title="Privacy" subtitle="Loading your privacy preferences…">
+        <div style={{ display: 'grid', gap: 10 }}>
+          <Skeleton width="100%" height={48} borderRadius={10} />
+          <Skeleton width="100%" height={64} borderRadius={10} />
+          <Skeleton width="60%" height={32} borderRadius={10} />
+        </div>
       </SectionCard>
     )
   }

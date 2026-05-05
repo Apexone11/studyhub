@@ -15,6 +15,30 @@ function authHeaders() {
   return { 'Content-Type': 'application/json' }
 }
 
+/* WCAG 2.1 SC 2.3.3 — respect the OS / in-app reduced-motion preference for
+   non-essential transitions. The chevron rotation is decorative; turn it
+   off when the user has asked for reduced motion. */
+function prefersReducedMotion() {
+  try {
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return true
+    }
+    if (
+      typeof document !== 'undefined' &&
+      document.documentElement?.dataset?.reducedMotion === 'on'
+    ) {
+      return true
+    }
+  } catch {
+    /* SSR / no-DOM */
+  }
+  return false
+}
+
 export default function FollowRequestsList() {
   const [requests, setRequests] = useState([])
   const [count, setCount] = useState(0)
@@ -44,7 +68,7 @@ export default function FollowRequestsList() {
   }, [])
 
   useEffect(() => {
-    loadRequests()
+    queueMicrotask(loadRequests)
   }, [loadRequests])
 
   async function handleAccept(username) {
@@ -108,9 +132,14 @@ export default function FollowRequestsList() {
         overflow: 'hidden',
       }}
     >
-      {/* Header bar — always visible, acts as toggle */}
+      {/* Header bar — always visible, acts as toggle. aria-expanded so AT
+          users hear the disclosure state; aria-controls points the toggle at
+          the panel it owns so screen readers can navigate to it directly. */}
       <button
         onClick={() => setExpanded((v) => !v)}
+        aria-expanded={expanded}
+        aria-controls="follow-requests-panel"
+        aria-label={`Follow requests: ${count} pending. ${expanded ? 'Collapse' : 'Expand'}`}
         style={{
           display: 'flex',
           alignItems: 'center',
@@ -171,8 +200,9 @@ export default function FollowRequestsList() {
             strokeWidth="2"
             strokeLinecap="round"
             strokeLinejoin="round"
+            aria-hidden="true"
             style={{
-              transition: 'transform 0.2s',
+              transition: prefersReducedMotion() ? 'none' : 'transform 0.2s',
               transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)',
             }}
           >
@@ -183,7 +213,7 @@ export default function FollowRequestsList() {
 
       {/* Expanded list */}
       {expanded && (
-        <div style={{ padding: '8px 0' }}>
+        <div id="follow-requests-panel" style={{ padding: '8px 0' }}>
           {requests.length === 0 ? (
             <div
               style={{

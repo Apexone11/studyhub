@@ -90,8 +90,9 @@ export default function PlaygroundPage() {
         </div>
       </section>
 
-      {/* Mock Editor */}
-      <section className="playground-editor-section">
+      {/* Mock Editor — decorative preview, hidden from assistive tech so the
+       * screen-reader flow stays on the heading + features grid. */}
+      <section className="playground-editor-section" aria-hidden="true">
         <div className="playground-editor-container">
           <div className="playground-editor-mockup">
             <div className="playground-editor-mockup__watermark">Coming Soon</div>
@@ -139,10 +140,16 @@ export default function PlaygroundPage() {
       </section>
 
       {/* Early Access CTA */}
-      <section className="playground-cta">
+      <section className="playground-cta" aria-labelledby="playground-cta-text">
         <div className="playground-cta__inner">
-          <p className="playground-cta__text">Want to be the first to try it?</p>
-          <Link to="/pricing" className="playground-cta__button">
+          <p id="playground-cta-text" className="playground-cta__text">
+            Want to be the first to try it?
+          </p>
+          <Link
+            to="/pricing"
+            className="playground-cta__button"
+            aria-label="View pricing plans for early access to the Playground"
+          >
             Notify Me
           </Link>
         </div>

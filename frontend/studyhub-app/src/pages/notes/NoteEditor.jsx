@@ -84,6 +84,11 @@ function markdownToHtml(content) {
   return DOMPurify.sanitize(raw, { USE_PROFILES: { html: true } })
 }
 
+// Reading speed used for the inline "X min read" footer estimate. 220 wpm
+// matches the value used on NoteViewerPage so the editor and shared-view
+// estimates always agree.
+const WORDS_PER_MINUTE = 220
+
 /* ── Word count from HTML text content ──────────────────────── */
 function htmlWordCount(html) {
   if (!html?.trim()) return 0
@@ -227,30 +232,53 @@ function NoteRichEditor({ content, onUpdate, noteId, sanitizePaste }) {
         <EditorContent editor={editor} style={{ height: '100%' }} />
       </div>
 
-      {/* Word count footer */}
-      <div
-        style={{
-          display: 'flex',
-          justifyContent: 'flex-end',
-          padding: '6px 14px',
-          borderTop: '1px solid var(--sh-border)',
-          background: 'var(--sh-soft)',
-        }}
-      >
-        <span
-          style={{
-            fontSize: 11,
-            color: 'var(--sh-subtext)',
-            fontWeight: 600,
-            padding: '2px 8px',
-            background: 'var(--sh-surface)',
-            borderRadius: 6,
-            border: '1px solid var(--sh-border)',
-          }}
-        >
-          {htmlWordCount(editor?.getHTML?.() || '')} words
-        </span>
-      </div>
+      {/* Word count + read-time footer */}
+      {(() => {
+        const wc = htmlWordCount(editor?.getHTML?.() || '')
+        const readMinutes = wc > 0 ? Math.max(1, Math.ceil(wc / WORDS_PER_MINUTE)) : 0
+        return (
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'flex-end',
+              gap: 6,
+              padding: '6px 14px',
+              borderTop: '1px solid var(--sh-border)',
+              background: 'var(--sh-soft)',
+            }}
+            aria-label={`${wc} words${readMinutes > 0 ? `, about ${readMinutes} minute read` : ''}`}
+          >
+            <span
+              style={{
+                fontSize: 11,
+                color: 'var(--sh-subtext)',
+                fontWeight: 600,
+                padding: '2px 8px',
+                background: 'var(--sh-surface)',
+                borderRadius: 6,
+                border: '1px solid var(--sh-border)',
+              }}
+            >
+              {wc} words
+            </span>
+            {readMinutes > 0 ? (
+              <span
+                style={{
+                  fontSize: 11,
+                  color: 'var(--sh-subtext)',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  background: 'var(--sh-surface)',
+                  borderRadius: 6,
+                  border: '1px solid var(--sh-border)',
+                }}
+              >
+                {readMinutes} min read
+              </span>
+            ) : null}
+          </div>
+        )
+      })()}
     </div>
   )
 }

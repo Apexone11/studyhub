@@ -13,6 +13,7 @@
  * is still in flight.
  */
 
+const log = require('../../../lib/logger')
 const { HOSTS } = require('../scholar.constants')
 
 const SOURCE = 'core'
@@ -26,16 +27,32 @@ function _isEnabled() {
 }
 
 async function search(_q, _filters) {
-  if (!_isEnabled()) return { source: SOURCE, results: [], throttled: false }
-  // TODO(week5-day4): implement CORE search via safeFetch with HOST allowlist.
-  // Return shape: { source, results: ScholarPaper[], throttled }.
-  return { source: SOURCE, results: [], throttled: false }
+  try {
+    if (!_isEnabled()) return { source: SOURCE, results: [], throttled: false }
+    // TODO(week5-day4): implement CORE search via safeFetch with HOST allowlist.
+    // Return shape: { source, results: ScholarPaper[], throttled }.
+    return { source: SOURCE, results: [], throttled: false }
+  } catch (err) {
+    log.warn(
+      { event: 'scholar.adapter.unexpected', source: SOURCE, err: err && err.message },
+      'CORE search threw unexpectedly',
+    )
+    return { source: SOURCE, results: [], error: 'unexpected_error' }
+  }
 }
 
 async function fetch(_canonicalId) {
-  if (!_isEnabled()) return { source: SOURCE, paper: null }
-  // TODO(week5-day4): implement CORE fetch-by-doi via safeFetch.
-  return { source: SOURCE, paper: null }
+  try {
+    if (!_isEnabled()) return { source: SOURCE, paper: null }
+    // TODO(week5-day4): implement CORE fetch-by-doi via safeFetch.
+    return { source: SOURCE, paper: null }
+  } catch (err) {
+    log.warn(
+      { event: 'scholar.adapter.unexpected', source: SOURCE, err: err && err.message },
+      'CORE fetch threw unexpectedly',
+    )
+    return { source: SOURCE, paper: null, error: 'unexpected_error' }
+  }
 }
 
 module.exports = {

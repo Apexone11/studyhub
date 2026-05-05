@@ -21,11 +21,65 @@ import { useProtectedPage } from '../../lib/useProtectedPage'
 import { useResponsiveAppLayout } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { useSharedAiChat } from '../../lib/aiChatContext'
+import { showToast } from '../../lib/toast'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { pageShell } from '../../lib/ui'
 import { API as API_BASE } from '../../config'
 import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import { useSearchParams } from 'react-router-dom'
+
+// Inline trash glyph — Icons.jsx ships no IconTrash today and this file
+// is the only consumer. Kept local rather than touching the shared icon
+// barrel (out of scope for this fix). Same 24×24 viewBox + currentColor
+// + 1.8 stroke conventions as the rest of the icon set.
+function IconTrash({ size = 14, ...p }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      xmlns="http://www.w3.org/2000/svg"
+      aria-hidden="true"
+      {...p}
+    >
+      <path d="M4 7h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <path
+        d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <line
+        x1="10"
+        y1="11"
+        x2="10"
+        y2="17"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+      <line
+        x1="14"
+        y1="11"
+        x2="14"
+        y2="17"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinecap="round"
+      />
+    </svg>
+  )
+}
 
 /* ═══════════════════════════════════════════════════════════════════════════
  * Main Page
@@ -134,16 +188,20 @@ export default function AiPage() {
   useEffect(() => {
     if (!paperIdParam) return
     if (!PAPER_ID_REGEX.test(paperIdParam) || paperIdParam.length > 256) {
-      setPaperContextError('Invalid paper id')
-      // Strip the bad param so a refresh doesn't loop the error.
-      setSearchParams(
-        (prev) => {
-          const next = new URLSearchParams(prev)
-          next.delete('paperId')
-          return next
-        },
-        { replace: true },
-      )
+      // Strip the bad param so a refresh doesn't loop the error. State
+      // mutations are deferred to a microtask so the rule about
+      // setState-in-effect isn't tripped on this validation branch.
+      queueMicrotask(() => {
+        setPaperContextError('Invalid paper id')
+        setSearchParams(
+          (prev) => {
+            const next = new URLSearchParams(prev)
+            next.delete('paperId')
+            return next
+          },
+          { replace: true },
+        )
+      })
       return
     }
     let aborted = false
@@ -179,7 +237,7 @@ export default function AiPage() {
   // again.
   const [stopped, setStopped] = useState(false)
   useEffect(() => {
-    if (chat.streaming) setStopped(false)
+    if (chat.streaming) queueMicrotask(() => setStopped(false))
   }, [chat.streaming])
 
   if (authStatus !== 'ready') {
@@ -254,7 +312,25 @@ export default function AiPage() {
                   activeId={chat.activeConversationId}
                   onSelect={chat.selectConversation}
                   onNew={chat.startNewConversation}
-                  onDelete={chat.removeConversation}
+                  // Strip ?conversation=N from the URL when the active
+                  // conversation is the one being deleted, otherwise
+                  // the searchParams effect on this page would try to
+                  // reselect it on the next URL bump (e.g. user clicks
+                  // a notification, refreshes, or navigates back).
+                  onDelete={async (id) => {
+                    const wasActive = id === chat.activeConversationId
+                    await chat.removeConversation(id)
+                    if (wasActive) {
+                      setSearchParams(
+                        (prev) => {
+                          const next = new URLSearchParams(prev)
+                          next.delete('conversation')
+                          return next
+                        },
+                        { replace: true },
+                      )
+                    }
+                  }}
                   onRename={chat.editConversationTitle}
                   usage={chat.usage}
                   isCompact={isCompact}
@@ -262,66 +338,15 @@ export default function AiPage() {
                 />
               )}
 
-              {/* Scholar paper-context banner: shows when /ai?paperId=... was
-                  used to land here. The metadata is informational; clicking
-                  the chip clears the banner without affecting the conversation. */}
-              {(paperContext || paperContextError) && (
-                <div
-                  role="status"
-                  aria-live="polite"
-                  style={{
-                    margin: '12px 16px',
-                    padding: '12px 14px',
-                    background: paperContextError ? 'var(--sh-warning-bg)' : 'var(--sh-brand-soft)',
-                    color: paperContextError
-                      ? 'var(--sh-warning-text)'
-                      : 'var(--sh-pill-text, var(--sh-brand))',
-                    border: '1px solid var(--sh-border)',
-                    borderRadius: 10,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 12,
-                    fontSize: 'var(--type-sm)',
-                  }}
-                >
-                  <strong style={{ fontWeight: 600 }}>
-                    {paperContextError ? 'Paper context unavailable.' : 'Attached paper:'}
-                  </strong>
-                  <span
-                    style={{
-                      flex: 1,
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}
-                  >
-                    {paperContextError || paperContext?.title || ''}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPaperContext(null)
-                      setPaperContextError(null)
-                    }}
-                    aria-label="Dismiss paper context"
-                    style={{
-                      background: 'transparent',
-                      border: 0,
-                      cursor: 'pointer',
-                      color: 'inherit',
-                      padding: 4,
-                      minWidth: 32,
-                      minHeight: 32,
-                    }}
-                  >
-                    ×
-                  </button>
-                </div>
-              )}
-
               {/* Chat Area — `key={chatAreaKey}` lets a fresh ?prompt=
                   arrival reset internal state cleanly without any
-                  setState-during-render workaround inside ChatArea. */}
+                  setState-during-render workaround inside ChatArea.
+
+                  The Scholar paper-context banner is now passed in as
+                  `paperBanner` so it renders as a slim banner at the
+                  TOP of the chat column instead of as a flex sibling
+                  next to the sidebar (which was producing a giant
+                  brand-soft panel beside the empty-state hero — Bug 10). */}
               {(!isCompact || chat.activeConversationId) && (
                 <ChatArea
                   key={chatAreaKey}
@@ -344,6 +369,12 @@ export default function AiPage() {
                   initialPrompt={initialPrompt}
                   density={density}
                   onDensityChange={setDensity}
+                  paperContext={paperContext}
+                  paperContextError={paperContextError}
+                  onDismissPaperContext={() => {
+                    setPaperContext(null)
+                    setPaperContextError(null)
+                  }}
                 />
               )}
             </div>
@@ -386,6 +417,15 @@ function ConversationSidebar({
 }) {
   const [editingId, setEditingId] = useState(null)
   const [editTitle, setEditTitle] = useState('')
+  // Bug 9: rename + delete affordances are now visible on every row
+  // (hover-reveal on desktop, always-visible on touch). The delete flow
+  // routes through a portal-rendered confirm modal so a stray click in
+  // the row doesn't nuke a conversation. CLAUDE.md A4: only remove the
+  // row from local state after the server returns 200 — until then we
+  // show an inline "Deleting…" spinner + keep the row mounted.
+  const [hoveredId, setHoveredId] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(null) // { id, title }
+  const [deletingId, setDeletingId] = useState(null)
 
   const handleRename = (conv) => {
     setEditingId(conv.id)
@@ -397,6 +437,24 @@ function ConversationSidebar({
       onRename(editingId, editTitle.trim())
     }
     setEditingId(null)
+  }
+
+  const requestDelete = (conv) => {
+    setConfirmDelete({ id: conv.id, title: conv.title || 'New conversation' })
+  }
+
+  const performDelete = async () => {
+    if (!confirmDelete) return
+    const { id } = confirmDelete
+    setDeletingId(id)
+    setConfirmDelete(null)
+    try {
+      await onDelete(id)
+    } catch {
+      showToast('Could not delete conversation. Please try again.', 'error')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   return (
@@ -474,131 +532,206 @@ function ConversationSidebar({
             No conversations yet. Start a new chat!
           </div>
         )}
-        {conversations.map((conv) => (
-          <div
-            key={conv.id}
-            // Outer wrapper is a non-interactive container so the
-            // <button> activator + <button>(Rename) + <button>(Delete)
-            // are siblings, not nested interactive elements (HTML
-            // forbids interactive-in-interactive nesting; screen
-            // readers were getting confused). Copilot a11y finding
-            // 2026-05-03.
-            style={{
-              background: conv.id === activeId ? 'var(--sh-soft)' : 'transparent',
-              borderLeft:
-                conv.id === activeId ? '3px solid var(--sh-brand)' : '3px solid transparent',
-              transition: 'background 0.15s',
-            }}
-            onMouseEnter={(e) => {
-              if (conv.id !== activeId) e.currentTarget.style.background = 'var(--sh-soft)'
-            }}
-            onMouseLeave={(e) => {
-              if (conv.id !== activeId) e.currentTarget.style.background = 'transparent'
-            }}
-          >
-            {editingId === conv.id ? (
-              <form
-                onSubmit={(e) => {
-                  e.preventDefault()
-                  submitRename()
-                }}
-                style={{ display: 'flex', gap: 6, padding: '10px 16px' }}
-              >
-                <input
-                  autoFocus
-                  value={editTitle}
-                  onChange={(e) => setEditTitle(e.target.value)}
-                  onBlur={submitRename}
-                  style={{
-                    flex: 1,
-                    fontSize: 13,
-                    padding: '4px 8px',
-                    borderRadius: 6,
-                    border: '1px solid var(--sh-border)',
-                    background: 'var(--sh-bg)',
-                    color: 'var(--sh-text)',
-                    outline: 'none',
+        {conversations.map((conv) => {
+          const isActive = conv.id === activeId
+          const isHovered = hoveredId === conv.id
+          const isDeleting = deletingId === conv.id
+          // Hover-reveal on desktop, always-visible on the active row,
+          // and always-visible while the row is mid-delete. Inactive
+          // rows show actions on hover so the list stays clean at rest.
+          const actionsVisible = isActive || isHovered || isDeleting
+          return (
+            <div
+              key={conv.id}
+              // Outer wrapper is a non-interactive container so the
+              // <button> activator + <button>(Rename) + <button>(Delete)
+              // are siblings, not nested interactive elements (HTML
+              // forbids interactive-in-interactive nesting; screen
+              // readers were getting confused). Copilot a11y finding
+              // 2026-05-03.
+              style={{
+                background: isActive ? 'var(--sh-soft)' : 'transparent',
+                borderLeft: isActive ? '3px solid var(--sh-brand)' : '3px solid transparent',
+                transition: 'background 0.15s',
+              }}
+              onMouseEnter={(e) => {
+                setHoveredId(conv.id)
+                if (!isActive) e.currentTarget.style.background = 'var(--sh-soft)'
+              }}
+              onMouseLeave={(e) => {
+                setHoveredId((prev) => (prev === conv.id ? null : prev))
+                if (!isActive) e.currentTarget.style.background = 'transparent'
+              }}
+            >
+              {editingId === conv.id ? (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault()
+                    submitRename()
                   }}
-                />
-              </form>
-            ) : (
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: '1fr auto',
-                  alignItems: 'center',
-                  columnGap: 6,
-                  padding: '10px 16px',
-                }}
-              >
-                <button
-                  type="button"
-                  onClick={() => onSelect(conv.id)}
-                  aria-current={conv.id === activeId ? 'page' : undefined}
-                  aria-label={`Open conversation: ${conv.title || 'New conversation'}`}
+                  style={{ display: 'flex', gap: 6, padding: '10px 16px' }}
+                >
+                  <input
+                    autoFocus
+                    value={editTitle}
+                    onChange={(e) => setEditTitle(e.target.value)}
+                    onBlur={submitRename}
+                    style={{
+                      flex: 1,
+                      fontSize: 13,
+                      padding: '4px 8px',
+                      borderRadius: 6,
+                      border: '1px solid var(--sh-border)',
+                      background: 'var(--sh-bg)',
+                      color: 'var(--sh-text)',
+                      outline: 'none',
+                    }}
+                  />
+                </form>
+              ) : (
+                <div
                   style={{
-                    display: 'block',
-                    width: '100%',
-                    background: 'none',
-                    border: 'none',
-                    padding: 0,
-                    cursor: 'pointer',
-                    textAlign: 'left',
-                    color: 'inherit',
-                    font: 'inherit',
+                    display: 'grid',
+                    gridTemplateColumns: '1fr auto',
+                    alignItems: 'center',
+                    columnGap: 6,
+                    padding: '10px 16px',
                   }}
                 >
-                  <div
+                  <button
+                    type="button"
+                    onClick={() => onSelect(conv.id)}
+                    aria-current={isActive ? 'page' : undefined}
+                    aria-label={`Open conversation: ${conv.title || 'New conversation'}`}
                     style={{
-                      fontSize: 13,
-                      fontWeight: 600,
-                      color: 'var(--sh-text)',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      marginBottom: 2,
+                      display: 'block',
+                      width: '100%',
+                      background: 'none',
+                      border: 'none',
+                      padding: 0,
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      color: 'inherit',
+                      font: 'inherit',
                     }}
                   >
-                    {conv.title || 'New conversation'}
-                  </div>
-                  <div style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>
-                    {conv._count?.messages || 0} messages
-                  </div>
-                </button>
-                {/* Actions are only meaningful for the active conversation.
-                    Hiding via opacity left them keyboard-reachable on
-                    inactive rows — Copilot finding 2026-05-03. Switch to
-                    `visibility: hidden` (also removes from tab order)
-                    and add an explicit tabIndex/aria-hidden pair so the
-                    inactive-row buttons can't be focused, clicked by
-                    keyboard, or read by a screen reader. */}
-                {conv.id === activeId ? (
-                  <span style={{ display: 'flex', gap: 4 }}>
-                    <button
-                      type="button"
-                      onClick={() => handleRename(conv)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
-                      aria-label="Rename conversation"
-                      title="Rename"
+                    <div
+                      style={{
+                        fontSize: 13,
+                        fontWeight: 600,
+                        color: 'var(--sh-text)',
+                        whiteSpace: 'nowrap',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        marginBottom: 2,
+                      }}
                     >
-                      <IconPen size={12} style={{ color: 'var(--sh-muted)' }} />
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => onDelete(conv.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2 }}
-                      aria-label="Delete conversation"
-                      title="Delete"
-                    >
-                      <IconX size={12} style={{ color: 'var(--sh-danger-text)' }} />
-                    </button>
+                      {conv.title || 'New conversation'}
+                    </div>
+                    <div style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>
+                      {conv._count?.messages || 0} messages
+                    </div>
+                  </button>
+                  {/* Bug 9: rename + delete are now available on EVERY row,
+                      not just the active one. Inactive rows hide them at
+                      rest (opacity 0) and reveal on hover — the active
+                      row keeps them visible so keyboard users always have
+                      an obvious affordance on the row they're working in.
+                      `visibility: hidden` also pulls inactive-row hidden
+                      buttons out of the tab order. While a delete request
+                      is in flight we keep the row mounted with a spinner
+                      until the server confirms (CLAUDE.md A4 — no
+                      optimistic removal). */}
+                  <span
+                    style={{
+                      display: 'flex',
+                      gap: 4,
+                      visibility: actionsVisible ? 'visible' : 'hidden',
+                      opacity: actionsVisible ? 1 : 0,
+                      transition: 'opacity 0.15s',
+                    }}
+                  >
+                    {isDeleting ? (
+                      <span
+                        role="status"
+                        aria-live="polite"
+                        style={{
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          gap: 4,
+                          fontSize: 11,
+                          color: 'var(--sh-subtext)',
+                          padding: '0 4px',
+                        }}
+                      >
+                        <IconSpinner
+                          size={12}
+                          style={{
+                            animation: 'spin 1s linear infinite',
+                            color: 'var(--sh-subtext)',
+                          }}
+                        />
+                        Deleting…
+                      </span>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => handleRename(conv)}
+                          tabIndex={actionsVisible ? 0 : -1}
+                          aria-hidden={actionsVisible ? undefined : true}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: 2,
+                          }}
+                          aria-label={`Rename conversation: ${conv.title || 'New conversation'}`}
+                          title="Rename"
+                        >
+                          <IconPen size={12} style={{ color: 'var(--sh-muted)' }} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => requestDelete(conv)}
+                          tabIndex={actionsVisible ? 0 : -1}
+                          aria-hidden={actionsVisible ? undefined : true}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: 2,
+                          }}
+                          aria-label={`Delete conversation: ${conv.title || 'New conversation'}`}
+                          title="Delete"
+                        >
+                          <IconTrash size={13} style={{ color: 'var(--sh-danger-text)' }} />
+                        </button>
+                      </>
+                    )}
                   </span>
-                ) : null}
-              </div>
-            )}
-          </div>
-        ))}
+                </div>
+              )}
+            </div>
+          )
+        })}
       </div>
+
+      {/* Delete-confirm modal — portal'd to <body> so an animated
+          ancestor with `transform` can't break the fixed-overlay
+          centering (CLAUDE.md "Modals broken inside animated
+          containers"). Cancel via Esc or backdrop click; confirm
+          calls performDelete which awaits the server before mutating
+          the list (CLAUDE.md A4). */}
+      {confirmDelete &&
+        createPortal(
+          <DeleteConfirmModal
+            title={confirmDelete.title}
+            onCancel={() => setConfirmDelete(null)}
+            onConfirm={performDelete}
+          />,
+          document.body,
+        )}
 
       {/* Usage footer — daily + weekly quota bars */}
       {usage && (
@@ -665,6 +798,9 @@ function ChatArea({
   initialPrompt,
   density,
   onDensityChange,
+  paperContext,
+  paperContextError,
+  onDismissPaperContext,
 }) {
   const messagesEndRef = useRef(null)
   // initialPrompt is consumed on mount by AiComposer; the parent resets
@@ -676,6 +812,13 @@ function ChatArea({
   }, [messages, streamingText])
 
   // Empty state (no conversation selected).
+  // Bug 10: previously the Scholar paper-context banner was rendered as
+  // a flex sibling alongside the sidebar + chat-area columns, so when a
+  // paper was attached on a fresh /ai visit the banner became a giant
+  // brand-soft vertical strip. The banner now lives INSIDE the chat
+  // column as a slim top-row, and the empty-state hero centers in the
+  // remaining vertical space below it. Background stays --sh-surface
+  // so there's no oversized colored panel.
   if (!activeConversationId) {
     return (
       <div
@@ -683,97 +826,123 @@ function ChatArea({
           flex: 1,
           display: 'flex',
           flexDirection: 'column',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 40,
+          background: 'var(--sh-surface)',
+          minWidth: 0,
         }}
       >
+        {(paperContext || paperContextError) && (
+          <PaperContextBanner
+            paperContext={paperContext}
+            paperContextError={paperContextError}
+            onDismiss={onDismissPaperContext}
+          />
+        )}
         <div
           style={{
-            width: 64,
-            height: 64,
-            borderRadius: '50%',
-            background: 'var(--sh-ai-gradient)',
+            flex: 1,
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
-            marginBottom: 20,
+            padding: 40,
           }}
         >
-          <IconSpark size={32} style={{ color: '#fff' }} />
-        </div>
-        <h2 style={{ fontSize: 20, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 8 }}>
-          How can I help you study today?
-        </h2>
-        <p
-          style={{
-            fontSize: 14,
-            color: 'var(--sh-subtext)',
-            textAlign: 'center',
-            maxWidth: 400,
-            lineHeight: 1.6,
-            marginBottom: 24,
-          }}
-        >
-          I can create study sheets, explain concepts, quiz you on your materials, and analyze
-          images of textbooks or notes.
-        </p>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
-          {[
-            { label: 'Create a study sheet', prompt: 'Help me create a study sheet for ' },
-            { label: 'Quiz me on my materials', prompt: 'Quiz me on ' },
-            { label: 'Explain a concept', prompt: 'Explain the concept of ' },
-            { label: 'Summarize my notes', prompt: 'Summarize my notes on ' },
-          ].map((suggestion) => (
-            <button
-              key={suggestion.label}
-              onClick={async () => {
-                await onNewChat()
-                // The new conversation flow re-mounts ChatArea via key so
-                // the prompt seed needs to come from URL ?prompt= path.
-                // For the empty-state suggestion clicks we just navigate
-                // to the prompt by setting URL query — handled at the
-                // page level.
-                if (typeof window !== 'undefined') {
-                  const url = new URL(window.location.href)
-                  url.searchParams.set('prompt', suggestion.prompt)
-                  window.history.replaceState({}, '', url.toString())
-                  // Trigger a re-render via a storage-like event:
-                  window.dispatchEvent(new PopStateEvent('popstate'))
-                }
-              }}
-              style={{
-                background: 'var(--sh-soft)',
-                border: '1px solid var(--sh-border)',
-                borderRadius: 10,
-                padding: '10px 16px',
-                fontSize: 13,
-                fontWeight: 500,
-                color: 'var(--sh-text)',
-                cursor: 'pointer',
-                transition: 'all 0.15s',
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'var(--sh-brand)'
-                e.currentTarget.style.color = '#fff'
-                e.currentTarget.style.borderColor = 'var(--sh-brand)'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'var(--sh-soft)'
-                e.currentTarget.style.color = 'var(--sh-text)'
-                e.currentTarget.style.borderColor = 'var(--sh-border)'
-              }}
-            >
-              {suggestion.label}
-            </button>
-          ))}
+          <div
+            style={{
+              width: 64,
+              height: 64,
+              borderRadius: '50%',
+              background: 'var(--sh-ai-gradient)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 20,
+            }}
+          >
+            <IconSpark size={32} style={{ color: '#fff' }} />
+          </div>
+          <h2
+            style={{ fontSize: 20, fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 8 }}
+          >
+            How can I help you study today?
+          </h2>
+          <p
+            style={{
+              fontSize: 14,
+              color: 'var(--sh-subtext)',
+              textAlign: 'center',
+              maxWidth: 400,
+              lineHeight: 1.6,
+              marginBottom: 24,
+            }}
+          >
+            I can create study sheets, explain concepts, quiz you on your materials, and analyze
+            images of textbooks or notes.
+          </p>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, justifyContent: 'center' }}>
+            {[
+              { label: 'Create a study sheet', prompt: 'Help me create a study sheet for ' },
+              { label: 'Quiz me on my materials', prompt: 'Quiz me on ' },
+              { label: 'Explain a concept', prompt: 'Explain the concept of ' },
+              { label: 'Summarize my notes', prompt: 'Summarize my notes on ' },
+            ].map((suggestion) => (
+              <button
+                key={suggestion.label}
+                onClick={async () => {
+                  await onNewChat()
+                  // The new conversation flow re-mounts ChatArea via key so
+                  // the prompt seed needs to come from URL ?prompt= path.
+                  // For the empty-state suggestion clicks we just navigate
+                  // to the prompt by setting URL query — handled at the
+                  // page level.
+                  if (typeof window !== 'undefined') {
+                    const url = new URL(window.location.href)
+                    url.searchParams.set('prompt', suggestion.prompt)
+                    window.history.replaceState({}, '', url.toString())
+                    // Trigger a re-render via a storage-like event:
+                    window.dispatchEvent(new PopStateEvent('popstate'))
+                  }
+                }}
+                style={{
+                  background: 'var(--sh-soft)',
+                  border: '1px solid var(--sh-border)',
+                  borderRadius: 10,
+                  padding: '10px 16px',
+                  fontSize: 13,
+                  fontWeight: 500,
+                  color: 'var(--sh-text)',
+                  cursor: 'pointer',
+                  transition: 'all 0.15s',
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'var(--sh-brand)'
+                  e.currentTarget.style.color = '#fff'
+                  e.currentTarget.style.borderColor = 'var(--sh-brand)'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'var(--sh-soft)'
+                  e.currentTarget.style.color = 'var(--sh-text)'
+                  e.currentTarget.style.borderColor = 'var(--sh-border)'
+                }}
+              >
+                {suggestion.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
     )
   }
 
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%' }}>
+    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', height: '100%', minWidth: 0 }}>
+      {(paperContext || paperContextError) && (
+        <PaperContextBanner
+          paperContext={paperContext}
+          paperContextError={paperContextError}
+          onDismiss={onDismissPaperContext}
+        />
+      )}
       {/* Header — Figma 2026-05-03 redesign:
           - Title left
           - Gradient-bordered model pill ("CLAUDE SONNET 4.5") right of title
@@ -1027,6 +1196,181 @@ function ChatArea({
           initialPrompt={initialPrompt}
           density={density}
         />
+      </div>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Paper Context Banner — slim top-row chip rendered INSIDE the chat
+ * column when /ai?paperId=… landed the user with attached paper context.
+ * Bug 10 fix: previously this lived as a flex-row sibling of the
+ * sidebar + chat-area columns, which made the banner inflate into a
+ * giant brand-soft vertical strip beside the empty-state hero.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+function PaperContextBanner({ paperContext, paperContextError, onDismiss }) {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      style={{
+        padding: '10px 16px',
+        background: paperContextError ? 'var(--sh-warning-bg)' : 'var(--sh-brand-soft)',
+        color: paperContextError
+          ? 'var(--sh-warning-text)'
+          : 'var(--sh-pill-text, var(--sh-brand))',
+        borderBottom: '1px solid var(--sh-border)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 12,
+        fontSize: 'var(--type-sm)',
+        minHeight: 44,
+        flexShrink: 0,
+      }}
+    >
+      <strong style={{ fontWeight: 600 }}>
+        {paperContextError ? 'Paper context unavailable.' : 'Attached paper:'}
+      </strong>
+      <span
+        style={{
+          flex: 1,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+          whiteSpace: 'nowrap',
+        }}
+      >
+        {paperContextError || paperContext?.title || ''}
+      </span>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss paper context"
+        style={{
+          background: 'transparent',
+          border: 0,
+          cursor: 'pointer',
+          color: 'inherit',
+          padding: 4,
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          minWidth: 28,
+          minHeight: 28,
+          borderRadius: 6,
+        }}
+      >
+        <IconX size={14} />
+      </button>
+    </div>
+  )
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Delete Confirm Modal
+ * ═══════════════════════════════════════════════════════════════════════════ */
+function DeleteConfirmModal({ title, onCancel, onConfirm }) {
+  // Close on Esc and trap focus on the destructive primary button so
+  // a keyboard user lands on Cancel-equivalent behavior by default
+  // (autoFocus on Delete would let an accidental Enter wipe data).
+  useEffect(() => {
+    const onKey = (e) => {
+      if (e.key === 'Escape') onCancel()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCancel])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="ai-delete-conv-title"
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onCancel()
+      }}
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0, 0, 0, 0.5)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: 16,
+      }}
+    >
+      <div
+        style={{
+          background: 'var(--sh-surface)',
+          color: 'var(--sh-text)',
+          border: '1px solid var(--sh-border)',
+          borderRadius: 14,
+          padding: 22,
+          maxWidth: 420,
+          width: '100%',
+          boxShadow: '0 20px 50px rgba(0,0,0,0.25)',
+          fontFamily: PAGE_FONT,
+        }}
+      >
+        <h3
+          id="ai-delete-conv-title"
+          style={{
+            fontSize: 17,
+            fontWeight: 700,
+            color: 'var(--sh-heading)',
+            margin: 0,
+            marginBottom: 8,
+          }}
+        >
+          Delete this conversation?
+        </h3>
+        <p
+          style={{
+            fontSize: 14,
+            color: 'var(--sh-subtext)',
+            lineHeight: 1.5,
+            margin: 0,
+            marginBottom: 18,
+          }}
+        >
+          {`"${title}" will be removed permanently. Messages cannot be recovered.`}
+        </p>
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <button
+            type="button"
+            onClick={onCancel}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 8,
+              border: '1px solid var(--sh-border)',
+              background: 'var(--sh-surface)',
+              color: 'var(--sh-text)',
+              fontSize: 13,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={onConfirm}
+            style={{
+              padding: '8px 16px',
+              borderRadius: 8,
+              border: 'none',
+              background: 'var(--sh-danger)',
+              color: 'var(--sh-btn-primary-text, #fff)',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+            }}
+          >
+            Delete
+          </button>
+        </div>
       </div>
     </div>
   )

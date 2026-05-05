@@ -37,6 +37,8 @@ function SchoolLogoCard({ school, selected, onClick, size = 'md' }) {
     <button
       type="button"
       onClick={onClick}
+      aria-pressed={selected ? 'true' : 'false'}
+      aria-label={`${selected ? 'Selected:' : 'Select'} ${school.name}`}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -157,6 +159,8 @@ function CourseChip({ course, selected, onToggle }) {
     <button
       type="button"
       onClick={() => onToggle(course.id)}
+      aria-pressed={selected ? 'true' : 'false'}
+      aria-label={`${selected ? 'Selected:' : 'Toggle'} ${course.code} ${course.name}`}
       style={{
         padding: '8px 14px',
         borderRadius: 10,
@@ -216,12 +220,19 @@ export default function MyCoursesPage() {
   const [courseSearch, setCourseSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
+  // Recommendations come from the existing /api/courses/recommendations endpoint
+  // (collaborative filter on overlapping enrollments, popular fallback for
+  // brand-new users). We cache them in state so toggling chips doesn't refetch.
+  const [recommendations, setRecommendations] = useState([])
 
   /* ── Load catalog + current enrollments ─────────────────────────────── */
   useEffect(() => {
     let active = true
-    setCatalogLoading(true)
-    setCatalogError('')
+    queueMicrotask(() => {
+      if (!active) return
+      setCatalogLoading(true)
+      setCatalogError('')
+    })
 
     fetch(`${API}/api/courses/schools`, {
       headers: authHeaders(),
@@ -275,10 +286,34 @@ export default function MyCoursesPage() {
   /* ── Seed from current user enrollments ─────────────────────────────── */
   useEffect(() => {
     if (!user?.enrollments?.length) return
-    const currentSchoolId = user.enrollments[0]?.course?.schoolId
-    if (currentSchoolId) setSelectedSchoolId(String(currentSchoolId))
-    setSelectedCourseIds(user.enrollments.map((e) => e.courseId))
+    queueMicrotask(() => {
+      const currentSchoolId = user.enrollments[0]?.course?.schoolId
+      if (currentSchoolId) setSelectedSchoolId(String(currentSchoolId))
+      setSelectedCourseIds(user.enrollments.map((e) => e.courseId))
+    })
   }, [user?.enrollments])
+
+  /* ── Load course recommendations (collaborative filter via backend) ─── */
+  useEffect(() => {
+    if (!user) return
+    const controller = new AbortController()
+    fetch(`${API}/api/courses/recommendations`, {
+      headers: authHeaders(),
+      credentials: 'include',
+      signal: controller.signal,
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        if (!data) return
+        const list = Array.isArray(data.recommendations) ? data.recommendations : []
+        setRecommendations(list)
+      })
+      .catch((err) => {
+        // Silent: recommendations are progressive enhancement, never block the page.
+        if (err?.name !== 'AbortError') setRecommendations([])
+      })
+    return () => controller.abort()
+  }, [user])
 
   /* ── Derived state ──────────────────────────────────────────────────── */
   const selectedSchool = useMemo(
@@ -541,10 +576,11 @@ export default function MyCoursesPage() {
 
                 {/* Search */}
                 <input
-                  type="text"
+                  type="search"
                   value={schoolSearch}
                   onChange={(e) => setSchoolSearch(e.target.value)}
                   placeholder="Search schools..."
+                  aria-label="Search schools"
                   style={{
                     width: '100%',
                     padding: '10px 14px',
@@ -674,10 +710,11 @@ export default function MyCoursesPage() {
 
                   {/* Course search */}
                   <input
-                    type="text"
+                    type="search"
                     value={courseSearch}
                     onChange={(e) => setCourseSearch(e.target.value)}
                     placeholder="Search courses..."
+                    aria-label="Search courses"
                     style={{
                       width: '100%',
                       padding: '10px 14px',
@@ -692,6 +729,47 @@ export default function MyCoursesPage() {
                       boxSizing: 'border-box',
                     }}
                   />
+
+                  {/* Recommended chips — only show courses at the selected
+                   * school that the user hasn't already picked, capped at 5
+                   * to keep the section a quick "you might like" nudge rather
+                   * than a second full catalog. */}
+                  {(() => {
+                    const recsForSchool = recommendations
+                      .filter(
+                        (r) =>
+                          String(r.schoolId) === selectedSchoolId &&
+                          !selectedCourseIds.includes(r.id),
+                      )
+                      .slice(0, 5)
+                    if (recsForSchool.length === 0) return null
+                    return (
+                      <div style={{ marginBottom: 14 }}>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 800,
+                            color: 'var(--sh-muted)',
+                            textTransform: 'uppercase',
+                            letterSpacing: '0.05em',
+                            marginBottom: 8,
+                          }}
+                        >
+                          Recommended for you
+                        </div>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                          {recsForSchool.map((course) => (
+                            <CourseChip
+                              key={`rec-${course.id}`}
+                              course={course}
+                              selected={false}
+                              onToggle={toggleCourse}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    )
+                  })()}
 
                   {/* Course chips */}
                   <div

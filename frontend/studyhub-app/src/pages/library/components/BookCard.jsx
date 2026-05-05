@@ -24,6 +24,7 @@ export default function BookCard({ book, progress }) {
     <Link
       to={`/library/${book.volumeId}`}
       className="book-card"
+      aria-label={`${book.title}${author ? ` by ${author}` : ''}`}
       style={{ textDecoration: 'none', color: 'inherit' }}
     >
       <div className="book-card__image-container">

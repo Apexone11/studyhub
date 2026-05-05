@@ -21,27 +21,66 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { API } from '../../config'
 import PaperCard from './paperCard/PaperCard'
 import { TRY_CHIPS, POPULAR_TOPICS, formatCount } from './scholarConstants'
+import ScholarFiltersDrawer from './ScholarFiltersDrawer'
 import './ScholarPage.css'
+
+// Stats cache: 1h TTL, surfaces instantly on remount instead of letting
+// the hardcoded fallback flash before the live response arrives.
+const STATS_CACHE_KEY = 'studyhub.scholar.stats.v1'
+const STATS_TTL_MS = 60 * 60 * 1000
+
+function readStatsCache() {
+  try {
+    const raw = localStorage.getItem(STATS_CACHE_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed || typeof parsed !== 'object') return null
+    if (typeof parsed.fetchedAt !== 'number') return null
+    if (Date.now() - parsed.fetchedAt > STATS_TTL_MS) return null
+    if (!parsed.value || typeof parsed.value !== 'object') return null
+    return parsed.value
+  } catch {
+    // Safari private mode + JSON.parse failures both end up here.
+    return null
+  }
+}
+
+function writeStatsCache(value) {
+  try {
+    localStorage.setItem(STATS_CACHE_KEY, JSON.stringify({ value, fetchedAt: Date.now() }))
+  } catch {
+    // Storage quota / private mode — stats refresh on next mount instead.
+  }
+}
 
 export default function ScholarPage() {
   usePageTitle('Scholar')
   const navigate = useNavigate()
   const inputRef = useRef(null)
+  const filtersBtnRef = useRef(null)
   const [searchInput, setSearchInput] = useState('')
   const [trending, setTrending] = useState([])
   const [trendingLoading, setTrendingLoading] = useState(true)
   // Saved-papers preview is reserved for a future endpoint; the section
   // currently renders an empty state and a "See all →" link to /scholar/saved.
   const [saved] = useState([])
-  const [stats, setStats] = useState({ papers: 0, openAccess: 0, thisYear: 0 })
+  // Hydrate stats from localStorage on first render so the visible stats
+  // never flash from "212M / 48M / 3.4M" → live values on remount.
+  // `stats === null` means we have nothing real to show yet → render skeletons.
+  const [stats, setStats] = useState(() => readStatsCache())
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
-  // Fetch hero stats (degrades gracefully)
+  // Fetch hero stats (SWR-style: cached value rendered first, network
+  // fetch refreshes both state + localStorage). Degrades gracefully on
+  // network failure — last-known cached value stays on screen.
   useEffect(() => {
     let aborted = false
     fetch(`${API}/api/scholar/stats`, { credentials: 'include' })
-      .then((res) => (res.ok ? res.json() : { papers: 0, openAccess: 0, thisYear: 0 }))
+      .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
-        if (!aborted) setStats(json)
+        if (aborted || !json || typeof json !== 'object') return
+        setStats(json)
+        writeStatsCache(json)
       })
       .catch(() => {})
     return () => {
@@ -137,10 +176,24 @@ export default function ScholarPage() {
               ⌘K
             </kbd>
           </div>
-          <button type="button" className="scholar-filters-btn" aria-label="Open filters">
+          <button
+            type="button"
+            ref={filtersBtnRef}
+            className="scholar-filters-btn"
+            onClick={() => setFiltersOpen(true)}
+            aria-haspopup="dialog"
+            aria-expanded={filtersOpen}
+            aria-label="Open filters"
+          >
             Filters
           </button>
         </form>
+
+        <ScholarFiltersDrawer
+          open={filtersOpen}
+          onClose={() => setFiltersOpen(false)}
+          returnFocusRef={filtersBtnRef}
+        />
 
         <div className="scholar-try-chips">
           {TRY_CHIPS.map((chip) => (
@@ -157,15 +210,27 @@ export default function ScholarPage() {
 
         <div className="scholar-stats" aria-label="Scholar corpus stats">
           <div className="scholar-stat">
-            <div className="scholar-stat__value">{formatCount(stats.papers || 212_000_000)}</div>
+            {stats ? (
+              <div className="scholar-stat__value">{formatCount(stats.papers || 0)}</div>
+            ) : (
+              <span className="scholar-skeleton scholar-skeleton--stat-value" aria-hidden="true" />
+            )}
             <div className="scholar-stat__label">Papers · across 5 sources</div>
           </div>
           <div className="scholar-stat">
-            <div className="scholar-stat__value">{formatCount(stats.openAccess || 48_000_000)}</div>
+            {stats ? (
+              <div className="scholar-stat__value">{formatCount(stats.openAccess || 0)}</div>
+            ) : (
+              <span className="scholar-skeleton scholar-skeleton--stat-value" aria-hidden="true" />
+            )}
             <div className="scholar-stat__label">Open access · free to read</div>
           </div>
           <div className="scholar-stat">
-            <div className="scholar-stat__value">{formatCount(stats.thisYear || 3_400_000)}</div>
+            {stats ? (
+              <div className="scholar-stat__value">{formatCount(stats.thisYear || 0)}</div>
+            ) : (
+              <span className="scholar-skeleton scholar-skeleton--stat-value" aria-hidden="true" />
+            )}
             <div className="scholar-stat__label">This year · new in 2026</div>
           </div>
         </div>
@@ -187,7 +252,11 @@ export default function ScholarPage() {
             </Link>
           </div>
           {trendingLoading ? (
-            <div style={{ color: 'var(--sh-subtext)' }}>Loading…</div>
+            <div className="paper-card-grid" aria-hidden="true">
+              {[0, 1, 2, 3].map((i) => (
+                <span key={i} className="scholar-skeleton" style={{ height: 180, width: '100%' }} />
+              ))}
+            </div>
           ) : trending.length === 0 ? (
             <div
               style={{

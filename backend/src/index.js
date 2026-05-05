@@ -230,6 +230,10 @@ const appSurfaceCsp = buildCsp([
   `img-src 'self' data:${r2OriginList}`,
   "font-src 'none'",
   `media-src 'self' blob:${r2OriginList}`,
+  // Scholar OA-PDF iframe loads signed R2 URLs (10-min TTL, sandbox without
+  // allow-same-origin per A14). Without this directive the browser blocks
+  // the iframe at the CSP layer even when the signed URL itself works.
+  `frame-src 'self'${r2OriginList}`,
   "object-src 'none'",
   "script-src 'none'",
   "style-src 'none'",

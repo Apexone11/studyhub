@@ -8,6 +8,8 @@ import { resolveImageUrl } from '../../lib/imageUrls'
 import { formatRelativeTime, getPostTypeLabel } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 
+const REPLY_INITIAL_VISIBLE = 5
+
 function DiscussionPostItem({
   post,
   expanded,
@@ -24,6 +26,11 @@ function DiscussionPostItem({
   isAdminOrMod,
   userId,
 }) {
+  // Long Q&A threads can balloon to 30-50 replies; rendering them all on
+  // expand is fine but visually overwhelms the user. Default-collapse
+  // anything past the first REPLY_INITIAL_VISIBLE and let the user click
+  // through. Collapsed state resets per-post via local state.
+  const [showAllReplies, setShowAllReplies] = useState(false)
   const isAuthor = post.userId === userId || post.authorId === userId
   const authorName = post.author?.username || post.authorName || 'Unknown'
   const isResolved = post.resolved || post.isResolved
@@ -42,8 +49,23 @@ function DiscussionPostItem({
       style={{
         ...styles.discussionPost,
         marginBottom: 'var(--space-3)',
+        cursor: 'pointer',
       }}
       onClick={onToggleExpanded}
+      role="button"
+      tabIndex={0}
+      aria-expanded={expanded}
+      aria-label={`${expanded ? 'Collapse' : 'Expand'} discussion: ${post.title || 'untitled post'}`}
+      onKeyDown={(e) => {
+        // Only trigger on direct activation keys; let Enter inside the
+        // expanded form's textarea / inputs work normally (those events
+        // don't bubble here because the form lives inside an
+        // onClick={(e) => e.stopPropagation()} wrapper).
+        if ((e.key === 'Enter' || e.key === ' ') && e.target === e.currentTarget) {
+          e.preventDefault()
+          onToggleExpanded()
+        }
+      }}
     >
       <div style={styles.discussionHeader}>
         <div style={{ flex: 1 }}>
@@ -322,45 +344,89 @@ function DiscussionPostItem({
 
           {post.replies && post.replies.length > 0 && (
             <div style={styles.repliesList}>
-              {post.replies.map((reply) => (
-                <div key={reply.id} style={styles.reply}>
-                  <div style={styles.replyAuthor}>
-                    {reply.author?.username || reply.authorName || 'Unknown'}
-                  </div>
-                  <div style={styles.replyContent}>
-                    <MentionText text={reply.content || ''} />
-                  </div>
-                  {Array.isArray(reply.attachments) && reply.attachments.length > 0 && (
-                    <div
-                      style={{
-                        display: 'flex',
-                        flexWrap: 'wrap',
-                        gap: 6,
-                        marginTop: 6,
-                      }}
-                    >
-                      {reply.attachments.map((att, idx) => {
-                        const name =
-                          att.name || (att.url ? att.url.split('/').pop() : `attachment-${idx + 1}`)
-                        const resolvedUrl = resolveImageUrl(att.url)
-                        if (!resolvedUrl) return null
-                        return (
-                          <AttachmentPreview
-                            key={`${att.url}-${idx}`}
-                            attachment={{
-                              url: resolvedUrl,
-                              name,
-                              type: att.mime,
-                              kind: att.kind,
-                            }}
-                          />
-                        )
-                      })}
+              {(showAllReplies ? post.replies : post.replies.slice(0, REPLY_INITIAL_VISIBLE)).map(
+                (reply) => (
+                  <div key={reply.id} style={styles.reply}>
+                    <div style={styles.replyAuthor}>
+                      {reply.author?.username || reply.authorName || 'Unknown'}
                     </div>
-                  )}
-                  <div style={styles.replyTime}>{formatRelativeTime(reply.createdAt)}</div>
-                </div>
-              ))}
+                    <div style={styles.replyContent}>
+                      <MentionText text={reply.content || ''} />
+                    </div>
+                    {Array.isArray(reply.attachments) && reply.attachments.length > 0 && (
+                      <div
+                        style={{
+                          display: 'flex',
+                          flexWrap: 'wrap',
+                          gap: 6,
+                          marginTop: 6,
+                        }}
+                      >
+                        {reply.attachments.map((att, idx) => {
+                          const name =
+                            att.name ||
+                            (att.url ? att.url.split('/').pop() : `attachment-${idx + 1}`)
+                          const resolvedUrl = resolveImageUrl(att.url)
+                          if (!resolvedUrl) return null
+                          return (
+                            <AttachmentPreview
+                              key={`${att.url}-${idx}`}
+                              attachment={{
+                                url: resolvedUrl,
+                                name,
+                                type: att.mime,
+                                kind: att.kind,
+                              }}
+                            />
+                          )
+                        })}
+                      </div>
+                    )}
+                    <div style={styles.replyTime}>{formatRelativeTime(reply.createdAt)}</div>
+                  </div>
+                ),
+              )}
+              {post.replies.length > REPLY_INITIAL_VISIBLE && !showAllReplies ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllReplies(true)}
+                  style={{
+                    background: 'none',
+                    border: '1px solid var(--sh-border)',
+                    borderRadius: 'var(--radius-control)',
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    color: 'var(--sh-brand)',
+                    fontFamily: 'inherit',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    marginTop: 'var(--space-2)',
+                  }}
+                >
+                  Show {post.replies.length - REPLY_INITIAL_VISIBLE} more{' '}
+                  {post.replies.length - REPLY_INITIAL_VISIBLE === 1 ? 'reply' : 'replies'}
+                </button>
+              ) : null}
+              {showAllReplies && post.replies.length > REPLY_INITIAL_VISIBLE ? (
+                <button
+                  type="button"
+                  onClick={() => setShowAllReplies(false)}
+                  style={{
+                    background: 'none',
+                    border: '1px solid var(--sh-border)',
+                    borderRadius: 'var(--radius-control)',
+                    padding: '6px 12px',
+                    cursor: 'pointer',
+                    color: 'var(--sh-muted)',
+                    fontFamily: 'inherit',
+                    fontSize: 12,
+                    fontWeight: 600,
+                    marginTop: 'var(--space-2)',
+                  }}
+                >
+                  Show fewer replies
+                </button>
+              ) : null}
             </div>
           )}
 
@@ -415,7 +481,7 @@ export function GroupDiscussionsTab({
   // auto-expands because lazy-init only fires once.
   useEffect(() => {
     if (initialFocusedPostId && initialFocusedPostId !== expandedPostId) {
-      setExpandedPostId(initialFocusedPostId)
+      queueMicrotask(() => setExpandedPostId(initialFocusedPostId))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialFocusedPostId])

@@ -22,14 +22,19 @@ function LinkPreview({ content, isOwn }) {
   if (!urlMatch) return null
   const url = urlMatch[0]
 
-  // Only show preview for common linkable domains
-  const domain = (() => {
+  // Only show preview for common linkable domains. Re-validate the
+  // protocol on the parsed URL — the regex above already restricts to
+  // http(s), but a follow-up regex change must not silently let
+  // javascript:/data: through. Defense in depth.
+  const parsed = (() => {
     try {
-      return new URL(url).hostname
+      return new URL(url)
     } catch {
-      return ''
+      return null
     }
   })()
+  if (!parsed || (parsed.protocol !== 'http:' && parsed.protocol !== 'https:')) return null
+  const domain = parsed.hostname
   if (!domain) return null
 
   return (
@@ -310,7 +315,13 @@ export function MessageBubble({
             )}
 
             {message.editedAt && !isDeleted && (
-              <div style={{ fontSize: 10, opacity: 0.7, marginTop: 2 }}>(edited)</div>
+              <div
+                style={{ fontSize: 10, opacity: 0.7, marginTop: 2, cursor: 'help' }}
+                title={`Edited ${new Date(message.editedAt).toLocaleString()}`}
+                aria-label={`Edited ${new Date(message.editedAt).toLocaleString()}`}
+              >
+                (edited)
+              </div>
             )}
 
             <div style={{ fontSize: 11, opacity: 0.7, marginTop: 4 }}>

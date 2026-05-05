@@ -86,8 +86,10 @@ export function useAiChat() {
   }, [])
 
   useEffect(() => {
-    loadConversations()
-    loadUsage()
+    queueMicrotask(() => {
+      loadConversations()
+      loadUsage()
+    })
   }, [loadConversations, loadUsage])
 
   // L16-HIGH-3: unmount cleanup. If the provider tears down mid-stream
@@ -294,17 +296,17 @@ export function useAiChat() {
   }, [streaming, truncated, activeConversationId, sendMessage])
 
   // ── Delete a conversation ────────────────────────────────────────
+  // CLAUDE.md A4: do NOT remove from list before server confirms 200.
+  // Throw on failure so the caller can surface a toast and the row
+  // stays visible. The caller is responsible for showing a "Deleting…"
+  // spinner during the await.
   const removeConversation = useCallback(
     async (id) => {
-      try {
-        await aiService.deleteConversation(id)
-        setConversations((prev) => prev.filter((c) => c.id !== id))
-        if (id === activeConversationId) {
-          setActiveConversationId(null)
-          setMessages([])
-        }
-      } catch {
-        setError('Failed to delete conversation.')
+      await aiService.deleteConversation(id)
+      setConversations((prev) => prev.filter((c) => c.id !== id))
+      if (id === activeConversationId) {
+        setActiveConversationId(null)
+        setMessages([])
       }
     },
     [activeConversationId],

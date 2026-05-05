@@ -16,30 +16,63 @@ const log = require('../../lib/logger')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 
+// Allowlist for the `sort` query param. Anything else falls back to
+// 'ranked'. CLAUDE.md A13 — explicit allowlist before any string from
+// req.query reaches branching logic.
+const ALLOWED_SORT_MODES = new Set(['ranked', 'recent'])
+
 /**
- * Score a feed item by weighted engagement signals + recency.
- * Higher score = shown higher in feed.
+ * Score a feed item with a Hacker-News-style time-decay model blended with
+ * engagement and personalization signals. Returned score is consumed by the
+ * `merged.sort()` call below to order the candidate window before pagination.
+ *
+ * Formula:
+ *   engagement = likes + comments * 2 + forks * 3 + downloads * 0.1
+ *                + dislikes * -0.5
+ *   timeScore  = (engagement + 1) / (ageHours + 2) ** 1.5
+ *   final      = timeScore * followBoost * schoolBoost * courseBoost
+ *
+ * The `+1` keeps a brand-new post with zero engagement above a 7-day-old post
+ * with one like. The `+2` epsilon in the denominator prevents divide-by-zero
+ * for posts created in the last second and keeps the slope reasonable for
+ * very fresh posts. Pinned announcements bypass scoring (handled at sort
+ * time) so admin urgent-comms always sit at the top.
  */
 function scoreFeedItem(item, userContext = null) {
-  const likes = item.reactionSummary?.likes || item.stars || 0
-  const dislikes = item.reactionSummary?.dislikes || 0
+  const likes = item.reactions?.likes || item.stars || 0
+  const dislikes = item.reactions?.dislikes || 0
   const comments = item.commentCount || 0
-  const forks = item.forkCount || 0
-  const ageHours = (Date.now() - new Date(item.createdAt).getTime()) / (1000 * 60 * 60)
-  const recencyBoost = Math.max(0, 1 - ageHours / 720) * 15
-  let score = likes * 3 + dislikes * -1 + comments * 5 + forks * 8 + recencyBoost
+  const forks = item.forks || item.forkCount || 0
+  const downloads = item.downloads || 0
+  // Use createdAt; missing dates fall back to "old" so they sink rather than
+  // promoting bad data. Math.max guards against future-dated rows.
+  const created = item.createdAt ? new Date(item.createdAt).getTime() : 0
+  const ageHours = Math.max(0, (Date.now() - created) / (1000 * 60 * 60))
+  const engagement = likes * 1 + comments * 2 + forks * 3 + downloads * 0.1 + dislikes * -0.5
+  // Hacker-News-style decay: posts older than ~7d sink hard, fresh posts
+  // float even with zero engagement (the +1 gives them a baseline lift).
+  let score = (engagement + 1) / Math.pow(ageHours + 2, 1.5)
 
-  // Personalization boosts when user context is available
   if (userContext) {
     const courseId = item.course?.id || item.courseId
     const authorId = item.author?.id || item.user?.id || item.authorId
+    const authorSchoolIds = item.authorSchoolIds || null
 
-    // Boost content from user's enrolled courses
-    if (userContext.courseIds && courseId && userContext.courseIds.has(courseId)) {
-      score *= 1.4
-    }
-    // Boost content from followed users
+    // Followed authors — strongest personalization signal.
     if (userContext.followingIds && authorId && userContext.followingIds.has(authorId)) {
+      score *= 1.5
+    }
+    // Same-school authors — softer boost, only if not already a follow.
+    else if (
+      userContext.schoolIds &&
+      userContext.schoolIds.size > 0 &&
+      Array.isArray(authorSchoolIds) &&
+      authorSchoolIds.some((id) => userContext.schoolIds.has(id))
+    ) {
+      score *= 1.2
+    }
+    // Course enrollment overlap — independent of follow/school.
+    if (userContext.courseIds && courseId && userContext.courseIds.has(courseId)) {
       score *= 1.3
     }
   }
@@ -51,7 +84,14 @@ router.get('/', async (req, res) => {
   const startedAt = Date.now()
   const limit = parsePositiveInt(req.query.limit, 20)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
-  const take = limit + offset + 8
+  // For `sort=ranked` we pull a wider candidate window (200 items) so the
+  // JS scorer has enough material to outrank a pure recency feed without
+  // pushing the SQL planner into per-table heavy plans. For `sort=recent`
+  // we keep the legacy behaviour: just enough rows to satisfy the page.
+  const rawSort = typeof req.query.sort === 'string' ? req.query.sort : 'ranked'
+  const sortMode = ALLOWED_SORT_MODES.has(rawSort) ? rawSort : 'ranked'
+  const candidateWindow = sortMode === 'ranked' ? 200 : limit + offset + 8
+  const take = candidateWindow
   const announcementTake = Math.min(6, Math.max(2, Math.ceil((limit + offset) / 3)))
   const search = typeof req.query.search === 'string' ? req.query.search.trim() : ''
   const filterUserId = req.query.userId ? Number.parseInt(req.query.userId, 10) : null
@@ -413,11 +453,13 @@ router.get('/', async (req, res) => {
       ...notes.map((note) => formatNote(note, noteCommentCounts)),
     ]
 
-    // Build personalization context for authenticated users
+    // Build personalization context for authenticated users. Includes the
+    // viewer's enrolled courses, followed users, and school memberships so
+    // the scorer can apply the follow / same-school / course boosts.
     let userContext = null
-    if (req.user?.userId) {
+    if (req.user?.userId && sortMode === 'ranked') {
       try {
-        const [enrollments, follows] = await Promise.all([
+        const [enrollments, follows, schoolEnrollments] = await Promise.all([
           prisma.enrollment.findMany({
             where: { userId: req.user.userId },
             select: { courseId: true },
@@ -426,10 +468,15 @@ router.get('/', async (req, res) => {
             where: { followerId: req.user.userId, status: 'active' },
             select: { followingId: true },
           }),
+          prisma.userSchoolEnrollment.findMany({
+            where: { userId: req.user.userId },
+            select: { schoolId: true },
+          }),
         ])
         userContext = {
           courseIds: new Set(enrollments.map((e) => e.courseId)),
           followingIds: new Set(follows.map((f) => f.followingId)),
+          schoolIds: new Set(schoolEnrollments.map((s) => s.schoolId)),
         }
       } catch (err) {
         // Non-fatal - proceed without personalization
@@ -441,23 +488,94 @@ router.get('/', async (req, res) => {
       }
     }
 
-    merged.sort((a, b) => {
-      // Pinned announcements always float to the top
-      if (a.type === 'announcement' && b.type === 'announcement') {
-        if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
-      } else if (a.type === 'announcement' && a.pinned) {
-        return -1
-      } else if (b.type === 'announcement' && b.pinned) {
-        return 1
+    // For ranked mode with a school-aware boost, hydrate per-author school
+    // memberships in one round-trip. Without this `authorSchoolIds` is null
+    // and the boost simply doesn't fire — so the loss is graceful, not a
+    // regression. We only run the query when there's a viewer school set.
+    if (
+      sortMode === 'ranked' &&
+      userContext?.schoolIds &&
+      userContext.schoolIds.size > 0 &&
+      merged.length > 0
+    ) {
+      try {
+        const authorIds = [
+          ...new Set(
+            merged
+              .map((item) => item.author?.id || item.user?.id)
+              .filter((id) => Number.isInteger(id) && id > 0),
+          ),
+        ]
+        if (authorIds.length > 0) {
+          const authorSchoolRows = await prisma.userSchoolEnrollment.findMany({
+            where: { userId: { in: authorIds } },
+            select: { userId: true, schoolId: true },
+          })
+          const byAuthor = new Map()
+          for (const row of authorSchoolRows) {
+            const list = byAuthor.get(row.userId) || []
+            list.push(row.schoolId)
+            byAuthor.set(row.userId, list)
+          }
+          for (const item of merged) {
+            const authorId = item.author?.id || item.user?.id
+            if (authorId && byAuthor.has(authorId)) {
+              item.authorSchoolIds = byAuthor.get(authorId)
+            }
+          }
+        }
+      } catch (err) {
+        // Non-fatal — same-school boost just doesn't fire on this request.
+        captureError(err, {
+          context: 'feed.authorSchoolHydrate',
+          route: req.originalUrl,
+          method: req.method,
+        })
       }
+    }
 
-      return scoreFeedItem(b, userContext) - scoreFeedItem(a, userContext)
-    })
+    if (sortMode === 'recent') {
+      // Legacy behaviour: pure createdAt DESC with pinned announcements first.
+      merged.sort((a, b) => {
+        if (a.type === 'announcement' && b.type === 'announcement') {
+          if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+        } else if (a.type === 'announcement' && a.pinned) {
+          return -1
+        } else if (b.type === 'announcement' && b.pinned) {
+          return 1
+        }
+        const aTime = a.createdAt ? new Date(a.createdAt).getTime() : 0
+        const bTime = b.createdAt ? new Date(b.createdAt).getTime() : 0
+        return bTime - aTime
+      })
+    } else {
+      merged.sort((a, b) => {
+        // Pinned announcements always float to the top
+        if (a.type === 'announcement' && b.type === 'announcement') {
+          if (a.pinned !== b.pinned) return a.pinned ? -1 : 1
+        } else if (a.type === 'announcement' && a.pinned) {
+          return -1
+        } else if (b.type === 'announcement' && b.pinned) {
+          return 1
+        }
+
+        return scoreFeedItem(b, userContext) - scoreFeedItem(a, userContext)
+      })
+    }
 
     const items = merged
 
-    // Enrich feed item authors with Pro/Donor badge data
-    const slicedItems = items.slice(offset, offset + limit)
+    // Enrich feed item authors with Pro/Donor badge data. Strip the
+    // server-only `authorSchoolIds` hydration field before returning so we
+    // never leak per-author school memberships to clients (defence-in-depth
+    // for the same-school boost — only the boost should ever see it).
+    const slicedItems = items.slice(offset, offset + limit).map((item) => {
+      if (item.authorSchoolIds) {
+        const { authorSchoolIds: _stripped, ...rest } = item
+        return rest
+      }
+      return item
+    })
     try {
       const authorMap = new Map()
       for (const item of slicedItems) {
@@ -493,8 +611,10 @@ router.get('/', async (req, res) => {
 
     log.info(
       {
+        event: 'feed.loaded',
         userId: req.user.userId,
         search,
+        sortMode,
         durationMs: Date.now() - startedAt,
         partial: payload.partial,
         counts: {
@@ -520,4 +640,10 @@ router.get('/', async (req, res) => {
   }
 })
 
+// Default export is the express Router; the named exports power unit tests.
+// Express ignores extra fields on a router instance, so attaching them here
+// keeps `require('./feed.list.controller')` returning the router exactly as
+// before — no `module.exports = { router, ... }` rewrite needed.
 module.exports = router
+module.exports.scoreFeedItem = scoreFeedItem
+module.exports.ALLOWED_SORT_MODES = ALLOWED_SORT_MODES

@@ -9,6 +9,7 @@ import { Link } from 'react-router-dom'
 import { API } from '../../config'
 import { SectionCard, Button, Message } from './settingsShared'
 import { FONT } from './settingsState'
+import { Skeleton } from '../../components/Skeleton'
 
 const MILESTONES = [
   { threshold: 5, proMonths: 1, label: '1 month free Pro' },
@@ -38,7 +39,7 @@ export default function ReferralsTab() {
   }, [])
 
   useEffect(() => {
-    fetchData()
+    queueMicrotask(fetchData)
   }, [fetchData])
 
   const referralUrl = data?.code ? `${window.location.origin}/register?ref=${data.code}` : ''
@@ -62,8 +63,17 @@ export default function ReferralsTab() {
 
   if (loading) {
     return (
-      <div style={{ padding: 40, textAlign: 'center' }}>
-        <div style={{ fontSize: 14, color: 'var(--sh-muted)' }}>Loading referrals...</div>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
+        <SectionCard title="Your Referral Link" subtitle="Loading your referral details…">
+          <Skeleton width="100%" height={44} borderRadius={10} />
+        </SectionCard>
+        <SectionCard title="Referral Summary">
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+            <Skeleton width="100%" height={68} borderRadius={12} />
+            <Skeleton width="100%" height={68} borderRadius={12} />
+            <Skeleton width="100%" height={68} borderRadius={12} />
+          </div>
+        </SectionCard>
       </div>
     )
   }

@@ -8,6 +8,7 @@
 const { safeFetch } = require('../../../lib/safeFetch')
 const log = require('../../../lib/logger')
 const rateBucket = require('../rateBucket')
+const { logAdapterError } = require('../_adapterLogger')
 const { HOSTS, ADAPTER_SOFT_TIMEOUT_MS } = require('../scholar.constants')
 
 const SOURCE = 'crossref'
@@ -73,58 +74,82 @@ function _normalize(item) {
 }
 
 async function search(query, opts = {}) {
-  if (!rateBucket.take(SOURCE)) {
-    return { source: SOURCE, results: [], throttled: true }
-  }
-  const limit = Math.min(50, Math.max(1, opts.limit || 20))
-  const params = new URLSearchParams({
-    'query.bibliographic': query,
-    rows: String(limit),
-  })
-  const filters = []
-  if (opts.from) filters.push(`from-pub-date:${opts.from}-01-01`)
-  if (opts.to) filters.push(`until-pub-date:${opts.to}-12-31`)
-  if (filters.length > 0) params.set('filter', filters.join(','))
-  const url = `https://${HOST}/works?${params.toString()}`
-  const res = await safeFetch(url, {
-    allowlist: [HOST],
-    headers: { 'user-agent': _ua() },
-    expect: 'json',
-    timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
-  })
-  if (!res.ok) {
+  try {
+    if (!rateBucket.take(SOURCE)) {
+      return { source: SOURCE, results: [], throttled: true }
+    }
+    const limit = Math.min(50, Math.max(1, opts.limit || 20))
+    const params = new URLSearchParams({
+      'query.bibliographic': query,
+      rows: String(limit),
+    })
+    const filters = []
+    if (opts.from) filters.push(`from-pub-date:${opts.from}-01-01`)
+    if (opts.to) filters.push(`until-pub-date:${opts.to}-12-31`)
+    if (filters.length > 0) params.set('filter', filters.join(','))
+    const url = `https://${HOST}/works?${params.toString()}`
+    const res = await safeFetch(url, {
+      allowlist: [HOST],
+      headers: { 'user-agent': _ua() },
+      expect: 'json',
+      timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
+    })
+    if (!res.ok) {
+      logAdapterError({
+        source: SOURCE,
+        error: res.error,
+        status: res.status,
+        message: 'CrossRef search failed',
+      })
+      return { source: SOURCE, results: [], error: res.error || 'http_error' }
+    }
+    const list = Array.isArray(res.body?.message?.items) ? res.body.message.items : []
+    return {
+      source: SOURCE,
+      results: list.map(_normalize).filter(Boolean),
+    }
+  } catch (err) {
     log.warn(
-      { event: 'scholar.adapter.error', source: SOURCE, error: res.error, status: res.status },
-      'CrossRef search failed',
+      { event: 'scholar.adapter.unexpected', source: SOURCE, err: err && err.message },
+      'CrossRef search threw unexpectedly',
     )
-    return { source: SOURCE, results: [], error: res.error || 'http_error' }
-  }
-  const list = Array.isArray(res.body?.message?.items) ? res.body.message.items : []
-  return {
-    source: SOURCE,
-    results: list.map(_normalize).filter(Boolean),
+    return { source: SOURCE, results: [], error: 'unexpected_error' }
   }
 }
 
 async function fetch(canonicalId) {
-  if (!rateBucket.take(SOURCE)) {
-    return { source: SOURCE, paper: null, throttled: true }
+  try {
+    if (!rateBucket.take(SOURCE)) {
+      return { source: SOURCE, paper: null, throttled: true }
+    }
+    if (!canonicalId.startsWith('doi:')) {
+      return { source: SOURCE, paper: null, error: 'unsupported_id' }
+    }
+    const doi = canonicalId.slice(4)
+    const url = `https://${HOST}/works/${encodeURIComponent(doi)}`
+    const res = await safeFetch(url, {
+      allowlist: [HOST],
+      headers: { 'user-agent': _ua() },
+      expect: 'json',
+      timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
+    })
+    if (!res.ok) {
+      logAdapterError({
+        source: SOURCE,
+        error: res.error,
+        status: res.status,
+        message: 'CrossRef fetch failed',
+      })
+      return { source: SOURCE, paper: null, error: res.error || 'http_error' }
+    }
+    return { source: SOURCE, paper: _normalize(res.body?.message) }
+  } catch (err) {
+    log.warn(
+      { event: 'scholar.adapter.unexpected', source: SOURCE, err: err && err.message },
+      'CrossRef fetch threw unexpectedly',
+    )
+    return { source: SOURCE, paper: null, error: 'unexpected_error' }
   }
-  if (!canonicalId.startsWith('doi:')) {
-    return { source: SOURCE, paper: null, error: 'unsupported_id' }
-  }
-  const doi = canonicalId.slice(4)
-  const url = `https://${HOST}/works/${encodeURIComponent(doi)}`
-  const res = await safeFetch(url, {
-    allowlist: [HOST],
-    headers: { 'user-agent': _ua() },
-    expect: 'json',
-    timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
-  })
-  if (!res.ok) {
-    return { source: SOURCE, paper: null, error: res.error || 'http_error' }
-  }
-  return { source: SOURCE, paper: _normalize(res.body?.message) }
 }
 
 module.exports = { SOURCE, search, fetch, _normalize }

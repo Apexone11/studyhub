@@ -133,6 +133,22 @@ function writeMutedPreference(muted) {
   }
 }
 
+// Compute the video's display aspect ratio. Falls back to 16/9 so the
+// reserved box matches the most common encoder output and the layout never
+// reflows on metadata load. Returning a CSS string (not a number) lets us
+// drop it straight into `aspectRatio` without runtime math per render.
+function computeAspectRatio(video) {
+  const w = Number(video?.width) || 0
+  const h = Number(video?.height) || 0
+  if (w > 0 && h > 0) return `${w} / ${h}`
+  return '16 / 9'
+}
+
+// Mount-distance threshold for the IntersectionObserver-driven lazy load.
+// 200px keeps the next-card video pre-warmed without burning bandwidth on
+// cards five screens away — matches the task spec.
+const VIDEO_VIEWPORT_MARGIN = '200px'
+
 function FeedVideoPlayer({ video }) {
   const [streamUrl, setStreamUrl] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -150,23 +166,52 @@ function FeedVideoPlayer({ video }) {
   // alongside the other video-tied state below so a virtualised feed
   // doesn't carry a "hot" overlay over to the next video.
   const [overlayHot, setOverlayHot] = useState(false)
+  // Lazy-load gate: stays false for cards far from the viewport so the
+  // <video> element never mounts and we never fetch the stream URL. Flips
+  // true when IntersectionObserver reports the wrapper within the rootMargin
+  // window. Initial value uses a lazy initializer so SSR / very old browsers
+  // without IntersectionObserver eagerly enable at mount (no setState-in-
+  // effect — that pattern is banned by react-hooks/set-state-in-effect).
+  const [inView, setInView] = useState(() => typeof IntersectionObserver !== 'function')
+  const wrapperRef = useRef(null)
   const videoRef = useRef(null)
+  const aspectRatio = computeAspectRatio(video)
+
+  // IntersectionObserver lazy-mount. Cards more than 200px from the viewport
+  // render a static poster placeholder instead of the <video>, which both
+  // eliminates the metadata-fetch reflow on initial paint and saves
+  // bandwidth on long feeds. The IO-unavailable fallback is handled by the
+  // useState initializer above, so this effect never has to setState
+  // synchronously on mount.
+  useEffect(() => {
+    if (typeof IntersectionObserver !== 'function') return undefined
+    const node = wrapperRef.current
+    if (!node) return undefined
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            setInView(true)
+            observer.disconnect()
+            break
+          }
+        }
+      },
+      { rootMargin: VIDEO_VIEWPORT_MARGIN, threshold: 0 },
+    )
+    observer.observe(node)
+    return () => observer.disconnect()
+  }, [])
 
   useEffect(() => {
-    if (!video?.id || video.status !== 'ready') return
+    if (!video?.id || video.status !== 'ready' || !inView) return
     let cancelled = false
 
-    // Reset every state that's tied to a specific video src. If a parent
-    // ever swaps the `video` prop on the same mounted instance (virtualised
-    // feed, FLIP animation, key-less conditional render), the previous
-    // video's `started=true` would otherwise hide the click-to-play overlay
-    // forever for the new video. Same for stalled / error / streamUrl.
-    setStarted(false)
-    setStalled(false)
-    setError(null)
-    setStreamUrl(null)
-    setLoading(true)
-    setOverlayHot(false)
+    // Per-video state (started, stalled, streamUrl, etc.) is initialised
+    // fresh on mount and the parent keys this component on `video.id`, so
+    // a video swap unmounts the old instance instead of mutating state in
+    // an effect. That avoids the `react-hooks/set-state-in-effect`
+    // anti-pattern and keeps the player stable across feed polls.
 
     async function fetchStream() {
       try {
@@ -214,7 +259,7 @@ function FeedVideoPlayer({ video }) {
     return () => {
       cancelled = true
     }
-  }, [video?.id, video?.status])
+  }, [video?.id, video?.status, inView])
 
   const thumbnailUrl = video?.thumbnailR2Key
     ? `${API}/api/video/media/${encodeURIComponent(video.thumbnailR2Key)}`
@@ -318,37 +363,99 @@ function FeedVideoPlayer({ video }) {
     [video?.downloadable],
   )
 
+  // Single outer wrapper with a locked aspect ratio. Every render branch
+  // below renders INTO this wrapper so the box's height never changes — no
+  // reflow on stream-URL arrival, on metadata load, or on error swap. This
+  // is the load-bearing fix for the "feed flash on every navigation" bug.
+  const outerWrapperStyle = {
+    position: 'relative',
+    marginTop: 14,
+    borderRadius: 'var(--radius-card)',
+    overflow: 'hidden',
+    background: '#000',
+    aspectRatio,
+    width: '100%',
+  }
+
+  // Fallback poster placeholder: solid surface tile with optional thumbnail.
+  // Used when the video is processing, when the card is off-screen, while
+  // the stream URL is being fetched, and on error. A single element shape
+  // means React reconciles it across state transitions without a remount.
+  function renderPosterShell({ overlay }) {
+    return (
+      <>
+        {thumbnailUrl ? (
+          <img
+            src={thumbnailUrl}
+            alt=""
+            // Stable dimensions to lock layout regardless of natural image
+            // size. `decoding="async"` keeps the main thread free; `loading="lazy"`
+            // defers the network fetch to when the wrapper is observed.
+            decoding="async"
+            loading="lazy"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              width: '100%',
+              height: '100%',
+              objectFit: 'cover',
+              opacity: 0.7,
+            }}
+          />
+        ) : (
+          <div
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              inset: 0,
+              background: 'var(--sh-soft)',
+            }}
+          />
+        )}
+        {overlay}
+      </>
+    )
+  }
+
   if (video?.status === 'processing') {
     return (
-      <div
-        style={{
-          background: '#000',
-          borderRadius: 'var(--radius-card)',
-          overflow: 'hidden',
-          aspectRatio: '16/9',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'column',
-          gap: 8,
-          marginTop: 14,
-        }}
-      >
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            border: '3px solid rgba(255,255,255,0.2)',
-            borderTopColor: 'var(--sh-brand)',
-            borderRadius: '50%',
-            animation: 'shp-spin 0.8s linear infinite',
-          }}
-        />
-        <span
-          style={{ color: 'rgba(255,255,255,0.7)', fontSize: 'var(--type-xs)', fontWeight: 500 }}
-        >
-          Video is processing...
-        </span>
+      <div ref={wrapperRef} style={outerWrapperStyle}>
+        {renderPosterShell({
+          overlay: (
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                flexDirection: 'column',
+                gap: 8,
+                background: 'rgba(0,0,0,0.45)',
+              }}
+            >
+              <div
+                style={{
+                  width: 32,
+                  height: 32,
+                  border: '3px solid rgba(255,255,255,0.2)',
+                  borderTopColor: 'var(--sh-brand)',
+                  borderRadius: '50%',
+                  animation: 'shp-spin 0.8s linear infinite',
+                }}
+              />
+              <span
+                style={{
+                  color: 'rgba(255,255,255,0.85)',
+                  fontSize: 'var(--type-xs)',
+                  fontWeight: 500,
+                }}
+              >
+                Video is processing...
+              </span>
+            </div>
+          ),
+        })}
       </div>
     )
   }
@@ -356,11 +463,14 @@ function FeedVideoPlayer({ video }) {
   if (video?.status === 'failed') {
     return (
       <div
+        ref={wrapperRef}
         style={{
+          ...outerWrapperStyle,
           background: 'var(--sh-danger-bg)',
-          borderRadius: 'var(--radius-card)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           padding: 16,
-          marginTop: 14,
           textAlign: 'center',
           color: 'var(--sh-danger-text)',
           fontSize: 'var(--type-sm)',
@@ -374,11 +484,14 @@ function FeedVideoPlayer({ video }) {
   if (error) {
     return (
       <div
+        ref={wrapperRef}
         style={{
+          ...outerWrapperStyle,
           background: 'var(--sh-danger-bg)',
-          borderRadius: 'var(--radius-card)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
           padding: 16,
-          marginTop: 14,
           textAlign: 'center',
           color: 'var(--sh-danger-text)',
           fontSize: 'var(--type-sm)',
@@ -389,47 +502,70 @@ function FeedVideoPlayer({ video }) {
     )
   }
 
-  if (loading || !streamUrl) {
+  // Off-screen card OR stream URL not yet known. Render the poster shell
+  // INSIDE the same outer wrapper. No aspect-ratio swap, no reflow, no
+  // re-mount of the <video> when the stream URL eventually arrives. The
+  // user clicks the overlay only after the URL is in hand (handlePlayClick
+  // checks videoRef which is null until <video> mounts in the next branch).
+  if (!inView || loading || !streamUrl) {
     return (
-      <div
-        style={{
-          background: '#000',
-          borderRadius: 'var(--radius-card)',
-          overflow: 'hidden',
-          aspectRatio: '16/9',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          marginTop: 14,
-        }}
-      >
-        {thumbnailUrl && (
-          <img
-            src={thumbnailUrl}
-            alt=""
-            style={{
-              position: 'absolute',
-              width: '100%',
-              height: '100%',
-              objectFit: 'cover',
-              opacity: 0.5,
-            }}
-          />
-        )}
-        <div
-          style={{
-            width: 32,
-            height: 32,
-            border: '3px solid rgba(255,255,255,0.2)',
-            borderTopColor: 'var(--sh-brand)',
-            borderRadius: '50%',
-            animation: 'shp-spin 0.8s linear infinite',
-          }}
-        />
+      <div ref={wrapperRef} style={outerWrapperStyle}>
+        {renderPosterShell({
+          overlay: (
+            <div
+              aria-hidden="true"
+              style={{
+                position: 'absolute',
+                inset: 0,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                background: 'rgba(0,0,0,0.18)',
+              }}
+            >
+              {/* Show the spinner only while the network fetch is actually
+                  inflight; off-screen cards stay quiet so the feed isn't a
+                  field of spinners. */}
+              {inView ? (
+                <div
+                  style={{
+                    width: 32,
+                    height: 32,
+                    border: '3px solid rgba(255,255,255,0.2)',
+                    borderTopColor: 'var(--sh-brand)',
+                    borderRadius: '50%',
+                    animation: 'shp-spin 0.8s linear infinite',
+                  }}
+                />
+              ) : (
+                <span
+                  aria-hidden="true"
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: '50%',
+                    background: 'rgba(255,255,255,0.85)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                  }}
+                >
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="#111">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </span>
+              )}
+            </div>
+          ),
+        })}
       </div>
     )
   }
 
+  // Success branch. The outer wrapper holds an aspect-ratio'd MEDIA box
+  // followed by a normal-flow metadata strip. The aspect-ratio lock lives
+  // on the media box so the strip below grows naturally without touching
+  // the reserved video height.
   return (
     <div
       style={{
@@ -439,22 +575,22 @@ function FeedVideoPlayer({ video }) {
         background: '#000',
       }}
     >
-      {/*
-        Standard `<video poster>` pattern — the browser renders the poster
-        image until first play, after which it shows decoded frames. No
-        opacity hacks: the video element is always visible at full opacity,
-        controls are always reachable. A custom click-to-play overlay sits
-        on top of the poster only while `started === false`, so users get
-        a big obvious play target instead of the small native control.
-      */}
-      <div style={{ position: 'relative', backgroundColor: '#000' }}>
+      <div ref={wrapperRef} style={{ ...outerWrapperStyle, marginTop: 0 }}>
+        {/*
+          Standard `<video poster>` pattern — the browser renders the poster
+          image until first play, after which it shows decoded frames. No
+          opacity hacks: the video element is always visible at full opacity,
+          controls are always reachable. A custom click-to-play overlay sits
+          on top of the poster only while `started === false`, so users get
+          a big obvious play target instead of the small native control.
+        */}
         <video
           ref={videoRef}
           src={streamUrl}
           poster={thumbnailUrl || undefined}
           controls
           playsInline
-          preload="metadata"
+          preload="none"
           tabIndex={0}
           controlsList={
             video.downloadable === false ? 'nodownload nofullscreen noremoteplayback' : undefined
@@ -477,10 +613,17 @@ function FeedVideoPlayer({ video }) {
           }}
           onVolumeChange={handleVolumeChange}
           onKeyDown={handleKeyDown}
+          // Fill the aspect-ratio box exactly. `object-fit: contain` keeps
+          // odd source ratios letterboxed instead of stretching. The element
+          // is absolutely positioned so the strip below the wrapper sits in
+          // normal flow without competing for height.
           style={{
+            position: 'absolute',
+            inset: 0,
             width: '100%',
+            height: '100%',
             display: 'block',
-            maxHeight: 500,
+            objectFit: 'contain',
             backgroundColor: '#000',
           }}
         />
@@ -970,7 +1113,15 @@ function FeedCardInner({
           ) : null}
 
           {/* Video player */}
-          {item.video && <FeedVideoPlayer video={item.video} />}
+          {/*
+            Key on the video id so a swap between two videos under the same
+            FeedCard remounts the player with default state (no need for
+            setState-resets in a useEffect). For the same id, the instance
+            persists across parent re-renders so the stream URL, started,
+            and stalled state survive the 30-second feed poll. This is the
+            "react canonical reset" pattern from the docs.
+          */}
+          {item.video && <FeedVideoPlayer key={item.video.id} video={item.video} />}
 
           {urls ? (
             <section

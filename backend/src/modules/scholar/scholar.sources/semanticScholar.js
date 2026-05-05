@@ -9,6 +9,7 @@
 const { safeFetch } = require('../../../lib/safeFetch')
 const log = require('../../../lib/logger')
 const rateBucket = require('../rateBucket')
+const { logAdapterError } = require('../_adapterLogger')
 const { HOSTS, ADAPTER_SOFT_TIMEOUT_MS } = require('../scholar.constants')
 
 const SOURCE = 'semanticScholar'
@@ -80,62 +81,86 @@ function _normalize(p) {
 }
 
 async function search(query, opts = {}) {
-  if (!rateBucket.take(SOURCE)) {
-    return { source: SOURCE, results: [], throttled: true }
-  }
-  const limit = Math.min(50, Math.max(1, opts.limit || 20))
-  const params = new URLSearchParams({
-    query,
-    limit: String(limit),
-    fields: FIELDS,
-  })
-  if (opts.from || opts.to) {
-    const from = opts.from || ''
-    const to = opts.to || ''
-    params.set('year', `${from}-${to}`)
-  }
-  const url = `https://${HOST}/graph/v1/paper/search?${params.toString()}`
-  const res = await safeFetch(url, {
-    allowlist: [HOST],
-    headers: _headers(),
-    expect: 'json',
-    timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
-  })
-  if (!res.ok) {
+  try {
+    if (!rateBucket.take(SOURCE)) {
+      return { source: SOURCE, results: [], throttled: true }
+    }
+    const limit = Math.min(50, Math.max(1, opts.limit || 20))
+    const params = new URLSearchParams({
+      query,
+      limit: String(limit),
+      fields: FIELDS,
+    })
+    if (opts.from || opts.to) {
+      const from = opts.from || ''
+      const to = opts.to || ''
+      params.set('year', `${from}-${to}`)
+    }
+    const url = `https://${HOST}/graph/v1/paper/search?${params.toString()}`
+    const res = await safeFetch(url, {
+      allowlist: [HOST],
+      headers: _headers(),
+      expect: 'json',
+      timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
+    })
+    if (!res.ok) {
+      logAdapterError({
+        source: SOURCE,
+        error: res.error,
+        status: res.status,
+        message: 'Semantic Scholar search failed',
+      })
+      return { source: SOURCE, results: [], error: res.error || 'http_error' }
+    }
+    const list = Array.isArray(res.body?.data) ? res.body.data : []
+    return {
+      source: SOURCE,
+      results: list.map(_normalize).filter(Boolean),
+    }
+  } catch (err) {
     log.warn(
-      { event: 'scholar.adapter.error', source: SOURCE, error: res.error, status: res.status },
-      'Semantic Scholar search failed',
+      { event: 'scholar.adapter.unexpected', source: SOURCE, err: err && err.message },
+      'Semantic Scholar search threw unexpectedly',
     )
-    return { source: SOURCE, results: [], error: res.error || 'http_error' }
-  }
-  const list = Array.isArray(res.body?.data) ? res.body.data : []
-  return {
-    source: SOURCE,
-    results: list.map(_normalize).filter(Boolean),
+    return { source: SOURCE, results: [], error: 'unexpected_error' }
   }
 }
 
 async function fetch(canonicalId) {
-  if (!rateBucket.take(SOURCE)) {
-    return { source: SOURCE, paper: null, throttled: true }
-  }
-  // Accept either ss:<id> or doi:<id>; map to S2's identifier scheme.
-  let lookupId = canonicalId
-  if (canonicalId.startsWith('ss:')) lookupId = canonicalId.slice(3)
-  else if (canonicalId.startsWith('doi:')) lookupId = `DOI:${canonicalId.slice(4)}`
-  else if (canonicalId.startsWith('arxiv:')) lookupId = `ARXIV:${canonicalId.slice(6)}`
+  try {
+    if (!rateBucket.take(SOURCE)) {
+      return { source: SOURCE, paper: null, throttled: true }
+    }
+    // Accept either ss:<id> or doi:<id>; map to S2's identifier scheme.
+    let lookupId = canonicalId
+    if (canonicalId.startsWith('ss:')) lookupId = canonicalId.slice(3)
+    else if (canonicalId.startsWith('doi:')) lookupId = `DOI:${canonicalId.slice(4)}`
+    else if (canonicalId.startsWith('arxiv:')) lookupId = `ARXIV:${canonicalId.slice(6)}`
 
-  const url = `https://${HOST}/graph/v1/paper/${encodeURIComponent(lookupId)}?fields=${encodeURIComponent(FIELDS)}`
-  const res = await safeFetch(url, {
-    allowlist: [HOST],
-    headers: _headers(),
-    expect: 'json',
-    timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
-  })
-  if (!res.ok) {
-    return { source: SOURCE, paper: null, error: res.error || 'http_error' }
+    const url = `https://${HOST}/graph/v1/paper/${encodeURIComponent(lookupId)}?fields=${encodeURIComponent(FIELDS)}`
+    const res = await safeFetch(url, {
+      allowlist: [HOST],
+      headers: _headers(),
+      expect: 'json',
+      timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
+    })
+    if (!res.ok) {
+      logAdapterError({
+        source: SOURCE,
+        error: res.error,
+        status: res.status,
+        message: 'Semantic Scholar fetch failed',
+      })
+      return { source: SOURCE, paper: null, error: res.error || 'http_error' }
+    }
+    return { source: SOURCE, paper: _normalize(res.body) }
+  } catch (err) {
+    log.warn(
+      { event: 'scholar.adapter.unexpected', source: SOURCE, err: err && err.message },
+      'Semantic Scholar fetch threw unexpectedly',
+    )
+    return { source: SOURCE, paper: null, error: 'unexpected_error' }
   }
-  return { source: SOURCE, paper: _normalize(res.body) }
 }
 
 module.exports = { SOURCE, search, fetch, _normalize }

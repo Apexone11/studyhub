@@ -11,10 +11,16 @@ import ReportModal from '../../components/ReportModal'
 import ModerationBanner from '../../components/ModerationBanner'
 import PendingReviewBanner from '../../components/PendingReviewBanner'
 import UserAvatar from '../../components/UserAvatar'
+import { SkeletonCard } from '../../components/Skeleton'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { MarkdownPreview, wordCount, countWordsFromHtml } from './notesConstants'
 import NoteCommentSection from './NoteCommentSection'
 import { useNoteViewer } from './useNoteViewer'
+
+// Reading speed used for the "X min read" estimate. 220 wpm is the median
+// silent-reading rate cited by Brysbaert (2019) — same baseline Bear and
+// Notion use, so the estimate matches what students see in other tools.
+const WORDS_PER_MINUTE = 220
 
 function formatDate(dateStr) {
   if (!dateStr) return ''
@@ -228,12 +234,14 @@ export default function NoteViewerPage() {
       <div
         style={{
           fontFamily: PAGE_FONT,
-          padding: 40,
-          textAlign: 'center',
-          color: 'var(--sh-muted)',
+          maxWidth: 820,
+          margin: '0 auto',
+          padding: '24px 16px',
         }}
+        aria-busy="true"
+        aria-label="Loading note"
       >
-        Loading...
+        <SkeletonCard />
       </div>
     )
   }
@@ -255,12 +263,16 @@ export default function NoteViewerPage() {
   const words = isHtmlContent(note.content)
     ? countWordsFromHtml(note.content)
     : wordCount(note.content)
+  // Floor + max(1) keeps short notes (under one minute) from displaying
+  // "0 min read" while still being honest about long-form content.
+  const readMinutes = words > 0 ? Math.max(1, Math.ceil(words / WORDS_PER_MINUTE)) : 0
 
   return (
     <div style={{ fontFamily: PAGE_FONT, maxWidth: 820, margin: '0 auto', padding: '24px 16px' }}>
       {/* Header */}
       <div style={{ marginBottom: 24 }}>
-        <div
+        <nav
+          aria-label="Breadcrumb"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -275,8 +287,23 @@ export default function NoteViewerPage() {
           >
             Notes
           </Link>
-          <span style={{ color: 'var(--sh-slate-300)' }}>/</span>
-        </div>
+          <span aria-hidden="true" style={{ color: 'var(--sh-slate-300)' }}>
+            /
+          </span>
+          <span
+            aria-current="page"
+            style={{
+              color: 'var(--sh-subtext)',
+              fontSize: 13,
+              maxWidth: 360,
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            {note.title || 'Untitled'}
+          </span>
+        </nav>
 
         <h1
           style={{ fontSize: 26, fontWeight: 800, color: 'var(--sh-heading)', margin: '0 0 12px' }}
@@ -328,6 +355,7 @@ export default function NoteViewerPage() {
           <span>
             {words} {words === 1 ? 'word' : 'words'}
           </span>
+          {readMinutes > 0 ? <span>{readMinutes} min read</span> : null}
           {!note.private && (
             <span
               style={{

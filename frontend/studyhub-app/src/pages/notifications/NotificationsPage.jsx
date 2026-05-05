@@ -8,7 +8,7 @@
  *   - Live socket push (no polling lag) + 30s polling fallback
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
@@ -56,8 +56,10 @@ export default function NotificationsPage() {
 
   useEffect(() => {
     if (user) {
-      setSessionExpired(false)
-      setLoadError(false)
+      queueMicrotask(() => {
+        setSessionExpired(false)
+        setLoadError(false)
+      })
     }
   }, [user])
 
@@ -383,8 +385,10 @@ export default function NotificationsPage() {
           </div>
         )}
 
-        {/* List */}
-        <div role="list">
+        {/* List — each row is a button (clickable + keyboard-activatable),
+            so we deliberately don't wrap them in role="list" / role="listitem".
+            The previous "listitem button" composite role was invalid ARIA. */}
+        <div>
           {loading ? (
             <div style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <Skeleton height={64} />
@@ -421,6 +425,7 @@ export default function NotificationsPage() {
             >
               <i
                 className="fas fa-bell-slash"
+                aria-hidden="true"
                 style={{
                   fontSize: 36,
                   display: 'block',
@@ -431,11 +436,30 @@ export default function NotificationsPage() {
               <div style={{ fontWeight: 600, fontSize: 15, color: 'var(--sh-text)' }}>
                 {filter === 'unread' ? 'No unread notifications' : 'Nothing here yet'}
               </div>
-              <div style={{ fontSize: 13, marginTop: 4 }}>
+              <div style={{ fontSize: 13, marginTop: 4, marginBottom: 16 }}>
                 {filter === 'unread'
                   ? 'You are all caught up.'
-                  : 'When activity reaches you, it will show up here.'}
+                  : 'When classmates star a sheet, follow you, or comment on your work, it will show up here.'}
               </div>
+              {/* CTA gives the empty state somewhere to go — Linear / Twitter
+                  pattern. Suggest the feed when nothing's happening yet. */}
+              {filter !== 'unread' && (
+                <Link
+                  to="/feed"
+                  style={{
+                    display: 'inline-block',
+                    padding: '8px 16px',
+                    borderRadius: 8,
+                    background: 'var(--sh-brand)',
+                    color: 'var(--sh-on-brand, #ffffff)',
+                    fontSize: 13,
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Browse the feed
+                </Link>
+              )}
             </div>
           ) : (
             filtered.map((notif) => {
@@ -444,7 +468,7 @@ export default function NotificationsPage() {
               return (
                 <div
                   key={notif.id}
-                  role="listitem button"
+                  role="button"
                   tabIndex={0}
                   aria-label={labelText}
                   onClick={() => markOneRead(notif)}
