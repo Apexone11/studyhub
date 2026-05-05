@@ -1,5 +1,38 @@
 import { Button, Message, MsgList, SectionCard, ToggleRow } from './settingsShared'
+import { Skeleton } from '../../components/Skeleton'
 import { usePreferences } from './settingsState'
+
+/* Notification preferences modeled as a 2D grid (delivery channel × type),
+ * matching GitHub / Linear / Notion. Each row is a topic; each column is a
+ * delivery channel (Email or In-App). The flat key list still maps 1:1 to
+ * the existing /api/settings/preferences contract — only the layout changed. */
+const NOTIFICATION_TYPES = [
+  {
+    label: 'Mentions',
+    description: 'When someone @-mentions you in a comment or post',
+    channels: { email: 'emailMentions', inApp: 'inAppMentions' },
+  },
+  {
+    label: 'Comments and replies',
+    description: 'Comments on your work, replies to you',
+    channels: { email: 'emailComments', inApp: 'inAppComments' },
+  },
+  {
+    label: 'Sheets and contributions',
+    description: 'Contributions to your sheets and upstream changes',
+    channels: { email: 'emailContributions', inApp: 'inAppContributions' },
+  },
+  {
+    label: 'Social activity',
+    description: 'Follows, follow requests, stars, and forks',
+    channels: { email: 'emailSocial', inApp: 'inAppSocial' },
+  },
+  {
+    label: 'Study groups',
+    description: 'Invites, approvals, sessions, and discussion posts',
+    channels: { email: 'emailStudyGroups', inApp: 'inAppStudyGroups' },
+  },
+]
 
 const EMAIL_NOTIFICATION_KEYS = [
   'emailDigest',
@@ -21,13 +54,42 @@ const IN_APP_NOTIFICATION_KEYS = [
 
 const SAVE_KEYS = [...EMAIL_NOTIFICATION_KEYS, ...IN_APP_NOTIFICATION_KEYS]
 
+/* Token-driven cell so the grid renders identically in light and dark. */
+function GridCell({ checked, onChange, disabled, ariaLabel }) {
+  return (
+    <label
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        opacity: disabled ? 0.5 : 1,
+        padding: 8,
+      }}
+    >
+      <input
+        type="checkbox"
+        checked={!!checked}
+        onChange={onChange}
+        disabled={disabled}
+        aria-label={ariaLabel}
+        style={{ width: 18, height: 18, accentColor: 'var(--sh-brand)', cursor: 'inherit' }}
+      />
+    </label>
+  )
+}
+
 export default function NotificationsTab() {
   const { prefs, loading, saving, msg, loadError, toggle, save, retry } = usePreferences()
 
   if (loading) {
     return (
-      <SectionCard title="Notifications">
-        <div style={{ color: '#64748b', fontSize: 13 }}>Loading preferences...</div>
+      <SectionCard title="Notifications" subtitle="Loading your delivery preferences…">
+        <div style={{ display: 'grid', gap: 10 }}>
+          <Skeleton width="100%" height={48} borderRadius={10} />
+          <Skeleton width="100%" height={48} borderRadius={10} />
+          <Skeleton width="100%" height={48} borderRadius={10} />
+        </div>
       </SectionCard>
     )
   }
@@ -46,92 +108,150 @@ export default function NotificationsTab() {
     )
   }
 
+  const inAppMaster = !!prefs.inAppNotifications
+
   return (
     <>
-      <SectionCard title="Email Notifications" subtitle="Control which emails StudyHub sends you.">
+      <SectionCard
+        title="Activity inbox"
+        subtitle="Master switch for routine in-app alerts. When off, the bell menu still shows account-safety alerts."
+      >
         <ToggleRow
-          label="Weekly digest"
-          description="A summary of activity in your enrolled courses"
-          checked={prefs.emailDigest}
-          onChange={() => toggle('emailDigest')}
-        />
-        <ToggleRow
-          label="Mentions"
-          description="When someone mentions you in a comment or post"
-          checked={prefs.emailMentions}
-          onChange={() => toggle('emailMentions')}
-        />
-        <ToggleRow
-          label="Comments and replies"
-          description="When someone comments on your posts, sheets, notes, or replies to you"
-          checked={prefs.emailComments}
-          onChange={() => toggle('emailComments')}
-        />
-        <ToggleRow
-          label="Sheets and contributions"
-          description="When someone contributes to your sheets or the source sheet you forked changes"
-          checked={prefs.emailContributions}
-          onChange={() => toggle('emailContributions')}
-        />
-        <ToggleRow
-          label="Social activity"
-          description="When someone follows you, sends a follow request, stars your sheet, or forks your work"
-          checked={prefs.emailSocial}
-          onChange={() => toggle('emailSocial')}
-        />
-        <ToggleRow
-          label="Study groups"
-          description="When you are invited, approved, or receive new session and discussion updates"
-          checked={prefs.emailStudyGroups}
-          onChange={() => toggle('emailStudyGroups')}
+          label="Show routine activity in the bell menu"
+          description="Turn off to silence the unread badge for follows, comments, contributions, and study groups."
+          checked={inAppMaster}
+          onChange={() => toggle('inAppNotifications')}
         />
       </SectionCard>
 
       <SectionCard
-        title="In-App Notifications"
-        subtitle="Control which routine alerts appear in the StudyHub inbox."
+        title="Weekly email digest"
+        subtitle="A weekly summary of activity in your enrolled courses."
       >
         <ToggleRow
-          label="Activity inbox"
-          description="Show routine activity alerts in the bell menu and unread badge"
-          checked={prefs.inAppNotifications}
-          onChange={() => toggle('inAppNotifications')}
+          label="Send weekly digest"
+          description="One email per week with the top activity across your courses."
+          checked={prefs.emailDigest}
+          onChange={() => toggle('emailDigest')}
         />
-        <ToggleRow
-          label="Mentions"
-          description="Mention alerts in comments and posts"
-          checked={prefs.inAppMentions}
-          onChange={() => toggle('inAppMentions')}
-          disabled={!prefs.inAppNotifications}
-        />
-        <ToggleRow
-          label="Comments and replies"
-          description="Replies and comment activity across feed, sheets, and notes"
-          checked={prefs.inAppComments}
-          onChange={() => toggle('inAppComments')}
-          disabled={!prefs.inAppNotifications}
-        />
-        <ToggleRow
-          label="Social activity"
-          description="Follows, stars, forks, and other profile activity"
-          checked={prefs.inAppSocial}
-          onChange={() => toggle('inAppSocial')}
-          disabled={!prefs.inAppNotifications}
-        />
-        <ToggleRow
-          label="Sheets and contributions"
-          description="Contribution updates and upstream sheet changes"
-          checked={prefs.inAppContributions}
-          onChange={() => toggle('inAppContributions')}
-          disabled={!prefs.inAppNotifications}
-        />
-        <ToggleRow
-          label="Study groups"
-          description="Invites, approvals, new sessions, and new discussion posts"
-          checked={prefs.inAppStudyGroups}
-          onChange={() => toggle('inAppStudyGroups')}
-          disabled={!prefs.inAppNotifications}
-        />
+      </SectionCard>
+
+      <SectionCard
+        title="Per-topic delivery"
+        subtitle="Choose how each kind of notification reaches you. In-App goes to the bell menu; Email goes to your inbox."
+      >
+        {/* Real <table> so screen readers announce row+column context. */}
+        <div style={{ overflowX: 'auto' }}>
+          <table
+            style={{
+              width: '100%',
+              borderCollapse: 'collapse',
+              fontFamily: 'inherit',
+            }}
+          >
+            <thead>
+              <tr>
+                <th
+                  scope="col"
+                  style={{
+                    textAlign: 'left',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: 'var(--sh-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    padding: '8px 12px 8px 0',
+                    borderBottom: '1px solid var(--sh-border)',
+                  }}
+                >
+                  Topic
+                </th>
+                <th
+                  scope="col"
+                  style={{
+                    textAlign: 'center',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: 'var(--sh-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    padding: '8px 0',
+                    width: 96,
+                    borderBottom: '1px solid var(--sh-border)',
+                  }}
+                >
+                  In-App
+                </th>
+                <th
+                  scope="col"
+                  style={{
+                    textAlign: 'center',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: 'var(--sh-muted)',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.04em',
+                    padding: '8px 0',
+                    width: 96,
+                    borderBottom: '1px solid var(--sh-border)',
+                  }}
+                >
+                  Email
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {NOTIFICATION_TYPES.map((row) => {
+                const inAppDisabled = !inAppMaster
+                return (
+                  <tr key={row.label}>
+                    <th
+                      scope="row"
+                      style={{
+                        textAlign: 'left',
+                        padding: '12px 12px 12px 0',
+                        borderBottom: '1px solid var(--sh-soft)',
+                        verticalAlign: 'top',
+                      }}
+                    >
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--sh-text)' }}>
+                        {row.label}
+                      </div>
+                      <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginTop: 2 }}>
+                        {row.description}
+                      </div>
+                    </th>
+                    <td
+                      style={{
+                        borderBottom: '1px solid var(--sh-soft)',
+                        verticalAlign: 'middle',
+                      }}
+                    >
+                      <GridCell
+                        checked={prefs[row.channels.inApp]}
+                        onChange={() => toggle(row.channels.inApp)}
+                        disabled={inAppDisabled}
+                        ariaLabel={`${row.label} in-app notifications`}
+                      />
+                    </td>
+                    <td
+                      style={{
+                        borderBottom: '1px solid var(--sh-soft)',
+                        verticalAlign: 'middle',
+                      }}
+                    >
+                      <GridCell
+                        checked={prefs[row.channels.email]}
+                        onChange={() => toggle(row.channels.email)}
+                        ariaLabel={`${row.label} email notifications`}
+                      />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
       </SectionCard>
 
       <SectionCard
@@ -145,6 +265,9 @@ export default function NotificationsTab() {
       </SectionCard>
 
       <MsgList msg={msg} />
+      <div role="status" aria-live="polite" style={{ position: 'absolute', left: -9999 }}>
+        {saving ? 'Saving notification preferences…' : ''}
+      </div>
       <Button disabled={saving} onClick={() => save(SAVE_KEYS, 'Notification preferences saved.')}>
         {saving ? 'Saving...' : 'Save Notification Preferences'}
       </Button>

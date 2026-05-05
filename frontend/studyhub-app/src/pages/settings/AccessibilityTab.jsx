@@ -100,7 +100,34 @@ export default function AccessibilityTab() {
   )
 }
 
+/* Read the user's motion preference once at module load so the toggle
+   transitions can be turned off when prefers-reduced-motion is set OR when
+   the in-app reducedMotion flag is on (data attribute set in the parent
+   effect above). Keeps the toggle from animating right after a user just
+   turned ON "Reduce motion" — which would itself be a contradiction. */
+function reduceMotionActive() {
+  try {
+    if (
+      typeof window !== 'undefined' &&
+      window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    ) {
+      return true
+    }
+    if (
+      typeof document !== 'undefined' &&
+      document.documentElement?.dataset?.reducedMotion === 'on'
+    ) {
+      return true
+    }
+  } catch {
+    /* SSR / no-DOM */
+  }
+  return false
+}
+
 function ToggleRow({ title, description, checked, onChange }) {
+  const reduce = reduceMotionActive()
   return (
     <div style={settingsCardStyle}>
       <div
@@ -139,7 +166,7 @@ function ToggleRow({ title, description, checked, onChange }) {
             background: checked ? 'var(--sh-brand)' : 'var(--sh-soft)',
             cursor: 'pointer',
             position: 'relative',
-            transition: 'background 0.15s',
+            transition: reduce ? 'none' : 'background 0.15s',
           }}
         >
           <span
@@ -151,7 +178,7 @@ function ToggleRow({ title, description, checked, onChange }) {
               height: 18,
               borderRadius: '50%',
               background: '#fff',
-              transition: 'left 0.15s',
+              transition: reduce ? 'none' : 'left 0.15s',
               boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
             }}
           />

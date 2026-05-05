@@ -32,6 +32,11 @@ const mocks = vi.hoisted(() => {
     },
     bookShelf: { findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn() },
     shelfBook: { upsert: vi.fn(), deleteMany: vi.fn() },
+    // Feature flag gate (`requireFeatureFlag('flag_scholar_enabled')` mounted
+    // on the router) reads from this model. Default to enabled so existing
+    // route tests can drive the handler; flip per-test if a fail-closed
+    // path needs coverage.
+    featureFlag: { findUnique: vi.fn().mockResolvedValue({ enabled: true }) },
   }
 
   // Make a pass-through soft-timeout: each adapter is mocked at module level
@@ -238,6 +243,258 @@ describe('GET /api/scholar/search fan-out', () => {
     const res = await request(app).get('/api/scholar/search').query({ q: 'physics' })
     expect(res.status).toBe(200)
     expect(res.body.throttledSources).toContain('arxiv')
+  })
+})
+
+// ── New filter params (Filters drawer wiring) ───────────────────────────
+
+// Helper: build a synthetic paper with sensible defaults so tests can
+// override only the field under inspection.
+function _samplePaper(overrides = {}) {
+  return {
+    id: overrides.id || `doi:10.${Math.floor(Math.random() * 9999)}/x`,
+    title: overrides.title || 'Sample Paper',
+    authors: overrides.authors || [{ name: 'Anon Author' }],
+    doi: overrides.doi || `10.${Math.floor(Math.random() * 9999)}/x`,
+    source: overrides.source || 'semanticScholar',
+    topics: overrides.topics || [],
+    openAccess: overrides.openAccess === true,
+    pdfExternalUrl: overrides.pdfExternalUrl || null,
+    citationCount: typeof overrides.citationCount === 'number' ? overrides.citationCount : 0,
+    publishedAt: overrides.publishedAt || null,
+    venue: overrides.venue || null,
+  }
+}
+
+describe('GET /api/scholar/search new filters', () => {
+  it('hasPdf=true drops papers without pdfExternalUrl', async () => {
+    mocks.semanticScholar.search.mockResolvedValue({
+      source: 'semanticScholar',
+      results: [
+        _samplePaper({
+          id: 'doi:10.1/with-pdf',
+          doi: '10.1/with-pdf',
+          pdfExternalUrl: 'https://arxiv.org/pdf/1234.5678.pdf',
+        }),
+        _samplePaper({ id: 'doi:10.1/no-pdf', doi: '10.1/no-pdf', pdfExternalUrl: null }),
+      ],
+    })
+    const res = await request(app).get('/api/scholar/search').query({ q: 'pdf', hasPdf: 'true' })
+    expect(res.status).toBe(200)
+    expect(res.body.results).toHaveLength(1)
+    expect(res.body.results[0].id).toBe('doi:10.1/with-pdf')
+  })
+
+  it('sources restricts fan-out to the requested subset', async () => {
+    mocks.semanticScholar.search.mockResolvedValue({
+      source: 'semanticScholar',
+      results: [_samplePaper({ id: 'doi:10.1/s2', doi: '10.1/s2', source: 'semanticScholar' })],
+    })
+    mocks.openAlex.search.mockResolvedValue({
+      source: 'openAlex',
+      results: [_samplePaper({ id: 'doi:10.2/oa', doi: '10.2/oa', source: 'openAlex' })],
+    })
+    mocks.crossref.search.mockResolvedValue({
+      source: 'crossref',
+      results: [_samplePaper({ id: 'doi:10.3/cr', doi: '10.3/cr', source: 'crossref' })],
+    })
+    mocks.arxiv.search.mockResolvedValue({
+      source: 'arxiv',
+      results: [_samplePaper({ id: 'doi:10.4/ax', doi: '10.4/ax', source: 'arxiv' })],
+    })
+
+    const res = await request(app)
+      .get('/api/scholar/search')
+      .query({ q: 'subset', sources: 'semanticScholar,arxiv' })
+    expect(res.status).toBe(200)
+    expect(mocks.semanticScholar.search).toHaveBeenCalledTimes(1)
+    expect(mocks.arxiv.search).toHaveBeenCalledTimes(1)
+    expect(mocks.openAlex.search).not.toHaveBeenCalled()
+    expect(mocks.crossref.search).not.toHaveBeenCalled()
+    const ids = res.body.results.map((r) => r.id)
+    expect(ids).toEqual(expect.arrayContaining(['doi:10.1/s2', 'doi:10.4/ax']))
+    expect(ids).not.toContain('doi:10.2/oa')
+  })
+
+  it('rejects an unknown source slug', async () => {
+    const res = await request(app)
+      .get('/api/scholar/search')
+      .query({ q: 'bad', sources: 'semanticScholar,evil' })
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('VALIDATION')
+    expect(res.body.reason).toBe('sources_invalid_value')
+  })
+
+  it('domains keeps only papers whose topics intersect', async () => {
+    mocks.semanticScholar.search.mockResolvedValue({
+      source: 'semanticScholar',
+      results: [
+        _samplePaper({
+          id: 'doi:10.1/ml',
+          doi: '10.1/ml',
+          topics: ['Machine Learning', 'Statistics'],
+        }),
+        _samplePaper({
+          id: 'doi:10.1/medicine',
+          doi: '10.1/medicine',
+          topics: ['Internal Medicine'],
+        }),
+      ],
+    })
+    const res = await request(app)
+      .get('/api/scholar/search')
+      .query({ q: 'topics', domains: 'machine-learning' })
+    expect(res.status).toBe(200)
+    expect(res.body.results).toHaveLength(1)
+    expect(res.body.results[0].id).toBe('doi:10.1/ml')
+  })
+
+  it('rejects an unknown domain slug', async () => {
+    const res = await request(app)
+      .get('/api/scholar/search')
+      .query({ q: 'bad', domains: 'machine-learning,nonexistent-topic' })
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('VALIDATION')
+    expect(res.body.reason).toBe('domains_invalid_value')
+  })
+
+  it('sort=year-desc orders by publishedAt descending', async () => {
+    mocks.semanticScholar.search.mockResolvedValue({
+      source: 'semanticScholar',
+      results: [
+        _samplePaper({
+          id: 'doi:10.1/old',
+          doi: '10.1/old',
+          publishedAt: '2010-01-01',
+        }),
+        _samplePaper({
+          id: 'doi:10.1/new',
+          doi: '10.1/new',
+          publishedAt: '2024-06-01',
+        }),
+        _samplePaper({
+          id: 'doi:10.1/mid',
+          doi: '10.1/mid',
+          publishedAt: '2018-03-01',
+        }),
+      ],
+    })
+    const res = await request(app)
+      .get('/api/scholar/search')
+      .query({ q: 'sort', sort: 'year-desc' })
+    expect(res.status).toBe(200)
+    const ids = res.body.results.map((r) => r.id)
+    expect(ids).toEqual(['doi:10.1/new', 'doi:10.1/mid', 'doi:10.1/old'])
+  })
+
+  it('sort=citations-desc orders by citationCount descending', async () => {
+    mocks.semanticScholar.search.mockResolvedValue({
+      source: 'semanticScholar',
+      results: [
+        _samplePaper({ id: 'doi:10.1/lo', doi: '10.1/lo', citationCount: 5 }),
+        _samplePaper({ id: 'doi:10.1/hi', doi: '10.1/hi', citationCount: 500 }),
+        _samplePaper({ id: 'doi:10.1/mid', doi: '10.1/mid', citationCount: 50 }),
+      ],
+    })
+    const res = await request(app)
+      .get('/api/scholar/search')
+      .query({ q: 'sort', sort: 'citations-desc' })
+    expect(res.status).toBe(200)
+    const ids = res.body.results.map((r) => r.id)
+    expect(ids).toEqual(['doi:10.1/hi', 'doi:10.1/mid', 'doi:10.1/lo'])
+  })
+
+  it('rejects an unknown sort slug', async () => {
+    const res = await request(app).get('/api/scholar/search').query({ q: 'bad', sort: 'evil' })
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('VALIDATION')
+    expect(res.body.reason).toBe('sort_invalid_value')
+  })
+
+  it('minCitations drops entries below the threshold', async () => {
+    mocks.semanticScholar.search.mockResolvedValue({
+      source: 'semanticScholar',
+      results: [
+        _samplePaper({ id: 'doi:10.1/cited', doi: '10.1/cited', citationCount: 100 }),
+        _samplePaper({ id: 'doi:10.1/uncited', doi: '10.1/uncited', citationCount: 0 }),
+      ],
+    })
+    const res = await request(app)
+      .get('/api/scholar/search')
+      .query({ q: 'cit', minCitations: '10' })
+    expect(res.status).toBe(200)
+    expect(res.body.results).toHaveLength(1)
+    expect(res.body.results[0].id).toBe('doi:10.1/cited')
+  })
+
+  it('rejects negative minCitations', async () => {
+    const res = await request(app)
+      .get('/api/scholar/search')
+      .query({ q: 'bad', minCitations: '-5' })
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('VALIDATION')
+    expect(res.body.reason).toBe('minCitations_out_of_range')
+  })
+
+  it('author filter is a case-insensitive substring match', async () => {
+    mocks.semanticScholar.search.mockResolvedValue({
+      source: 'semanticScholar',
+      results: [
+        _samplePaper({
+          id: 'doi:10.1/lecun',
+          doi: '10.1/lecun',
+          authors: [{ name: 'Yann LeCun' }, { name: 'Geoffrey Hinton' }],
+        }),
+        _samplePaper({
+          id: 'doi:10.1/turing',
+          doi: '10.1/turing',
+          authors: [{ name: 'Alan Turing' }],
+        }),
+      ],
+    })
+    const res = await request(app).get('/api/scholar/search').query({ q: 'auth', author: 'lecun' })
+    expect(res.status).toBe(200)
+    expect(res.body.results).toHaveLength(1)
+    expect(res.body.results[0].id).toBe('doi:10.1/lecun')
+  })
+
+  it('venue filter is a case-insensitive substring match', async () => {
+    mocks.semanticScholar.search.mockResolvedValue({
+      source: 'semanticScholar',
+      results: [
+        _samplePaper({ id: 'doi:10.1/nips', doi: '10.1/nips', venue: 'NeurIPS 2024' }),
+        _samplePaper({ id: 'doi:10.1/nature', doi: '10.1/nature', venue: 'Nature' }),
+      ],
+    })
+    const res = await request(app)
+      .get('/api/scholar/search')
+      .query({ q: 'venue', venue: 'neurips' })
+    expect(res.status).toBe(200)
+    expect(res.body.results).toHaveLength(1)
+    expect(res.body.results[0].id).toBe('doi:10.1/nips')
+  })
+
+  it('openAccess=true drops papers where openAccess is false', async () => {
+    mocks.semanticScholar.search.mockResolvedValue({
+      source: 'semanticScholar',
+      results: [
+        _samplePaper({ id: 'doi:10.1/oa', doi: '10.1/oa', openAccess: true }),
+        _samplePaper({ id: 'doi:10.1/closed', doi: '10.1/closed', openAccess: false }),
+      ],
+    })
+    const res = await request(app).get('/api/scholar/search').query({ q: 'oa', openAccess: 'true' })
+    expect(res.status).toBe(200)
+    const ids = res.body.results.map((r) => r.id)
+    expect(ids).toContain('doi:10.1/oa')
+    expect(ids).not.toContain('doi:10.1/closed')
+  })
+
+  it('rejects yearFrom outside [1700, currentYear+1]', async () => {
+    const res = await request(app)
+      .get('/api/scholar/search')
+      .query({ q: 'years', yearFrom: '1500' })
+    expect(res.status).toBe(400)
+    expect(res.body.reason).toBe('yearFrom_out_of_range')
   })
 })
 

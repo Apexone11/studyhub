@@ -79,13 +79,15 @@ export default function GroupDetailView({ groupId }) {
   // remounting). Without this, a second notification click strands the
   // user on the previous tab/post (Copilot review #1, 2026-05-03).
   useEffect(() => {
-    if (VALID_TABS.includes(tabParam) && tabParam !== activeTab) {
-      setActiveTab(tabParam)
-    }
-    const nextPost = Number.isInteger(postParam) && postParam > 0 ? postParam : null
-    if (nextPost !== focusedPostId) {
-      setFocusedPostId(nextPost)
-    }
+    queueMicrotask(() => {
+      if (VALID_TABS.includes(tabParam) && tabParam !== activeTab) {
+        setActiveTab(tabParam)
+      }
+      const nextPost = Number.isInteger(postParam) && postParam > 0 ? postParam : null
+      if (nextPost !== focusedPostId) {
+        setFocusedPostId(nextPost)
+      }
+    })
     // VALID_TABS is a stable literal; tabParam/postParam are the inputs.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tabParam, postParam])
@@ -154,6 +156,33 @@ export default function GroupDetailView({ groupId }) {
       loadActivity(groupId)
     }
   }, [activeTab, activeGroup, groupId, loadActivity])
+
+  // Find a session starting within the next hour so the page can render
+  // a "Starting soon" reminder banner. Re-evaluates every minute via a
+  // ticking `now` clock so the banner appears / disappears as time passes
+  // without needing a refresh. Looks for either `startsAt` (the field on
+  // the activity-feed `upcomingSessions` payload) or `scheduledAt` (the
+  // field on the full sessions list) so it works regardless of which one
+  // populated the preview list.
+  const [now, setNow] = useState(() => Date.now())
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 60_000)
+    return () => clearInterval(id)
+  }, [])
+  const imminentSession = (() => {
+    const list = upcomingSessionsPreview || []
+    if (list.length === 0) return null
+    const ONE_HOUR = 60 * 60 * 1000
+    for (const session of list) {
+      const when = session.startsAt || session.scheduledAt
+      if (!when) continue
+      const ts = new Date(when).getTime()
+      if (Number.isFinite(ts) && ts > now && ts - now <= ONE_HOUR) {
+        return session
+      }
+    }
+    return null
+  })()
 
   // Load resources when resources tab is active
   useEffect(() => {
@@ -317,6 +346,56 @@ export default function GroupDetailView({ groupId }) {
         <Link to="/study-groups" style={styles.backLink}>
           Back to Study Groups
         </Link>
+
+        {/* Imminent-session reminder. Surfaces a session that starts
+            inside the next hour so members notice without needing to
+            click into the Sessions tab. Click jumps to that tab. */}
+        {imminentSession ? (
+          <div
+            role="status"
+            aria-live="polite"
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              flexWrap: 'wrap',
+              padding: '12px 16px',
+              borderRadius: 12,
+              border: '1px solid var(--sh-info-border)',
+              background: 'var(--sh-info-bg)',
+              color: 'var(--sh-info-text)',
+              fontSize: 13,
+              fontWeight: 600,
+              margin: '0 0 12px',
+            }}
+          >
+            <span style={{ flex: 1, minWidth: 0 }}>
+              {imminentSession.title || 'Study session'} starts at{' '}
+              {new Date(imminentSession.startsAt || imminentSession.scheduledAt).toLocaleTimeString(
+                undefined,
+                { hour: 'numeric', minute: '2-digit' },
+              )}
+              {imminentSession.location ? ` · ${imminentSession.location}` : ''}
+            </span>
+            <button
+              type="button"
+              onClick={() => setActiveTab('sessions')}
+              style={{
+                padding: '6px 14px',
+                borderRadius: 8,
+                border: '1px solid var(--sh-info-border)',
+                background: 'var(--sh-surface)',
+                color: 'var(--sh-info-text)',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              View session
+            </button>
+          </div>
+        ) : null}
 
         {/* Group header */}
         <section style={styles.detailHeader}>

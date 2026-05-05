@@ -78,7 +78,7 @@ export default function LibraryPage() {
 
   useEffect(() => {
     if (showShelves && shelves.length === 0 && !shelvesLoading) {
-      loadShelves()
+      queueMicrotask(loadShelves)
     }
   }, [showShelves, shelves.length, shelvesLoading, loadShelves])
 
@@ -164,6 +164,46 @@ export default function LibraryPage() {
   const gridRef = useRef(null)
   useEffect(() => {
     if (gridRef.current) autoAnimate(gridRef.current, { duration: 250 })
+  }, [])
+
+  // Keyboard navigation across the books grid: arrow keys move focus
+  // between book card links and Enter follows the focused link. The
+  // browser already handles Enter on a focused <a> natively, so we only
+  // need to reroute arrows. Columns are derived from the rendered grid
+  // (`getBoundingClientRect().y` clusters cards by row), so the math
+  // adapts to any responsive break-point without hard-coding a count.
+  // (Goodreads / Notion gallery view pattern.)
+  const handleGridKeyDown = useCallback((e) => {
+    const key = e.key
+    if (key !== 'ArrowRight' && key !== 'ArrowLeft' && key !== 'ArrowDown' && key !== 'ArrowUp') {
+      return
+    }
+    const grid = gridRef.current
+    if (!grid) return
+    const cards = Array.from(grid.querySelectorAll('a.book-card'))
+    if (cards.length === 0) return
+    const active = document.activeElement
+    const currentIndex = cards.indexOf(active)
+    if (currentIndex === -1) return
+
+    e.preventDefault()
+    let nextIndex = currentIndex
+    if (key === 'ArrowRight') {
+      nextIndex = Math.min(currentIndex + 1, cards.length - 1)
+    } else if (key === 'ArrowLeft') {
+      nextIndex = Math.max(currentIndex - 1, 0)
+    } else {
+      // Detect column count from current row's y-coordinate clustering.
+      const currentRect = cards[currentIndex].getBoundingClientRect()
+      const currentRowY = Math.round(currentRect.top)
+      const sameRow = cards.filter((c) => Math.round(c.getBoundingClientRect().top) === currentRowY)
+      const columns = sameRow.length || 1
+      nextIndex =
+        key === 'ArrowDown'
+          ? Math.min(currentIndex + columns, cards.length - 1)
+          : Math.max(currentIndex - columns, 0)
+    }
+    cards[nextIndex]?.focus()
   }, [])
 
   const handleSearchSubmit = (e) => {
@@ -465,7 +505,12 @@ export default function LibraryPage() {
           {/* Books Grid */}
           {!loading && books.length > 0 && (
             <>
-              <div ref={gridRef} className="library-grid">
+              <div
+                ref={gridRef}
+                className="library-grid"
+                aria-label="Books"
+                onKeyDown={handleGridKeyDown}
+              >
                 {books.map((book) => (
                   <BookCard key={book.volumeId} book={book} />
                 ))}

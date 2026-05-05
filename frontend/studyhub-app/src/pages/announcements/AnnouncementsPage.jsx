@@ -278,6 +278,7 @@ export default function AnnouncementsPage() {
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             placeholder="Announcement title"
+            aria-label="Announcement title"
             maxLength={200}
             style={{ ...inputBase, marginBottom: 12 }}
           />
@@ -285,6 +286,7 @@ export default function AnnouncementsPage() {
             value={body}
             onChange={(e) => setBody(e.target.value)}
             placeholder="Write the announcement body..."
+            aria-label="Announcement body"
             rows={6}
             maxLength={MAX_BODY}
             style={{ ...inputBase, resize: 'vertical', marginBottom: 4 }}
@@ -317,12 +319,13 @@ export default function AnnouncementsPage() {
                 >
                   <img
                     src={url}
-                    alt=""
+                    alt={`Pending image ${idx + 1}`}
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                   <button
                     type="button"
                     onClick={() => removeImage(idx)}
+                    aria-label={`Remove image ${idx + 1}`}
                     style={{
                       position: 'absolute',
                       top: 2,
@@ -406,6 +409,7 @@ export default function AnnouncementsPage() {
                   setPendingVideoId(null)
                   setShowVideoUploader(false)
                 }}
+                aria-label="Remove attached video"
                 style={{
                   background: 'none',
                   border: 'none',

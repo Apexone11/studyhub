@@ -24,6 +24,7 @@ const openAlex = require('./scholar.sources/openAlex')
 const crossref = require('./scholar.sources/crossref')
 const arxiv = require('./scholar.sources/arxiv')
 const unpaywall = require('./scholar.sources/unpaywall')
+const { logAdapterError } = require('./_adapterLogger')
 
 const {
   ADAPTER_SOFT_TIMEOUT_MS,
@@ -33,6 +34,7 @@ const {
   normalizeTitleForDedupe,
   normalizeAuthorForDedupe,
   SOURCE_TIER,
+  slugifyTopic,
 } = require('./scholar.constants')
 
 const ADAPTERS = {
@@ -66,6 +68,8 @@ const SCHOLAR_PDF_HOST_ALLOWLIST = Object.freeze([
 // ── Cache key derivation ────────────────────────────────────────────────
 
 function _searchCacheKey(q, filters, source) {
+  // Stable serialization across all filter axes — different filter sets
+  // must NEVER collide on the same cache row.
   const stable = JSON.stringify({
     q: String(q || '')
       .toLowerCase()
@@ -76,6 +80,17 @@ function _searchCacheKey(q, filters, source) {
     to: filters?.to || '',
     limit: filters?.limit || 20,
     source: source || 'all',
+    openAccess: filters?.openAccess ? 1 : 0,
+    hasPdf: filters?.hasPdf ? 1 : 0,
+    sources: Array.isArray(filters?.sources) ? [...filters.sources].sort().join(',') : '',
+    domains: Array.isArray(filters?.domains) ? [...filters.domains].sort().join(',') : '',
+    sort: filters?.sort || 'relevance',
+    minCitations:
+      typeof filters?.minCitations === 'number' && filters.minCitations > 0
+        ? filters.minCitations
+        : 0,
+    author: (filters?.author || '').toLowerCase().trim(),
+    venue: (filters?.venue || '').toLowerCase().trim(),
   })
   return crypto.createHash('sha256').update(stable).digest('hex').slice(0, 32)
 }
@@ -177,10 +192,141 @@ async function _enrichWithUnpaywall(papers, maxToEnrich = 10) {
   return papers
 }
 
+// ── Post-fetch filtering ────────────────────────────────────────────────
+
+// Filters that cannot be pushed down to the upstream adapters cleanly
+// (every adapter has a different API contract for them). We apply them
+// to the deduped + merged list so the user sees a single coherent
+// response regardless of which sources contributed.
+function _applyPostFetchFilters(papers, opts) {
+  const { openAccess, hasPdf, domains, minCitations, author, venue } = opts || {}
+  const wantDomains =
+    Array.isArray(domains) && domains.length > 0
+      ? new Set(domains.map((d) => slugifyTopic(d)))
+      : null
+  const minCit = Number.isInteger(minCitations) && minCitations > 0 ? minCitations : 0
+  const authorNeedle = typeof author === 'string' && author.length > 0 ? author.toLowerCase() : null
+  const venueNeedle = typeof venue === 'string' && venue.length > 0 ? venue.toLowerCase() : null
+
+  return papers.filter((p) => {
+    if (openAccess && !p.openAccess) return false
+    if (hasPdf) {
+      const url = p.pdfExternalUrl
+      if (!url || typeof url !== 'string' || url.trim().length === 0) return false
+    }
+    if (minCit > 0 && (typeof p.citationCount !== 'number' || p.citationCount < minCit)) {
+      return false
+    }
+    if (wantDomains) {
+      const paperTopics = Array.isArray(p.topics) ? p.topics : []
+      const haveSlugs = new Set()
+      for (const t of paperTopics) {
+        if (typeof t === 'string') {
+          const s = slugifyTopic(t)
+          if (s) haveSlugs.add(s)
+        } else if (t && typeof t === 'object') {
+          // Some adapters emit { name } or { displayName }.
+          const candidate = t.slug || t.name || t.displayName || ''
+          const s = slugifyTopic(String(candidate))
+          if (s) haveSlugs.add(s)
+        }
+      }
+      let intersects = false
+      for (const want of wantDomains) {
+        if (haveSlugs.has(want)) {
+          intersects = true
+          break
+        }
+      }
+      if (!intersects) return false
+    }
+    if (authorNeedle) {
+      const authors = Array.isArray(p.authors) ? p.authors : []
+      const matched = authors.some((a) => {
+        const name = a && typeof a === 'object' ? a.name : a
+        return typeof name === 'string' && name.toLowerCase().includes(authorNeedle)
+      })
+      if (!matched) return false
+    }
+    if (venueNeedle) {
+      if (typeof p.venue !== 'string' || !p.venue.toLowerCase().includes(venueNeedle)) return false
+    }
+    return true
+  })
+}
+
+function _applySort(papers, sort) {
+  if (!Array.isArray(papers) || papers.length < 2) return papers
+  switch (sort) {
+    case 'year-desc':
+    case 'recent': {
+      // Papers without a parseable date sink to the bottom; ties keep
+      // the merge order (Array.prototype.sort is stable in Node 20+).
+      return [...papers].sort((a, b) => _yearKey(b) - _yearKey(a))
+    }
+    case 'citations-desc': {
+      return [...papers].sort(
+        (a, b) =>
+          (Number.isFinite(b?.citationCount) ? b.citationCount : 0) -
+          (Number.isFinite(a?.citationCount) ? a.citationCount : 0),
+      )
+    }
+    case 'relevance':
+    default:
+      return papers
+  }
+}
+
+function _yearKey(p) {
+  if (!p || !p.publishedAt) return Number.NEGATIVE_INFINITY
+  const t = new Date(p.publishedAt).getTime()
+  return Number.isFinite(t) ? t : Number.NEGATIVE_INFINITY
+}
+
 // ── Search fan-out ──────────────────────────────────────────────────────
 
-async function searchPapers({ q, type, domain, from, to, limit, cursor: _cursor }) {
-  const filters = { type, domain, from, to, limit }
+// All five known search-result-emitting adapters keyed by slug. Unpaywall
+// is enrichment-only and is intentionally not in this map (picking it
+// alone yields zero results — see scholar.constants.js note).
+const SEARCH_ADAPTERS_BY_SLUG = {
+  semanticScholar,
+  openAlex,
+  crossref,
+  arxiv,
+}
+
+async function searchPapers({
+  q,
+  type,
+  domain,
+  from,
+  to,
+  limit,
+  cursor: _cursor,
+  openAccess = false,
+  hasPdf = false,
+  sources = null,
+  domains = null,
+  sort = 'relevance',
+  minCitations = 0,
+  author = null,
+  venue = null,
+}) {
+  const filters = {
+    type,
+    domain,
+    from,
+    to,
+    limit,
+    openAccess,
+    hasPdf,
+    sources,
+    domains,
+    sort,
+    minCitations,
+    author,
+    venue,
+  }
   const cacheKey = _searchCacheKey(q, filters, 'all')
 
   // Check cache.
@@ -193,8 +339,16 @@ async function searchPapers({ q, type, domain, from, to, limit, cursor: _cursor 
     log.warn({ event: 'scholar.search.cache_read_failed', err: err.message }, 'cache read failed')
   }
 
-  // Fan out — Unpaywall is enrichment-only, not a search source.
-  const sourceAdapters = [semanticScholar, openAlex, crossref, arxiv]
+  // Restrict fan-out to the user-picked subset when present. `sources`
+  // is the only filter pushed down to the adapters; the rest are
+  // post-fetch so the change stays isolated and avoids per-adapter API
+  // contract negotiations.
+  const requestedSlugs =
+    Array.isArray(sources) && sources.length > 0
+      ? sources.filter((s) => s in SEARCH_ADAPTERS_BY_SLUG)
+      : Object.keys(SEARCH_ADAPTERS_BY_SLUG)
+  const sourceAdapters = requestedSlugs.map((slug) => SEARCH_ADAPTERS_BY_SLUG[slug])
+
   const tasks = sourceAdapters.map((adapter) =>
     Promise.race([
       adapter.search(q, filters),
@@ -219,6 +373,19 @@ async function searchPapers({ q, type, domain, from, to, limit, cursor: _cursor 
 
   let deduped = _dedupe(merged)
   await _enrichWithUnpaywall(deduped, 10)
+
+  // ── Post-fetch filters (applied to the merged + deduped list) ────────
+  deduped = _applyPostFetchFilters(deduped, {
+    openAccess,
+    hasPdf,
+    domains,
+    minCitations,
+    author,
+    venue,
+  })
+
+  // ── Sort ────────────────────────────────────────────────────────────
+  deduped = _applySort(deduped, sort)
 
   const finalLimit = Math.min(50, Math.max(1, Number(limit) || 20))
   deduped = deduped.slice(0, finalLimit)
@@ -299,29 +466,46 @@ async function _refreshPaperFromSources(canonicalId) {
     : canonicalId.startsWith('doi:')
       ? [semanticScholar, openAlex, crossref]
       : [semanticScholar]
+  // Sequential by design — we want the highest-priority adapter that
+  // returns a non-null paper to win, not the fastest. Each adapter's
+  // `fetch()` is itself wrapped in try/catch and returns the documented
+  // shape on any error, so an upstream failure cannot poison the chain.
+  // The outer try here is belt-and-suspenders for the unlikely case that
+  // an adapter rejects with an Error before its own catch can run.
   for (const adapter of order) {
+    let r
     try {
-      const r = await adapter.fetch(canonicalId)
-      if (r?.paper) {
-        // Best-effort enrichment for OA-PDF / license.
-        if (r.paper.doi) {
-          try {
-            const u = await unpaywall.fetch(`doi:${r.paper.doi}`)
-            if (u?.paper) {
-              if (u.paper.pdfExternalUrl) {
-                r.paper.pdfExternalUrl = r.paper.pdfExternalUrl || u.paper.pdfExternalUrl
-                r.paper.openAccess = true
-              }
-              if (u.paper.license && !r.paper.license) r.paper.license = u.paper.license
+      r = await adapter.fetch(canonicalId)
+    } catch (err) {
+      logAdapterError({
+        source: adapter.SOURCE || 'unknown',
+        error: 'unexpected_throw',
+        message: err && err.message,
+      })
+      continue
+    }
+    if (r?.paper) {
+      // Best-effort enrichment for OA-PDF / license.
+      if (r.paper.doi) {
+        try {
+          const u = await unpaywall.fetch(`doi:${r.paper.doi}`)
+          if (u?.paper) {
+            if (u.paper.pdfExternalUrl) {
+              r.paper.pdfExternalUrl = r.paper.pdfExternalUrl || u.paper.pdfExternalUrl
+              r.paper.openAccess = true
             }
-          } catch {
-            // enrichment best-effort
+            if (u.paper.license && !r.paper.license) r.paper.license = u.paper.license
           }
+        } catch (err) {
+          logAdapterError({
+            source: 'unpaywall',
+            error: 'unexpected_throw',
+            message: err && err.message,
+          })
+          // enrichment best-effort
         }
-        return r.paper
       }
-    } catch {
-      // try next adapter
+      return r.paper
     }
   }
   return null
@@ -402,29 +586,45 @@ async function getReferences(canonicalId, { limit = 20, offset = 0 }) {
 }
 
 async function _walk(canonicalId, kind, limit, offset) {
-  const lookupId = canonicalId.startsWith('doi:')
-    ? `DOI:${canonicalId.slice(4)}`
-    : canonicalId.slice(3) // ss:
-  const fields = 'paperId,title,year,authors.name,externalIds'
-  const url =
-    `https://${require('./scholar.constants').HOSTS.semanticScholar}` +
-    `/graph/v1/paper/${encodeURIComponent(lookupId)}/${kind}` +
-    `?fields=${encodeURIComponent(fields)}&limit=${limit}&offset=${offset}`
-  const res = await safeFetch(url, {
-    allowlist: [require('./scholar.constants').HOSTS.semanticScholar],
-    headers: process.env.SEMANTIC_SCHOLAR_API_KEY
-      ? { 'x-api-key': process.env.SEMANTIC_SCHOLAR_API_KEY }
-      : {},
-    expect: 'json',
-    timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
-  })
-  if (!res.ok) return { results: [], error: res.error || 'http_error' }
-  const list = Array.isArray(res.body?.data) ? res.body.data : []
-  const pick = (entry) => (kind === 'citations' ? entry.citingPaper : entry.citedPaper)
-  return {
-    results: list.map((entry) => semanticScholar._normalize(pick(entry))).filter(Boolean),
-    offset,
-    limit,
+  try {
+    const lookupId = canonicalId.startsWith('doi:')
+      ? `DOI:${canonicalId.slice(4)}`
+      : canonicalId.slice(3) // ss:
+    const fields = 'paperId,title,year,authors.name,externalIds'
+    const url =
+      `https://${require('./scholar.constants').HOSTS.semanticScholar}` +
+      `/graph/v1/paper/${encodeURIComponent(lookupId)}/${kind}` +
+      `?fields=${encodeURIComponent(fields)}&limit=${limit}&offset=${offset}`
+    const res = await safeFetch(url, {
+      allowlist: [require('./scholar.constants').HOSTS.semanticScholar],
+      headers: process.env.SEMANTIC_SCHOLAR_API_KEY
+        ? { 'x-api-key': process.env.SEMANTIC_SCHOLAR_API_KEY }
+        : {},
+      expect: 'json',
+      timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
+    })
+    if (!res.ok) {
+      logAdapterError({
+        source: 'semanticScholar',
+        error: res.error,
+        status: res.status,
+        message: `${kind} walk failed`,
+      })
+      return { results: [], error: res.error || 'http_error' }
+    }
+    const list = Array.isArray(res.body?.data) ? res.body.data : []
+    const pick = (entry) => (kind === 'citations' ? entry.citingPaper : entry.citedPaper)
+    return {
+      results: list.map((entry) => semanticScholar._normalize(pick(entry))).filter(Boolean),
+      offset,
+      limit,
+    }
+  } catch (err) {
+    log.warn(
+      { event: 'scholar.walk.unexpected', kind, err: err && err.message },
+      `${kind} walk threw unexpectedly`,
+    )
+    return { results: [], error: 'unexpected_error' }
   }
 }
 
@@ -512,7 +712,12 @@ async function getSignedPdfUrl(canonicalId) {
   if (!row.pdfCachedKey) return { url: null, reason: 'not_cached' }
   if (!r2.isR2Configured()) return { url: null, reason: 'r2_not_configured' }
   try {
-    const url = await r2.getSignedDownloadUrl(row.pdfCachedKey, 3600)
+    // Inline-view default. 600s = 10 min keeps the URL short-lived per
+    // CLAUDE.md "R2 signed URLs default to 1h download / 10min upload TTL"
+    // and the security-overview baseline. The PDF is uploaded with
+    // Content-Type: application/pdf and no override on Content-Disposition,
+    // so the iframe renders inline rather than triggering a download.
+    const url = await r2.getSignedDownloadUrl(row.pdfCachedKey, 600)
     return { url, key: row.pdfCachedKey }
   } catch (err) {
     log.warn(
@@ -534,5 +739,7 @@ module.exports = {
   _dedupe,
   _searchCacheKey,
   _serializePaper,
+  _applyPostFetchFilters,
+  _applySort,
   ADAPTERS,
 }

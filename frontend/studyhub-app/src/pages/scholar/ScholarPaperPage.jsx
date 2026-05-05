@@ -31,6 +31,69 @@ import CiteModal from './cite/CiteModal'
 import DiscussionThread from './discussion/DiscussionThread'
 import './ScholarPage.css'
 
+function authorByline(authors) {
+  if (!Array.isArray(authors) || authors.length === 0) return ''
+  const names = authors.map((a) => a?.name || '').filter(Boolean)
+  if (names.length === 0) return ''
+  if (names.length <= 3) return names.join(', ')
+  return `${names.slice(0, 3).join(', ')}, et al.`
+}
+
+function refMetaLine(ref) {
+  const year = ref?.publishedAt ? new Date(ref.publishedAt).getUTCFullYear() : ref?.year || ''
+  const parts = []
+  const byline = authorByline(ref?.authors)
+  if (byline) parts.push(byline)
+  if (ref?.venue) parts.push(ref.venue)
+  if (year) parts.push(String(year))
+  return parts.join(' · ')
+}
+
+function ReferenceList({ items }) {
+  return (
+    <div className="scholar-ref-list">
+      {items.map((ref, idx) => {
+        const id = ref?.id
+        const meta = refMetaLine(ref)
+        const title = ref?.title || 'Untitled reference'
+        const key = id || `ref-${idx}`
+        const inner = (
+          <>
+            <h4 className="scholar-ref-card__title">{title}</h4>
+            {meta && <div className="scholar-ref-card__meta">{meta}</div>}
+          </>
+        )
+        if (id && isValidPaperId(id)) {
+          return (
+            <Link
+              key={key}
+              to={`/scholar/paper/${encodeURIComponent(id)}`}
+              className="scholar-ref-card"
+            >
+              {inner}
+            </Link>
+          )
+        }
+        return (
+          <div key={key} className="scholar-ref-card">
+            {inner}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+function RefSkeletons() {
+  return (
+    <div className="scholar-ref-list" aria-hidden="true">
+      {[0, 1, 2, 3].map((i) => (
+        <span key={i} className="scholar-skeleton scholar-skeleton--ref-card" />
+      ))}
+    </div>
+  )
+}
+
 const TABS = [
   { id: 'info', label: 'Info' },
   { id: 'citedby', label: 'Cited by' },
@@ -166,15 +229,38 @@ export default function ScholarPaperPage() {
   const [activeTab, setActiveTab] = useState('info')
   const [citeOpen, setCiteOpen] = useState(false)
 
+  // PDF signed-URL state. Fetched from /api/scholar/paper/:id/pdf which
+  // returns { url } for cached OA PDFs. The raw `paper.pdfExternalUrl`
+  // is NEVER used as the iframe src — most upstreams (arXiv, publisher
+  // CDNs) block cross-origin iframes with `(blocked:origin)` per L? bug.
+  const [pdfState, setPdfState] = useState({
+    status: 'idle', // 'idle' | 'loading' | 'ready' | 'unavailable'
+    url: null,
+  })
+
+  // References / citations tab caches: keyed null = not yet fetched,
+  // [] = fetched-and-empty, [Item, ...] = populated. `error` is per-tab.
+  const [refsState, setRefsState] = useState({ status: 'idle', items: null, error: null })
+  const [citedByState, setCitedByState] = useState({
+    status: 'idle',
+    items: null,
+    error: null,
+  })
+
   useEffect(() => {
     if (!validId) {
-      setError('Invalid paper id')
-      setLoading(false)
+      queueMicrotask(() => {
+        setError('Invalid paper id')
+        setLoading(false)
+      })
       return undefined
     }
     let aborted = false
-    setLoading(true)
-    setError(null)
+    queueMicrotask(() => {
+      if (aborted) return
+      setLoading(true)
+      setError(null)
+    })
     fetch(`${API}/api/scholar/paper/${encodeURIComponent(validId)}`, { credentials: 'include' })
       .then((res) => {
         if (!res.ok) throw new Error(`Failed to load paper (${res.status})`)
@@ -193,6 +279,129 @@ export default function ScholarPaperPage() {
       aborted = true
     }
   }, [validId])
+
+  // Lazy-fetch the signed OA PDF URL when the user activates `viewMode='pdf'`.
+  // Skip the network entirely when the paper has no upstream PDF — show
+  // the empty-state immediately. Caches the resolved url in `pdfState` so
+  // toggling text/pdf doesn't re-hit the endpoint.
+  useEffect(() => {
+    if (viewMode !== 'pdf') return undefined
+    if (!validId || !paper) return undefined
+    if (!paper.pdfExternalUrl) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setPdfState({ status: 'unavailable', url: null })
+      return undefined
+    }
+    if (pdfState.status === 'ready' || pdfState.status === 'loading') return undefined
+
+    let aborted = false
+    setPdfState({ status: 'loading', url: null })
+    fetch(`${API}/api/scholar/paper/${encodeURIComponent(validId)}/pdf`, {
+      credentials: 'include',
+    })
+      .then(async (res) => {
+        if (!res.ok) return null
+        try {
+          return await res.json()
+        } catch {
+          return null
+        }
+      })
+      .then((json) => {
+        if (aborted) return
+        if (json && typeof json.url === 'string' && json.url.length > 0) {
+          setPdfState({ status: 'ready', url: json.url })
+        } else {
+          setPdfState({ status: 'unavailable', url: null })
+        }
+      })
+      .catch(() => {
+        if (!aborted) setPdfState({ status: 'unavailable', url: null })
+      })
+    return () => {
+      aborted = true
+    }
+  }, [viewMode, validId, paper, pdfState.status])
+
+  // References tab — fetch on first activation, cache in state thereafter.
+  useEffect(() => {
+    if (activeTab !== 'references' || !validId) return undefined
+    if (refsState.items !== null || refsState.status === 'loading') return undefined
+
+    let aborted = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setRefsState({ status: 'loading', items: null, error: null })
+    fetch(`${API}/api/scholar/paper/${encodeURIComponent(validId)}/references?limit=50&offset=0`, {
+      credentials: 'include',
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`References failed (${res.status})`)
+        return res.json()
+      })
+      .then((json) => {
+        if (aborted) return
+        const items = Array.isArray(json?.references)
+          ? json.references
+          : Array.isArray(json?.results)
+            ? json.results
+            : Array.isArray(json)
+              ? json
+              : []
+        setRefsState({ status: 'ready', items, error: null })
+      })
+      .catch((err) => {
+        if (!aborted) {
+          setRefsState({
+            status: 'error',
+            items: null,
+            error: err?.message || 'Could not load references',
+          })
+        }
+      })
+    return () => {
+      aborted = true
+    }
+  }, [activeTab, validId, refsState.items, refsState.status])
+
+  // Cited-by tab — same pattern as references.
+  useEffect(() => {
+    if (activeTab !== 'citedby' || !validId) return undefined
+    if (citedByState.items !== null || citedByState.status === 'loading') return undefined
+
+    let aborted = false
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setCitedByState({ status: 'loading', items: null, error: null })
+    fetch(`${API}/api/scholar/paper/${encodeURIComponent(validId)}/citations?limit=50&offset=0`, {
+      credentials: 'include',
+    })
+      .then((res) => {
+        if (!res.ok) throw new Error(`Cited-by failed (${res.status})`)
+        return res.json()
+      })
+      .then((json) => {
+        if (aborted) return
+        const items = Array.isArray(json?.citations)
+          ? json.citations
+          : Array.isArray(json?.results)
+            ? json.results
+            : Array.isArray(json)
+              ? json
+              : []
+        setCitedByState({ status: 'ready', items, error: null })
+      })
+      .catch((err) => {
+        if (!aborted) {
+          setCitedByState({
+            status: 'error',
+            items: null,
+            error: err?.message || 'Could not load cited-by',
+          })
+        }
+      })
+    return () => {
+      aborted = true
+    }
+  }, [activeTab, validId, citedByState.items, citedByState.status])
 
   const handleSave = useCallback(async () => {
     if (!validId) return
@@ -365,19 +574,54 @@ export default function ScholarPaperPage() {
             )}
 
             {!loading && !error && paper && viewMode === 'pdf' && paper.pdfExternalUrl && (
-              <iframe
-                title={`PDF viewer for ${paper.title}`}
-                src={paper.pdfExternalUrl}
-                /* allow-scripts only — never allow-same-origin (A14). */
-                sandbox="allow-scripts allow-popups allow-forms"
-                style={{
-                  width: '100%',
-                  minHeight: 600,
-                  border: '1px solid var(--sh-border)',
-                  borderRadius: 10,
-                  background: 'var(--sh-surface)',
-                }}
-              />
+              <>
+                {pdfState.status === 'loading' && (
+                  <span
+                    className="scholar-skeleton scholar-skeleton--pdf"
+                    aria-label="Loading PDF"
+                  />
+                )}
+                {pdfState.status === 'ready' && pdfState.url && (
+                  <iframe
+                    title={`PDF viewer for ${paper.title}`}
+                    src={pdfState.url}
+                    /* allow-scripts only — never allow-same-origin (A14). */
+                    sandbox="allow-scripts allow-popups allow-forms"
+                    style={{
+                      width: '100%',
+                      minHeight: 600,
+                      border: '1px solid var(--sh-border)',
+                      borderRadius: 10,
+                      background: 'var(--sh-surface)',
+                    }}
+                  />
+                )}
+                {pdfState.status === 'unavailable' && (
+                  <div className="scholar-reader__paywall-card">
+                    <h3 style={{ fontFamily: 'var(--font-paper)', margin: '0 0 8px' }}>
+                      PDF not available in-app
+                    </h3>
+                    <p
+                      style={{
+                        color: 'var(--sh-subtext)',
+                        margin: '0 0 24px',
+                        fontSize: 'var(--type-sm)',
+                      }}
+                    >
+                      This paper's PDF isn't available for in-app viewing. Open the original on the
+                      publisher's site.
+                    </p>
+                    <a
+                      href={paper.pdfExternalUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="scholar-action-btn scholar-action-btn--primary"
+                    >
+                      Open original
+                    </a>
+                  </div>
+                )}
+              </>
             )}
 
             {!loading && !error && paper && !paper.pdfExternalUrl && viewMode === 'pdf' && (
@@ -431,14 +675,56 @@ export default function ScholarPaperPage() {
 
             {activeTab === 'info' && <InfoTab paper={paper} />}
             {activeTab === 'citedby' && (
-              <div style={{ color: 'var(--sh-subtext)', fontSize: 'var(--type-sm)' }}>
-                Cited-by data loads from /api/scholar/paper/:id/citations.
-              </div>
+              <>
+                {citedByState.status === 'loading' && <RefSkeletons />}
+                {citedByState.status === 'error' && (
+                  <div
+                    style={{
+                      color: 'var(--sh-danger-text)',
+                      background: 'var(--sh-danger-bg)',
+                      padding: 12,
+                      borderRadius: 8,
+                      fontSize: 'var(--type-sm)',
+                    }}
+                  >
+                    {citedByState.error}
+                  </div>
+                )}
+                {citedByState.status === 'ready' && citedByState.items.length === 0 && (
+                  <div style={{ color: 'var(--sh-subtext)', fontSize: 'var(--type-sm)' }}>
+                    No citing papers found yet.
+                  </div>
+                )}
+                {citedByState.status === 'ready' && citedByState.items.length > 0 && (
+                  <ReferenceList items={citedByState.items} />
+                )}
+              </>
             )}
             {activeTab === 'references' && (
-              <div style={{ color: 'var(--sh-subtext)', fontSize: 'var(--type-sm)' }}>
-                Reference list loads from /api/scholar/paper/:id/references.
-              </div>
+              <>
+                {refsState.status === 'loading' && <RefSkeletons />}
+                {refsState.status === 'error' && (
+                  <div
+                    style={{
+                      color: 'var(--sh-danger-text)',
+                      background: 'var(--sh-danger-bg)',
+                      padding: 12,
+                      borderRadius: 8,
+                      fontSize: 'var(--type-sm)',
+                    }}
+                  >
+                    {refsState.error}
+                  </div>
+                )}
+                {refsState.status === 'ready' && refsState.items.length === 0 && (
+                  <div style={{ color: 'var(--sh-subtext)', fontSize: 'var(--type-sm)' }}>
+                    No references available for this paper.
+                  </div>
+                )}
+                {refsState.status === 'ready' && refsState.items.length > 0 && (
+                  <ReferenceList items={refsState.items} />
+                )}
+              </>
             )}
             {activeTab === 'notes' && (
               <div style={{ color: 'var(--sh-subtext)', fontSize: 'var(--type-sm)' }}>

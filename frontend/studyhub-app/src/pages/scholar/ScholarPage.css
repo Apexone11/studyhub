@@ -549,8 +549,24 @@
   border-color: transparent;
 }
 
+/* L? hover fix: brightness(1.05) was washing the white foreground out on
+   the gradient. Replace with a shadow + subtle lift, and pin `color: white`
+   so it can never inherit-collapse. Identical treatment for both light and
+   dark mode — gradient + white text reads on both. */
 .scholar-action-btn--primary:hover {
-  filter: brightness(1.05);
+  color: white;
+  box-shadow: 0 6px 18px rgb(from var(--sh-brand) r g b / 0.35);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-action-btn--primary {
+    transition:
+      box-shadow 150ms ease-out,
+      transform 150ms ease-out;
+  }
+  .scholar-action-btn--primary:hover {
+    transform: translateY(-1px);
+  }
 }
 
 .scholar-reader__viewer {
@@ -753,4 +769,279 @@
   .scholar-topic__layout {
     grid-template-columns: 1fr;
   }
+}
+
+/* ── Filters drawer ────────────────────────────────────────────────────── */
+
+.scholar-filters-drawer__backdrop {
+  position: fixed;
+  inset: 0;
+  background: var(--sh-overlay, rgb(0 0 0 / 40%));
+  z-index: 200;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.scholar-filters-drawer {
+  width: min(420px, 100vw);
+  height: 100vh;
+  background: var(--sh-surface);
+  border-left: 1px solid var(--sh-border);
+  box-shadow: -8px 0 24px rgb(0 0 0 / 12%);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-filters-drawer {
+    animation: scholar-drawer-slide-in 200ms ease-out;
+  }
+}
+
+@keyframes scholar-drawer-slide-in {
+  from {
+    transform: translateX(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.scholar-filters-drawer__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+
+.scholar-filters-drawer__title {
+  font-family: var(--font-paper);
+  font-size: var(--type-lg);
+  color: var(--sh-heading);
+  margin: 0;
+  font-weight: 600;
+}
+
+.scholar-filters-drawer__body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+}
+
+.scholar-filters-drawer__group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.scholar-filters-drawer__group-title {
+  font-size: var(--type-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sh-subtext);
+  font-weight: 600;
+  margin: 0;
+}
+
+.scholar-filters-drawer__row {
+  display: flex;
+  gap: 8px;
+}
+
+.scholar-filters-drawer__input,
+.scholar-filters-drawer__select {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--sh-bg);
+  border: 1px solid var(--sh-border);
+  border-radius: 8px;
+  color: var(--sh-text);
+  font-size: var(--type-sm);
+  font-family: inherit;
+}
+
+.scholar-filters-drawer__input:focus,
+.scholar-filters-drawer__select:focus {
+  outline: none;
+  border-color: var(--sh-brand);
+  box-shadow: 0 0 0 3px var(--sh-brand-soft);
+}
+
+.scholar-filters-drawer__chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scholar-filters-drawer__chip {
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  font-size: var(--type-xs);
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.scholar-filters-drawer__chip[aria-pressed='true'] {
+  background: var(--sh-brand-soft);
+  color: var(--sh-pill-text, var(--sh-brand));
+  border-color: var(--sh-brand);
+}
+
+.scholar-filters-drawer__toggle-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: var(--type-sm);
+  color: var(--sh-text);
+}
+
+.scholar-filters-drawer__foot {
+  padding: 14px 20px;
+  border-top: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  display: flex;
+  gap: 10px;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.scholar-filters-drawer__clear {
+  background: transparent;
+  border: 0;
+  color: var(--sh-subtext);
+  font-size: var(--type-sm);
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.scholar-filters-drawer__clear:hover {
+  background: var(--sh-soft);
+  color: var(--sh-text);
+}
+
+.scholar-filters-drawer__apply {
+  flex: 1;
+  padding: 12px 16px;
+  background: linear-gradient(135deg, var(--sh-brand), var(--sh-brand-accent));
+  color: white;
+  border: 0;
+  border-radius: 10px;
+  font-size: var(--type-sm);
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-filters-drawer__apply {
+    transition:
+      box-shadow 150ms ease-out,
+      transform 150ms ease-out;
+  }
+  .scholar-filters-drawer__apply:hover {
+    color: white;
+    box-shadow: 0 6px 18px rgb(from var(--sh-brand) r g b / 0.35);
+    transform: translateY(-1px);
+  }
+}
+
+/* ── References / Cited-by lists ───────────────────────────────────────── */
+
+.scholar-ref-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scholar-ref-card {
+  padding: 12px 14px;
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  border-radius: 10px;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-ref-card {
+    transition: background 150ms ease-out;
+  }
+  .scholar-ref-card:hover {
+    background: var(--sh-brand-soft);
+  }
+}
+
+.scholar-ref-card__title {
+  font-family: var(--font-paper);
+  font-size: var(--type-sm);
+  font-weight: 600;
+  color: var(--sh-heading);
+  margin: 0 0 4px;
+  line-height: 1.35;
+}
+
+.scholar-ref-card__meta {
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+  line-height: 1.4;
+}
+
+/* ── Skeleton placeholders ─────────────────────────────────────────────── */
+
+.scholar-skeleton {
+  background: linear-gradient(90deg, var(--sh-soft) 0%, var(--sh-border) 50%, var(--sh-soft) 100%);
+  background-size: 200% 100%;
+  border-radius: 8px;
+  display: block;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-skeleton {
+    animation: scholar-skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+}
+
+@keyframes scholar-skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.scholar-skeleton--stat-value {
+  height: 38px;
+  width: 80%;
+  margin: 0 auto;
+}
+
+.scholar-skeleton--ref-card {
+  height: 64px;
+  width: 100%;
+}
+
+.scholar-skeleton--pdf {
+  width: 100%;
+  min-height: 600px;
+  border-radius: 10px;
 }

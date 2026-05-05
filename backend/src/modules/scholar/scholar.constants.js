@@ -62,6 +62,94 @@ const SEARCH_LIMIT_DEFAULT = 20
 const SEARCH_YEAR_MIN = 1900
 const SEARCH_YEAR_MAX = 2100
 
+// Drawer-driven year-range bounds: stricter than the legacy 1900-2100
+// window because those numeric inputs come straight from a user-facing
+// form and we do not want to let absurd values (e.g., year 0 or 2999)
+// reach the adapters. The plan explicitly specifies [1700, currentYear+1].
+const SEARCH_YEAR_RANGE_MIN = 1700
+const SEARCH_YEAR_RANGE_MAX = new Date().getUTCFullYear() + 1
+
+// `minCitations` upper bound. Any value above this is almost certainly a
+// mistake or an attempt to force an empty result set; clamp / reject.
+const SEARCH_MIN_CITATIONS_MAX = 1_000_000
+
+// Length caps for free-form filter text fields. Mirrors the existing
+// SEARCH_QUERY_MAX shape so all scholar text inputs share a contract.
+const SEARCH_AUTHOR_MAX = 200
+const SEARCH_VENUE_MAX = 200
+
+// Allowlist of search-source slugs the user may pick in the Filters
+// drawer. Mirrors `frontend/.../scholarConstants.js#SCHOLAR_SOURCES` —
+// when the frontend list changes, update this Set in lockstep. Note:
+// `unpaywall` is enrichment-only in the fan-out (never returns search
+// results) so picking it alone yields zero results by design.
+const SCHOLAR_SOURCE_SLUGS = Object.freeze([
+  'semanticScholar',
+  'openAlex',
+  'crossref',
+  'arxiv',
+  'unpaywall',
+])
+const SCHOLAR_SOURCE_SLUG_SET = new Set(SCHOLAR_SOURCE_SLUGS)
+
+// Allowlist of sort modes accepted by the search endpoint. Mirrors
+// `frontend/.../scholarConstants.js#SCHOLAR_SORTS`.
+const SCHOLAR_SORT_SLUGS = Object.freeze(['relevance', 'year-desc', 'citations-desc', 'recent'])
+const SCHOLAR_SORT_SLUG_SET = new Set(SCHOLAR_SORT_SLUGS)
+
+// Allowlist of topic / domain slugs the user may pick. Mirrors
+// `frontend/.../scholarConstants.js#POPULAR_TOPICS` (slug field). Defined
+// here standalone — never imported from the frontend, per CLAUDE.md
+// (frontend and backend are separate trust domains).
+const SCHOLAR_DOMAIN_SLUGS = Object.freeze([
+  'medicine',
+  'machine-learning',
+  'engineering',
+  'physics-general',
+  'nlp',
+  'public-health',
+  'chemistry',
+  'materials-science',
+  'cell-biology',
+  'psychology',
+  'computer-vision',
+  'economics',
+  'mathematics',
+  'neuroscience',
+  'astrophysics',
+  'biochemistry',
+  'genomics',
+  'sociology',
+  'statistics',
+  'climate-science',
+  'earth-science',
+  'quantum-physics',
+  'education',
+  'linguistics',
+])
+const SCHOLAR_DOMAIN_SLUG_SET = new Set(SCHOLAR_DOMAIN_SLUGS)
+
+// Cap on how many entries a multi-select param may carry. The drawer
+// caps via UI but a hand-crafted URL could try to flood the validator;
+// reject anything past these caps to keep validation cost bounded.
+const SCHOLAR_SOURCES_MAX = SCHOLAR_SOURCE_SLUGS.length
+const SCHOLAR_DOMAINS_MAX = SCHOLAR_DOMAIN_SLUGS.length
+
+/** Lower-case + space-to-hyphen so adapter topic strings can match the
+ *  domain-slug allowlist. Used for both sides of the `domains` filter
+ *  intersection check so "Machine Learning" → "machine-learning".
+ */
+function slugifyTopic(raw) {
+  if (!raw || typeof raw !== 'string') return ''
+  return raw
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')
+    .trim()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
 // Per-adapter soft timeout in the fan-out (master plan §18.5).
 const ADAPTER_SOFT_TIMEOUT_MS = 3_000
 
@@ -198,6 +286,20 @@ module.exports = {
   SEARCH_LIMIT_DEFAULT,
   SEARCH_YEAR_MIN,
   SEARCH_YEAR_MAX,
+  SEARCH_YEAR_RANGE_MIN,
+  SEARCH_YEAR_RANGE_MAX,
+  SEARCH_MIN_CITATIONS_MAX,
+  SEARCH_AUTHOR_MAX,
+  SEARCH_VENUE_MAX,
+  SCHOLAR_SOURCE_SLUGS,
+  SCHOLAR_SOURCE_SLUG_SET,
+  SCHOLAR_SORT_SLUGS,
+  SCHOLAR_SORT_SLUG_SET,
+  SCHOLAR_DOMAIN_SLUGS,
+  SCHOLAR_DOMAIN_SLUG_SET,
+  SCHOLAR_SOURCES_MAX,
+  SCHOLAR_DOMAINS_MAX,
+  slugifyTopic,
   ADAPTER_SOFT_TIMEOUT_MS,
   SEARCH_CACHE_TTL_MS,
   PAPER_DEFAULT_STALE_DAYS,

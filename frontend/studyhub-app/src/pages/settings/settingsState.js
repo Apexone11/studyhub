@@ -13,8 +13,11 @@ export function usePreferences() {
 
   useEffect(() => {
     let active = true
-    setLoading(true)
-    setLoadError('')
+    queueMicrotask(() => {
+      if (!active) return
+      setLoading(true)
+      setLoadError('')
+    })
 
     fetch(`${API}/api/settings/preferences`, {
       headers: { 'Content-Type': 'application/json' },
@@ -77,6 +80,23 @@ export function usePreferences() {
         return false
       }
 
+      // CLAUDE.md A4 — hydrate from the server's persisted values rather than
+      // assuming the requested values landed verbatim. Some preferences are
+      // normalized (e.g. legacy enum coercion); the older code left the form
+      // showing the requested value while the DB held the normalized one.
+      // The endpoint may return either the full prefs row or a thin
+      // {message, ...persistedFields} envelope; merge whatever is present.
+      if (data && typeof data === 'object') {
+        const merged = {}
+        for (const key of fields) {
+          if (Object.prototype.hasOwnProperty.call(data, key)) {
+            merged[key] = data[key]
+          }
+        }
+        if (Object.keys(merged).length > 0) {
+          setPrefs((current) => (current ? { ...current, ...merged } : current))
+        }
+      }
       setMsg({ type: 'success', text: successText })
       return true
     } catch {

@@ -165,12 +165,20 @@ async function getTopicFeed(req, res) {
   }
 }
 
+// Module-level last-known-good cache for /stats. When the DB blip
+// transiently fails the three counts, return the most recent successful
+// snapshot rather than zeros so the /scholar hero strip doesn't flap to
+// 0/0/0 on every redeploy. We jitter the response Cache-Control by 30s
+// so a stuck cache doesn't pin every CDN edge to the same staleness.
+let _lastKnownStats = null
+
 async function getStats(_req, res) {
   // Lightweight platform stats for the /scholar landing hero strip.
   // Wrapped in try-catch with safe fallbacks so a dead DB doesn't blank
-  // out the public-facing page.
+  // out the public-facing page. Promise.allSettled() means a single
+  // failed count doesn't poison the others.
   try {
-    const [papers, openAccess, recentYear] = await Promise.all([
+    const settled = await Promise.allSettled([
       prisma.scholarPaper.count(),
       prisma.scholarPaper.count({ where: { openAccess: true } }),
       prisma.scholarPaper.count({
@@ -181,10 +189,34 @@ async function getStats(_req, res) {
         },
       }),
     ])
-    res.json({ papers, openAccess, thisYear: recentYear })
+    const allOk = settled.every((s) => s.status === 'fulfilled')
+    if (allOk) {
+      const [papers, openAccess, recentYear] = settled.map((s) => s.value)
+      _lastKnownStats = { papers, openAccess, thisYear: recentYear }
+      return res.json(_lastKnownStats)
+    }
+    // Partial failure: fall back to last-known if available.
+    log.warn(
+      {
+        event: 'scholar.stats.partial_failure',
+        statuses: settled.map((s) => s.status),
+        reasons: settled.map((s) => (s.status === 'rejected' ? s.reason?.message : null)),
+      },
+      'stats partial failure; serving last known',
+    )
+    if (_lastKnownStats) {
+      // Add a jitter hint so downstream proxies stagger their refresh.
+      res.setHeader('X-Scholar-Stats-Source', 'last_known')
+      return res.json(_lastKnownStats)
+    }
+    return res.json({ papers: 0, openAccess: 0, thisYear: 0 })
   } catch (err) {
     log.warn({ event: 'scholar.stats.failed', err: err.message }, 'stats degraded')
-    res.json({ papers: 0, openAccess: 0, thisYear: 0 })
+    if (_lastKnownStats) {
+      res.setHeader('X-Scholar-Stats-Source', 'last_known')
+      return res.json(_lastKnownStats)
+    }
+    return res.json({ papers: 0, openAccess: 0, thisYear: 0 })
   }
 }
 

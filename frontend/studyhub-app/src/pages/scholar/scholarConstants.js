@@ -16,15 +16,53 @@ export const TRY_CHIPS = [
   'diffusion models',
 ]
 
+// Ordered most-populous-first per Figma §3 "Browse by topic" treatment.
+// Counts are stable display strings; live counts will replace these once the
+// /api/scholar/topics endpoint reports per-topic populations.
 export const POPULAR_TOPICS = [
+  { slug: 'medicine', label: 'Medicine', count: '28.4k' },
   { slug: 'machine-learning', label: 'Machine Learning', count: '24.3k' },
-  { slug: 'computer-vision', label: 'Computer Vision', count: '12.7k' },
+  { slug: 'engineering', label: 'Engineering', count: '21.8k' },
+  { slug: 'physics-general', label: 'Physics', count: '19.6k' },
   { slug: 'nlp', label: 'NLP', count: '18.9k' },
-  { slug: 'biochemistry', label: 'Biochemistry', count: '8.4k' },
-  { slug: 'climate-science', label: 'Climate Science', count: '6.1k' },
+  { slug: 'public-health', label: 'Public Health', count: '17.5k' },
+  { slug: 'chemistry', label: 'Chemistry', count: '16.4k' },
+  { slug: 'materials-science', label: 'Materials Science', count: '15.7k' },
+  { slug: 'cell-biology', label: 'Cell Biology', count: '14.2k' },
+  { slug: 'psychology', label: 'Psychology', count: '13.8k' },
+  { slug: 'computer-vision', label: 'Computer Vision', count: '12.7k' },
+  { slug: 'economics', label: 'Economics', count: '11.9k' },
+  { slug: 'mathematics', label: 'Mathematics', count: '10.6k' },
   { slug: 'neuroscience', label: 'Neuroscience', count: '9.6k' },
-  { slug: 'quantum-physics', label: 'Quantum Physics', count: '5.2k' },
+  { slug: 'astrophysics', label: 'Astrophysics', count: '9.1k' },
+  { slug: 'biochemistry', label: 'Biochemistry', count: '8.4k' },
   { slug: 'genomics', label: 'Genomics', count: '7.8k' },
+  { slug: 'sociology', label: 'Sociology', count: '7.2k' },
+  { slug: 'statistics', label: 'Statistics', count: '6.8k' },
+  { slug: 'climate-science', label: 'Climate Science', count: '6.1k' },
+  { slug: 'earth-science', label: 'Earth Science', count: '5.6k' },
+  { slug: 'quantum-physics', label: 'Quantum Physics', count: '5.2k' },
+  { slug: 'education', label: 'Education', count: '4.9k' },
+  { slug: 'linguistics', label: 'Linguistics', count: '3.7k' },
+]
+
+// Backend source adapter slugs (mirrors `backend/src/modules/scholar/sources/*`).
+// Used by the Filters drawer multi-select chips.
+export const SCHOLAR_SOURCES = [
+  { slug: 'semanticScholar', label: 'Semantic Scholar' },
+  { slug: 'openAlex', label: 'OpenAlex' },
+  { slug: 'crossref', label: 'CrossRef' },
+  { slug: 'arxiv', label: 'arXiv' },
+  { slug: 'unpaywall', label: 'Unpaywall' },
+]
+
+// Sort options for the search results page. Param value matches what
+// ScholarSearchPage reads from URLSearchParams.
+export const SCHOLAR_SORTS = [
+  { slug: 'relevance', label: 'Relevance' },
+  { slug: 'year-desc', label: 'Year (newest first)' },
+  { slug: 'citations-desc', label: 'Most cited' },
+  { slug: 'recent', label: 'Recently added' },
 ]
 
 export const CITE_STYLES = [

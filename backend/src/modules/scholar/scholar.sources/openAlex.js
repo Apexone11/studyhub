@@ -9,6 +9,7 @@
 const { safeFetch } = require('../../../lib/safeFetch')
 const log = require('../../../lib/logger')
 const rateBucket = require('../rateBucket')
+const { logAdapterError } = require('../_adapterLogger')
 const { HOSTS, ADAPTER_SOFT_TIMEOUT_MS } = require('../scholar.constants')
 
 const SOURCE = 'openAlex'
@@ -86,72 +87,96 @@ function _withApiKey(params) {
 }
 
 async function search(query, opts = {}) {
-  if (!rateBucket.take(SOURCE)) {
-    return { source: SOURCE, results: [], throttled: true }
-  }
-  const limit = Math.min(50, Math.max(1, opts.limit || 20))
-  const params = new URLSearchParams({
-    search: query,
-    'per-page': String(limit),
-  })
-  if (opts.from) params.set('filter', `from_publication_date:${opts.from}-01-01`)
-  if (opts.to) {
-    const existing = params.get('filter') || ''
-    const range = `to_publication_date:${opts.to}-12-31`
-    params.set('filter', existing ? `${existing},${range}` : range)
-  }
-  _withApiKey(params)
-  const url = `https://${HOST}/works?${params.toString()}`
-  const res = await safeFetch(url, {
-    allowlist: [HOST],
-    expect: 'json',
-    timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
-  })
-  if (!res.ok) {
+  try {
+    if (!rateBucket.take(SOURCE)) {
+      return { source: SOURCE, results: [], throttled: true }
+    }
+    const limit = Math.min(50, Math.max(1, opts.limit || 20))
+    const params = new URLSearchParams({
+      search: query,
+      'per-page': String(limit),
+    })
+    if (opts.from) params.set('filter', `from_publication_date:${opts.from}-01-01`)
+    if (opts.to) {
+      const existing = params.get('filter') || ''
+      const range = `to_publication_date:${opts.to}-12-31`
+      params.set('filter', existing ? `${existing},${range}` : range)
+    }
+    _withApiKey(params)
+    const url = `https://${HOST}/works?${params.toString()}`
+    const res = await safeFetch(url, {
+      allowlist: [HOST],
+      expect: 'json',
+      timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
+    })
+    if (!res.ok) {
+      logAdapterError({
+        source: SOURCE,
+        error: res.error,
+        status: res.status,
+        message: 'OpenAlex search failed',
+      })
+      return { source: SOURCE, results: [], error: res.error || 'http_error' }
+    }
+    const list = Array.isArray(res.body?.results) ? res.body.results : []
+    return {
+      source: SOURCE,
+      results: list.map(_normalize).filter(Boolean),
+    }
+  } catch (err) {
     log.warn(
-      { event: 'scholar.adapter.error', source: SOURCE, error: res.error, status: res.status },
-      'OpenAlex search failed',
+      { event: 'scholar.adapter.unexpected', source: SOURCE, err: err && err.message },
+      'OpenAlex search threw unexpectedly',
     )
-    return { source: SOURCE, results: [], error: res.error || 'http_error' }
-  }
-  const list = Array.isArray(res.body?.results) ? res.body.results : []
-  return {
-    source: SOURCE,
-    results: list.map(_normalize).filter(Boolean),
+    return { source: SOURCE, results: [], error: 'unexpected_error' }
   }
 }
 
 async function fetch(canonicalId) {
-  if (!rateBucket.take(SOURCE)) {
-    return { source: SOURCE, paper: null, throttled: true }
+  try {
+    if (!rateBucket.take(SOURCE)) {
+      return { source: SOURCE, paper: null, throttled: true }
+    }
+    let lookupPath = ''
+    if (canonicalId.startsWith('doi:')) {
+      lookupPath = `doi:${canonicalId.slice(4)}`
+    } else if (canonicalId.startsWith('oa:')) {
+      // OpenAlex Work IDs start with `W` + digits. New canonical namespace
+      // per Copilot fix; replaces the prior `ss:` reuse which collided
+      // with the Semantic Scholar id space.
+      lookupPath = canonicalId.slice(3)
+    } else if (canonicalId.startsWith('ss:')) {
+      // Backward-compat for any rows persisted under the old namespace
+      // before the fix landed. New rows use `oa:`.
+      lookupPath = canonicalId.slice(3)
+    } else {
+      return { source: SOURCE, paper: null, error: 'unsupported_id' }
+    }
+    const params = new URLSearchParams()
+    _withApiKey(params)
+    const url = `https://${HOST}/works/${encodeURIComponent(lookupPath)}${params.toString() ? `?${params.toString()}` : ''}`
+    const res = await safeFetch(url, {
+      allowlist: [HOST],
+      expect: 'json',
+      timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
+    })
+    if (!res.ok) {
+      logAdapterError({
+        source: SOURCE,
+        error: res.error,
+        status: res.status,
+        message: 'OpenAlex fetch failed',
+      })
+      return { source: SOURCE, paper: null, error: res.error || 'http_error' }
+    }
+    return { source: SOURCE, paper: _normalize(res.body) }
+  } catch (err) {
+    log.warn(
+      { event: 'scholar.adapter.unexpected', source: SOURCE, err: err && err.message },
+      'OpenAlex fetch threw unexpectedly',
+    )
+    return { source: SOURCE, paper: null, error: 'unexpected_error' }
   }
-  let lookupPath = ''
-  if (canonicalId.startsWith('doi:')) {
-    lookupPath = `doi:${canonicalId.slice(4)}`
-  } else if (canonicalId.startsWith('oa:')) {
-    // OpenAlex Work IDs start with `W` + digits. New canonical namespace
-    // per Copilot fix; replaces the prior `ss:` reuse which collided
-    // with the Semantic Scholar id space.
-    lookupPath = canonicalId.slice(3)
-  } else if (canonicalId.startsWith('ss:')) {
-    // Backward-compat for any rows persisted under the old namespace
-    // before the fix landed. New rows use `oa:`.
-    lookupPath = canonicalId.slice(3)
-  } else {
-    return { source: SOURCE, paper: null, error: 'unsupported_id' }
-  }
-  const params = new URLSearchParams()
-  _withApiKey(params)
-  const url = `https://${HOST}/works/${encodeURIComponent(lookupPath)}${params.toString() ? `?${params.toString()}` : ''}`
-  const res = await safeFetch(url, {
-    allowlist: [HOST],
-    expect: 'json',
-    timeoutMs: ADAPTER_SOFT_TIMEOUT_MS,
-  })
-  if (!res.ok) {
-    return { source: SOURCE, paper: null, error: res.error || 'http_error' }
-  }
-  return { source: SOURCE, paper: _normalize(res.body) }
 }
 
 module.exports = { SOURCE, search, fetch, _normalize, _reconstructAbstract }

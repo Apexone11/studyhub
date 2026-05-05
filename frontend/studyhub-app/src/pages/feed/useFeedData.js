@@ -27,6 +27,57 @@ function markFeedVisit() {
   }
 }
 
+// Cheap structural hash of the fields a FeedCard cares about. Used by
+// `mergeFeedItems` below so a poll that returns the same payload reuses the
+// existing object reference, which keeps `React.memo` happy and prevents the
+// inline <video> from remounting / re-fetching its stream URL every 30s.
+// Stringify is bounded by what we hash (no nested objects / cyclic refs in
+// feed item shapes), so the cost stays linear in items × hashed-field-count.
+function fingerprintItem(item) {
+  if (!item) return ''
+  const r = item.reactions || {}
+  return [
+    item.feedKey,
+    item.id,
+    item.type,
+    item.title || '',
+    item.preview || item.content || item.description || '',
+    item.commentCount || 0,
+    item.starred ? 1 : 0,
+    item.stars || 0,
+    item.forks || 0,
+    item.downloads || 0,
+    r.likes || 0,
+    r.dislikes || 0,
+    r.userReaction || '',
+    item.video?.id || 0,
+    item.video?.status || '',
+    item.moderationStatus || '',
+    // createdAt drives `timeAgo` rendering — string compare is enough.
+    item.createdAt || '',
+  ].join('|')
+}
+
+// Merge a freshly fetched items array with the previous snapshot so any
+// item whose hash hasn't changed reuses the previous object reference. The
+// FeedCard memo comparator does `prev.item === next.item`, so reused refs
+// short-circuit the re-render path and the inline video player stays stable
+// across the 30-second polling interval.
+function mergeFeedItems(previousItems, nextItems) {
+  if (!Array.isArray(nextItems)) return previousItems
+  const previousByKey = new Map()
+  for (const entry of previousItems || []) {
+    if (entry?.feedKey) previousByKey.set(entry.feedKey, entry)
+  }
+  return nextItems.map((next) => {
+    const previous = next?.feedKey ? previousByKey.get(next.feedKey) : null
+    if (previous && fingerprintItem(previous) === fingerprintItem(next)) {
+      return previous
+    }
+    return next
+  })
+}
+
 export function useFeedData({ user, search }) {
   const [feedState, setFeedState] = useState({
     items: [],
@@ -80,14 +131,19 @@ export function useFeedData({ user, search }) {
         }
 
         apply(() => {
-          setFeedState({
-            items: Array.isArray(data.items) ? data.items : [],
+          setFeedState((current) => ({
+            // Reuse previous-poll item references when their content fingerprint
+            // is unchanged. Without this the 30s poll hands every FeedCard a
+            // brand-new object ref, busting React.memo and remounting the
+            // inline <video> (the cause of "feed flash on every navigation"
+            // when a user toggles back to /feed mid-poll).
+            items: mergeFeedItems(current.items, Array.isArray(data.items) ? data.items : []),
             total: data.total || 0,
             loading: false,
             error: '',
             partial: Boolean(data.partial),
             degradedSections: Array.isArray(data.degradedSections) ? data.degradedSections : [],
-          })
+          }))
         })
       } catch (error) {
         if (error?.name === 'AbortError') return
@@ -120,11 +176,12 @@ export function useFeedData({ user, search }) {
       const data = await readJsonSafely(response, {})
       if (response.ok && Array.isArray(data.items)) {
         setFeedState((current) => {
-          const existingIds = new Set(current.items.map((item) => item.id))
-          const newItems = data.items.filter((item) => !existingIds.has(item.id))
+          const existingKeys = new Set(current.items.map((item) => item.feedKey || item.id))
+          const newItems = data.items.filter((item) => !existingKeys.has(item.feedKey || item.id))
+          // Stable refs for repeats; brand-new objects for first-seen items.
           return {
             ...current,
-            items: [...current.items, ...newItems],
+            items: [...current.items, ...mergeFeedItems([], newItems)],
             total: data.total || current.total,
           }
         })
