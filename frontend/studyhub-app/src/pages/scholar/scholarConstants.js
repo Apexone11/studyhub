@@ -47,13 +47,15 @@ export const POPULAR_TOPICS = [
 ]
 
 // Backend source adapter slugs (mirrors `backend/src/modules/scholar/sources/*`).
-// Used by the Filters drawer multi-select chips.
+// Used by the Filters drawer multi-select chips. Only adapters that emit
+// search results belong here. Unpaywall is enrichment-only on the backend
+// (its `search()` is a deliberate no-op), so picking it would silently
+// produce zero results — keep it out of the user-facing source list.
 export const SCHOLAR_SOURCES = [
   { slug: 'semanticScholar', label: 'Semantic Scholar' },
   { slug: 'openAlex', label: 'OpenAlex' },
   { slug: 'crossref', label: 'CrossRef' },
   { slug: 'arxiv', label: 'arXiv' },
-  { slug: 'unpaywall', label: 'Unpaywall' },
 ]
 
 // Sort options for the search results page. Param value matches what

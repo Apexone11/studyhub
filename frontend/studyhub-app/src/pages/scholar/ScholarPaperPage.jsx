@@ -21,7 +21,6 @@
  */
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import Navbar from '../../components/navbar/Navbar'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { API } from '../../config'
 import { showToast } from '../../lib/toast'
@@ -29,6 +28,7 @@ import { authHeaders } from '../shared/pageUtils'
 import { isValidPaperId } from './scholarConstants'
 import CiteModal from './cite/CiteModal'
 import DiscussionThread from './discussion/DiscussionThread'
+import ScholarShell from './ScholarShell'
 import './ScholarPage.css'
 
 function authorByline(authors) {
@@ -247,6 +247,20 @@ export default function ScholarPaperPage() {
     error: null,
   })
 
+  // Reset all per-paper caches when navigating between papers in the same
+  // route instance. Without this, pdfState's `ready/loading` guard, and
+  // refsState/citedByState's `items !== null` guard, prevent the next
+  // paper's data from being fetched and the UI keeps showing the previous
+  // paper's PDF link, references, and cited-by list.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setPdfState({ status: 'idle', url: null })
+     
+    setRefsState({ status: 'idle', items: null, error: null })
+     
+    setCitedByState({ status: 'idle', items: null, error: null })
+  }, [validId])
+
   useEffect(() => {
     if (!validId) {
       queueMicrotask(() => {
@@ -448,25 +462,18 @@ export default function ScholarPaperPage() {
 
   if (!validId) {
     return (
-      <div className="scholar-page">
-        <Navbar />
-        <main className="scholar-shell" style={{ paddingTop: 64 }}>
-          <h1 style={{ fontFamily: 'var(--font-paper)' }}>Paper not found</h1>
-          <p style={{ color: 'var(--sh-subtext)' }}>The paper id is malformed.</p>
-          <Link to="/scholar" style={{ color: 'var(--sh-brand)' }}>
-            ← Back to Scholar
-          </Link>
-        </main>
-      </div>
+      <ScholarShell mainId="scholar-paper-not-found" mainStyle={{ paddingTop: 32 }}>
+        <h1 style={{ fontFamily: 'var(--font-paper)' }}>Paper not found</h1>
+        <p style={{ color: 'var(--sh-subtext)' }}>The paper id is malformed.</p>
+        <Link to="/scholar" style={{ color: 'var(--sh-brand)' }}>
+          ← Back to Scholar
+        </Link>
+      </ScholarShell>
     )
   }
 
   return (
-    <div className="scholar-page">
-      <Navbar />
-      <a href="#scholar-paper-viewer" className="scholar-skip-link">
-        Skip to paper viewer
-      </a>
+    <ScholarShell mainId="scholar-paper-viewer">
       <a href="#scholar-paper-sidecar" className="scholar-skip-link">
         Skip to sidecar
       </a>
@@ -492,7 +499,7 @@ export default function ScholarPaperPage() {
         />
       </header>
 
-      <main className="scholar-shell">
+      <div className="scholar-shell">
         <div className="scholar-reader">
           <section
             id="scholar-paper-viewer"
@@ -736,11 +743,11 @@ export default function ScholarPaperPage() {
             {activeTab === 'discuss' && validId && <DiscussionThread paperId={validId} />}
           </aside>
         </div>
-      </main>
+      </div>
 
       {citeOpen && validId && (
         <CiteModal paperId={validId} paperTitle={paper?.title} onClose={() => setCiteOpen(false)} />
       )}
-    </div>
+    </ScholarShell>
   )
 }

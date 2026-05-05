@@ -13,15 +13,10 @@
  *  - ESC closes; clicking the dimmed backdrop closes.
  *  - Respects prefers-reduced-motion via CSS.
  *
- * Param contract (matches ScholarSearchPage URL params):
+ * Param contract (matches ScholarSearchPage URL params and the backend
+ * search controller validators):
  *   q, yearFrom, yearTo, openAccess, hasPdf, sources, domains, sort,
  *   minCitations, author, venue
- *
- * NOTE TO BACKEND AGENT: ScholarSearchPage currently only consumes q /
- * yearFrom / yearTo / openAccess. The remaining params (hasPdf, sources,
- * domains, sort, minCitations, author, venue) are forwarded in the URL
- * for forward compatibility — wire them through the search controller +
- * adapters when the backend is ready.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'

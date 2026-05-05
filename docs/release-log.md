@@ -28,6 +28,16 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Bot-review verification + Scholar sidebar parity (2026-05-04 night)
+
+- **Scholar pages now render the AppSidebar.** New `ScholarShell` wrapper applies the standard navbar + 2-col grid + sticky AppSidebar pattern across `/scholar`, `/scholar/search`, `/scholar/saved`, `/scholar/topic/:slug`, `/scholar/paper/:id` so navigating into Scholar no longer drops the left-rail menu that every other authenticated page shows.
+- **ScholarPaperPage cache reset on paper change.** `pdfState`, `refsState`, and `citedByState` now reset when `validId` changes — previously the `ready/loading` and `items !== null` guards prevented refetching when the user navigated from paper A to paper B in the same component instance, leaving paper A's PDF link, references, and cited-by list visible under paper B.
+- **Feed ranked-mode pagination cap raised.** Candidate window now scales with offset (`Math.min(500, max(200, offset+limit+32))`) instead of a hardcoded 200, so deep infinite-scroll past page 10 (offset ≥ 200) actually returns rows. Recent-mode behavior unchanged.
+- **Scholar Filters drawer fully wired end-to-end.** `ScholarSearchPage` now forwards all 11 URL params (`yearFrom`, `yearTo`, `openAccess`, `hasPdf`, `sources`, `domains`, `sort`, `minCitations`, `author`, `venue`) to `GET /api/scholar/search` instead of only `q/from/to` plus client-side `openAccess` filtering. Removed the "forward compatibility" note in the drawer doc-comment now that the backend is the actual filter authority.
+- **Unpaywall removed from selectable Scholar sources.** The Unpaywall adapter is enrichment-only on the backend (`search()` is a deliberate no-op), so picking it alone in the Filters drawer used to silently produce zero results. Drawer now shows the four adapters that actually emit search results (Semantic Scholar, OpenAlex, CrossRef, arXiv); enrichment continues to run server-side as part of every fan-out.
+- **AI delete-confirm modal lands focus on Cancel, not Delete.** `DeleteConfirmModal` now actually focuses the Cancel button on mount (it claimed to but didn't) so an accidental Enter on a freshly opened "Delete this conversation?" dialog can't wipe data.
+- **Comment hygiene in `scholar.service.js`.** "All five known search-result-emitting adapters" updated to match the actual four-entry map; the inconsistency had been flagged by automated review.
+
 ### Multi-wave UX + bug sweep — Scholar/AI/Feed/Settings/Library/Groups/Notes (2026-05-04 evening)
 
 - **Scholar PDF viewer fixed.** `ScholarPaperPage` now fetches `/api/scholar/paper/:id/pdf` for the iframe `src` (signed R2 URL, 600s TTL) instead of using the raw `pdfExternalUrl` that the browser was blocking with `(blocked:origin)`. Sandbox stays `allow-scripts allow-popups allow-forms` (never `allow-same-origin` per CLAUDE.md A14). Skeleton during signed-URL fetch; clean "Open original →" empty-state on 404. Backend signed-URL TTL dropped from 3600s to 600s for the inline-view security default.

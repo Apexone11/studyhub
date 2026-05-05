@@ -7,11 +7,11 @@
  */
 import { useEffect, useState, useMemo } from 'react'
 import { useParams, useSearchParams, Link } from 'react-router-dom'
-import Navbar from '../../components/navbar/Navbar'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { API } from '../../config'
 import PaperCard from './paperCard/PaperCard'
 import { POPULAR_TOPICS } from './scholarConstants'
+import ScholarShell from './ScholarShell'
 import './ScholarPage.css'
 
 const SORT_OPTIONS = [
@@ -96,9 +96,8 @@ export default function ScholarTopicPage() {
   }
 
   return (
-    <div className="scholar-page">
-      <Navbar />
-      <main className="scholar-shell" style={{ paddingTop: 32 }}>
+    <ScholarShell mainId="scholar-topic-main">
+      <div className="scholar-shell" style={{ paddingTop: 0 }}>
         <div className="scholar-topic__layout">
           {/* L17-HIGH-5: layout class collapses to single column &lt;1024px
               via ScholarPage.css. Inline grid was causing horizontal scroll
@@ -224,7 +223,7 @@ export default function ScholarTopicPage() {
             </Link>
           </aside>
         </div>
-      </main>
-    </div>
+      </div>
+    </ScholarShell>
   )
 }

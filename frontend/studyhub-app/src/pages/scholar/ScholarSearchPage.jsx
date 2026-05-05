@@ -7,10 +7,10 @@
  */
 import { useEffect, useState, useCallback } from 'react'
 import { useNavigate, useSearchParams, Link } from 'react-router-dom'
-import Navbar from '../../components/navbar/Navbar'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { API } from '../../config'
 import PaperCard from './paperCard/PaperCard'
+import ScholarShell from './ScholarShell'
 import './ScholarPage.css'
 
 export default function ScholarSearchPage() {
@@ -21,6 +21,13 @@ export default function ScholarSearchPage() {
   const yearFrom = params.get('yearFrom') || ''
   const yearTo = params.get('yearTo') || ''
   const openAccess = params.get('openAccess') === '1'
+  const hasPdf = params.get('hasPdf') === '1'
+  const sources = params.get('sources') || ''
+  const domains = params.get('domains') || ''
+  const sort = params.get('sort') || ''
+  const minCitations = params.get('minCitations') || ''
+  const author = params.get('author') || ''
+  const venue = params.get('venue') || ''
   const [searchInput, setSearchInput] = useState(q)
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
@@ -28,11 +35,13 @@ export default function ScholarSearchPage() {
   const [throttled, setThrottled] = useState([])
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setSearchInput(q)
   }, [q])
 
   useEffect(() => {
     if (!q) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setResults([])
       setError(null)
       return
@@ -43,8 +52,16 @@ export default function ScholarSearchPage() {
     const url = new URL(`${API}/api/scholar/search`)
     url.searchParams.set('q', q)
     url.searchParams.set('limit', '20')
-    if (yearFrom) url.searchParams.set('from', yearFrom)
-    if (yearTo) url.searchParams.set('to', yearTo)
+    if (yearFrom) url.searchParams.set('yearFrom', yearFrom)
+    if (yearTo) url.searchParams.set('yearTo', yearTo)
+    if (openAccess) url.searchParams.set('openAccess', '1')
+    if (hasPdf) url.searchParams.set('hasPdf', '1')
+    if (sources) url.searchParams.set('sources', sources)
+    if (domains) url.searchParams.set('domains', domains)
+    if (sort) url.searchParams.set('sort', sort)
+    if (minCitations) url.searchParams.set('minCitations', minCitations)
+    if (author) url.searchParams.set('author', author)
+    if (venue) url.searchParams.set('venue', venue)
     fetch(url.toString(), { credentials: 'include' })
       .then((res) => {
         if (!res.ok) throw new Error(`Search failed (${res.status})`)
@@ -52,8 +69,7 @@ export default function ScholarSearchPage() {
       })
       .then((json) => {
         if (aborted) return
-        let list = Array.isArray(json.results) ? json.results : []
-        if (openAccess) list = list.filter((p) => p.openAccess)
+        const list = Array.isArray(json.results) ? json.results : []
         setResults(list)
         setThrottled(Array.isArray(json.throttledSources) ? json.throttledSources : [])
       })
@@ -66,7 +82,7 @@ export default function ScholarSearchPage() {
     return () => {
       aborted = true
     }
-  }, [q, yearFrom, yearTo, openAccess])
+  }, [q, yearFrom, yearTo, openAccess, hasPdf, sources, domains, sort, minCitations, author, venue])
 
   const handleSubmit = useCallback(
     (e) => {
@@ -86,9 +102,8 @@ export default function ScholarSearchPage() {
   }
 
   return (
-    <div className="scholar-page">
-      <Navbar />
-      <main className="scholar-shell" style={{ paddingTop: 32 }}>
+    <ScholarShell mainId="scholar-search-main">
+      <div className="scholar-shell" style={{ paddingTop: 0 }}>
         <form className="scholar-hero__search" onSubmit={handleSubmit} style={{ marginBottom: 24 }}>
           <div className="scholar-search-box">
             <input
@@ -275,7 +290,7 @@ export default function ScholarSearchPage() {
             </Link>
           </aside>
         </div>
-      </main>
-    </div>
+      </div>
+    </ScholarShell>
   )
 }
