@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { IconSearch, IconX, IconScroll } from '../Icons'
+import { IconSearch, IconX } from '../Icons'
 import { API } from '../../config'
 import { DEBOUNCE_MS, styles } from './searchModalConstants'
 import {
@@ -12,7 +12,6 @@ import {
 } from './SearchResultItems'
 import { trackEvent } from '../../lib/telemetry'
 import { useFocusTrap } from '../../lib/useFocusTrap'
-import { truncate } from '../../pages/scholar/scholarConstants'
 
 export default function SearchModal({ open, onClose }) {
   const [query, setQuery] = useState('')
@@ -22,7 +21,6 @@ export default function SearchModal({ open, onClose }) {
     users: [],
     notes: [],
     groups: [],
-    papers: [],
   })
   const [loading, setLoading] = useState(false)
   const [activeIndex, setActiveIndex] = useState(-1)
@@ -35,9 +33,11 @@ export default function SearchModal({ open, onClose }) {
   // Reset state when modal opens, cancel pending work when it closes
   useEffect(() => {
     if (open) {
-      setQuery('')
-      setResults({ sheets: [], courses: [], users: [], notes: [], groups: [], papers: [] })
-      setActiveIndex(-1)
+      queueMicrotask(() => {
+        setQuery('')
+        setResults({ sheets: [], courses: [], users: [], notes: [], groups: [] })
+        setActiveIndex(-1)
+      })
       return
     }
     // Modal closing — cancel any pending debounce timer and in-flight fetch
@@ -61,28 +61,17 @@ export default function SearchModal({ open, onClose }) {
     setLoading(true)
     const fetchStart = performance.now()
     try {
-      // Fan out: existing /api/search for sheets/courses/users/notes/groups
-      // and /api/scholar/search for papers. We don't merge into the existing
-      // /api/search backend yet because it would couple the unified search
-      // module to the Scholar adapter fan-out (added in Week 4-5).
-      const [searchRes, scholarRes] = await Promise.allSettled([
-        fetch(`${API}/api/search?q=${encodeURIComponent(searchQuery)}&type=all&limit=6`, {
+      // Fan out: existing /api/search for sheets/courses/users/notes/groups.
+      const searchRes = await fetch(
+        `${API}/api/search?q=${encodeURIComponent(searchQuery)}&type=all&limit=6`,
+        {
           signal: controller.signal,
           credentials: 'include',
-        }),
-        fetch(`${API}/api/scholar/search?q=${encodeURIComponent(searchQuery)}&limit=4`, {
-          signal: controller.signal,
-          credentials: 'include',
-        }),
-      ])
+        },
+      )
       let data = { results: {} }
-      if (searchRes.status === 'fulfilled' && searchRes.value.ok) {
-        data = await searchRes.value.json()
-      }
-      let papers = []
-      if (scholarRes.status === 'fulfilled' && scholarRes.value.ok) {
-        const j = await scholarRes.value.json()
-        papers = Array.isArray(j.results) ? j.results.slice(0, 4) : []
+      if (searchRes.ok) {
+        data = await searchRes.json()
       }
       // Copilot fix: stale-result guard. If a newer search has started
       // while we were awaiting JSON, abortRef has been swapped — the
@@ -97,8 +86,7 @@ export default function SearchModal({ open, onClose }) {
         (data.results?.courses?.length || 0) +
         (data.results?.users?.length || 0) +
         (data.results?.notes?.length || 0) +
-        (data.results?.groups?.length || 0) +
-        papers.length
+        (data.results?.groups?.length || 0)
       trackEvent('page_timing', { page: 'search', apiLatencyMs, totalResults })
       setResults({
         sheets: data.results?.sheets || [],
@@ -106,7 +94,6 @@ export default function SearchModal({ open, onClose }) {
         users: data.results?.users || [],
         notes: data.results?.notes || [],
         groups: data.results?.groups || [],
-        papers,
       })
       setActiveIndex(-1)
     } catch (err) {
@@ -125,7 +112,7 @@ export default function SearchModal({ open, onClose }) {
 
     if (value.trim().length < 2) {
       if (abortRef.current) abortRef.current.abort()
-      setResults({ sheets: [], courses: [], users: [], notes: [], groups: [], papers: [] })
+      setResults({ sheets: [], courses: [], users: [], notes: [], groups: [] })
       setLoading(false)
       return
     }
@@ -141,7 +128,6 @@ export default function SearchModal({ open, onClose }) {
   results.courses.forEach((c) => flatItems.push({ type: 'course', data: c }))
   results.users.forEach((u) => flatItems.push({ type: 'user', data: u }))
   results.groups.forEach((g) => flatItems.push({ type: 'group', data: g }))
-  results.papers.forEach((p) => flatItems.push({ type: 'paper', data: p }))
 
   function navigateToItem(item) {
     onClose()
@@ -150,7 +136,6 @@ export default function SearchModal({ open, onClose }) {
     else if (item.type === 'course') navigate(`/sheets?courseId=${item.data.id}`)
     else if (item.type === 'user') navigate(`/users/${item.data.username}`)
     else if (item.type === 'group') navigate(`/study-groups/${item.data.id}`)
-    else if (item.type === 'paper') navigate(`/scholar/paper/${encodeURIComponent(item.data.id)}`)
   }
 
   function handleKeyDown(e) {
@@ -277,55 +262,6 @@ export default function SearchModal({ open, onClose }) {
             setActiveIndex={setActiveIndex}
             navigateToItem={navigateToItem}
           />
-
-          {results.papers.length > 0 && (
-            <div role="group" aria-label="Paper results">
-              <div style={styles.sectionLabel} aria-hidden="true">
-                <IconScroll size={13} /> Papers
-              </div>
-              {results.papers.map((paper, i) => {
-                const flatIdx =
-                  results.sheets.length +
-                  results.notes.length +
-                  results.courses.length +
-                  results.users.length +
-                  results.groups.length +
-                  i
-                return (
-                  <div
-                    key={`p-${paper.id}`}
-                    role="option"
-                    aria-selected={activeIndex === flatIdx}
-                    aria-label={paper.title}
-                    tabIndex={-1}
-                    style={{
-                      ...styles.resultItem,
-                      background:
-                        activeIndex === flatIdx ? 'var(--sh-slate-100, #f1f5f9)' : 'transparent',
-                    }}
-                    onClick={() => navigateToItem({ type: 'paper', data: paper })}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault()
-                        navigateToItem({ type: 'paper', data: paper })
-                      }
-                    }}
-                    onMouseEnter={() => setActiveIndex(flatIdx)}
-                  >
-                    <div style={styles.resultTitle}>{truncate(paper.title || 'Untitled', 80)}</div>
-                    <div style={styles.resultMeta}>
-                      {(paper.authors || [])
-                        .slice(0, 2)
-                        .map((a) => a.name)
-                        .filter(Boolean)
-                        .join(', ')}
-                      {paper.venue ? ` · ${paper.venue}` : ''}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
         </div>
       </div>
     </div>
