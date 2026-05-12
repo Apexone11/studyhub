@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
+import { Skeleton } from '../../components/Skeleton'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { fadeInUp, staggerEntrance, fadeInOnScroll } from '../../lib/animations'
 import { LogoMark } from '../../components/Icons'
+import SubmitSpinner from '../../components/SubmitSpinner'
+import { useFormValidation } from '../../lib/useFormValidation'
 
 const FONT = "'Plus Jakarta Sans', sans-serif"
 
@@ -419,12 +422,15 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
       ) : (
         <form onSubmit={handleWaitlist} style={c.btnGroup}>
           <input
+            id="waitlist-email"
             type="email"
             placeholder="your@university.edu"
             value={waitlistEmail}
             onChange={(e) => setWaitlistEmail(e.target.value)}
             style={c.waitlistInput}
             disabled={waitlistLoading}
+            aria-invalid={error ? 'true' : undefined}
+            aria-describedby={error ? 'waitlist-email-error' : undefined}
             required
           />
           <button
@@ -432,9 +438,14 @@ function PlanCard({ tier, isFreeUser, hasActivePro, isYearly, subscription, onSu
             style={c.btnPrimary}
             disabled={waitlistLoading || !waitlistEmail.trim()}
           >
-            {waitlistLoading ? 'Joining...' : 'Join Waitlist'}
+            {waitlistLoading && <SubmitSpinner label="Joining" />}
+            {waitlistLoading ? 'Joining…' : 'Join Waitlist'}
           </button>
-          {error && <div style={c.errorMsg}>{error}</div>}
+          {error && (
+            <p id="waitlist-email-error" className="sh-field-error" role="alert" style={c.errorMsg}>
+              {error}
+            </p>
+          )}
         </form>
       )}
     </div>
@@ -617,13 +628,24 @@ function GiftCard() {
   const [giftMessage, setGiftMessage] = useState('')
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState(null)
+  const { errors, setFieldError, clearFieldError, focusFirstError, getFieldProps } =
+    useFormValidation()
 
   const handleGift = async (e) => {
     e.preventDefault()
     if (!email.trim()) {
-      setMsg({ type: 'error', text: 'Recipient email is required.' })
+      setFieldError('email', 'Recipient email is required.')
+      focusFirstError({ email: 'required' })
+      setMsg(null)
       return
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setFieldError('email', 'Please enter a valid email address.')
+      focusFirstError({ email: 'invalid' })
+      setMsg(null)
+      return
+    }
+    clearFieldError('email')
     setLoading(true)
     setMsg(null)
     try {
@@ -658,15 +680,27 @@ function GiftCard() {
       {msg && <div style={msg.type === 'error' ? p.errorBox : p.successBox}>{msg.text}</div>}
       <form onSubmit={handleGift} style={p.formStack}>
         <div style={p.fieldGroup}>
-          <label style={p.label}>Recipient Email</label>
+          <label style={p.label} htmlFor="gift-email">
+            Recipient Email
+          </label>
           <input
+            id="gift-email"
             type="email"
+            {...getFieldProps('email', { id: 'gift-email' })}
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value)
+              clearFieldError('email')
+            }}
             placeholder="friend@example.com"
             style={p.input}
             required
           />
+          {errors.email && (
+            <p id="gift-email-error" className="sh-field-error" role="alert">
+              {errors.email}
+            </p>
+          )}
         </div>
         <div style={p.fieldRow}>
           <div style={p.fieldGroup}>
@@ -708,7 +742,8 @@ function GiftCard() {
           />
         </div>
         <button type="submit" style={c.btnPrimary} disabled={loading}>
-          {loading ? 'Processing...' : 'Purchase Gift'}
+          {loading && <SubmitSpinner label="Processing" />}
+          {loading ? 'Processing…' : 'Purchase Gift'}
         </button>
       </form>
     </div>
@@ -743,9 +778,12 @@ function ReferralCard() {
     }
   }, [])
 
+  // Capture `now` once at mount via a lazy useState initializer so the
+  // React Compiler doesn't flag Date.now() as impure during render.
+  const [mountTimestamp] = useState(() => Date.now())
   const getReferralStatus = (code) => {
     const expiresAt = code.expiresAt ? new Date(code.expiresAt) : null
-    const isExpired = Boolean(expiresAt && expiresAt.getTime() < Date.now())
+    const isExpired = Boolean(expiresAt && expiresAt.getTime() < mountTimestamp)
     const isMaxed = code.maxUses > 0 && code.currentUses >= code.maxUses
     const inactiveReason =
       code.inactiveReason ||
@@ -838,7 +876,12 @@ function ReferralCard() {
       <p style={p.subCardDesc}>Share your code and earn rewards when friends join.</p>
       {msg && <div style={msg.type === 'error' ? p.errorBox : p.successBox}>{msg.text}</div>}
       {loading ? (
-        <p style={p.muted}>Loading referral codes...</p>
+        <div style={{ display: 'grid', gap: 8, marginTop: 4 }} aria-busy="true" aria-live="polite">
+          <span className="sr-only">Loading referral codes…</span>
+          <Skeleton width="60%" height={14} borderRadius={6} />
+          <Skeleton width="100%" height={48} borderRadius={10} />
+          <Skeleton width="92%" height={48} borderRadius={10} />
+        </div>
       ) : (
         <>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
@@ -920,14 +963,19 @@ function RedeemCard() {
   const [code, setCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [msg, setMsg] = useState(null)
+  const { errors, setFieldError, clearFieldError, focusFirstError, getFieldProps } =
+    useFormValidation()
 
   const handleRedeem = async (e) => {
     e.preventDefault()
     const trimmed = code.trim().toUpperCase()
     if (!trimmed) {
-      setMsg({ type: 'error', text: 'Please enter a code.' })
+      setFieldError('code', 'Please enter a code.')
+      focusFirstError({ code: 'required' })
+      setMsg(null)
       return
     }
+    clearFieldError('code')
     setLoading(true)
     setMsg(null)
     try {
@@ -977,16 +1025,29 @@ function RedeemCard() {
       </p>
       {msg && <div style={msg.type === 'error' ? p.errorBox : p.successBox}>{msg.text}</div>}
       <form onSubmit={handleRedeem} style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-        <input
-          type="text"
-          value={code}
-          onChange={(e) => setCode(e.target.value.toUpperCase())}
-          placeholder="SH-XXXXXXXX or GIFT-XXXXXXXX"
-          style={{ ...p.input, flex: 1, minWidth: 180 }}
-          maxLength={20}
-        />
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <input
+            id="redeem-code"
+            type="text"
+            {...getFieldProps('code', { id: 'redeem-code' })}
+            value={code}
+            onChange={(e) => {
+              setCode(e.target.value.toUpperCase())
+              clearFieldError('code')
+            }}
+            placeholder="SH-XXXXXXXX or GIFT-XXXXXXXX"
+            style={{ ...p.input, width: '100%' }}
+            maxLength={20}
+          />
+          {errors.code && (
+            <p id="redeem-code-error" className="sh-field-error" role="alert">
+              {errors.code}
+            </p>
+          )}
+        </div>
         <button type="submit" style={c.btnPrimary} disabled={loading || !code.trim()}>
-          {loading ? 'Redeeming...' : 'Redeem'}
+          {loading && <SubmitSpinner label="Redeeming" />}
+          {loading ? 'Redeeming…' : 'Redeem'}
         </button>
       </form>
     </div>
@@ -1003,6 +1064,8 @@ function DonationSection() {
   const [anonymous, setAnonymous] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const { errors, setFieldError, clearFieldError, focusFirstError, getFieldProps } =
+    useFormValidation()
 
   const handleDonate = async () => {
     setError('')
@@ -1011,9 +1074,11 @@ function DonationSection() {
       return
     }
     if (amount < 1 || amount > 1000) {
-      setError('Amount must be between $1 and $1,000.')
+      setFieldError('amount', 'Amount must be between $1 and $1,000.')
+      focusFirstError({ amount: 'invalid' })
       return
     }
+    clearFieldError('amount')
     setLoading(true)
     try {
       const res = await fetch(`${API}/api/payments/checkout/donation`, {
@@ -1059,22 +1124,37 @@ function DonationSection() {
           ))}
         </div>
         <div style={d.customRow}>
-          <label style={d.customLabel}>Custom amount</label>
+          <label style={d.customLabel} htmlFor="donation-amount">
+            Custom amount
+          </label>
           <div style={d.customWrap}>
             <span style={d.dollar}>$</span>
             <input
+              id="donation-amount"
               type="number"
               min={1}
               max={1000}
+              {...getFieldProps('amount', { id: 'donation-amount' })}
               value={amount}
               onChange={(e) => {
                 const v = Number(e.target.value)
                 if (v >= 0 && v <= 1000) setAmount(v)
+                clearFieldError('amount')
               }}
               style={d.customInput}
             />
           </div>
         </div>
+        {errors.amount && (
+          <p
+            id="donation-amount-error"
+            className="sh-field-error"
+            role="alert"
+            style={{ marginBottom: 16, textAlign: 'center' }}
+          >
+            {errors.amount}
+          </p>
+        )}
         <div style={{ marginBottom: 16 }}>
           <input
             type="text"
@@ -1099,7 +1179,8 @@ function DonationSection() {
           counted in the anonymous community total.
         </div>
         <button style={d.donateBtn} onClick={handleDonate} disabled={loading || amount < 1}>
-          {loading ? 'Redirecting to checkout...' : `Donate $${amount}`}
+          {loading && <SubmitSpinner label="Redirecting" />}
+          {loading ? 'Redirecting to checkout…' : `Donate $${amount}`}
         </button>
         {error && <div style={d.error}>{error}</div>}
         <p style={d.footnote}>

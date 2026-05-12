@@ -2,6 +2,8 @@ import Navbar from '../../components/navbar/Navbar'
 import { Link } from 'react-router-dom'
 import { useState } from 'react'
 import { API } from '../../config'
+import SubmitSpinner from '../../components/SubmitSpinner'
+import { useFormValidation } from '../../lib/useFormValidation'
 import './ForgotPasswordPage.css'
 
 function ForgotPasswordPage() {
@@ -9,14 +11,19 @@ function ForgotPasswordPage() {
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const { errors, setFieldError, clearFieldError, focusFirstError, getFieldProps } =
+    useFormValidation()
 
   async function handleSubmit(e) {
     e.preventDefault()
     if (!identifier.trim()) {
-      setError('Please enter your username or email.')
+      setFieldError('identifier', 'Please enter your username or email.')
+      setError('')
+      focusFirstError({ identifier: 'required' })
       return
     }
     setError('')
+    clearFieldError('identifier')
     setLoading(true)
     try {
       await fetch(`${API}/api/auth/forgot-password`, {
@@ -81,17 +88,25 @@ function ForgotPasswordPage() {
                     type="text"
                     placeholder="Enter your username or email"
                     autoComplete="username email"
+                    {...getFieldProps('identifier', { id: 'identifier' })}
                     value={identifier}
                     onChange={(e) => {
                       setIdentifier(e.target.value)
                       setError('')
+                      clearFieldError('identifier')
                     }}
                     className="forgot-input"
                   />
                 </div>
+                {errors.identifier && (
+                  <p id="identifier-error" className="sh-field-error" role="alert">
+                    {errors.identifier}
+                  </p>
+                )}
               </div>
 
               <button type="submit" disabled={loading} className="forgot-submit-btn">
+                {loading && <SubmitSpinner label="Sending" />}
                 {loading ? 'Sending…' : 'Send Reset Link'}
               </button>
 

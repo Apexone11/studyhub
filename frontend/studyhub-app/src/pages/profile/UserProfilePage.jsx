@@ -11,7 +11,7 @@
  * widgets live in pages/dashboard/DashboardWidgets.jsx (kept after the
  * legacy DashboardPage was removed in v2.0; /dashboard now redirects here).
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { IconShield, IconProfile, IconStar } from '../../components/Icons'
@@ -27,7 +27,6 @@ import { fadeInUp, staggerEntrance } from '../../lib/animations'
 import { useRecentlyViewed } from '../../lib/useRecentlyViewed'
 import { useAllStudyStatuses } from '../../lib/useStudyStatus'
 import AvatarCropModal from '../../components/AvatarCropModal'
-import ActivityHeatmap from '../../components/ActivityHeatmap'
 import { showToast } from '../../lib/toast'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { readJsonSafely } from '../../lib/http'
@@ -38,6 +37,10 @@ import ProfileBadges from '../../components/ProfileBadges'
 import VerificationBadge from '../../components/verification/VerificationBadge'
 import ProBadge from '../../components/ProBadge'
 import DonorBadge from '../../components/DonorBadge'
+import BioEditor from './BioEditor'
+import SocialLinksEditor from './SocialLinksEditor'
+import SocialLinksDisplay from './SocialLinksDisplay'
+import ContributionGraph from './ContributionGraph'
 
 import {
   authHeaders,
@@ -104,29 +107,68 @@ export default function UserProfilePage() {
 
   const isOwnProfile = currentUser?.username === username
 
-  /* ── Tab state (URL-driven) ────────────────────────────────────────── */
-  const rawTab = searchParams.get('tab') || DEFAULT_TAB
+  /* ── Tab state (URL-driven) ─────────────────────────────────────────
+   * URL params are untrusted input (CLAUDE.md A12). `isValidTab` runs an
+   * allowlist check against the per-mode tab definition; off-list values
+   * fall through to DEFAULT_TAB. */
+  const rawTab = (searchParams.get('tab') || DEFAULT_TAB).toString().toLowerCase()
   const viewerAccountType = currentUser?.accountType
   const activeTab = isValidTab(rawTab, isOwnProfile, viewerAccountType) ? rawTab : DEFAULT_TAB
   const tabs = tabsForProfile({ isOwn: isOwnProfile, accountType: viewerAccountType })
 
-  function setTab(key) {
-    setSearchParams(
-      (prev) => {
-        const next = new URLSearchParams(prev)
-        next.set('tab', key)
-        return next
-      },
-      { replace: true },
-    )
-  }
+  const setTab = useCallback(
+    (key) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev)
+          next.set('tab', key)
+          return next
+        },
+        { replace: true },
+      )
+    },
+    [setSearchParams],
+  )
 
   // If other-user visits with own-only tab, redirect to default.
   useEffect(() => {
     if (!isOwnProfile && (rawTab === 'study' || rawTab === 'learning')) {
       setTab(DEFAULT_TAB)
     }
-  }, [isOwnProfile, rawTab]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [isOwnProfile, rawTab, setTab])
+
+  // Lazy-load tab content: track every tab the user has actually visited
+  // and keep visited panels mounted (hidden) to preserve internal state
+  // across re-entries. The render-phase sync avoids the cascading-render
+  // warning from useEffect+setState.
+  const [visitedTabs, setVisitedTabs] = useState(() => new Set([activeTab]))
+  if (!visitedTabs.has(activeTab)) {
+    const next = new Set(visitedTabs)
+    next.add(activeTab)
+    setVisitedTabs(next)
+  }
+
+  // Keyboard nav per W3C APG (tabs with automatic activation): ArrowLeft/
+  // Right cycle, Home/End jump to ends, focus moves with selection.
+  const tabBtnRefs = useRef(new Map())
+  const handleTabKeyDown = useCallback(
+    (event, currentIndex) => {
+      const last = tabs.length - 1
+      let nextIndex = null
+      if (event.key === 'ArrowRight') nextIndex = currentIndex === last ? 0 : currentIndex + 1
+      else if (event.key === 'ArrowLeft') nextIndex = currentIndex === 0 ? last : currentIndex - 1
+      else if (event.key === 'Home') nextIndex = 0
+      else if (event.key === 'End') nextIndex = last
+      if (nextIndex === null) return
+      event.preventDefault()
+      const nextKey = tabs[nextIndex]?.key
+      if (!nextKey) return
+      setTab(nextKey)
+      const btn = tabBtnRefs.current.get(nextKey)
+      if (btn && typeof btn.focus === 'function') btn.focus()
+    },
+    [setTab, tabs],
+  )
 
   /* ── Profile state ─────────────────────────────────────────────────── */
   const [profile, setProfile] = useState(null)
@@ -145,6 +187,7 @@ export default function UserProfilePage() {
   const [followList, setFollowList] = useState([])
   const [followListLoading, setFollowListLoading] = useState(false)
   const [activityData, setActivityData] = useState([])
+  const [activityLoading, setActivityLoading] = useState(true)
   const [showAvatarCrop, setShowAvatarCrop] = useState(false)
   const [coverImgError, setCoverImgError] = useState(false)
 
@@ -174,12 +217,17 @@ export default function UserProfilePage() {
     return map
   }, [allStudyStatuses])
 
+  // Cache the "now" anchor in a lazy-initialized state so the React
+  // Compiler doesn't flag Date.now() as an impure render-time call.
+  // Weekly bucket math is not real-time critical; refresh on remount
+  // is fine.
+  const [mountTimestamp] = useState(() => Date.now())
   const studyActivity = useMemo(() => {
     if (!recentlyViewed || recentlyViewed.length === 0) return null
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
+    const weekAgo = mountTimestamp - 7 * 24 * 60 * 60 * 1000
     const thisWeek = recentlyViewed.filter((e) => new Date(e.viewedAt).getTime() > weekAgo)
     return { weeklyCount: thisWeek.length, lastStudied: recentlyViewed[0]?.viewedAt || null }
-  }, [recentlyViewed])
+  }, [recentlyViewed, mountTimestamp])
 
   const dashboardRecentSheets = useMemo(
     () => dashboardSummary?.recentSheets || [],
@@ -219,9 +267,14 @@ export default function UserProfilePage() {
 
   /* ── Load profile data ─────────────────────────────────────────────── */
   useEffect(() => {
-    setLoading(true)
-    setError(null)
-    setCoverImgError(false)
+    // Defer reset setStates out of effect body to satisfy the React
+    // Compiler's set-state-in-effect rule. The fetch chain itself is
+    // already async so the deferred microtask isn't user-visible.
+    Promise.resolve().then(() => {
+      setLoading(true)
+      setError(null)
+      setCoverImgError(false)
+    })
     animatedRef.current = false
     fetch(`${API}/api/users/${username}`, { headers: authHeaders(), credentials: 'include' })
       .then(async (r) => {
@@ -254,15 +307,28 @@ export default function UserProfilePage() {
    * call. Removing the second fetch here is a profile-load perf win. */
   useEffect(() => {
     if (!profile) return
-    fetch(`${API}/api/users/${username}/activity?weeks=12`, {
+    let cancelled = false
+    Promise.resolve().then(() => {
+      if (!cancelled) setActivityLoading(true)
+    })
+    fetch(`${API}/api/users/${username}/activity?weeks=13`, {
       headers: authHeaders(),
       credentials: 'include',
     })
       .then((r) => (r.ok ? r.json() : []))
       .then((data) => {
-        if (Array.isArray(data)) setActivityData(data)
+        if (cancelled) return
+        setActivityData(Array.isArray(data) ? data : [])
       })
-      .catch(() => {})
+      .catch(() => {
+        if (!cancelled) setActivityData([])
+      })
+      .finally(() => {
+        if (!cancelled) setActivityLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
   }, [profile, username])
 
   /* ── Load dashboard summary (own profile only) ─────────────────────── */
@@ -278,7 +344,9 @@ export default function UserProfilePage() {
   useEffect(() => {
     if (!isOwnProfile || !profile || !phase1On) return
     let cancelled = false
-    setTopContributorsLoading(true)
+    Promise.resolve().then(() => {
+      if (!cancelled) setTopContributorsLoading(true)
+    })
     fetch(`${API}/api/sheets/leaderboard?type=contributors`, {
       headers: authHeaders(),
       credentials: 'include',
@@ -643,20 +711,32 @@ export default function UserProfilePage() {
                 <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.7)', marginBottom: 10 }}>
                   Joined {fmtDate(profile.createdAt)}
                 </div>
-                {profile.bio && (
-                  <div
-                    data-testid="user-bio"
-                    className="bio"
-                    style={{
-                      maxWidth: 720,
-                      fontSize: 14,
-                      lineHeight: 1.7,
-                      color: 'rgba(255,255,255,0.86)',
-                      marginBottom: 12,
-                    }}
-                  >
-                    {profile.bio}
+                {isOwnProfile ? (
+                  <div data-testid="user-bio">
+                    <BioEditor
+                      initialBio={profile.bio || ''}
+                      onSaved={(bio) => {
+                        setProfile((prev) => (prev ? { ...prev, bio: bio || null } : prev))
+                      }}
+                    />
                   </div>
+                ) : (
+                  profile.bio && (
+                    <div
+                      data-testid="user-bio"
+                      className="bio"
+                      style={{
+                        maxWidth: 720,
+                        fontSize: 14,
+                        lineHeight: 1.7,
+                        color: 'rgba(255,255,255,0.86)',
+                        marginBottom: 12,
+                        whiteSpace: 'pre-wrap',
+                      }}
+                    >
+                      {profile.bio}
+                    </div>
+                  )
                 )}
                 {(profile.location || Number.isInteger(profile.age)) && (
                   <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -692,32 +772,22 @@ export default function UserProfilePage() {
                     )}
                   </div>
                 )}
-                {Array.isArray(profile.profileLinks) && profile.profileLinks.length > 0 && (
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-                    {profile.profileLinks.map((link) => (
-                      <a
-                        key={`${link.label}-${link.url}`}
-                        href={link.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          padding: '6px 12px',
-                          borderRadius: 999,
-                          border: '1px solid rgba(255,255,255,0.2)',
-                          background: 'rgba(255,255,255,0.1)',
-                          color: 'var(--sh-nav-text)',
-                          fontSize: 12,
-                          fontWeight: 700,
-                          textDecoration: 'none',
-                          backdropFilter: 'blur(6px)',
-                        }}
-                      >
-                        {link.label}
-                      </a>
-                    ))}
+                {isOwnProfile ? (
+                  <div style={{ marginBottom: 14 }}>
+                    {Array.isArray(profile.profileLinks) && profile.profileLinks.length > 0 && (
+                      <SocialLinksDisplay links={profile.profileLinks} variant="compact" />
+                    )}
+                    <SocialLinksEditor
+                      initialLinks={profile.profileLinks || []}
+                      onSaved={(profileLinks) => {
+                        setProfile((prev) =>
+                          prev ? { ...prev, profileLinks: profileLinks || [] } : prev,
+                        )
+                      }}
+                    />
                   </div>
+                ) : (
+                  <SocialLinksDisplay links={profile.profileLinks || []} />
                 )}
 
                 {/* Follower / following stats */}
@@ -1088,83 +1158,154 @@ export default function UserProfilePage() {
           </div>
         ) : (
           <>
-            {/* ── TABS ──────────────────────────────────────────────────────── */}
+            {/* ── TABS ────────────────────────────────────────────────────────
+             * W3C APG tablist with automatic activation. The active tab
+             * carries `aria-current="page"` (per task spec) alongside the
+             * tab-role `aria-selected="true"` so design-system audits can
+             * grep for either. */}
             <div style={{ marginBottom: 20 }}>
               <div className="profile-tabs" role="tablist" aria-label="Profile sections">
-                {tabs.map((tab) => (
-                  <button
-                    key={tab.key}
-                    role="tab"
-                    aria-selected={activeTab === tab.key}
-                    className={`profile-tab-btn${activeTab === tab.key ? ' profile-tab-btn--active' : ''}`}
-                    onClick={() => setTab(tab.key)}
-                  >
-                    {tab.label}
-                  </button>
-                ))}
+                {tabs.map((tab, index) => {
+                  const isActive = activeTab === tab.key
+                  return (
+                    <button
+                      key={tab.key}
+                      ref={(node) => {
+                        if (node) tabBtnRefs.current.set(tab.key, node)
+                        else tabBtnRefs.current.delete(tab.key)
+                      }}
+                      id={`profile-tab-${tab.key}`}
+                      role="tab"
+                      type="button"
+                      aria-selected={isActive}
+                      aria-current={isActive ? 'page' : undefined}
+                      aria-controls={`profile-tabpanel-${tab.key}`}
+                      tabIndex={isActive ? 0 : -1}
+                      className={`profile-tab-btn${isActive ? ' profile-tab-btn--active' : ''}`}
+                      onClick={() => setTab(tab.key)}
+                      onKeyDown={(event) => handleTabKeyDown(event, index)}
+                    >
+                      {tab.label}
+                    </button>
+                  )
+                })}
               </div>
             </div>
 
-            {/* ── TAB CONTENT ───────────────────────────────────────────────── */}
-            <div ref={contentRef} role="tabpanel" aria-label={activeTab}>
-              {activeTab === 'overview' &&
-                (isOwnProfile ? (
-                  <OwnOverviewTab
-                    profile={profile}
-                    dashboardSummary={dashboardSummary}
+            {/* ── TAB CONTENT ─────────────────────────────────────────────────
+             * Lazy-load: only mount panels the user has actually visited.
+             * Visited panels stay mounted (hidden) so reopening preserves
+             * scroll/filter state without re-fetching. */}
+            <div ref={contentRef}>
+              {visitedTabs.has('overview') && (
+                <div
+                  id="profile-tabpanel-overview"
+                  role="tabpanel"
+                  aria-labelledby="profile-tab-overview"
+                  hidden={activeTab !== 'overview'}
+                >
+                  {isOwnProfile ? (
+                    <OwnOverviewTab
+                      profile={profile}
+                      dashboardSummary={dashboardSummary}
+                      recentlyViewed={recentlyViewed}
+                      studyQueueCounts={studyQueueCounts}
+                      studyToReview={studyToReview}
+                      studyStudying={studyStudying}
+                      studyDone={studyDone}
+                      profileStudyStatusMap={profileStudyStatusMap}
+                      dashboardRecentSheets={dashboardRecentSheets}
+                      activityData={activityData}
+                      activityLoading={activityLoading}
+                      followers={followers}
+                      loadFollowList={loadFollowList}
+                      viewerAccountType={viewerAccountType}
+                      phase1On={phase1On}
+                      upcomingExamsOn={upcomingExamsOn}
+                      aiCardOn={aiCardOn}
+                      topContributors={topContributors}
+                      topContributorsLoading={topContributorsLoading}
+                    />
+                  ) : (
+                    <OtherOverviewTab
+                      profile={profile}
+                      activityData={activityData}
+                      activityLoading={activityLoading}
+                    />
+                  )}
+                </div>
+              )}
+
+              {isOwnProfile && visitedTabs.has('learning') && (
+                <div
+                  id="profile-tabpanel-learning"
+                  role="tabpanel"
+                  aria-labelledby="profile-tab-learning"
+                  hidden={activeTab !== 'learning'}
+                >
+                  <MyLearningTab profile={profile} recentlyViewed={recentlyViewed} />
+                </div>
+              )}
+
+              {isOwnProfile && !isSelfLearner(viewerAccountType) && visitedTabs.has('study') && (
+                <div
+                  id="profile-tabpanel-study"
+                  role="tabpanel"
+                  aria-labelledby="profile-tab-study"
+                  hidden={activeTab !== 'study'}
+                >
+                  <StudyTab
                     recentlyViewed={recentlyViewed}
+                    studyActivity={studyActivity}
                     studyQueueCounts={studyQueueCounts}
                     studyToReview={studyToReview}
                     studyStudying={studyStudying}
                     studyDone={studyDone}
-                    profileStudyStatusMap={profileStudyStatusMap}
                     dashboardRecentSheets={dashboardRecentSheets}
-                    activityData={activityData}
-                    followers={followers}
-                    loadFollowList={loadFollowList}
-                    viewerAccountType={viewerAccountType}
-                    phase1On={phase1On}
-                    upcomingExamsOn={upcomingExamsOn}
-                    aiCardOn={aiCardOn}
-                    topContributors={topContributors}
-                    topContributorsLoading={topContributorsLoading}
                   />
-                ) : (
-                  <OtherOverviewTab profile={profile} activityData={activityData} />
-                ))}
-
-              {activeTab === 'learning' && isOwnProfile && (
-                <MyLearningTab profile={profile} recentlyViewed={recentlyViewed} />
+                </div>
               )}
 
-              {activeTab === 'study' && isOwnProfile && !isSelfLearner(viewerAccountType) && (
-                <StudyTab
-                  recentlyViewed={recentlyViewed}
-                  studyActivity={studyActivity}
-                  studyQueueCounts={studyQueueCounts}
-                  studyToReview={studyToReview}
-                  studyStudying={studyStudying}
-                  studyDone={studyDone}
-                  dashboardRecentSheets={dashboardRecentSheets}
-                />
+              {visitedTabs.has('sheets') && (
+                <div
+                  id="profile-tabpanel-sheets"
+                  role="tabpanel"
+                  aria-labelledby="profile-tab-sheets"
+                  hidden={activeTab !== 'sheets'}
+                >
+                  <SheetsTab
+                    profile={profile}
+                    isOwnProfile={isOwnProfile}
+                    studyStatusMap={profileStudyStatusMap}
+                  />
+                </div>
               )}
 
-              {activeTab === 'sheets' && (
-                <SheetsTab
-                  profile={profile}
-                  isOwnProfile={isOwnProfile}
-                  studyStatusMap={profileStudyStatusMap}
-                />
+              {visitedTabs.has('posts') && (
+                <div
+                  id="profile-tabpanel-posts"
+                  role="tabpanel"
+                  aria-labelledby="profile-tab-posts"
+                  hidden={activeTab !== 'posts'}
+                >
+                  <PostsTab profileId={profile?.id} />
+                </div>
               )}
 
-              {activeTab === 'posts' && <PostsTab profileId={profile?.id} />}
-
-              {activeTab === 'achievements' && (
-                <AchievementsTab
-                  activityData={activityData}
-                  profile={profile}
-                  isOwner={isOwnProfile}
-                />
+              {visitedTabs.has('achievements') && (
+                <div
+                  id="profile-tabpanel-achievements"
+                  role="tabpanel"
+                  aria-labelledby="profile-tab-achievements"
+                  hidden={activeTab !== 'achievements'}
+                >
+                  <AchievementsTab
+                    activityData={activityData}
+                    activityLoading={activityLoading}
+                    profile={profile}
+                    isOwner={isOwnProfile}
+                  />
+                </div>
               )}
             </div>
           </>
@@ -1218,6 +1359,7 @@ function OwnOverviewTab({
   profileStudyStatusMap,
   dashboardRecentSheets,
   activityData,
+  activityLoading,
   followers,
   loadFollowList,
   viewerAccountType,
@@ -1249,11 +1391,7 @@ function OwnOverviewTab({
         <ProfileStatsWidget username={profile.username} />
         <PinnedSheetsSection sheets={profile.pinnedSheets} studyStatusMap={profileStudyStatusMap} />
         <SharedShelvesSection shelves={profile.sharedShelves} isOwnProfile />
-        {activityData.length > 0 && (
-          <div style={cardStyle}>
-            <ActivityHeatmap data={activityData} weeks={12} />
-          </div>
-        )}
+        <ContributionGraph data={activityData} loading={activityLoading} isOwner />
         {/* Achievements V2 — pinned-6 strip on own profile Overview.
             Replaces the legacy BadgesSection coin-renderer (deleted
             2026-05-01). Full gallery lives on the Achievements tab. */}
@@ -1495,17 +1633,13 @@ function PinnedBadgesCard({ username, ownerView }) {
 // state from /api/achievements/users/:username. The legacy v1 `badges`
 // prop has been fully removed everywhere (BadgesSection + BadgeDisplay
 // deleted 2026-05-01).
-function AchievementsTab({ activityData, profile, isOwner }) {
+function AchievementsTab({ activityData, activityLoading, profile, isOwner }) {
   const username = profile?.username
   const { items, stats, loading, error, reload } = useUserAchievements(username)
 
   return (
     <div className="profile-columns">
-      {activityData.length > 0 && (
-        <div style={cardStyle}>
-          <ActivityHeatmap data={activityData} weeks={12} />
-        </div>
-      )}
+      <ContributionGraph data={activityData} loading={activityLoading} isOwner={isOwner} />
 
       {loading ? (
         <div style={{ ...cardStyle, textAlign: 'center', padding: 32, color: 'var(--sh-muted)' }}>
@@ -1546,20 +1680,16 @@ function AchievementsTab({ activityData, profile, isOwner }) {
 }
 
 /* ── Other user Overview: "Showcase" ─────────────────────────────────────── */
-function OtherOverviewTab({ profile, activityData }) {
+function OtherOverviewTab({ profile, activityData, activityLoading }) {
   return (
     <div className="profile-columns">
       <ProfileStatsWidget username={profile.username} />
       {/* Achievements V2 — pinned-6 strip on other user's profile Overview.
-          Replaces the legacy BadgesSection coin-renderer (deleted 2026-05-01). */}
+          Replaces the legacy BadgesSection coin-renderer. */}
       <PinnedBadgesCard username={profile.username} ownerView={false} />
       <PinnedSheetsSection sheets={profile.pinnedSheets} />
       <SharedShelvesSection shelves={profile.sharedShelves} isOwnProfile={false} />
-      {activityData.length > 0 && (
-        <div style={cardStyle}>
-          <ActivityHeatmap data={activityData} weeks={12} />
-        </div>
-      )}
+      <ContributionGraph data={activityData} loading={activityLoading} isOwner={false} />
       <RecentSheetsSection sheets={profile.recentSheets} />
       <EnrolledCoursesSection enrollments={profile.enrollments} />
     </div>

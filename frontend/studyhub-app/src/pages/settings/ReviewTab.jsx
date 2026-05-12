@@ -11,6 +11,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { API } from '../../config'
+import { Skeleton } from '../../components/Skeleton'
 import { authHeaders } from '../shared/pageUtils'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { showToast } from '../../lib/toast'
@@ -51,7 +52,7 @@ export default function ReviewTab() {
   }, [])
 
   useEffect(() => {
-    loadReview()
+    Promise.resolve().then(loadReview)
   }, [loadReview])
 
   async function handleSubmit(event) {
@@ -78,7 +79,15 @@ export default function ReviewTab() {
   }
 
   if (loading) {
-    return <div style={{ padding: 24, color: 'var(--sh-muted)', fontSize: 13 }}>Loading...</div>
+    return (
+      <div style={{ padding: 8, display: 'grid', gap: 12 }} aria-busy="true" aria-live="polite">
+        <span className="sr-only">Loading your review…</span>
+        <Skeleton width="40%" height={18} borderRadius={6} />
+        <Skeleton width="100%" height={32} borderRadius={8} />
+        <Skeleton width="100%" height={96} borderRadius={10} />
+        <Skeleton width={140} height={36} borderRadius={10} />
+      </div>
+    )
   }
 
   // Existing review — read-only if approved, editable if pending

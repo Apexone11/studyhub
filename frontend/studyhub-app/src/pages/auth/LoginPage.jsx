@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import GoogleSignInButton from '../../components/GoogleSignInButton'
+import SubmitSpinner from '../../components/SubmitSpinner'
 import { getGoogleRedirectUri } from '../../components/googleSignInHelpers'
 import { AnimatedLogoMark as SiteAnimatedLogoMark } from '../../components/Icons'
 import { API, GOOGLE_CLIENT_ID } from '../../config'
@@ -21,6 +22,7 @@ import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { useSession, SESSION_EXPIRED_FLAG } from '../../lib/session-context'
 import { LOGGED_OUT_FLAG } from '../../lib/session'
 import { useRolesV2Flags, isRolesV2FlagEnabled } from '../../lib/rolesV2Flags'
+import { useFormValidation } from '../../lib/useFormValidation'
 import './LoginPage.css'
 
 export default function LoginPage() {
@@ -37,48 +39,10 @@ export default function LoginPage() {
   const [showForgot, setShowForgot] = useState(false)
   const [sessionExpired, setSessionExpired] = useState(false)
   const [loggedOut, setLoggedOut] = useState(false)
+  const { errors, setErrors, clearFieldError, focusFirstError, getFieldProps } = useFormValidation()
 
-  /* ── Detect session-expired redirect + Google OAuth redirect code ── */
-  useEffect(() => {
-    try {
-      if (sessionStorage.getItem(SESSION_EXPIRED_FLAG)) {
-        setSessionExpired(true)
-        sessionStorage.removeItem(SESSION_EXPIRED_FLAG)
-      }
-      if (sessionStorage.getItem(LOGGED_OUT_FLAG)) {
-        setLoggedOut(true)
-        sessionStorage.removeItem(LOGGED_OUT_FLAG)
-      }
-    } catch {
-      /* private mode */
-    }
-    const params = new URLSearchParams(window.location.search)
-    if (params.get('expired') === '1') {
-      setSessionExpired(true)
-      params.delete('expired')
-      const clean = params.toString()
-      window.history.replaceState({}, '', window.location.pathname + (clean ? `?${clean}` : ''))
-    }
-
-    // Google OAuth redirect-flow: Google redirected back with ?code=...
-    const googleCode = params.get('code')
-    if (googleCode) {
-      // Clean the code from the URL immediately
-      params.delete('code')
-      params.delete('scope')
-      params.delete('authuser')
-      params.delete('prompt')
-      const cleanUrl = params.toString()
-      window.history.replaceState(
-        {},
-        '',
-        window.location.pathname + (cleanUrl ? `?${cleanUrl}` : ''),
-      )
-      // Exchange the code for an authenticated session
-      handleGoogleCodeExchange(googleCode)
-    }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
+  /* Defined BEFORE the redirect-detection useEffect because the React
+   * Compiler flags forward references even when JS would hoist them. */
   async function handleGoogleCodeExchange(code) {
     setLoading(true)
     setError('')
@@ -128,6 +92,58 @@ export default function LoginPage() {
     }
   }
 
+  /* ── Detect session-expired redirect + Google OAuth redirect code ── */
+  useEffect(() => {
+    // Defer setState calls out of the synchronous effect body so the
+    // React Compiler doesn't flag them. The flags read from
+    // sessionStorage / URLSearchParams are still inspected here so a
+    // race against another tab's setItem stays accurate.
+    let expired = false
+    let loggedOutFlag = false
+    try {
+      if (sessionStorage.getItem(SESSION_EXPIRED_FLAG)) {
+        expired = true
+        sessionStorage.removeItem(SESSION_EXPIRED_FLAG)
+      }
+      if (sessionStorage.getItem(LOGGED_OUT_FLAG)) {
+        loggedOutFlag = true
+        sessionStorage.removeItem(LOGGED_OUT_FLAG)
+      }
+    } catch {
+      /* private mode */
+    }
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('expired') === '1') {
+      expired = true
+      params.delete('expired')
+      const clean = params.toString()
+      window.history.replaceState({}, '', window.location.pathname + (clean ? `?${clean}` : ''))
+    }
+
+    Promise.resolve().then(() => {
+      if (expired) setSessionExpired(true)
+      if (loggedOutFlag) setLoggedOut(true)
+    })
+
+    // Google OAuth redirect-flow: Google redirected back with ?code=...
+    const googleCode = params.get('code')
+    if (googleCode) {
+      // Clean the code from the URL immediately
+      params.delete('code')
+      params.delete('scope')
+      params.delete('authuser')
+      params.delete('prompt')
+      const cleanUrl = params.toString()
+      window.history.replaceState(
+        {},
+        '',
+        window.location.pathname + (cleanUrl ? `?${cleanUrl}` : ''),
+      )
+      // Exchange the code for an authenticated session
+      Promise.resolve().then(() => handleGoogleCodeExchange(googleCode))
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   /* ── Card entrance animation ───────────────────────────────────────── */
   useEffect(() => {
     if (cardRef.current) fadeInUp(cardRef.current, { duration: 450, y: 20 })
@@ -136,13 +152,19 @@ export default function LoginPage() {
   /* ── Username + password login handler ─────────────────────────────── */
   async function handleLogin(event) {
     event.preventDefault()
-    if (!username.trim() || !password.trim()) {
-      setError('Enter your username and password.')
+    const nextErrors = {}
+    if (!username.trim()) nextErrors.username = 'Enter your username.'
+    if (!password.trim()) nextErrors.password = 'Enter your password.'
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors)
+      setError('')
+      focusFirstError(nextErrors)
       return
     }
 
     setLoading(true)
     setError('')
+    setErrors({})
     setShowForgot(false)
 
     try {
@@ -314,16 +336,23 @@ export default function LoginPage() {
               </label>
               <input
                 id="login-username"
+                {...getFieldProps('username', { id: 'login-username' })}
                 value={username}
                 onChange={(event) => {
                   setUsername(event.target.value)
                   setError('')
                   setShowForgot(false)
+                  clearFieldError('username')
                 }}
                 autoComplete="username"
                 placeholder="Enter your username"
                 className="login-input"
               />
+              {errors.username && (
+                <p id="login-username-error" className="sh-field-error" role="alert">
+                  {errors.username}
+                </p>
+              )}
             </div>
 
             <div className="login-field login-field--last">
@@ -333,20 +362,28 @@ export default function LoginPage() {
               <input
                 id="login-password"
                 type="password"
+                {...getFieldProps('password', { id: 'login-password' })}
                 value={password}
                 onChange={(event) => {
                   setPassword(event.target.value)
                   setError('')
                   setShowForgot(false)
+                  clearFieldError('password')
                 }}
                 autoComplete="current-password"
                 placeholder="Enter your password"
                 className="login-input"
               />
+              {errors.password && (
+                <p id="login-password-error" className="sh-field-error" role="alert">
+                  {errors.password}
+                </p>
+              )}
             </div>
 
             <button type="submit" disabled={loading} className="login-submit-btn">
-              {loading ? 'Signing in...' : 'Sign In'}
+              {loading && <SubmitSpinner label="Signing in" />}
+              {loading ? 'Signing in…' : 'Sign In'}
             </button>
 
             <div className="login-forgot-wrap">

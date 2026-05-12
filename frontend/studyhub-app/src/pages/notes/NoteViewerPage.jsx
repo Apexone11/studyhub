@@ -15,6 +15,8 @@ import { SkeletonCard } from '../../components/Skeleton'
 import { PAGE_FONT } from '../shared/pageUtils'
 import { MarkdownPreview, wordCount, countWordsFromHtml } from './notesConstants'
 import NoteCommentSection from './NoteCommentSection'
+import NoteHighlightLayer from './NoteHighlightLayer'
+import AiNoteAssistant from '../../components/ai/AiNoteAssistant'
 import { useNoteViewer } from './useNoteViewer'
 
 // Reading speed used for the "X min read" estimate. 220 wpm is the median
@@ -371,6 +373,49 @@ export default function NoteViewerPage() {
             </span>
           )}
         </div>
+
+        {/* Print button — sits at the end of the header as its own block so
+            print-driven students can hand off to the browser print dialog
+            without scrolling for the action bar. The .sh-no-print class
+            keeps this button itself off the printed page. */}
+        <div className="sh-no-print" style={{ marginTop: 12 }}>
+          <button
+            type="button"
+            onClick={() => window.print()}
+            aria-label="Print this note"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: '1px solid var(--sh-border)',
+              background: 'var(--sh-surface)',
+              color: 'var(--sh-subtext)',
+              fontSize: 12,
+              fontWeight: 600,
+              cursor: 'pointer',
+              fontFamily: PAGE_FONT,
+            }}
+          >
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              aria-hidden="true"
+            >
+              <polyline points="6 9 6 2 18 2 18 9" />
+              <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+              <rect x="6" y="14" width="12" height="8" />
+            </svg>
+            Print
+          </button>
+        </div>
       </div>
 
       {/* Moderation banner (owner only) */}
@@ -484,22 +529,37 @@ export default function NoteViewerPage() {
         </div>
       )}
 
-      {/* Content */}
-      <div
-        style={{
-          background: 'var(--sh-surface)',
-          border: '1px solid var(--sh-border)',
-          borderRadius: 10,
-          padding: '24px 28px',
-          minHeight: 200,
-        }}
+      {/* Content — wrapped in NoteHighlightLayer (Phase 9, Note Review v1)
+          so reviewers can select text and create persisted highlights.
+          The layer renders nothing when the user can't highlight (e.g.
+          unauthenticated viewer on a public note) — `children` still
+          render normally. */}
+      <NoteHighlightLayer
+        noteId={note.id}
+        noteContent={note.content}
+        isOwner={Boolean(note.isOwner)}
+        isPrivate={Boolean(note.private)}
+        currentUserId={user?.id || null}
       >
-        {note.content?.trim() ? (
-          <MarkdownPreview content={note.content} />
-        ) : (
-          <p style={{ color: 'var(--sh-muted)', fontStyle: 'italic' }}>This note is empty.</p>
-        )}
-      </div>
+        <div
+          style={{
+            background: 'var(--sh-surface)',
+            border: '1px solid var(--sh-border)',
+            borderRadius: 10,
+            padding: '24px 28px',
+            minHeight: 200,
+          }}
+        >
+          {note.content?.trim() ? (
+            <MarkdownPreview content={note.content} />
+          ) : (
+            <p style={{ color: 'var(--sh-muted)', fontStyle: 'italic' }}>This note is empty.</p>
+          )}
+        </div>
+      </NoteHighlightLayer>
+
+      {/* AI assistant — summarize / flashcards / ask */}
+      <AiNoteAssistant noteId={note.id} />
 
       {/* Comments (visible on shared notes) */}
       {!note.private && (

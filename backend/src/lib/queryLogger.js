@@ -8,6 +8,8 @@
  * Phase 6 Step 2: "Add EXPLAIN ANALYZE logging in dev."
  */
 
+const log = require('./logger')
+
 const SLOW_QUERY_THRESHOLD_MS = 200
 
 /**
@@ -25,7 +27,10 @@ function attachQueryLogger(prisma) {
   prisma.$on('query', (event) => {
     const durationMs = Number(event.duration)
     if (durationMs >= SLOW_QUERY_THRESHOLD_MS) {
-      console.warn(`[SLOW QUERY] ${durationMs}ms | ${event.query} | params: ${event.params}`)
+      // `event.params` may contain row-level data (potentially PII); log only
+      // the query shape + duration. The query string itself is the SQL Prisma
+      // emits and does not embed parameter values.
+      log.warn({ event: 'prisma.slow_query', durationMs, query: event.query }, 'Slow Prisma query')
     }
   })
 }

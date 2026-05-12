@@ -3,6 +3,7 @@ import { FONT, tableHeadStyle, tableCell, tableCellStrong } from './adminConstan
 import { showToast } from '../../lib/toast'
 import { API } from '../../config'
 import { resolveImageUrl } from '../../lib/imageUrls'
+import { Skeleton } from '../../components/Skeleton'
 
 function DomainCell({ school, apiJson, onUpdate }) {
   const [editing, setEditing] = useState(false)
@@ -141,7 +142,7 @@ export default function SchoolsTab({ apiJson }) {
   }, [apiJson])
 
   useEffect(() => {
-    load()
+    Promise.resolve().then(load)
   }, [load])
 
   function startUpload(schoolId) {
@@ -205,8 +206,62 @@ export default function SchoolsTab({ apiJson }) {
   }
 
   if (loading)
-    return <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading schools...</div>
-  if (error) return <div style={{ color: 'var(--sh-danger)', fontSize: 13 }}>{error}</div>
+    return (
+      <div style={{ display: 'grid', gap: 8 }} aria-busy="true" aria-live="polite">
+        <span className="sr-only">Loading schools…</span>
+        <Skeleton width="40%" height={14} borderRadius={6} />
+        {Array.from({ length: 6 }).map((_, i) => (
+          <Skeleton key={i} width="100%" height={48} borderRadius={10} />
+        ))}
+      </div>
+    )
+  if (error)
+    return (
+      <div
+        role="alert"
+        style={{
+          padding: '14px 16px',
+          borderRadius: 12,
+          background: 'var(--sh-danger-bg)',
+          border: '1px solid var(--sh-danger-border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 12,
+          flexWrap: 'wrap',
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 180 }}>
+          <div
+            style={{
+              fontSize: 13,
+              fontWeight: 700,
+              color: 'var(--sh-danger-text)',
+              marginBottom: 2,
+            }}
+          >
+            We could not load the schools list.
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--sh-danger-text)', opacity: 0.85 }}>{error}</div>
+        </div>
+        <button
+          type="button"
+          onClick={load}
+          style={{
+            background: 'var(--sh-brand)',
+            color: 'var(--sh-btn-primary-text)',
+            border: 'none',
+            borderRadius: 8,
+            padding: '7px 14px',
+            fontSize: 12,
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontFamily: FONT,
+          }}
+        >
+          Try again
+        </button>
+      </div>
+    )
 
   return (
     <div>

@@ -59,6 +59,12 @@ router.patch('/email-suppressions/:id/unsuppress', async (req, res) => {
       .status(400)
       .json({ error: 'Provide an unsuppress reason with at least 8 characters.' })
   }
+  // A13: cap reason length to defend the EmailSuppressionAudit.reason TEXT
+  // column from unbounded writes. Reject rather than truncate so the
+  // operator sees the limit and shortens the rationale themselves.
+  if (reason.length > 500) {
+    return res.status(400).json({ error: 'Unsuppress reason must be 500 characters or fewer.' })
+  }
 
   try {
     const result = await prisma.$transaction(async (tx) => {

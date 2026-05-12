@@ -12,6 +12,7 @@
  *   3. Burst bundling — ≥ BURST_THRESHOLD high events for same userId
  *      within BURST_WINDOW → queue and send one digest email instead.
  */
+const log = require('./logger')
 const VALID_PRIORITIES = ['high', 'medium', 'low']
 const DEFAULT_NOTIFICATION_PREFERENCES = Object.freeze({
   emailDigest: true,
@@ -472,7 +473,10 @@ async function createNotification(
     return notif
   } catch (err) {
     // Non-fatal — log and continue
-    console.error('createNotification error:', err.message)
+    log.error(
+      { event: 'notify.create_failed', err: err?.message || String(err) },
+      'createNotification failed',
+    )
   }
 }
 
@@ -623,7 +627,10 @@ async function _flushBurstDigest(prisma, userId) {
       'high-priority-digest',
     )
   } catch (err) {
-    console.error('[notify] burst digest email failed:', err.message)
+    log.error(
+      { event: 'notify.burst_digest_email_failed', err: err?.message || String(err) },
+      'Burst digest email failed',
+    )
   }
 }
 

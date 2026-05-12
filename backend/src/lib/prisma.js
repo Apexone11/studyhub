@@ -15,6 +15,7 @@
 const { PrismaClient } = require('@prisma/client')
 const { withEncryption } = require('./prismaEncryption')
 const { attachQueryLogger } = require('./queryLogger')
+const log = require('./logger')
 
 const globalForPrisma = globalThis
 
@@ -41,9 +42,9 @@ function createPrismaClient() {
     },
   })
 
-  // Log Prisma errors to console (and Sentry if available)
+  // Log Prisma errors via structured logger (and Sentry if available)
   client.$on('error', (e) => {
-    console.error('[Prisma Error]', e.message)
+    log.error({ event: 'prisma.client_error', err: e?.message || String(e) }, 'Prisma client error')
   })
 
   // Phase 6: attach slow query logger (dev only, filters queries > 200ms)

@@ -9,6 +9,7 @@ const { sendPasswordReset } = require('../../lib/email/email')
 const { hashStoredSecret } = require('../../lib/authTokens')
 const { isPasswordPwned } = require('../../lib/passwordSafety')
 const prisma = require('../../lib/prisma')
+const log = require('../../lib/logger')
 const { PASSWORD_MIN_LENGTH } = require('./auth.constants')
 const { forgotLimiter } = require('./auth.constants')
 const { writeLimiter } = require('../../lib/rateLimiters')
@@ -59,7 +60,10 @@ router.post('/forgot-password', requireTrustedOrigin, forgotLimiter, async (req,
     return res.json({ message: GENERIC_MESSAGE })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    console.error('Password reset request failed:', error.message || 'unknown error')
+    log.error(
+      { event: 'auth.password_reset_request_failed', err: error?.message || 'unknown error' },
+      'Password reset request failed',
+    )
     return res.json({ message: GENERIC_MESSAGE })
   }
 })

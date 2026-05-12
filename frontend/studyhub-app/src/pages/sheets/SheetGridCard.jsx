@@ -27,6 +27,7 @@ import {
   SIGNAL_BADGE_CONFIG,
   timeAgo,
 } from './sheetsPageConstants'
+import { estimateSheetReadingMinutes } from './sheetReadingTime'
 import styles from './SheetGridCard.module.css'
 
 export default function SheetGridCard({ sheet, forking, onOpen, onStar, onFork, studyStatus }) {
@@ -59,6 +60,11 @@ export default function SheetGridCard({ sheet, forking, onOpen, onStar, onFork, 
   }, [mountedAt, sheet.updatedAt, sheet.createdAt])
   const signal = computeSignalBadge(sheet)
   const signalConfig = signal ? SIGNAL_BADGE_CONFIG[signal] : null
+  // 220-wpm reading-time estimate. The list endpoint returns full `content`
+  // via `include` (not a `select` allowlist), so this is a real word count,
+  // not an extrapolation from `previewText`. Returns 0 (chip hidden) for
+  // PDF / attachment-only sheets where there's no body text to count.
+  const readMinutes = estimateSheetReadingMinutes(sheet)
   // Map `signal` to the local CSS-Module class. `SIGNAL_BADGE_CONFIG`
   // ships a global BEM class for the List view; we want a scoped rule
   // here so the tone colors actually resolve.
@@ -145,6 +151,11 @@ export default function SheetGridCard({ sheet, forking, onOpen, onStar, onFork, 
           <span className={styles.stat}>
             <IconComment size={13} />
             {sheet.commentCount}
+          </span>
+        ) : null}
+        {readMinutes > 0 ? (
+          <span className={styles.stat} aria-label={`${readMinutes} minute read`}>
+            {readMinutes} min read
           </span>
         ) : null}
         <span className={styles.spacer} />

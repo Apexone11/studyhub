@@ -1,6 +1,7 @@
 const { classifyHtmlRisk, RISK_TIER } = require('./htmlSecurity')
 const { scanBufferWithClamAv } = require('../clamav')
 const { SCAN_STATUS, HTML_VERSION_KIND, findVersionByKind } = require('./htmlDraftStorage')
+const log = require('../logger')
 
 const scanTimers = new Map()
 
@@ -166,7 +167,14 @@ function scheduleHtmlScan(prisma, { sheetId, delayMs = 450 }) {
         try {
           await runHtmlScanNow(prisma, { sheetId })
         } catch (scanErr) {
-          console.error(`[htmlDraftWorkflow] Background scan failed for sheet ${sheetId}:`, scanErr)
+          log.error(
+            {
+              event: 'html_draft.background_scan_failed',
+              sheetId,
+              err: scanErr?.message || String(scanErr),
+            },
+            'Background scan failed for sheet',
+          )
           await prisma.studySheet
             .update({
               where: { id: sheetId },
@@ -184,9 +192,13 @@ function scheduleHtmlScan(prisma, { sheetId, delayMs = 450 }) {
               },
             })
             .catch((updateErr) => {
-              console.error(
-                `[htmlDraftWorkflow] Failed to update scan status for sheet ${sheetId}:`,
-                updateErr,
+              log.error(
+                {
+                  event: 'html_draft.scan_status_update_failed',
+                  sheetId,
+                  err: updateErr?.message || String(updateErr),
+                },
+                'Failed to update scan status for sheet',
               )
             })
         }

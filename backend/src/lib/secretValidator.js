@@ -8,6 +8,8 @@
  * Call validateSecrets() from index.js during startup.
  */
 
+const log = require('./logger')
+
 const REQUIRED = [
   { key: 'JWT_SECRET', minLength: 32, description: 'Auth token signing key' },
   { key: 'DATABASE_URL', minLength: 10, description: 'PostgreSQL connection string' },
@@ -183,17 +185,21 @@ function validateSecrets() {
   }
 
   if (missing.length > 0) {
-    console.error('[SECURITY] Missing required secrets:')
-    for (const m of missing) console.error(`  - ${m}`)
+    log.error({ event: 'secrets.missing_required', missing }, 'Missing required secrets')
     if (isProduction) {
-      console.error('[SECURITY] Cannot start in production with missing required secrets. Exiting.')
+      log.fatal(
+        { event: 'secrets.production_exit' },
+        'Cannot start in production with missing required secrets. Exiting.',
+      )
       process.exit(1)
     }
   }
 
   if (warnings.length > 0) {
-    console.warn('[SECURITY] Missing recommended secrets (features will be degraded):')
-    for (const w of warnings) console.warn(`  - ${w}`)
+    log.warn(
+      { event: 'secrets.missing_recommended', warnings },
+      'Missing recommended secrets (features will be degraded)',
+    )
   }
 
   const configured =
@@ -202,7 +208,10 @@ function validateSecrets() {
     (s) => process.env[s.key],
   ).length
 
-  console.warn(`[SECURITY] Secrets: ${set}/${configured} configured.`)
+  log.info(
+    { event: 'secrets.summary', configured: set, total: configured },
+    `Secrets: ${set}/${configured} configured.`,
+  )
 }
 
 module.exports = {

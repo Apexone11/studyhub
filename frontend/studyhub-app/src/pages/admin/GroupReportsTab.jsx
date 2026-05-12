@@ -14,6 +14,7 @@ import { authHeaders, FONT } from './adminConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { showToast } from '../../lib/toast'
 import UserAvatar from '../../components/UserAvatar'
+import { Skeleton } from '../../components/Skeleton'
 import { IconFlag, IconCheck, IconLock, IconX } from '../../components/Icons'
 
 const STATUSES = [
@@ -58,7 +59,9 @@ export default function GroupReportsTab() {
   }, [page, statusFilter])
 
   useEffect(() => {
-    loadReports()
+    // Defer out of the effect's synchronous body so the React Compiler
+    // doesn't flag setState-in-effect inside loadReports.
+    Promise.resolve().then(loadReports)
   }, [loadReports])
 
   async function handleAction(reportId, action) {
@@ -160,15 +163,87 @@ export default function GroupReportsTab() {
       </div>
 
       {loading ? (
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13, padding: 16 }}>Loading...</div>
+        <div style={{ display: 'grid', gap: 10, padding: 8 }} aria-busy="true" aria-live="polite">
+          <span className="sr-only">Loading group reports…</span>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} width="100%" height={92} borderRadius={12} />
+          ))}
+        </div>
       ) : null}
       {error ? (
-        <div style={{ color: 'var(--sh-danger)', fontSize: 13, padding: 16 }}>{error}</div>
+        <div
+          role="alert"
+          style={{
+            padding: '14px 16px',
+            borderRadius: 12,
+            background: 'var(--sh-danger-bg)',
+            border: '1px solid var(--sh-danger-border)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+            flexWrap: 'wrap',
+            margin: '8px 0',
+          }}
+        >
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: 'var(--sh-danger-text)',
+                marginBottom: 2,
+              }}
+            >
+              We could not load group reports.
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--sh-danger-text)', opacity: 0.85 }}>
+              {error}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => loadReports()}
+            style={{
+              background: 'var(--sh-brand)',
+              color: 'var(--sh-btn-primary-text)',
+              border: 'none',
+              borderRadius: 8,
+              padding: '7px 14px',
+              fontSize: 12,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: FONT,
+            }}
+          >
+            Try again
+          </button>
+        </div>
       ) : null}
 
       {!loading && !error && reports.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--sh-muted)', fontSize: 14 }}>
-          No reports matching this filter.
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '40px 24px',
+            borderRadius: 12,
+            background: 'var(--sh-soft)',
+            border: '1px dashed var(--sh-border)',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: 'var(--sh-heading)',
+              marginBottom: 4,
+            }}
+          >
+            No reports in this queue
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>
+            Switch a status above (pending, escalated, warned…) to review reports that have already
+            been actioned.
+          </div>
         </div>
       ) : null}
 

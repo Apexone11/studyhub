@@ -10,7 +10,11 @@ const {
   computeChecksum,
 } = require('./sheetLab.constants')
 const { trackActivity } = require('../../lib/activityTracker')
-const { checkAndAwardBadgesLegacy: checkAndAwardBadges } = require('../achievements')
+const {
+  checkAndAwardBadgesLegacy: checkAndAwardBadges,
+  emitAchievementEvent,
+  EVENT_KINDS,
+} = require('../achievements')
 
 const router = express.Router()
 
@@ -164,6 +168,12 @@ router.post('/:id/lab/commits', requireAuth, async (req, res) => {
 
     trackActivity(prisma, req.user.userId, 'commits')
     checkAndAwardBadges(prisma, req.user.userId)
+    // Achievements V2 — typed COMMIT_CREATE event so future event-match
+    // commit badges fire without re-running the legacy shim.
+    void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.COMMIT_CREATE, {
+      sheetId,
+      commitId: commit.id,
+    })
 
     res.status(201).json({
       commit: {

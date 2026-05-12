@@ -226,6 +226,10 @@ export default function MyCoursesPage() {
   const [recommendations, setRecommendations] = useState([])
 
   /* ── Load catalog + current enrollments ─────────────────────────────── */
+  // Bumping `catalogReloadKey` re-runs the catalog fetch effect — used by
+  // the inline error-state Retry button so the user does not have to
+  // refresh the whole page when a transient network blip blocks the load.
+  const [catalogReloadKey, setCatalogReloadKey] = useState(0)
   useEffect(() => {
     let active = true
     queueMicrotask(() => {
@@ -281,7 +285,7 @@ export default function MyCoursesPage() {
     return () => {
       active = false
     }
-  }, [])
+  }, [catalogReloadKey])
 
   /* ── Seed from current user enrollments ─────────────────────────────── */
   useEffect(() => {
@@ -468,7 +472,10 @@ export default function MyCoursesPage() {
         </div>
 
         {catalogLoading && (
-          <div style={{ display: 'grid', gap: 12 }}>
+          <div style={{ display: 'grid', gap: 12 }} aria-busy="true" aria-live="polite">
+            <span className="sr-only">Loading course catalog…</span>
+            <Skeleton width="100%" height={72} borderRadius={16} />
+            <Skeleton width="100%" height={72} borderRadius={16} />
             <Skeleton width="100%" height={72} borderRadius={16} />
             <Skeleton width="100%" height={72} borderRadius={16} />
             <Skeleton width="100%" height={72} borderRadius={16} />
@@ -477,39 +484,50 @@ export default function MyCoursesPage() {
 
         {catalogError && (
           <div
+            role="alert"
             style={{
               background: 'var(--sh-danger-bg)',
               border: '1px solid var(--sh-danger-border)',
               borderRadius: 14,
-              padding: '16px 20px',
+              padding: '18px 22px',
               marginBottom: 20,
               display: 'flex',
               alignItems: 'center',
-              gap: 12,
+              gap: 14,
+              flexWrap: 'wrap',
             }}
           >
-            <span style={{ fontSize: 14, color: 'var(--sh-danger-text)', flex: 1 }}>
-              {catalogError}
-            </span>
+            <div style={{ flex: 1, minWidth: 200 }}>
+              <div
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  color: 'var(--sh-danger-text)',
+                  marginBottom: 4,
+                }}
+              >
+                We could not load the course catalog.
+              </div>
+              <div style={{ fontSize: 13, color: 'var(--sh-danger-text)', opacity: 0.9 }}>
+                {catalogError} Check your connection and try again.
+              </div>
+            </div>
             <button
-              onClick={() => {
-                setCatalogError('')
-                setCatalog([])
-                setCatalogLoading(true)
-                window.location.reload()
-              }}
+              type="button"
+              onClick={() => setCatalogReloadKey((k) => k + 1)}
               style={{
                 background: 'var(--sh-brand)',
                 color: '#fff',
                 border: 'none',
                 borderRadius: 8,
-                padding: '7px 16px',
+                padding: '9px 18px',
                 fontSize: 13,
                 fontWeight: 700,
                 cursor: 'pointer',
+                fontFamily: 'inherit',
               }}
             >
-              Retry
+              Try again
             </button>
           </div>
         )}
@@ -610,12 +628,34 @@ export default function MyCoursesPage() {
                     <div
                       style={{
                         textAlign: 'center',
-                        padding: '20px 0',
+                        padding: '24px 12px',
                         color: 'var(--sh-muted)',
                         fontSize: 13,
+                        lineHeight: 1.6,
                       }}
                     >
-                      No schools found. Try a different search.
+                      <div style={{ fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 4 }}>
+                        No schools match {`"${schoolSearch}"`}
+                      </div>
+                      <div>Try a shorter query, or clear the search to browse the full list.</div>
+                      <button
+                        type="button"
+                        onClick={() => setSchoolSearch('')}
+                        style={{
+                          marginTop: 12,
+                          background: 'var(--sh-soft)',
+                          border: '1px solid var(--sh-border)',
+                          borderRadius: 8,
+                          padding: '6px 14px',
+                          fontSize: 12,
+                          fontWeight: 700,
+                          color: 'var(--sh-heading)',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                        }}
+                      >
+                        Clear search
+                      </button>
                     </div>
                   )}
                   {filteredSchools.map((school) => (
@@ -784,14 +824,23 @@ export default function MyCoursesPage() {
                     {filteredCourses.length === 0 && (
                       <div
                         style={{
-                          padding: '16px 0',
+                          padding: '20px 12px',
                           color: 'var(--sh-muted)',
                           fontSize: 13,
                           width: '100%',
                           textAlign: 'center',
+                          lineHeight: 1.6,
                         }}
                       >
-                        No courses match your search.
+                        <div
+                          style={{ fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 4 }}
+                        >
+                          No courses match your filters
+                        </div>
+                        <div>
+                          Try a different department or clear your search to see every course at
+                          this school.
+                        </div>
                       </div>
                     )}
                     {filteredCourses.map((course) => (

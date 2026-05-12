@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { API } from '../../config'
 import CourseListPicker from '../../components/CourseListPicker'
+import { Skeleton } from '../../components/Skeleton'
 import { Button, FormField, MsgList, SectionCard, Select } from './settingsShared'
 
 export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
@@ -19,8 +20,12 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
     if (catalog.length > 0 || catalogLoading) return
 
     let active = true
-    setCatalogLoading(true)
-    setCatalogError('')
+    Promise.resolve().then(() => {
+      if (active) {
+        setCatalogLoading(true)
+        setCatalogError('')
+      }
+    })
 
     fetch(`${API}/api/courses/schools`, {
       headers: { 'Content-Type': 'application/json' },
@@ -103,24 +108,50 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
       </FormField>
 
       {catalogLoading && (
-        <div style={{ marginBottom: 14, color: 'var(--sh-muted)', fontSize: 13 }}>
-          Loading course catalog...
+        <div
+          style={{ marginBottom: 14, display: 'grid', gap: 8 }}
+          aria-busy="true"
+          aria-live="polite"
+        >
+          <span className="sr-only">Loading course catalog…</span>
+          <Skeleton width="100%" height={40} borderRadius={10} />
+          <Skeleton width="92%" height={40} borderRadius={10} />
+          <Skeleton width="86%" height={40} borderRadius={10} />
         </div>
       )}
 
       {catalogError && (
         <div
+          role="alert"
           style={{
             marginBottom: 14,
-            color: 'var(--sh-danger)',
-            fontSize: 13,
+            padding: '12px 14px',
+            borderRadius: 10,
+            background: 'var(--sh-danger-bg)',
+            border: '1px solid var(--sh-danger-border)',
             display: 'flex',
             alignItems: 'center',
-            gap: 10,
+            gap: 12,
+            flexWrap: 'wrap',
           }}
         >
-          <span>{catalogError}</span>
+          <div style={{ flex: 1, minWidth: 180 }}>
+            <div
+              style={{
+                fontSize: 13,
+                fontWeight: 700,
+                color: 'var(--sh-danger-text)',
+                marginBottom: 2,
+              }}
+            >
+              We could not load the course catalog.
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--sh-danger-text)', opacity: 0.85 }}>
+              {catalogError}
+            </div>
+          </div>
           <button
+            type="button"
             onClick={() => {
               setCatalogError('')
               setCatalog([])
@@ -130,13 +161,13 @@ export default function CoursesTab({ user, busyKey, setBusyKey, syncUser }) {
               color: 'var(--sh-btn-primary-text)',
               border: 'none',
               borderRadius: 8,
-              padding: '5px 12px',
+              padding: '7px 14px',
               fontSize: 12,
               fontWeight: 700,
               cursor: 'pointer',
             }}
           >
-            Retry
+            Try again
           </button>
         </div>
       )}

@@ -1,5 +1,6 @@
 const prisma = require('./prisma')
 const { captureError } = require('../monitoring/sentry')
+const log = require('./logger')
 
 /**
  * Audit logging for security-relevant operations.
@@ -124,7 +125,10 @@ async function logAudit({
       },
     })
   } catch (err) {
-    console.error('Audit log failed:', err.message)
+    log.error(
+      { event: 'audit_log.write_failed', err: err?.message || String(err) },
+      'Audit log failed',
+    )
   }
 }
 

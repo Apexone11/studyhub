@@ -1,4 +1,5 @@
 const { captureError } = require('../../monitoring/sentry')
+const log = require('../../lib/logger')
 const { sendEmailVerification } = require('../../lib/email/email')
 const { setAuthCookie, signAuthToken, signCsrfToken } = require('../../lib/authTokens')
 const { maskEmailAddress } = require('../../lib/verification/verificationCodes')
@@ -442,6 +443,21 @@ async function issueAuthenticatedSession(res, userId, req, preComputed = null) {
   const token = signAuthToken(user, { jti })
   setAuthCookie(res, token)
 
+  // Achievements V2 — emit LOGIN so the `created_before` evaluator (founding
+  // member) picks up existing-but-not-yet-awarded users on their next
+  // session. Lazy require avoids a boot-time require-cycle through the
+  // achievements barrel. Fire-and-forget per engine contract; failures
+  // never block session issuance.
+  try {
+    const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
+    void emitAchievementEvent(prisma, userId, EVENT_KINDS.LOGIN, {
+      sessionId: sessionId || null,
+      band: riskResult?.band || null,
+    })
+  } catch {
+    // intentionally silent
+  }
+
   const payload = await buildSessionUserPayload(user)
   if (sessionId) payload.sessionId = sessionId
 
@@ -487,7 +503,15 @@ function handleAuthError(req, res, error) {
     return sendError(res, 409, 'That username or email is already taken.', ERROR_CODES.CONFLICT)
   }
   captureError(error, { route: req.originalUrl, method: req.method })
-  console.error(error)
+  log.error(
+    {
+      event: 'auth.request_failed',
+      route: req.originalUrl,
+      method: req.method,
+      err: error?.message || String(error),
+    },
+    'Auth request failed',
+  )
   return sendError(res, 500, 'Server error. Please try again.', ERROR_CODES.INTERNAL)
 }
 

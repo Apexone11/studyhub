@@ -5,6 +5,7 @@ const { captureError } = require('../../monitoring/sentry')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { runAudit } = require('./audit.service')
 const { CURRENT_CREATOR_RESPONSIBILITY_DOC_VERSION } = require('./creatorAudit.constants')
+const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
 
 const EU_COUNTRY_CODES = new Set([
   'AT',
@@ -202,6 +203,17 @@ async function runCreatorAudit(req, res) {
     }
     if (!persisted) {
       return sendError(res, 404, 'Content not found.', ERROR_CODES.NOT_FOUND)
+    }
+
+    // Achievements V2 — emit SHEET_AUDIT_GRADE_HIGH for sheet audits that
+    // returned an A grade. The quality-A badge (event_match, threshold 1)
+    // unlocks the first time this fires for a user. Fire-and-forget per the
+    // engine's contract; failures never bubble back to the API response.
+    if (entityType === 'sheet' && report.grade === 'A') {
+      void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.SHEET_AUDIT_GRADE_HIGH, {
+        sheetId: entityId,
+        overallScore: report.overallScore,
+      })
     }
 
     return res.json({ report, entity: { type: entityType, id: entityId, title: entity.title } })

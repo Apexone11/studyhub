@@ -12,11 +12,12 @@ import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { fadeInUp } from '../../lib/animations'
-import { validateAccountFields, getSteps } from './registerConstants'
+import { validateAccountFields, validateAccountFieldsMap, getSteps } from './registerConstants'
 import useRegisterFlow from './useRegisterFlow'
 import { StepIndicator, AccountStep, VerifyStep } from './RegisterStepFields'
 import { API } from '../../config'
 import { resolveImageUrl } from '../../lib/imageUrls'
+import { useFormValidation } from '../../lib/useFormValidation'
 import './RegisterScreen.css'
 
 export default function RegisterScreen() {
@@ -26,6 +27,7 @@ export default function RegisterScreen() {
 
   const flow = useRegisterFlow({ referralCode: ref || undefined })
   const steps = getSteps()
+  const fieldValidation = useFormValidation()
 
   /* ── Resolve referral code to inviter info ─────────────────────── */
   const [inviter, setInviter] = useState(null)
@@ -52,8 +54,19 @@ export default function RegisterScreen() {
 
   /* ── Account creation wrapper (validates then delegates to hook) ───── */
   function handleCreateAccount(event) {
+    const fieldErrors = validateAccountFieldsMap(flow.form)
+    fieldValidation.setErrors(fieldErrors)
+    if (Object.keys(fieldErrors).length > 0) {
+      fieldValidation.focusFirstError(fieldErrors)
+    }
     const validationError = validateAccountFields(flow.form)
     flow.handleCreateAccount(event, validationError)
+  }
+
+  /* ── Wrap setField so errors clear as the user fixes them ─────────── */
+  function setFieldAndClear(key, value) {
+    flow.setField(key, value)
+    fieldValidation.clearFieldError(key)
   }
 
   /* ── Render ────────────────────────────────────────────────────────── */
@@ -137,11 +150,13 @@ export default function RegisterScreen() {
           {flow.step === 'account' && (
             <AccountStep
               form={flow.form}
-              setField={flow.setField}
+              setField={setFieldAndClear}
               loading={flow.loading}
               onSubmit={handleCreateAccount}
               onGoogleSuccess={flow.handleGoogleSuccess}
               setError={flow.setError}
+              fieldErrors={fieldValidation.errors}
+              getFieldProps={fieldValidation.getFieldProps}
             />
           )}
 

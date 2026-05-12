@@ -16,6 +16,7 @@ const {
   DONATION_MAX_CENTS,
   planFromPriceId,
 } = require('./payments.constants')
+const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
 
 function getFrontendAppUrl() {
   return process.env.FRONTEND_URL || 'http://localhost:5173'
@@ -240,6 +241,17 @@ async function handleCheckoutCompleted(session) {
       })
 
       if (donation?.userId && session.payment_intent) {
+        // Achievements V2 — donation completed. Fire-and-forget; engine
+        // handles its own errors. The `donations_cents` evaluator reads from
+        // Donation.amount aggregate, so this is the authoritative trigger
+        // for donor badges. Userless guest donations (donation.userId null)
+        // are intentionally skipped.
+        void emitAchievementEvent(prisma, donation.userId, EVENT_KINDS.DONATION_COMPLETE, {
+          sessionId: session.id,
+          amountCents: donation.amount,
+          currency: donation.currency || 'usd',
+        })
+
         let createdDonationPayment = false
         const existingPayment = await prisma.payment.findUnique({
           where: { stripePaymentIntentId: session.payment_intent },
@@ -369,6 +381,14 @@ async function handleCheckoutCompleted(session) {
       },
     })
     log.info({ userId, plan, stripeSubscriptionId }, 'Subscription activated via checkout')
+    // Achievements V2 — subscription activated. The `plan_active` evaluator
+    // already reads from the Subscription table, but firing the typed event
+    // keeps event_match badges (and future audit consumers) in sync.
+    void emitAchievementEvent(prisma, userId, EVENT_KINDS.SUBSCRIPTION_ACTIVATE, {
+      plan,
+      stripeSubscriptionId,
+      status: stripeSub.status,
+    })
   } catch (upsertErr) {
     // This is the most critical error — the DB write failed.
     // Most likely cause: Subscription table does not exist (migration not deployed).
@@ -510,6 +530,18 @@ async function handleSubscriptionUpdated(subscription) {
   })
 
   log.info({ userId, plan, status: subscription.status }, 'Subscription updated')
+
+  // Achievements V2 — also fire SUBSCRIPTION_ACTIVATE on the update path so
+  // a `past_due → active` retry or a trial → active transition still awards
+  // the supporter badges. The engine's award table is unique-by-slug so a
+  // duplicate emit during the same lifecycle is harmless.
+  if (['active', 'trialing'].includes(subscription.status)) {
+    void emitAchievementEvent(prisma, userId, EVENT_KINDS.SUBSCRIPTION_ACTIVATE, {
+      plan,
+      stripeSubscriptionId: subscription.id,
+      status: subscription.status,
+    })
+  }
 }
 
 /**

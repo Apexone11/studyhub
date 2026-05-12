@@ -7,6 +7,7 @@
  */
 const prisma = require('./prisma')
 const { captureError } = require('../monitoring/sentry')
+const { runWithHeartbeat } = require('./jobs/heartbeat')
 
 /** In-memory map: userId -> last update timestamp (ms). */
 const lastUpdateMap = new Map()
@@ -22,16 +23,20 @@ const SWEEP_INTERVAL_MS = 5 * 60 * 1000
 
 let sweepTimerStarted = false
 
+function sweepLastUpdateMap() {
+  const now = Date.now()
+  for (const [userId, ts] of lastUpdateMap) {
+    if (now - ts > CACHE_TTL_MS) {
+      lastUpdateMap.delete(userId)
+    }
+  }
+}
+
 function startSweepTimer() {
   if (sweepTimerStarted) return
   sweepTimerStarted = true
   setInterval(() => {
-    const now = Date.now()
-    for (const [userId, ts] of lastUpdateMap) {
-      if (now - ts > CACHE_TTL_MS) {
-        lastUpdateMap.delete(userId)
-      }
-    }
+    runWithHeartbeat('active_tracking.sweep_cache', sweepLastUpdateMap, { slaMs: 5_000 })
   }, SWEEP_INTERVAL_MS).unref()
 }
 

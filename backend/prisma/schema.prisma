@@ -83,6 +83,7 @@ model User {
   noteComments               NoteComment[]
   noteStars                  NoteStar[]
   noteVersions               NoteVersion[]
+  noteHighlights             NoteHighlight[]
   reactions                  Reaction[]
   feedPosts                  FeedPost[]
   feedPostComments           FeedPostComment[]
@@ -112,6 +113,7 @@ model User {
   reviewedSheets             StudySheet[]              @relation("SheetReviewer")
   pinnedSheets               UserPinnedSheet[]
   dailyActivity              UserDailyActivity[]
+  streak                     UserStreak?
   badges                     UserBadge[]
   achievementEvents          AchievementEvent[]
   achievementStats           UserAchievementStats?
@@ -564,9 +566,29 @@ model Note {
   noteStars        NoteStar[]
   noteVersions     NoteVersion[]
   noteReactions    NoteReaction[]
+  noteHighlights   NoteHighlight[]
   materials        Material[]     @relation("MaterialNote")
   revision         Int            @default(0)
   lastSaveId       String?        @db.Uuid
+}
+
+// Range-anchored highlights for notes (Phase 9 — Note Review v1).
+// Migration: backend/prisma/migrations/20260512000001_note_highlights/
+model NoteHighlight {
+  id            Int      @id @default(autoincrement())
+  noteId        Int
+  userId        Int
+  anchorText    String
+  anchorOffset  Int
+  anchorContext String?
+  color         String   @default("yellow")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  note          Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([noteId, createdAt(sort: Desc)])
+  @@index([userId])
 }
 
 model NoteComment {
@@ -1080,6 +1102,26 @@ model UserDailyActivity {
 
   @@unique([userId, date])
   @@index([userId, date(sort: Desc)])
+}
+
+// ── Retention: per-user activity streak counter ─────────────
+// Maintained by lib/streakService.js — incremented when the user
+// takes any "active" action (sheet create, note create, sheetLab
+// commit, comment). The daily sweeper in lib/jobs/streakSweeper.js
+// resets currentStreak to 0 when lastActiveDate is older than
+// yesterday. Separate from UserDailyActivity because that table
+// counts per-action volume for the contribution graph; this one
+// is a denormalized cache the UI can render without scanning
+// 366 rows of UserDailyActivity per page load.
+model UserStreak {
+  userId         Int       @id
+  currentStreak  Int       @default(0)
+  longestStreak  Int       @default(0)
+  lastActiveDate DateTime? @db.Date
+  updatedAt      DateTime  @default(now()) @updatedAt
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([lastActiveDate])
 }
 
 // ── Achievements V2: badge catalog & unlocks ───────────────
@@ -1869,6 +1911,13 @@ model AiGlobalSpendDay {
   documentTokens BigInt   @default(0)
   costUsdCents   Int      @default(0)
   requestCount   Int      @default(0)
+  // Prompt-cache telemetry (Loop A7, 2026-05-12). cacheReadInputTokens
+  // is the daily total of tokens served from Anthropic's prompt cache
+  // (90% cheaper than fresh input). cacheCreationInputTokens is the
+  // daily total of tokens written into the cache by `cache_control`
+  // breakpoints. Hit rate = cacheRead / (tokensIn + cacheRead).
+  cacheReadInputTokens     BigInt @default(0)
+  cacheCreationInputTokens BigInt @default(0)
 }
 
 // Stripe-style idempotency for POST /api/ai/attachments.

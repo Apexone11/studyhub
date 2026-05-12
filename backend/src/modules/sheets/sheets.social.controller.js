@@ -15,6 +15,7 @@ const { timedSection, logTiming } = require('../../lib/requestTiming')
 const { commentReactLimiter } = require('../../lib/rateLimiters')
 const { normalizeCommentGifAttachments } = require('../../lib/commentGifAttachments')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
+const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
 
 const router = express.Router()
 
@@ -83,6 +84,15 @@ router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
         sheetId,
         linkPath: `/sheets/${sheetId}`,
       })
+      // Achievements V2 — emit STAR_RECEIVED for the sheet's author. Only on
+      // newly-created stars, not on the un-star (delete) branch, so toggling
+      // doesn't double-count.
+      if (visibility.userId && visibility.userId !== userId) {
+        void emitAchievementEvent(prisma, visibility.userId, EVENT_KINDS.STAR_RECEIVED, {
+          sheetId,
+          actorId: userId,
+        })
+      }
     }
 
     return res.json({ stars: starCount, starred: Boolean(currentStar) })

@@ -15,6 +15,7 @@ import { API } from '../../config'
 import { authHeaders, FONT } from './adminConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { showToast } from '../../lib/toast'
+import { Skeleton } from '../../components/Skeleton'
 
 const TIERS = ['all', 'pro', 'institution']
 const STATUSES = ['all', 'waiting', 'invited', 'converted', 'removed']
@@ -71,10 +72,10 @@ export default function WaitlistTab() {
   }, [])
 
   useEffect(() => {
-    loadEntries()
+    Promise.resolve().then(loadEntries)
   }, [loadEntries])
   useEffect(() => {
-    loadStats()
+    Promise.resolve().then(loadStats)
   }, [loadStats])
 
   async function handleInvite(id) {
@@ -302,11 +303,36 @@ export default function WaitlistTab() {
 
       {/* Table */}
       {loading ? (
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13, padding: 16 }}>Loading...</div>
+        <div style={{ display: 'grid', gap: 8, padding: 8 }} aria-busy="true" aria-live="polite">
+          <span className="sr-only">Loading waitlist entries…</span>
+          {Array.from({ length: 6 }).map((_, i) => (
+            <Skeleton key={i} width="100%" height={44} borderRadius={10} />
+          ))}
+        </div>
       ) : null}
       {!loading && entries.length === 0 ? (
-        <div style={{ textAlign: 'center', padding: 40, color: 'var(--sh-muted)' }}>
-          No entries match your filters.
+        <div
+          style={{
+            textAlign: 'center',
+            padding: '40px 24px',
+            borderRadius: 12,
+            background: 'var(--sh-soft)',
+            border: '1px dashed var(--sh-border)',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: 'var(--sh-heading)',
+              marginBottom: 4,
+            }}
+          >
+            No waitlist entries match
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>
+            Try a different tier, status, or clear the search to see every waitlist signup.
+          </div>
         </div>
       ) : null}
 

@@ -19,7 +19,11 @@ const {
 const { serializeContribution } = require('./sheets.serializer')
 const { computeChecksum } = require('../sheetLab/sheetLab.constants')
 const { trackActivity } = require('../../lib/activityTracker')
-const { checkAndAwardBadgesLegacy: checkAndAwardBadges } = require('../achievements')
+const {
+  checkAndAwardBadgesLegacy: checkAndAwardBadges,
+  emitAchievementEvent,
+  EVENT_KINDS,
+} = require('../achievements')
 const { withPreviewText } = require('../../lib/sheets/applyContentUpdate')
 
 const router = express.Router()
@@ -170,6 +174,56 @@ router.patch(
       trackActivity(prisma, req.user.userId, 'reviews')
       checkAndAwardBadges(prisma, req.user.userId)
 
+      // Achievements V2 — emit typed review/contribution events. The reviewer
+      // always gets REVIEW_SUBMIT; if the review landed within 24h of the
+      // contribution being created, REVIEW_FAST fires too (fast-reviewer
+      // badge). On accept the proposer gets CONTRIBUTION_ACCEPT, and
+      // CONTRIBUTION_PERFECT fires when there is no review comment (proxy
+      // for "zero requested changes" per the perfect-pr badge spec).
+      // Reject has no corresponding EVENT_KINDS entry in the engine today;
+      // the rejection notification still fires below.
+      const reviewedAt = new Date()
+      const submittedAt = contribution.createdAt
+      const isFastReview =
+        submittedAt instanceof Date &&
+        reviewedAt.getTime() - submittedAt.getTime() <= 24 * 60 * 60 * 1000
+      void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.REVIEW_SUBMIT, {
+        contributionId: contribution.id,
+        sheetId: contribution.targetSheet.id,
+        action,
+      })
+      if (isFastReview) {
+        void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.REVIEW_FAST, {
+          contributionId: contribution.id,
+          sheetId: contribution.targetSheet.id,
+        })
+      }
+      if (action === 'accept') {
+        void emitAchievementEvent(
+          prisma,
+          contribution.proposer.id,
+          EVENT_KINDS.CONTRIBUTION_ACCEPT,
+          {
+            contributionId: contribution.id,
+            sheetId: contribution.targetSheet.id,
+            reviewerId: req.user.userId,
+          },
+        )
+        // perfect-pr — accepted with zero requested changes (no review comment).
+        if (!reviewComment) {
+          void emitAchievementEvent(
+            prisma,
+            contribution.proposer.id,
+            EVENT_KINDS.CONTRIBUTION_PERFECT,
+            {
+              contributionId: contribution.id,
+              sheetId: contribution.targetSheet.id,
+              reviewerId: req.user.userId,
+            },
+          )
+        }
+      }
+
       await createNotification(prisma, {
         userId: contribution.proposer.id,
         type: 'contribution',
@@ -217,6 +271,7 @@ router.post(
           title: true,
           userId: true,
           forkOf: true,
+          createdAt: true,
         },
       })
 
@@ -279,6 +334,26 @@ router.post(
         sheetId: targetSheet.id,
         linkPath: `/sheets/${targetSheet.id}`,
       })
+
+      // Achievements V2 — emit CONTRIBUTION_SUBMIT for the proposer. If the
+      // contribution was opened within an hour of forking, also fire
+      // CONTRIBUTION_QUICKDRAW (quickdraw badge spec).
+      const submittedAt = new Date()
+      void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.CONTRIBUTION_SUBMIT, {
+        contributionId: contribution.id,
+        sheetId: targetSheet.id,
+        forkSheetId,
+      })
+      if (
+        forkSheet.createdAt instanceof Date &&
+        submittedAt.getTime() - forkSheet.createdAt.getTime() <= 60 * 60 * 1000
+      ) {
+        void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.CONTRIBUTION_QUICKDRAW, {
+          contributionId: contribution.id,
+          sheetId: targetSheet.id,
+          forkSheetId,
+        })
+      }
 
       res.status(201).json({ contribution: serializeContribution(contribution) })
     } catch (error) {

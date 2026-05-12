@@ -21,6 +21,7 @@
 const prisma = require('./prisma')
 const { captureError } = require('../monitoring/sentry')
 const { logModerationEvent } = require('./moderation/moderationLogger')
+const { runWithHeartbeat } = require('./jobs/heartbeat')
 
 /* ── Configuration ──────────────────────────────────────────── */
 
@@ -68,7 +69,7 @@ function getRecentCount(userId, actionType) {
 }
 
 // Periodic cleanup of stale entries
-setInterval(() => {
+function pruneRateBuckets() {
   if (rateBuckets.size <= MAX_BUCKET_SIZE) return
   const cutoff = Date.now() - RATE_WINDOW_MS
   for (const [key, timestamps] of rateBuckets) {
@@ -79,6 +80,10 @@ setInterval(() => {
       rateBuckets.set(key, recent)
     }
   }
+}
+
+setInterval(() => {
+  runWithHeartbeat('abuse_detection.prune_rate_buckets', pruneRateBuckets, { slaMs: 5_000 })
 }, PRUNE_INTERVAL_MS).unref()
 
 /* ── Spam fingerprinting ───────────────────────────────────── */

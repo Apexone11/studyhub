@@ -1,4 +1,5 @@
 const prisma = require('../prisma')
+const log = require('../logger')
 
 /**
  * Write a moderation audit log entry.
@@ -45,7 +46,10 @@ async function logModerationEvent({
     })
   } catch (err) {
     // Best-effort — never throw from logger
-    console.error('[moderation-log] Failed to write log entry:', err.message)
+    log.error(
+      { event: 'moderation_log.write_failed', err: err?.message || String(err) },
+      'Failed to write moderation log entry',
+    )
   }
 }
 

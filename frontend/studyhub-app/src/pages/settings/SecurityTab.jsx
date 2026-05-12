@@ -7,6 +7,8 @@ import LoginActivitySection from './LoginActivitySection'
 import SecurityAlertsSection from './SecurityAlertsSection'
 import PanicSection from './PanicSection'
 import RecoveryCodesSection from './RecoveryCodesSection'
+import SubmitSpinner from '../../components/SubmitSpinner'
+import { useFormValidation } from '../../lib/useFormValidation'
 import {
   googleLinkedBadgeStyle,
   googleOnlyHintStyle,
@@ -33,6 +35,10 @@ export default function SecurityTab({
   const [passwordMsg, setPasswordMsg] = useState(null)
   const [usernameMsg, setUsernameMsg] = useState(null)
   const [googleMsg, setGoogleMsg] = useState(null)
+
+  const passwordValidation = useFormValidation()
+  const usernameValidation = useFormValidation()
+  const googleUnlinkValidation = useFormValidation()
 
   const isGoogleOnly = user?.authProvider === 'google'
   const [showGooglePopup, setShowGooglePopup] = useState(false)
@@ -68,9 +74,11 @@ export default function SecurityTab({
 
   async function handleGoogleUnlink() {
     if (!googleUnlinkPassword) {
-      setGoogleMsg({ type: 'error', text: 'Enter your password to unlink Google.' })
+      googleUnlinkValidation.setFieldError('password', 'Enter your password to unlink Google.')
+      googleUnlinkValidation.focusFirstError({ password: 'required' })
       return
     }
+    googleUnlinkValidation.resetErrors()
     setBusyKey('google-unlink')
     setGoogleMsg(null)
 
@@ -105,35 +113,78 @@ export default function SecurityTab({
           title="Change Password"
           subtitle="Use a password with at least 8 characters, one capital letter, and one number."
         >
-          <FormField label="Current Password">
+          <FormField
+            label="Current Password"
+            error={passwordValidation.errors.currentPassword}
+            errorId="pw-current-error"
+          >
             <Input
+              id="pw-current"
               type="password"
+              {...passwordValidation.getFieldProps('currentPassword', { id: 'pw-current' })}
               value={passwordForm.currentPassword}
-              onChange={(e) => setPasswordForm((c) => ({ ...c, currentPassword: e.target.value }))}
+              onChange={(e) => {
+                setPasswordForm((c) => ({ ...c, currentPassword: e.target.value }))
+                passwordValidation.clearFieldError('currentPassword')
+              }}
             />
           </FormField>
-          <FormField label="New Password">
+          <FormField
+            label="New Password"
+            error={passwordValidation.errors.newPassword}
+            errorId="pw-new-error"
+          >
             <Input
+              id="pw-new"
               type="password"
+              {...passwordValidation.getFieldProps('newPassword', { id: 'pw-new' })}
               value={passwordForm.newPassword}
-              onChange={(e) => setPasswordForm((c) => ({ ...c, newPassword: e.target.value }))}
+              onChange={(e) => {
+                setPasswordForm((c) => ({ ...c, newPassword: e.target.value }))
+                passwordValidation.clearFieldError('newPassword')
+              }}
             />
           </FormField>
-          <FormField label="Confirm New Password">
+          <FormField
+            label="Confirm New Password"
+            error={passwordValidation.errors.confirmPassword}
+            errorId="pw-confirm-error"
+          >
             <Input
+              id="pw-confirm"
               type="password"
+              {...passwordValidation.getFieldProps('confirmPassword', { id: 'pw-confirm' })}
               value={passwordForm.confirmPassword}
-              onChange={(e) => setPasswordForm((c) => ({ ...c, confirmPassword: e.target.value }))}
+              onChange={(e) => {
+                setPasswordForm((c) => ({ ...c, confirmPassword: e.target.value }))
+                passwordValidation.clearFieldError('confirmPassword')
+              }}
             />
           </FormField>
           <MsgList msg={passwordMsg} />
           <Button
             disabled={busyKey === 'password'}
             onClick={() => {
-              if (passwordForm.newPassword !== passwordForm.confirmPassword) {
-                setPasswordMsg({ type: 'error', text: 'New passwords do not match.' })
+              const nextErrors = {}
+              if (!passwordForm.currentPassword)
+                nextErrors.currentPassword = 'Enter your current password.'
+              if (!passwordForm.newPassword) nextErrors.newPassword = 'Choose a new password.'
+              else if (passwordForm.newPassword.length < 8)
+                nextErrors.newPassword = 'Password must be at least 8 characters.'
+              if (!passwordForm.confirmPassword)
+                nextErrors.confirmPassword = 'Re-enter the new password.'
+              else if (
+                passwordForm.newPassword &&
+                passwordForm.newPassword !== passwordForm.confirmPassword
+              )
+                nextErrors.confirmPassword = 'New passwords do not match.'
+              if (Object.keys(nextErrors).length > 0) {
+                passwordValidation.setErrors(nextErrors)
+                passwordValidation.focusFirstError(nextErrors)
+                setPasswordMsg(null)
                 return
               }
+              passwordValidation.resetErrors()
               void handlePatch(
                 'password',
                 {
@@ -147,7 +198,8 @@ export default function SecurityTab({
               )
             }}
           >
-            {busyKey === 'password' ? 'Saving...' : 'Update Password'}
+            {busyKey === 'password' && <SubmitSpinner label="Saving" />}
+            {busyKey === 'password' ? 'Saving…' : 'Update Password'}
           </Button>
         </SectionCard>
       )}
@@ -163,29 +215,59 @@ export default function SecurityTab({
           </Message>
         ) : (
           <>
-            <FormField label="New Username">
+            <FormField
+              label="New Username"
+              error={usernameValidation.errors.newUsername}
+              errorId="username-new-error"
+            >
               <Input
+                id="username-new"
+                {...usernameValidation.getFieldProps('newUsername', { id: 'username-new' })}
                 value={usernameForm.newUsername}
-                onChange={(e) => setUsernameForm((c) => ({ ...c, newUsername: e.target.value }))}
+                onChange={(e) => {
+                  setUsernameForm((c) => ({ ...c, newUsername: e.target.value }))
+                  usernameValidation.clearFieldError('newUsername')
+                }}
               />
             </FormField>
-            <FormField label="Confirm with Password">
+            <FormField
+              label="Confirm with Password"
+              error={usernameValidation.errors.password}
+              errorId="username-pw-error"
+            >
               <Input
+                id="username-pw"
                 type="password"
+                {...usernameValidation.getFieldProps('password', { id: 'username-pw' })}
                 value={usernameForm.password}
-                onChange={(e) => setUsernameForm((c) => ({ ...c, password: e.target.value }))}
+                onChange={(e) => {
+                  setUsernameForm((c) => ({ ...c, password: e.target.value }))
+                  usernameValidation.clearFieldError('password')
+                }}
               />
             </FormField>
             <MsgList msg={usernameMsg} />
             <Button
               disabled={busyKey === 'username'}
-              onClick={() =>
+              onClick={() => {
+                const nextErrors = {}
+                if (!usernameForm.newUsername.trim())
+                  nextErrors.newUsername = 'Enter a new username.'
+                if (!usernameForm.password)
+                  nextErrors.password = 'Confirm with your current password.'
+                if (Object.keys(nextErrors).length > 0) {
+                  usernameValidation.setErrors(nextErrors)
+                  usernameValidation.focusFirstError(nextErrors)
+                  return
+                }
+                usernameValidation.resetErrors()
                 void handlePatch('username', usernameForm, setUsernameMsg, () => {
                   setUsernameForm({ newUsername: '', password: '' })
                 })
-              }
+              }}
             >
-              {busyKey === 'username' ? 'Saving...' : 'Update Username'}
+              {busyKey === 'username' && <SubmitSpinner label="Saving" />}
+              {busyKey === 'username' ? 'Saving…' : 'Update Username'}
             </Button>
           </>
         )}
@@ -208,11 +290,22 @@ export default function SecurityTab({
               </div>
               {user.authProvider !== 'google' && (
                 <>
-                  <FormField label="Confirm with Password">
+                  <FormField
+                    label="Confirm with Password"
+                    error={googleUnlinkValidation.errors.password}
+                    errorId="google-unlink-error"
+                  >
                     <Input
+                      id="google-unlink-pw"
                       type="password"
+                      {...googleUnlinkValidation.getFieldProps('password', {
+                        id: 'google-unlink-pw',
+                      })}
                       value={googleUnlinkPassword}
-                      onChange={(e) => setGoogleUnlinkPassword(e.target.value)}
+                      onChange={(e) => {
+                        setGoogleUnlinkPassword(e.target.value)
+                        googleUnlinkValidation.clearFieldError('password')
+                      }}
                       placeholder="Enter your password to unlink"
                     />
                   </FormField>
@@ -221,7 +314,8 @@ export default function SecurityTab({
                     disabled={busyKey === 'google-unlink' || !googleUnlinkPassword}
                     onClick={handleGoogleUnlink}
                   >
-                    {busyKey === 'google-unlink' ? 'Unlinking...' : 'Unlink Google'}
+                    {busyKey === 'google-unlink' && <SubmitSpinner label="Unlinking" />}
+                    {busyKey === 'google-unlink' ? 'Unlinking…' : 'Unlink Google'}
                   </Button>
                 </>
               )}

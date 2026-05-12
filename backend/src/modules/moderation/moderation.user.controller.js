@@ -1,6 +1,7 @@
 const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
+const log = require('../../lib/logger')
 const {
   countActiveStrikes,
   hasActiveRestriction,
@@ -434,7 +435,10 @@ router.get('/my-log', async (req, res) => {
     ])
     res.json({ items, page, totalPages: Math.ceil(total / limit) || 1 })
   } catch (err) {
-    console.error('[moderation] Failed to load user log:', err.message)
+    log.error(
+      { event: 'moderation.user_log_load_failed', err: err?.message || String(err) },
+      'Failed to load moderation history for user',
+    )
     res.status(500).json({ error: 'Failed to load history.' })
   }
 })

@@ -115,150 +115,164 @@ async function fetchTriageBand(userId, excludedUserIds) {
   const items = []
   const now = new Date()
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+  const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
   const notExcluded =
     excludedUserIds.length > 0 ? { NOT: [{ userId: { in: excludedUserIds } }] } : {}
   const authorNotExcluded =
     excludedUserIds.length > 0 ? { NOT: [{ id: { in: excludedUserIds } }] } : {}
 
-  // 1. Stars on user's sheets (recent)
-  try {
-    const recentStars = await prisma.starredSheet.findMany({
-      where: {
-        sheet: { userId },
-        ...notExcluded,
-      },
-      take: 3,
-      orderBy: { sheetId: 'desc' }, // StarredSheet has no createdAt, so approximate
-      include: {
-        sheet: {
-          select: {
-            id: true,
-            title: true,
-            stars: true,
-            forks: true,
-            createdAt: true,
+  // Parallelize the four independent sections. Each section is wrapped
+  // in its own try/catch so a single failed query degrades to an empty
+  // contribution instead of taking down the whole band. Promise.all is
+  // safe because every block returns an array (possibly empty) — there
+  // is nothing for Promise.allSettled to guard against here.
+  const [recentStars, newFollowers, upcomingSessions, freshSheets] = await Promise.all([
+    // 1. Stars on user's sheets (recent)
+    (async () => {
+      try {
+        return await prisma.starredSheet.findMany({
+          where: {
+            sheet: { userId },
+            ...notExcluded,
+          },
+          take: 3,
+          orderBy: { sheetId: 'desc' }, // StarredSheet has no createdAt, so approximate
+          include: {
+            sheet: {
+              select: {
+                id: true,
+                title: true,
+                stars: true,
+                forks: true,
+                createdAt: true,
+                course: { select: { code: true } },
+              },
+            },
+            user: { select: { id: true, username: true, avatarUrl: true } },
+          },
+        })
+      } catch {
+        return []
+      }
+    })(),
+
+    // 2. New followers
+    (async () => {
+      try {
+        return await prisma.userFollow.findMany({
+          where: {
+            followingId: userId,
+            status: 'active',
+            createdAt: { gte: oneDayAgo },
+            follower: authorNotExcluded,
+          },
+          take: 2,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            follower: { select: { id: true, username: true, avatarUrl: true } },
+          },
+        })
+      } catch {
+        return []
+      }
+    })(),
+
+    // 3. Upcoming study sessions (within next hour) — chained: need group
+    // membership before the session query, so the inner pair stays
+    // sequential while the outer block runs in parallel with 1/2/4.
+    (async () => {
+      try {
+        const memberGroups = await prisma.studyGroupMember.findMany({
+          where: { userId, status: 'active' },
+          select: { groupId: true },
+        })
+        const groupIds = memberGroups.map((m) => m.groupId)
+        if (groupIds.length === 0) return []
+        return await prisma.groupSession.findMany({
+          where: {
+            groupId: { in: groupIds },
+            scheduledAt: { gte: now, lte: oneHourFromNow },
+            status: 'upcoming',
+          },
+          take: 2,
+          orderBy: { scheduledAt: 'asc' },
+          include: {
+            group: { select: { id: true, name: true } },
+          },
+        })
+      } catch {
+        return []
+      }
+    })(),
+
+    // 4. Fresh content from followed users — same chain pattern: list
+    // followees first, then fetch their fresh sheets.
+    (async () => {
+      try {
+        const followedUsers = await prisma.userFollow.findMany({
+          where: { followerId: userId, status: 'active' },
+          select: { followingId: true },
+        })
+        const followedIds = followedUsers
+          .map((f) => f.followingId)
+          .filter((id) => !excludedUserIds.includes(id))
+        if (followedIds.length === 0) return []
+        return await prisma.studySheet.findMany({
+          where: {
+            userId: { in: followedIds },
+            status: 'published',
+            createdAt: { gte: oneDayAgo },
+          },
+          take: 2,
+          orderBy: { createdAt: 'desc' },
+          include: {
+            author: { select: { id: true, username: true, avatarUrl: true } },
             course: { select: { code: true } },
           },
-        },
-        user: { select: { id: true, username: true, avatarUrl: true } },
-      },
-    })
-
-    for (const star of recentStars) {
-      items.push({
-        type: 'sheet',
-        id: star.sheet.id,
-        createdAt: star.sheet.createdAt,
-        author: authorShape(star.user),
-        payload: sheetPayload(star.sheet),
-      })
-    }
-  } catch {
-    // graceful
-  }
-
-  // 2. New followers
-  try {
-    const newFollowers = await prisma.userFollow.findMany({
-      where: {
-        followingId: userId,
-        status: 'active',
-        createdAt: { gte: oneDayAgo },
-        follower: authorNotExcluded,
-      },
-      take: 2,
-      orderBy: { createdAt: 'desc' },
-      include: {
-        follower: { select: { id: true, username: true, avatarUrl: true } },
-      },
-    })
-
-    for (const follow of newFollowers) {
-      items.push({
-        type: 'post',
-        id: follow.followerId,
-        createdAt: follow.createdAt,
-        author: authorShape(follow.follower),
-        payload: {
-          body: `${follow.follower.username} started following you`,
-          courseTag: null,
-          reactionCount: 0,
-          commentCount: 0,
-        },
-      })
-    }
-  } catch {
-    // graceful
-  }
-
-  // 3. Upcoming study sessions (within next hour)
-  try {
-    const oneHourFromNow = new Date(now.getTime() + 60 * 60 * 1000)
-    const memberGroups = await prisma.studyGroupMember.findMany({
-      where: { userId, status: 'active' },
-      select: { groupId: true },
-    })
-    const groupIds = memberGroups.map((m) => m.groupId)
-
-    if (groupIds.length > 0) {
-      const upcomingSessions = await prisma.groupSession.findMany({
-        where: {
-          groupId: { in: groupIds },
-          scheduledAt: { gte: now, lte: oneHourFromNow },
-          status: 'upcoming',
-        },
-        take: 2,
-        orderBy: { scheduledAt: 'asc' },
-        include: {
-          group: { select: { id: true, name: true } },
-        },
-      })
-
-      for (const session of upcomingSessions) {
-        items.push({
-          type: 'group_activity',
-          id: session.id,
-          createdAt: session.createdAt,
-          author: null,
-          payload: groupActivityPayload(session),
         })
+      } catch {
+        return []
       }
-    }
-  } catch {
-    // graceful
+    })(),
+  ])
+
+  for (const star of recentStars) {
+    items.push({
+      type: 'sheet',
+      id: star.sheet.id,
+      createdAt: star.sheet.createdAt,
+      author: authorShape(star.user),
+      payload: sheetPayload(star.sheet),
+    })
   }
 
-  // 4. Fresh content from followed users
-  try {
-    const followedUsers = await prisma.userFollow.findMany({
-      where: { followerId: userId, status: 'active' },
-      select: { followingId: true },
+  for (const follow of newFollowers) {
+    items.push({
+      type: 'post',
+      id: follow.followerId,
+      createdAt: follow.createdAt,
+      author: authorShape(follow.follower),
+      payload: {
+        body: `${follow.follower.username} started following you`,
+        courseTag: null,
+        reactionCount: 0,
+        commentCount: 0,
+      },
     })
-    const followedIds = followedUsers
-      .map((f) => f.followingId)
-      .filter((id) => !excludedUserIds.includes(id))
+  }
 
-    if (followedIds.length > 0) {
-      const freshSheets = await prisma.studySheet.findMany({
-        where: {
-          userId: { in: followedIds },
-          status: 'published',
-          createdAt: { gte: oneDayAgo },
-        },
-        take: 2,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          author: { select: { id: true, username: true, avatarUrl: true } },
-          course: { select: { code: true } },
-        },
-      })
+  for (const session of upcomingSessions) {
+    items.push({
+      type: 'group_activity',
+      id: session.id,
+      createdAt: session.createdAt,
+      author: null,
+      payload: groupActivityPayload(session),
+    })
+  }
 
-      for (const sheet of freshSheets) {
-        items.push(toFeedItem('sheet', sheet, sheetPayload(sheet)))
-      }
-    }
-  } catch {
-    // graceful
+  for (const sheet of freshSheets) {
+    items.push(toFeedItem('sheet', sheet, sheetPayload(sheet)))
   }
 
   // Sort by recency and cap at 5
@@ -274,29 +288,34 @@ async function fetchDiscoveryBand(userId, excludedUserIds, cursor, limit) {
   const notExcludedAuthor =
     excludedUserIds.length > 0 ? { NOT: [{ userId: { in: excludedUserIds } }] } : {}
 
-  // Get user's enrolled course IDs
-  let courseIds = []
-  try {
-    const enrollments = await prisma.enrollment.findMany({
-      where: { userId },
-      select: { courseId: true },
-    })
-    courseIds = enrollments.map((e) => e.courseId)
-  } catch {
-    // graceful
-  }
-
-  // Get followed user IDs
-  let followedIds = []
-  try {
-    const follows = await prisma.userFollow.findMany({
-      where: { followerId: userId, status: 'active' },
-      select: { followingId: true },
-    })
-    followedIds = follows.map((f) => f.followingId).filter((id) => !excludedUserIds.includes(id))
-  } catch {
-    // graceful
-  }
+  // Phase 1: fetch enrolled-course IDs and followed-user IDs in parallel.
+  // These two queries are fully independent — Promise.all halves the
+  // round-trip cost. Each is wrapped in its own catch so a single
+  // failure degrades to an empty array.
+  const [courseIds, followedIds] = await Promise.all([
+    (async () => {
+      try {
+        const enrollments = await prisma.enrollment.findMany({
+          where: { userId },
+          select: { courseId: true },
+        })
+        return enrollments.map((e) => e.courseId)
+      } catch {
+        return []
+      }
+    })(),
+    (async () => {
+      try {
+        const follows = await prisma.userFollow.findMany({
+          where: { followerId: userId, status: 'active' },
+          select: { followingId: true },
+        })
+        return follows.map((f) => f.followingId).filter((id) => !excludedUserIds.includes(id))
+      } catch {
+        return []
+      }
+    })(),
+  ])
 
   // Build OR conditions: from enrolled courses OR from followed users
   const orConditions = []
@@ -306,102 +325,105 @@ async function fetchDiscoveryBand(userId, excludedUserIds, cursor, limit) {
   // If user has no courses and follows nobody, show recent public content
   const hasFilters = orConditions.length > 0
 
-  // Fetch sheets
-  try {
-    const sheets = await prisma.studySheet.findMany({
-      where: {
-        status: 'published',
-        ...cursorFilter,
-        ...notExcludedAuthor,
-        ...(hasFilters ? { OR: orConditions } : {}),
-      },
-      take: Math.ceil(limit / 2),
-      orderBy: { createdAt: 'desc' },
-      include: {
-        author: { select: { id: true, username: true, avatarUrl: true } },
-        course: { select: { code: true } },
-      },
-    })
+  const postOrConditions = []
+  if (courseIds.length > 0) postOrConditions.push({ courseId: { in: courseIds } })
+  if (followedIds.length > 0) postOrConditions.push({ userId: { in: followedIds } })
 
-    for (const sheet of sheets) {
-      items.push(toFeedItem('sheet', sheet, sheetPayload(sheet)))
-    }
-  } catch {
-    // graceful
+  // Phase 2: fetch the four content types in parallel. Each is
+  // independent of the others (they all share the prefetched
+  // courseIds/followedIds but never read each other's results).
+  const [sheets, notes, posts, announcements] = await Promise.all([
+    (async () => {
+      try {
+        return await prisma.studySheet.findMany({
+          where: {
+            status: 'published',
+            ...cursorFilter,
+            ...notExcludedAuthor,
+            ...(hasFilters ? { OR: orConditions } : {}),
+          },
+          take: Math.ceil(limit / 2),
+          orderBy: { createdAt: 'desc' },
+          include: {
+            author: { select: { id: true, username: true, avatarUrl: true } },
+            course: { select: { code: true } },
+          },
+        })
+      } catch {
+        return []
+      }
+    })(),
+    (async () => {
+      try {
+        return await prisma.note.findMany({
+          where: {
+            private: false,
+            ...cursorFilter,
+            ...notExcludedAuthor,
+            ...(hasFilters ? { OR: orConditions } : {}),
+          },
+          take: Math.ceil(limit / 4),
+          orderBy: { createdAt: 'desc' },
+          include: {
+            author: { select: { id: true, username: true, avatarUrl: true } },
+            course: { select: { code: true } },
+            _count: { select: { noteStars: true } },
+          },
+        })
+      } catch {
+        return []
+      }
+    })(),
+    (async () => {
+      try {
+        return await prisma.feedPost.findMany({
+          where: {
+            moderationStatus: 'clean',
+            ...cursorFilter,
+            ...notExcludedAuthor,
+            ...(postOrConditions.length > 0 ? { OR: postOrConditions } : {}),
+          },
+          take: Math.ceil(limit / 4),
+          orderBy: { createdAt: 'desc' },
+          include: {
+            author: { select: { id: true, username: true, avatarUrl: true } },
+            course: { select: { code: true } },
+            _count: { select: { reactions: true, comments: true } },
+          },
+        })
+      } catch {
+        return []
+      }
+    })(),
+    (async () => {
+      try {
+        return await prisma.announcement.findMany({
+          where: {
+            ...cursorFilter,
+          },
+          take: Math.min(3, Math.ceil(limit / 6)),
+          orderBy: { createdAt: 'desc' },
+          include: {
+            author: { select: { id: true, username: true, avatarUrl: true } },
+          },
+        })
+      } catch {
+        return []
+      }
+    })(),
+  ])
+
+  for (const sheet of sheets) {
+    items.push(toFeedItem('sheet', sheet, sheetPayload(sheet)))
   }
-
-  // Fetch public notes
-  try {
-    const notes = await prisma.note.findMany({
-      where: {
-        private: false,
-        ...cursorFilter,
-        ...notExcludedAuthor,
-        ...(hasFilters ? { OR: orConditions } : {}),
-      },
-      take: Math.ceil(limit / 4),
-      orderBy: { createdAt: 'desc' },
-      include: {
-        author: { select: { id: true, username: true, avatarUrl: true } },
-        course: { select: { code: true } },
-        _count: { select: { noteStars: true } },
-      },
-    })
-
-    for (const note of notes) {
-      items.push(toFeedItem('note', note, notePayload(note)))
-    }
-  } catch {
-    // graceful
+  for (const note of notes) {
+    items.push(toFeedItem('note', note, notePayload(note)))
   }
-
-  // Fetch feed posts
-  try {
-    const postOrConditions = []
-    if (courseIds.length > 0) postOrConditions.push({ courseId: { in: courseIds } })
-    if (followedIds.length > 0) postOrConditions.push({ userId: { in: followedIds } })
-
-    const posts = await prisma.feedPost.findMany({
-      where: {
-        moderationStatus: 'clean',
-        ...cursorFilter,
-        ...notExcludedAuthor,
-        ...(postOrConditions.length > 0 ? { OR: postOrConditions } : {}),
-      },
-      take: Math.ceil(limit / 4),
-      orderBy: { createdAt: 'desc' },
-      include: {
-        author: { select: { id: true, username: true, avatarUrl: true } },
-        course: { select: { code: true } },
-        _count: { select: { reactions: true, comments: true } },
-      },
-    })
-
-    for (const post of posts) {
-      items.push(toFeedItem('post', post, postPayload(post)))
-    }
-  } catch {
-    // graceful
+  for (const post of posts) {
+    items.push(toFeedItem('post', post, postPayload(post)))
   }
-
-  // Fetch announcements
-  try {
-    const announcements = await prisma.announcement.findMany({
-      where: {
-        ...cursorFilter,
-      },
-      take: Math.min(3, Math.ceil(limit / 6)),
-      orderBy: { createdAt: 'desc' },
-      include: {
-        author: { select: { id: true, username: true, avatarUrl: true } },
-      },
-    })
-
-    for (const ann of announcements) {
-      items.push(toFeedItem('announcement', ann, announcementPayload(ann)))
-    }
-  } catch {
-    // graceful
+  for (const ann of announcements) {
+    items.push(toFeedItem('announcement', ann, announcementPayload(ann)))
   }
 
   // Sort all items by createdAt desc

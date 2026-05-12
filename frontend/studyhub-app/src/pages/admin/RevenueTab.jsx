@@ -6,6 +6,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState } from 'react'
 import { API } from '../../config'
+import { Skeleton } from '../../components/Skeleton'
 import { FONT, formatDateTime, tableHeadStyle, tableCell } from './adminConstants'
 
 const SECTION = {
@@ -126,8 +127,25 @@ export default function RevenueTab() {
 
   if (loading) {
     return (
-      <section style={SECTION}>
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading revenue data...</div>
+      <section style={SECTION} aria-busy="true" aria-live="polite">
+        <span className="sr-only">Loading revenue data…</span>
+        <div style={{ display: 'flex', gap: 14, flexWrap: 'wrap', marginBottom: 18 }}>
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton
+              key={i}
+              width={160}
+              height={88}
+              borderRadius={14}
+              style={{ flex: '1 1 0', minWidth: 160 }}
+            />
+          ))}
+        </div>
+        <Skeleton width="32%" height={18} borderRadius={6} style={{ marginBottom: 12 }} />
+        <div style={{ display: 'grid', gap: 8 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} width="100%" height={36} borderRadius={8} />
+          ))}
+        </div>
       </section>
     )
   }
@@ -136,16 +154,54 @@ export default function RevenueTab() {
     return (
       <section style={SECTION}>
         <div
+          role="alert"
           style={{
-            color: 'var(--sh-danger-text)',
             background: 'var(--sh-danger-bg)',
             border: '1px solid var(--sh-danger-border)',
             borderRadius: 12,
-            padding: '12px 14px',
-            fontSize: 13,
+            padding: '16px 18px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 14,
+            flexWrap: 'wrap',
           }}
         >
-          {error}
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div
+              style={{
+                fontSize: 14,
+                fontWeight: 700,
+                color: 'var(--sh-danger-text)',
+                marginBottom: 4,
+              }}
+            >
+              We could not load revenue data.
+            </div>
+            <div style={{ fontSize: 13, color: 'var(--sh-danger-text)', opacity: 0.85 }}>
+              {error}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              setError('')
+              setLoading(true)
+              window.location.reload()
+            }}
+            style={{
+              background: 'var(--sh-brand)',
+              color: 'var(--sh-btn-primary-text)',
+              border: 'none',
+              borderRadius: 8,
+              padding: '8px 16px',
+              fontSize: 13,
+              fontWeight: 700,
+              cursor: 'pointer',
+              fontFamily: FONT,
+            }}
+          >
+            Try again
+          </button>
         </div>
       </section>
     )

@@ -5,6 +5,8 @@ import { API } from '../../config'
 import { readJsonSafely } from '../../lib/http'
 import { resolveImageUrl } from '../../lib/imageUrls'
 import { Button, FormField, Input, Message, SectionCard, Select } from './settingsShared'
+import SubmitSpinner from '../../components/SubmitSpinner'
+import { useFormValidation } from '../../lib/useFormValidation'
 
 const DEFAULT_VISIBILITY = {
   displayName: 'public',
@@ -84,6 +86,7 @@ export default function ProfileTab({
   const [form, setForm] = useState(() => buildFormState(user))
   const [saving, setSaving] = useState(false)
   const [message, setMessage] = useState(null)
+  const profileValidation = useFormValidation()
   const avatarUrl = user?.avatarUrl || sessionUser?.avatarUrl
   const coverUrl = user?.coverImageUrl || sessionUser?.coverImageUrl
   const avatarImageUrl = resolveImageUrl(avatarUrl)
@@ -92,15 +95,15 @@ export default function ProfileTab({
   const initials = (user?.username || '??').slice(0, 2).toUpperCase()
 
   useEffect(() => {
-    setForm(buildFormState(user))
+    Promise.resolve().then(() => setForm(buildFormState(user)))
   }, [user])
 
   useEffect(() => {
-    setImgError(false)
+    Promise.resolve().then(() => setImgError(false))
   }, [avatarUrl])
 
   useEffect(() => {
-    setCoverImgError(false)
+    Promise.resolve().then(() => setCoverImgError(false))
   }, [coverUrl])
 
   async function handleRemoveCover() {
@@ -162,6 +165,22 @@ export default function ProfileTab({
   }
 
   async function handleSaveProfile() {
+    const nextErrors = {}
+    if (form.bio && form.bio.length > 500) nextErrors.bio = 'Bio must be 500 characters or fewer.'
+    if (form.age !== '' && form.age !== null) {
+      const ageNum = Number(form.age)
+      if (!Number.isInteger(ageNum) || ageNum < 13 || ageNum > 120)
+        nextErrors.age = 'Age must be a whole number between 13 and 120.'
+    }
+    if (form.displayName && form.displayName.length > 60)
+      nextErrors.displayName = 'Display name must be 60 characters or fewer.'
+    if (Object.keys(nextErrors).length > 0) {
+      profileValidation.setErrors(nextErrors)
+      profileValidation.focusFirstError(nextErrors)
+      setMessage(null)
+      return
+    }
+    profileValidation.resetErrors()
     setSaving(true)
     setMessage(null)
 
@@ -347,25 +366,42 @@ export default function ProfileTab({
       >
         {message && <Message tone={message.tone}>{message.text}</Message>}
 
-        <FormField label="Display Name" hint="Optional name shown alongside your username.">
+        <FormField
+          label="Display Name"
+          hint="Optional name shown alongside your username."
+          error={profileValidation.errors.displayName}
+          errorId="profile-displayName-error"
+        >
           <Input
+            id="profile-displayName"
+            {...profileValidation.getFieldProps('displayName', { id: 'profile-displayName' })}
             value={form.displayName}
             maxLength={60}
             placeholder="Your full name or nickname"
-            onChange={(event) => updateField('displayName', event.target.value)}
+            onChange={(event) => {
+              updateField('displayName', event.target.value)
+              profileValidation.clearFieldError('displayName')
+            }}
           />
         </FormField>
 
         <FormField
           label="Profile Description"
           hint="This description stays visible even when your account is private."
+          error={profileValidation.errors.bio}
+          errorId="profile-bio-error"
         >
           <textarea
+            id="profile-bio"
+            {...profileValidation.getFieldProps('bio', { id: 'profile-bio' })}
             value={form.bio}
             maxLength={500}
             rows={5}
             placeholder="Tell other students what you study, what you like to share, or what people can expect from your profile."
-            onChange={(event) => updateField('bio', event.target.value)}
+            onChange={(event) => {
+              updateField('bio', event.target.value)
+              profileValidation.clearFieldError('bio')
+            }}
             style={{
               width: '100%',
               padding: '12px 14px',
@@ -393,14 +429,21 @@ export default function ProfileTab({
           <FormField
             label="Age"
             hint="Optional and stored securely with your private profile data."
+            error={profileValidation.errors.age}
+            errorId="profile-age-error"
           >
             <Input
+              id="profile-age"
               type="number"
               min={13}
               max={120}
+              {...profileValidation.getFieldProps('age', { id: 'profile-age' })}
               value={form.age}
               placeholder="21"
-              onChange={(event) => updateField('age', event.target.value)}
+              onChange={(event) => {
+                updateField('age', event.target.value)
+                profileValidation.clearFieldError('age')
+              }}
             />
           </FormField>
 
@@ -494,7 +537,8 @@ export default function ProfileTab({
 
         <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
           <Button type="button" onClick={handleSaveProfile} disabled={saving}>
-            {saving ? 'Saving...' : 'Save Profile'}
+            {saving && <SubmitSpinner label="Saving" />}
+            {saving ? 'Saving…' : 'Save Profile'}
           </Button>
         </div>
       </SectionCard>

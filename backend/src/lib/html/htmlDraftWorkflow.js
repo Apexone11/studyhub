@@ -12,6 +12,7 @@ const {
   generateTierExplanation,
   groupFindingsByCategory,
 } = require('./htmlSecurity')
+const log = require('../logger')
 // sendHighRiskSheetAlert moved to sheetReviewer.service.js (escalate branch
 // only) per the AI-first review policy 2026-05-03.
 const { createNotification } = require('../notify')
@@ -289,7 +290,14 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
       sheet.title,
       sheet.description,
     ).catch((err) =>
-      console.error('[htmlDraftWorkflow] AI review failed for sheet', sheetId, err.message),
+      log.error(
+        {
+          event: 'html_draft.ai_review_failed',
+          sheetId,
+          err: err?.message || String(err),
+        },
+        'AI review failed for sheet',
+      ),
     )
   }
 

@@ -5,6 +5,8 @@ import { Button, FormField, Input, Message, MsgList, SectionCard } from './setti
 import { FONT } from './settingsState'
 import RoleTile from './RoleTile'
 import SetPasswordModal from './SetPasswordModal'
+import SubmitSpinner from '../../components/SubmitSpinner'
+import { useFormValidation } from '../../lib/useFormValidation'
 
 const DELETION_REASONS = [
   { value: 'better_platform', label: 'Found a better platform' },
@@ -44,6 +46,9 @@ export default function AccountTab({
 
   const [emailMsg, setEmailMsg] = useState(null)
   const [deleteMsg, setDeleteMsg] = useState(null)
+
+  const emailValidation = useFormValidation()
+  const deleteValidation = useFormValidation()
 
   // Google-signup users who never chose a password get a 409 +
   // PASSWORD_NOT_SET from delete-account / patch-email / patch-
@@ -136,14 +141,16 @@ export default function AccountTab({
   // SetPasswordModal success handler (Google users who set a password
   // mid-flow should land here automatically with the new password).
   async function submitDeleteAccount(form) {
-    if (!form.reason) {
-      setDeleteMsg({ type: 'error', text: 'Choose a reason for leaving.' })
+    const nextErrors = {}
+    if (!form.reason) nextErrors.reason = 'Choose a reason for leaving.'
+    if (!form.password) nextErrors.password = 'Confirm with your password.'
+    if (Object.keys(nextErrors).length > 0) {
+      deleteValidation.setErrors(nextErrors)
+      deleteValidation.focusFirstError(nextErrors)
+      setDeleteMsg(null)
       return
     }
-    if (!form.password) {
-      setDeleteMsg({ type: 'error', text: 'Confirm with your password.' })
-      return
-    }
+    deleteValidation.resetErrors()
 
     setBusyKey('delete-account')
     setDeleteMsg(null)
@@ -252,32 +259,58 @@ export default function AccountTab({
           </Message>
         )}
 
-        <FormField label="New Email">
+        <FormField label="New Email" error={emailValidation.errors.email} errorId="email-error">
           <Input
+            id="email"
             type="email"
+            {...emailValidation.getFieldProps('email', { id: 'email' })}
             value={emailForm.email}
-            onChange={(e) => setEmailForm((c) => ({ ...c, email: e.target.value }))}
+            onChange={(e) => {
+              setEmailForm((c) => ({ ...c, email: e.target.value }))
+              emailValidation.clearFieldError('email')
+            }}
             placeholder="you@example.com"
           />
         </FormField>
-        <FormField label="Confirm with Password">
+        <FormField
+          label="Confirm with Password"
+          error={emailValidation.errors.password}
+          errorId="email-password-error"
+        >
           <Input
+            id="email-password"
             type="password"
+            {...emailValidation.getFieldProps('password', { id: 'email-password' })}
             value={emailForm.password}
-            onChange={(e) => setEmailForm((c) => ({ ...c, password: e.target.value }))}
+            onChange={(e) => {
+              setEmailForm((c) => ({ ...c, password: e.target.value }))
+              emailValidation.clearFieldError('password')
+            }}
           />
         </FormField>
         <MsgList msg={emailMsg} />
         <Button
           disabled={busyKey === 'email'}
-          onClick={() =>
+          onClick={() => {
+            const nextErrors = {}
+            if (!emailForm.email.trim()) nextErrors.email = 'Enter your new email address.'
+            else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailForm.email.trim()))
+              nextErrors.email = 'Please enter a valid email address.'
+            if (!emailForm.password) nextErrors.password = 'Confirm with your current password.'
+            if (Object.keys(nextErrors).length > 0) {
+              emailValidation.setErrors(nextErrors)
+              emailValidation.focusFirstError(nextErrors)
+              return
+            }
+            emailValidation.resetErrors()
             void handlePatch('email', emailForm, setEmailMsg, () => {
               setEmailForm({ email: '', password: '' })
               setVerificationCode('')
             })
-          }
+          }}
         >
-          {busyKey === 'email' ? 'Updating...' : 'Start Email Update'}
+          {busyKey === 'email' && <SubmitSpinner label="Updating" />}
+          {busyKey === 'email' ? 'Updating…' : 'Start Email Update'}
         </Button>
 
         {user?.pendingEmailVerification && (
@@ -341,10 +374,19 @@ export default function AccountTab({
         subtitle="Deleting your account is permanent. Your sheets, notes, comments, and profile will be removed."
       >
         <form onSubmit={handleDeleteAccount}>
-          <FormField label="Reason for leaving">
+          <FormField
+            label="Reason for leaving"
+            error={deleteValidation.errors.reason}
+            errorId="delete-reason-error"
+          >
             <select
+              id="delete-reason"
+              {...deleteValidation.getFieldProps('reason', { id: 'delete-reason' })}
               value={deleteForm.reason}
-              onChange={(e) => setDeleteForm((c) => ({ ...c, reason: e.target.value }))}
+              onChange={(e) => {
+                setDeleteForm((c) => ({ ...c, reason: e.target.value }))
+                deleteValidation.clearFieldError('reason')
+              }}
               style={{
                 width: '100%',
                 padding: '10px 14px',
@@ -383,16 +425,26 @@ export default function AccountTab({
               }}
             />
           </FormField>
-          <FormField label="Confirm with Password">
+          <FormField
+            label="Confirm with Password"
+            error={deleteValidation.errors.password}
+            errorId="delete-password-error"
+          >
             <Input
+              id="delete-password"
               type="password"
+              {...deleteValidation.getFieldProps('password', { id: 'delete-password' })}
               value={deleteForm.password}
-              onChange={(e) => setDeleteForm((c) => ({ ...c, password: e.target.value }))}
+              onChange={(e) => {
+                setDeleteForm((c) => ({ ...c, password: e.target.value }))
+                deleteValidation.clearFieldError('password')
+              }}
             />
           </FormField>
           <MsgList msg={deleteMsg} />
           <Button danger type="submit" disabled={busyKey === 'delete-account'}>
-            {busyKey === 'delete-account' ? 'Deleting...' : 'Delete My Account'}
+            {busyKey === 'delete-account' && <SubmitSpinner label="Deleting" />}
+            {busyKey === 'delete-account' ? 'Deleting…' : 'Delete My Account'}
           </Button>
         </form>
       </SectionCard>

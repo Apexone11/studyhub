@@ -139,11 +139,20 @@ export default function ConsentLogTab() {
           </thead>
           <tbody>
             {loading && data.rows.length === 0 && (
-              <tr>
-                <td colSpan={5} className="admin-empty">
-                  Loading…
-                </td>
-              </tr>
+              <>
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={`sk-${i}`} aria-busy="true">
+                    {[120, 160, 80, 90, 60].map((w, j) => (
+                      <td key={j} style={{ padding: '10px 12px' }}>
+                        <div
+                          className="sh-skeleton"
+                          style={{ height: 12, width: w, borderRadius: 6 }}
+                        />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </>
             )}
             {!loading && data.rows.length === 0 && (
               <tr>

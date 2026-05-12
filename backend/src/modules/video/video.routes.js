@@ -92,13 +92,18 @@ async function flushBufferIfReady(r2Key, uploadId, state, force = false) {
 // than BUFFER_TTL_MS so active uploads are never disturbed.
 const BUFFER_TTL_MS = 30 * 60 * 1000
 const BUFFER_SWEEP_INTERVAL_MS = 5 * 60 * 1000
-setInterval(() => {
+
+function sweepUploadBuffers() {
   const now = Date.now()
   for (const [uploadId, state] of uploadBuffers.entries()) {
     if (now - (state.lastTouched || 0) > BUFFER_TTL_MS) {
       uploadBuffers.delete(uploadId)
     }
   }
+}
+
+setInterval(() => {
+  runWithHeartbeat('video.upload_buffer_sweep', sweepUploadBuffers, { slaMs: 5_000 })
 }, BUFFER_SWEEP_INTERVAL_MS).unref?.()
 
 // Multer for caption uploads only (small files, memory storage)
@@ -204,6 +209,15 @@ router.post('/upload/init', requireAuth, videoUploadInitLimiter, async (req, res
     // Validate inputs
     if (!fileName || !fileSize || !mimeType) {
       return res.status(400).json({ error: 'fileName, fileSize, and mimeType are required.' })
+    }
+
+    // A13: cap fileName length so it can't blow up the R2 key generator
+    // or whatever the client supplies to us. 255 matches the common
+    // POSIX/NTFS filename ceiling and is plenty for any real upload.
+    if (typeof fileName !== 'string' || fileName.length > 255) {
+      return res
+        .status(400)
+        .json({ error: 'fileName must be a string of 255 characters or fewer.' })
     }
 
     if (!ALLOWED_VIDEO_MIMES.has(mimeType)) {
@@ -858,6 +872,20 @@ router.post('/:id/captions', requireAuth, captionUpload.single('file'), async (r
     const { language, label } = req.body || {}
     if (!language || !label) {
       return res.status(400).json({ error: 'language and label are required.' })
+    }
+
+    // A13: VideoCaption.language is @db.VarChar(10) and BCP-47 codes
+    // never exceed ~12 chars; reject anything longer to avoid a
+    // P2000 column-overflow error from Prisma. `label` is the human
+    // readable name shown in the player track list and is unbounded
+    // TEXT in the schema, so cap it before the DB write.
+    if (typeof language !== 'string' || language.length > 10) {
+      return res
+        .status(400)
+        .json({ error: 'language must be a BCP-47 code of 10 characters or fewer.' })
+    }
+    if (typeof label !== 'string' || label.length > 80) {
+      return res.status(400).json({ error: 'label must be 80 characters or fewer.' })
     }
 
     if (!req.file) {

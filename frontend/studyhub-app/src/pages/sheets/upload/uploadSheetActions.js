@@ -468,7 +468,14 @@ export function useHandleSubmit({
 
         await uploadAttachment(data.id)
         setHasUnsavedChanges(false)
-        navigate(`/sheets/${data.id}`)
+        // `firstCreation` is set by the backend when count===1 after
+        // insert. We append `?celebrate=first_sheet` so the global
+        // FirstCreationCelebration listener can fire its toast after
+        // the redirect lands.
+        const dest = data?.firstCreation
+          ? `/sheets/${data.id}?celebrate=first_sheet`
+          : `/sheets/${data.id}`
+        navigate(dest)
       } catch (publishError) {
         setError(publishError.message || 'Failed to save sheet.')
       } finally {

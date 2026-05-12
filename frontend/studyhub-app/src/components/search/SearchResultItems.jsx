@@ -1,6 +1,7 @@
-import { IconSheets, IconNotes, IconUsers, IconSchool } from '../Icons'
+import { IconSheets, IconNotes, IconUsers, IconSchool, IconClock } from '../Icons'
 import UserAvatar from '../UserAvatar'
-import { Highlight, styles } from './searchModalConstants'
+import { Highlight, TypeChip } from './searchModalComponents'
+import { styles } from './searchModalConstants'
 
 function IconGroups({ size = 13 }) {
   return (
@@ -31,6 +32,33 @@ function handleResultKeyDown(e, action) {
   }
 }
 
+/** Format an ISO timestamp as a short relative stamp. */
+function shortTimeAgo(value) {
+  if (!value) return null
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000)
+  if (seconds < 60) return 'just now'
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`
+  if (seconds < 86400 * 30) return `${Math.floor(seconds / 86400)}d ago`
+  if (seconds < 86400 * 365) return `${Math.floor(seconds / (86400 * 30))}mo ago`
+  return `${Math.floor(seconds / (86400 * 365))}y ago`
+}
+
+function StampMeta({ value }) {
+  const stamp = shortTimeAgo(value)
+  if (!stamp) return null
+  return (
+    <span
+      style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
+      title={value ? new Date(value).toLocaleString() : undefined}
+    >
+      <IconClock size={11} /> {stamp}
+    </span>
+  )
+}
+
 export function SheetResults({ sheets, query, activeIndex, setActiveIndex, navigateToItem }) {
   if (sheets.length === 0) return null
   return (
@@ -41,6 +69,7 @@ export function SheetResults({ sheets, query, activeIndex, setActiveIndex, navig
       {sheets.map((sheet, i) => {
         const flatIdx = i
         const label = `${sheet.title}${sheet.course?.code ? `, ${sheet.course.code}` : ''}${sheet.author?.username ? `, by ${sheet.author.username}` : ''}`
+        const stamp = sheet.updatedAt || sheet.createdAt
         return (
           <div
             key={`s-${sheet.id}`}
@@ -58,12 +87,27 @@ export function SheetResults({ sheets, query, activeIndex, setActiveIndex, navig
             }
             onMouseEnter={() => setActiveIndex(flatIdx)}
           >
-            <div style={styles.resultTitle}>
-              <Highlight text={sheet.title} query={query} />
-            </div>
-            <div style={styles.resultMeta}>
-              {sheet.course?.code} &middot; by {sheet.author?.username}
-              {sheet.stars > 0 && <span> &middot; {sheet.stars} stars</span>}
+            <span style={styles.resultIcon} aria-hidden="true">
+              <IconSheets size={14} />
+            </span>
+            <div style={styles.resultBody}>
+              <div style={styles.resultTitle}>
+                <span style={styles.resultTitleText}>
+                  <Highlight text={sheet.title} query={query} />
+                </span>
+                <TypeChip label="Sheet" />
+              </div>
+              <div style={styles.resultMeta}>
+                {sheet.course?.code && <span>{sheet.course.code}</span>}
+                {sheet.author?.username && <span> &middot; by {sheet.author.username}</span>}
+                {sheet.stars > 0 && <span> &middot; {sheet.stars} stars</span>}
+                {stamp && (
+                  <>
+                    {' '}
+                    &middot; <StampMeta value={stamp} />
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )
@@ -89,6 +133,7 @@ export function NoteResults({
       {notes.map((note, i) => {
         const flatIdx = sheetsCount + i
         const label = `${note.title}${note.course?.code ? `, ${note.course.code}` : ''}${note.author?.username ? `, by ${note.author.username}` : ''}`
+        const stamp = note.updatedAt || note.createdAt
         return (
           <div
             key={`n-${note.id}`}
@@ -106,11 +151,26 @@ export function NoteResults({
             }
             onMouseEnter={() => setActiveIndex(flatIdx)}
           >
-            <div style={styles.resultTitle}>
-              <Highlight text={note.title} query={query} />
-            </div>
-            <div style={styles.resultMeta}>
-              {note.course?.code} &middot; by {note.author?.username}
+            <span style={styles.resultIcon} aria-hidden="true">
+              <IconNotes size={14} />
+            </span>
+            <div style={styles.resultBody}>
+              <div style={styles.resultTitle}>
+                <span style={styles.resultTitleText}>
+                  <Highlight text={note.title} query={query} />
+                </span>
+                <TypeChip label="Note" />
+              </div>
+              <div style={styles.resultMeta}>
+                {note.course?.code && <span>{note.course.code}</span>}
+                {note.author?.username && <span> &middot; by {note.author.username}</span>}
+                {stamp && (
+                  <>
+                    {' '}
+                    &middot; <StampMeta value={stamp} />
+                  </>
+                )}
+              </div>
             </div>
           </div>
         )
@@ -153,10 +213,18 @@ export function CourseResults({
             }
             onMouseEnter={() => setActiveIndex(flatIdx)}
           >
-            <div style={styles.resultTitle}>
-              <Highlight text={`${course.code} — ${course.name}`} query={query} />
+            <span style={styles.resultIcon} aria-hidden="true">
+              <IconSchool size={14} />
+            </span>
+            <div style={styles.resultBody}>
+              <div style={styles.resultTitle}>
+                <span style={styles.resultTitleText}>
+                  <Highlight text={`${course.code} — ${course.name}`} query={query} />
+                </span>
+                <TypeChip label="Course" />
+              </div>
+              <div style={styles.resultMeta}>{course.school?.name}</div>
             </div>
-            <div style={styles.resultMeta}>{course.school?.name}</div>
           </div>
         )
       })}
@@ -199,19 +267,22 @@ export function UserResults({
             }
             onMouseEnter={() => setActiveIndex(flatIdx)}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ flexShrink: 0 }} aria-hidden="true">
               <UserAvatar
                 username={user.username}
                 avatarUrl={user.avatarUrl}
                 role={user.role}
-                size={32}
+                size={28}
               />
-              <div>
-                <div style={styles.resultTitle}>
+            </span>
+            <div style={styles.resultBody}>
+              <div style={styles.resultTitle}>
+                <span style={styles.resultTitleText}>
                   <Highlight text={user.username} query={query} />
-                </div>
-                <div style={styles.resultMeta}>{user.role}</div>
+                </span>
+                <TypeChip label="User" />
               </div>
+              <div style={styles.resultMeta}>{user.role || 'student'}</div>
             </div>
           </div>
         )
@@ -238,7 +309,7 @@ export function GroupResults({
       </div>
       {groups.map((group, i) => {
         const flatIdx = sheetsCount + coursesCount + usersCount + i
-        const memberCount = group._count.members
+        const memberCount = group._count?.members ?? 0
         const label = `${group.name}, ${memberCount} member${memberCount !== 1 ? 's' : ''}${group.course?.code ? `, ${group.course.code}` : ''}`
         return (
           <div
@@ -257,12 +328,20 @@ export function GroupResults({
             }
             onMouseEnter={() => setActiveIndex(flatIdx)}
           >
-            <div style={styles.resultTitle}>
-              <Highlight text={group.name} query={query} />
-            </div>
-            <div style={styles.resultMeta}>
-              {memberCount} member{memberCount !== 1 ? 's' : ''}
-              {group.course?.code && <span> &middot; {group.course.code}</span>}
+            <span style={styles.resultIcon} aria-hidden="true">
+              <IconGroups size={14} />
+            </span>
+            <div style={styles.resultBody}>
+              <div style={styles.resultTitle}>
+                <span style={styles.resultTitleText}>
+                  <Highlight text={group.name} query={query} />
+                </span>
+                <TypeChip label="Group" />
+              </div>
+              <div style={styles.resultMeta}>
+                {memberCount} member{memberCount !== 1 ? 's' : ''}
+                {group.course?.code && <span> &middot; {group.course.code}</span>}
+              </div>
             </div>
           </div>
         )

@@ -12,6 +12,7 @@
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const { createNotification } = require('../../lib/notify')
+const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
 const {
   comprehensiveSimilarity,
   fingerprint,
@@ -367,6 +368,31 @@ async function resolveDispute({ disputeId, reviewerId, action }) {
       })
     }
   })
+
+  // Achievements V2 — when admin upholds the report (action === 'reject'),
+  // the plagiarism is "confirmed". The plagiarism-spotter / Sentinel badge
+  // is awarded to the owner of the original (matched) sheet, i.e. the
+  // person whose work was confirmed to have been copied. Fire-and-forget;
+  // the engine wraps its own body in try/catch. Done outside the
+  // transaction so a badge-write error never rolls back the resolution.
+  if (action !== 'accept') {
+    try {
+      const matched = await prisma.studySheet.findUnique({
+        where: { id: dispute.report.matchedSheetId },
+        select: { userId: true },
+      })
+      if (matched?.userId) {
+        void emitAchievementEvent(prisma, matched.userId, EVENT_KINDS.PLAGIARISM_CONFIRMED_REPORT, {
+          reportId: dispute.reportId,
+          sheetId: dispute.report.sheetId,
+          matchedSheetId: dispute.report.matchedSheetId,
+          reviewerId,
+        })
+      }
+    } catch (err) {
+      captureError(err, { source: 'resolveDispute.emitAchievement', disputeId })
+    }
+  }
 }
 
 module.exports = {

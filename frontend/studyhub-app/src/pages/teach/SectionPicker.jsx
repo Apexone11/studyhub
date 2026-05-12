@@ -116,12 +116,14 @@ export default function SectionPicker({
 
   useEffect(() => {
     if (!open) return
-    setSelectedSectionIds(new Set())
-    setDueAt('')
-    setInstructions('')
-    setNewSectionName('')
-    setResult(null)
-    loadSections()
+    Promise.resolve().then(() => {
+      setSelectedSectionIds(new Set())
+      setDueAt('')
+      setInstructions('')
+      setNewSectionName('')
+      setResult(null)
+      loadSections()
+    })
   }, [open, loadSections])
 
   if (!open) return null
@@ -257,7 +259,16 @@ export default function SectionPicker({
             <section style={styles.section}>
               <h3 style={styles.sectionTitle}>Sections</h3>
               {loading ? (
-                <p style={styles.muted}>Loading sections…</p>
+                <div style={{ display: 'grid', gap: 8 }} aria-busy="true" aria-live="polite">
+                  <span className="sr-only">Loading sections…</span>
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="sh-skeleton"
+                      style={{ height: 38, borderRadius: 10, width: '100%' }}
+                    />
+                  ))}
+                </div>
               ) : sections.length === 0 ? (
                 <form onSubmit={handleCreateSection} style={styles.createForm}>
                   <p style={styles.muted}>

@@ -4,6 +4,7 @@ const { sendForbidden } = require('../../lib/accessControl')
 const { sendCourseRequestNotice } = require('../../lib/email/email')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
+const log = require('../../lib/logger')
 const { writeLimiter } = require('../../lib/rateLimiters')
 const {
   POPULAR_THRESHOLD,
@@ -101,7 +102,10 @@ router.get('/recommendations', requireAuth, async (req, res) => {
       method: req.method,
     })
 
-    console.error(error)
+    log.error(
+      { event: 'courses.recommendations_failed', err: error?.message || String(error) },
+      'Failed to load course recommendations',
+    )
     return res.status(500).json({ error: 'Server error.' })
   }
 })
@@ -194,7 +198,13 @@ router.post('/request', requireAuth, writeLimiter, async (req, res) => {
         method: req.method,
         source: 'sendCourseRequestNotice',
       })
-      console.error('Course request notification failed:', emailError.message || 'unknown error')
+      log.error(
+        {
+          event: 'courses.request_notice_email_failed',
+          err: emailError?.message || 'unknown error',
+        },
+        'Course request notification email failed',
+      )
     }
 
     return res.status(201).json({
@@ -208,7 +218,10 @@ router.post('/request', requireAuth, writeLimiter, async (req, res) => {
       method: req.method,
     })
 
-    console.error('Course request failed:', error.message || 'unknown error')
+    log.error(
+      { event: 'courses.request_failed', err: error?.message || 'unknown error' },
+      'Course request failed',
+    )
     return res.status(500).json({ error: 'Server error.' })
   }
 })
@@ -235,7 +248,10 @@ router.get('/requested', requireAuth, async (req, res) => {
       method: req.method,
     })
 
-    console.error(error)
+    log.error(
+      { event: 'courses.requested_list_failed', err: error?.message || String(error) },
+      'Failed to load requested courses list',
+    )
     return res.status(500).json({ error: 'Server error.' })
   }
 })

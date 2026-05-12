@@ -12,6 +12,7 @@ import { API } from '../../config'
 import { authHeaders, FONT } from './adminConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { showToast } from '../../lib/toast'
+import { Skeleton } from '../../components/Skeleton'
 import { IconShield, IconLock } from '../../components/Icons'
 
 export default function SecurityTab() {
@@ -38,7 +39,7 @@ export default function SecurityTab() {
   }, [])
 
   useEffect(() => {
-    loadStats()
+    Promise.resolve().then(loadStats)
   }, [loadStats])
 
   async function handleUnlock(userId, username) {
@@ -58,8 +59,76 @@ export default function SecurityTab() {
   }
 
   if (loading)
-    return <div style={{ padding: 24, color: 'var(--sh-muted)' }}>Loading security stats...</div>
-  if (error) return <div style={{ padding: 24, color: 'var(--sh-danger)' }}>{error}</div>
+    return (
+      <section
+        style={{ fontFamily: FONT, display: 'grid', gap: 14, padding: 8 }}
+        aria-busy="true"
+        aria-live="polite"
+      >
+        <span className="sr-only">Loading security stats…</span>
+        <Skeleton width="40%" height={20} borderRadius={6} />
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+            gap: 10,
+          }}
+        >
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} width="100%" height={80} borderRadius={12} />
+          ))}
+        </div>
+        <Skeleton width="100%" height={140} borderRadius={12} />
+      </section>
+    )
+  if (error)
+    return (
+      <div
+        role="alert"
+        style={{
+          padding: '16px 18px',
+          borderRadius: 12,
+          background: 'var(--sh-danger-bg)',
+          border: '1px solid var(--sh-danger-border)',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 14,
+          flexWrap: 'wrap',
+          fontFamily: FONT,
+        }}
+      >
+        <div style={{ flex: 1, minWidth: 200 }}>
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: 'var(--sh-danger-text)',
+              marginBottom: 4,
+            }}
+          >
+            We could not load security stats.
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--sh-danger-text)', opacity: 0.85 }}>{error}</div>
+        </div>
+        <button
+          type="button"
+          onClick={loadStats}
+          style={{
+            background: 'var(--sh-brand)',
+            color: 'var(--sh-btn-primary-text)',
+            border: 'none',
+            borderRadius: 8,
+            padding: '8px 16px',
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: 'pointer',
+            fontFamily: FONT,
+          }}
+        >
+          Try again
+        </button>
+      </div>
+    )
   if (!data) return null
 
   const o = data.overview || {}

@@ -12,6 +12,43 @@ export const RULES = {
 }
 
 /* ── Account-field validation ──────────────────────────────────────────── */
+
+/**
+ * Per-field validation map. Returns `{ fieldName: message }` so the form can
+ * render inline `aria-invalid` errors next to each input. Empty object means
+ * the form is valid.
+ */
+export function validateAccountFieldsMap(form) {
+  const errors = {}
+  if (!form.username.trim()) errors.username = 'Please enter a username.'
+  else if (!RULES.username.test(form.username.trim()))
+    errors.username = 'Username must be 3-20 characters using letters, numbers, or underscores.'
+
+  if (!form.email.trim()) errors.email = 'Please enter your email.'
+  else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim()))
+    errors.email = 'Please enter a valid email address.'
+
+  if (!form.password) errors.password = 'Please choose a password.'
+  else if (!RULES.password.test(form.password))
+    errors.password =
+      'Password must be at least 8 characters and include a capital letter and a number.'
+
+  if (!form.confirmPassword) errors.confirmPassword = 'Re-enter your password.'
+  else if (form.password && form.password !== form.confirmPassword)
+    errors.confirmPassword = 'Passwords do not match.'
+
+  if (!form.termsAccepted)
+    errors.termsAccepted =
+      'You must accept the Terms of Use, Privacy Policy, and Community Guidelines.'
+
+  return errors
+}
+
+/**
+ * Legacy single-message validator. Returns the first violation's message or
+ * empty string. Kept for backward compatibility with existing tests and the
+ * banner alert in `RegisterScreen`.
+ */
 export function validateAccountFields(form) {
   if (!form.username.trim() || !form.email.trim() || !form.password || !form.confirmPassword) {
     return 'Please fill in all required fields.'

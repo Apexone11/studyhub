@@ -3,6 +3,7 @@ import UserAvatar from '../../../components/UserAvatar'
 import VerificationBadge from '../../../components/verification/VerificationBadge'
 import { IconFork, IconStar, IconArrowLeft } from '../../../components/Icons'
 import { FONT, statusPill, timeAgo } from './sheetViewerConstants'
+import { estimateSheetReadingMinutes } from '../sheetReadingTime'
 
 const STUDY_STATUS_COPY = {
   default: {
@@ -47,6 +48,11 @@ export default function SheetHeader({
   if (!sheet) return null
 
   const studyStatusDetails = STUDY_STATUS_COPY[studyStatus] || STUDY_STATUS_COPY.default
+  // Reading-time estimate (220 wpm, branches on contentFormat). 0 means
+  // we can't compute one — either the viewer payload didn't include the
+  // body text or it's a PDF / attachment-only sheet — so we hide the
+  // chip rather than render "0 min read".
+  const readMinutes = estimateSheetReadingMinutes(sheet)
 
   return (
     <div style={{ display: 'grid', gap: 10 }}>
@@ -180,6 +186,12 @@ export default function SheetHeader({
         <span style={{ color: 'var(--sh-muted)' }}>
           updated {timeAgo(sheet.updatedAt || sheet.createdAt)}
         </span>
+
+        {readMinutes > 0 ? (
+          <span style={{ color: 'var(--sh-muted)' }} aria-label={`${readMinutes} minute read`}>
+            {readMinutes} min read
+          </span>
+        ) : null}
       </div>
 
       {/* Fork relationship banner */}

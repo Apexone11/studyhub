@@ -158,11 +158,19 @@ async function recordActualUsage({
 }) {
   const date = todayUtcDate()
   try {
+    // Loop A7 (2026-05-12): persist the prompt-cache counters too so the
+    // admin AI cache-hit endpoint can read a single row per day instead
+    // of scanning AiUsageLog. These columns were added in migration
+    // 20260512000003_ai_cache_telemetry; older deploys without the
+    // migration will throw and fall into captureError — the per-user
+    // upsert below is unaffected.
     await prisma.$executeRaw`
       UPDATE "AiGlobalSpendDay"
       SET "tokensIn" = "tokensIn" + ${BigInt(tokensIn)},
           "tokensOut" = "tokensOut" + ${BigInt(tokensOut)},
-          "documentTokens" = "documentTokens" + ${BigInt(documentTokens)}
+          "documentTokens" = "documentTokens" + ${BigInt(documentTokens)},
+          "cacheReadInputTokens" = "cacheReadInputTokens" + ${BigInt(cacheReadInputTokens)},
+          "cacheCreationInputTokens" = "cacheCreationInputTokens" + ${BigInt(cacheCreationInputTokens)}
       WHERE "date" = ${date}
     `
   } catch (err) {

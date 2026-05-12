@@ -19,6 +19,10 @@ const readLimiter = sharingReadLimiter
 // ══════════════════════════════════════════════════════════════════════════
 
 // POST /api/sharing/links — Create a new share link
+// A13: cap the optional `password` length so the ShareLink.password TEXT
+// column never grows unbounded. 200 is generous for a passphrase while
+// keeping the comparison and the storage row predictable.
+const SHARE_LINK_PASSWORD_MAX = 200
 router.post('/links', requireAuth, mutateLimiter, async (req, res) => {
   const { contentType, contentId, permission, expiresAt, maxViews, password } = req.body
 
@@ -32,6 +36,17 @@ router.post('/links', requireAuth, mutateLimiter, async (req, res) => {
     }
     if (!['view', 'comment', 'edit'].includes(permission)) {
       return res.status(400).json({ error: 'permission must be "view", "comment", or "edit".' })
+    }
+    if (
+      password !== undefined &&
+      password !== null &&
+      (typeof password !== 'string' || password.length > SHARE_LINK_PASSWORD_MAX)
+    ) {
+      return res
+        .status(400)
+        .json({
+          error: `password must be a string of ${SHARE_LINK_PASSWORD_MAX} characters or fewer.`,
+        })
     }
 
     const contentIdInt = parseInt(contentId, 10)
@@ -257,12 +272,19 @@ router.get('/access/:token', optionalAuth, readLimiter, async (req, res) => {
       }
     }
 
-    // Fetch content
+    // Fetch content. Explicit `select` keeps the payload small — only the
+    // columns the response actually uses are fetched (StudySheet in
+    // particular has multi-kilobyte audit / scan / HTML columns this
+    // route never serializes).
     let content
     if (shareLink.contentType === 'sheet') {
       content = await prisma.studySheet.findUnique({
         where: { id: shareLink.contentId },
-        include: {
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          createdAt: true,
           author: { select: { id: true, username: true } },
           course: { select: { id: true, code: true } },
         },
@@ -270,7 +292,11 @@ router.get('/access/:token', optionalAuth, readLimiter, async (req, res) => {
     } else {
       content = await prisma.note.findUnique({
         where: { id: shareLink.contentId },
-        include: {
+        select: {
+          id: true,
+          title: true,
+          content: true,
+          createdAt: true,
           author: { select: { id: true, username: true } },
           course: { select: { id: true, code: true } },
         },
@@ -380,8 +406,13 @@ router.get('/access/:token/watermarked', optionalAuth, readLimiter, async (req, 
       return res.status(404).json({ error: `${shareLink.contentType} not found.` })
     }
 
-    // Generate watermark text
-    const createdDate = new Date(content.createdAt).toLocaleDateString()
+    // Generate watermark text. toLocaleDateString() without
+    // arguments would format using whatever locale + tz the Node
+    // process was started with — that's non-deterministic across
+    // Railway redeploys and renders unparseable formats for non-US
+    // viewers. Stamp the UTC ISO date (YYYY-MM-DD) so every viewer
+    // sees the same value regardless of where the server boots.
+    const createdDate = new Date(content.createdAt).toISOString().slice(0, 10)
     const watermarkMsg = `View Only - ${shareLink.createdBy.username} - ${createdDate}`
 
     // Increment view count

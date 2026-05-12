@@ -1,6 +1,7 @@
 const prisma = require('../prisma')
 const { logModerationEvent } = require('./moderationLogger')
 const log = require('../logger')
+const { runWithHeartbeat } = require('../jobs/heartbeat')
 
 let cleanupInterval = null
 
@@ -101,8 +102,12 @@ function startModerationCleanupScheduler() {
     }
   }
 
-  setTimeout(runCleanup, 30_000)
-  cleanupInterval = setInterval(runCleanup, intervalMs)
+  const wrappedCleanup = () =>
+    runWithHeartbeat('moderation.cleanup_snapshots', runCleanup, { slaMs: 60_000 })
+
+  const initialTimeout = setTimeout(wrappedCleanup, 30_000)
+  if (typeof initialTimeout.unref === 'function') initialTimeout.unref()
+  cleanupInterval = setInterval(wrappedCleanup, intervalMs)
   if (typeof cleanupInterval.unref === 'function') cleanupInterval.unref()
 }
 

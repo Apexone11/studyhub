@@ -163,7 +163,12 @@ export function useNotesData() {
 
   useEffect(() => {
     let active = true
-    loadNotes()
+    // Defer the initial load out of the effect's synchronous body so the
+    // React Compiler doesn't flag the setState-in-effect inside loadNotes.
+    // Pattern matches ConsentLogTab.jsx + NoteHighlightLayer.jsx.
+    Promise.resolve().then(() => {
+      if (active) loadNotes()
+    })
 
     // The rest of this effect fetches the course-school list; that one
     // doesn't need polling (course enrollments change rarely).
@@ -389,9 +394,18 @@ export function useNotesData() {
         showToast(errData.error || 'Failed to create note', 'error')
         return
       }
-      const note = normalizeNote(await response.json())
+      const raw = await response.json()
+      const note = normalizeNote(raw)
       setNotes((prev) => [note, ...prev])
       selectNote(note)
+      // `firstCreation` is set by the backend when the user's
+      // note count == 1 after the insert. Fire the celebration toast
+      // here directly — the notes page stays on the same URL after
+      // a create, so the `?celebrate=` redirect pattern used by
+      // sheets doesn't apply.
+      if (raw?.firstCreation) {
+        showToast('You created your first note!', 'success', 5000)
+      }
     } finally {
       setCreating(false)
     }

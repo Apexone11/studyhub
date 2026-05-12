@@ -17,6 +17,7 @@ const { extractPreviewText } = require('../../lib/sheets/extractPreviewText')
 const { getUserTier } = require('../../lib/getUserPlan')
 const { PLANS } = require('../payments/payments.constants')
 const { trackActivity } = require('../../lib/activityTracker')
+const { EVENTS, trackServerEvent } = require('../../lib/events')
 const { runAbuseChecks } = require('../../lib/abuseDetection')
 const {
   checkAndAwardBadgesLegacy: checkAndAwardBadges,
@@ -35,8 +36,12 @@ const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 
 router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
-  const { title, content, courseId, forkOf, description, allowDownloads } = req.body || {}
+  const { title, content, courseId, forkOf, description, allowDownloads, source } = req.body || {}
   const contentFormat = normalizeContentFormat(req.body?.contentFormat)
+  // Accept both `hub_ai` (engine canonical) and `hub-ai` (the frontend
+  // navigation-state marker emitted by AiSheetPreview) so a future client
+  // tweak that forwards `source` verbatim still triggers AI_PUBLISH_SHEET.
+  const isHubAiSource = typeof source === 'string' && /^hub[-_]ai$/i.test(source.trim())
   const nextStatus = resolveNextSheetStatus({
     requestedStatus: req.body?.status,
     contentFormat,
@@ -183,10 +188,41 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
         sheetId: sheet.id,
         courseId: sheet.courseId,
       })
+      // Achievements V2 — AI-authored publishes also emit AI_PUBLISH_SHEET so
+      // the ai-author badge unlocks. Same fire-and-forget semantics.
+      if (isHubAiSource) {
+        void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.AI_PUBLISH_SHEET, {
+          sheetId: sheet.id,
+          courseId: sheet.courseId,
+        })
+      }
+    }
+
+    // First-creation funnel event (Loop 5 finding F2). The count
+    // *after* the insert above is the authoritative "is this the
+    // user's first sheet" check — cheaper than a User.firstSheetAt
+    // column for v1. Surfaces a `firstCreation` flag on the response
+    // so the frontend can route into a celebration toast.
+    let firstCreation = false
+    try {
+      const sheetCount = await prisma.studySheet.count({
+        where: { userId: req.user.userId },
+      })
+      if (sheetCount === 1) {
+        firstCreation = true
+        trackServerEvent(req.user.userId, EVENTS.SHEET_FIRST_CREATED, {
+          sheetId: sheet.id,
+          status: sheet.status,
+          courseId: sheet.courseId,
+        })
+      }
+    } catch {
+      /* best effort — never block the create */
     }
 
     res.status(201).json({
       ...serializeSheet(sheet),
+      firstCreation,
       message:
         sheet.status === SHEET_STATUS.PENDING_REVIEW
           ? 'HTML sheet submitted for admin review.'

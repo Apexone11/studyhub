@@ -28,6 +28,29 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Cleanup + perf polish (2026-05-12 — Loop A18)
+
+- **Removed dead backend deps `file-type`, `domelementtype`, `domhandler`, `domutils`.** Loop 5 audit confirmed zero `require()` / `import` sites; only stale comment references remained. Backend package.json now declares 29 deps instead of 33.
+- **Stripped Termly CSP allowlist from `frontend/studyhub-app/public/_headers`.** Termly was removed 2026-04-30 (CLAUDE.md "Don't introduce a third-party iframe for legal docs / forms"); remaining `termly-display-preferences` references are CSS class names that load nothing. Dropped `*.termly.io` from `script-src`, `style-src`, `font-src`, `connect-src`, `frame-src`.
+- **Mobile feed parallelized.** `feed.mobile.controller.js` now issues the 4 triage-band queries and the 4 discovery-band content queries via `Promise.all` (with the courseIds/followedIds prefetch also parallelized). Closes Loop 3 P1 #13.
+- **5-min Cache-Control on stable read endpoints.** `/api/library/search` (5min), `/api/library/books/:volumeId` (10min), `/api/hashtags/catalog` (5min). Cuts repeat-hit cost on the signup / book-browse paths; private cache only per the Cloudflare/Vary caveat.
+- **Search modal UX polish (Loop P9).** Empty state now shows Recent searches (top 5 from localStorage, capped at 10) + course-aware Suggestions ("Try CS101 review sheet") + keyboard shortcut hints. Results gained type icons, type chips, relative last-updated stamps for sheets/notes, and bolded substring highlights. Tab cycles between Sheets / Courses / Users / Notes / Groups filter chips; ArrowUp/Down navigates rows including the empty-state lists. Loading state is a 5-row shimmer skeleton instead of "Searching…". Debounce 300ms → 250ms.
+- **Profile polish (Loop P8).** Inline click-to-edit bio with 500-char counter, save on blur or Ctrl/Cmd+Enter, Esc cancels — server-confirmed per CLAUDE.md A4. Owner can edit up to 4 https-only social links with platform-aware icons + safety badge for untrusted hosts; viewers see an icon row. 90-day contribution heatmap (was 12 weeks) with skeleton + empty state. Tabs: keyboard arrow-key nav, `aria-current="page"`, lazy-loaded panels that preserve internal state across re-entries.
+
+### Notification actor bundling (2026-05-12)
+
+- **The bell dropdown now bundles distinct starrers/forkers/followers into one row.** `GET /api/notifications` groups consecutive `star`, `fork`, `follow`, `follow_request` notifications that target the same sheet or link within a 24h window into a single row carrying `actors[]` (up to 3 avatars), `actorCount`, and `groupedIds`. Unread count now reports grouped rows. PATCH `/:id/read` and DELETE `/:id` accept `?groupedIds=...` to sweep the whole bundle. Closes Loop 4 finding F7.
+- **Dropdown UI shows stacked avatars + "Alice, Bob, and 3 others starred your sheet"** for grouped rows; single-actor rows render exactly as before. Click still navigates to the same target.
+
+### Admin AI cache-hit telemetry (2026-05-12)
+
+- **AI prompt-cache hit rate is now visible to admins.** New `GET /api/admin/ai/cache-stats?days=7` aggregates Anthropic prompt-cache reads vs. total input tokens from `AiGlobalSpendDay`; the admin Overview tab shows a 7-day weighted-average card with healthy/warning/danger bands (>=60% / 50-60% / <50%). Closes Research Loop 1 gap #2 — cache counters were captured but never persisted to the spend-day row, so we could not catch prompt-drift regressions that would silently break caching and ~10x daily spend.
+
+### Print-friendly sheets + notes (2026-05-12)
+
+- **Print stylesheet rewritten.** `@media print` now hides navbar, sidebar, AI bubble, toasts, modals, scroll-to-top, tutorials, footer, and any `.sh-no-print` element; forces white background + black ink; disables transitions/animations/shadows; pins `html, body` to 12pt; `h1, h2 { break-after: avoid-page }` and `pre, table, blockquote { break-inside: avoid }`; and the URL-dump `::after` only fires for explicit `http(s)://` links so internal anchors and route links print clean (matches Notion / Google Docs behavior).
+- **Print buttons.** SheetViewerPage and NoteViewerPage both render a small token-styled "Print" button (`window.print()`) at the end of their page header, isolated in its own `.sh-no-print` JSX block so 3-way merges with other in-flight viewer edits stay clean.
+
 ### Bot-review verification + Scholar sidebar parity (2026-05-04 night)
 
 - **Scholar runtime surfaces have been disabled in production.** Scholar backend routes and UI entry points have been removed so the feature no longer exposes `/api/scholar` or `/scholar` navigation paths in the live app.

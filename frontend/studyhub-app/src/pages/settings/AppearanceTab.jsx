@@ -6,6 +6,7 @@ import {
   writeGlobalTheme,
 } from '../../lib/appearance'
 import { useSession } from '../../lib/session-context'
+import { Skeleton } from '../../components/Skeleton'
 import { Button, FormField, MsgList, SectionCard, Select, ToggleRow } from './settingsShared'
 import { usePreferences } from './settingsState'
 
@@ -64,8 +65,14 @@ export default function AppearanceTab() {
 
   if (loading) {
     return (
-      <SectionCard title="Appearance">
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading preferences...</div>
+      <SectionCard title="Appearance" subtitle="Loading your display preferences…">
+        <div style={{ display: 'grid', gap: 10 }} aria-busy="true" aria-live="polite">
+          <span className="sr-only">Loading appearance preferences…</span>
+          <Skeleton width="40%" height={14} borderRadius={6} />
+          <Skeleton width="100%" height={40} borderRadius={10} />
+          <Skeleton width="40%" height={14} borderRadius={6} style={{ marginTop: 8 }} />
+          <Skeleton width="100%" height={40} borderRadius={10} />
+        </div>
       </SectionCard>
     )
   }

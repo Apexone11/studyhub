@@ -101,13 +101,17 @@ ${content}
     const noteMatch = opts.currentPage.match(/^\/notes\/(\d+)/)
     if (noteMatch) {
       try {
-        const note = await prisma.note.findFirst({
-          where: {
-            id: parseInt(noteMatch[1], 10),
-            OR: [{ userId }, { visibility: 'public' }],
-          },
-          select: { title: true, content: true, course: { select: { code: true } } },
-        })
+        const noteIdInt = Number.parseInt(noteMatch[1], 10)
+        const note =
+          Number.isInteger(noteIdInt) && noteIdInt > 0
+            ? await prisma.note.findFirst({
+                where: {
+                  id: noteIdInt,
+                  OR: [{ userId }, { private: false }],
+                },
+                select: { title: true, content: true, course: { select: { code: true } } },
+              })
+            : null
         if (note) {
           const content = (note.content || '').slice(0, 6000)
           sections.push(`<current_note>

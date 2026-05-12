@@ -80,6 +80,7 @@ const FocusTrapHarnessPage = import.meta.env.DEV
 
 import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
+import FirstCreationCelebration from './components/FirstCreationCelebration'
 import OfflineIndicator from './components/OfflineIndicator'
 import LegalAcceptanceEnforcementModal from './components/LegalAcceptanceEnforcementModal'
 import CookieConsentBanner from './components/CookieConsentBanner'
@@ -766,6 +767,7 @@ function AppRoutes() {
               </Suspense>
               <ScrollToTop />
               <ToastContainer />
+              <FirstCreationCelebration />
               <OfflineIndicator />
               {/* Achievements V2 — celebration modal for ?celebrate=:slug
                   fires globally so unlocks anywhere in the app surface a
