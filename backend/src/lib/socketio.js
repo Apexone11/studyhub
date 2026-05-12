@@ -14,6 +14,7 @@ const { verifyAuthToken } = require('./authTokens')
 const prisma = require('./prisma')
 const { captureError } = require('../monitoring/sentry')
 const SOCKET_EVENTS = require('./socketEvents')
+const { runWithHeartbeat } = require('./jobs/heartbeat')
 
 let io = null
 const onlineUsers = new Map() // userId -> Set<socketId>
@@ -43,14 +44,18 @@ function isSocketRateLimited(socketId, event, maxPerMinute = 30) {
 // lazy-requires it for emit) does not keep the Node event loop alive in tests
 // or short-lived scripts.
 let _rateLimitSweepHandle = null
+function sweepSocketRateLimits() {
+  const now = Date.now()
+  for (const [key, entry] of socketRateLimits) {
+    if (now > entry.resetAt) socketRateLimits.delete(key)
+  }
+}
+
 function startRateLimitSweep() {
   if (_rateLimitSweepHandle) return
   _rateLimitSweepHandle = setInterval(
     () => {
-      const now = Date.now()
-      for (const [key, entry] of socketRateLimits) {
-        if (now > entry.resetAt) socketRateLimits.delete(key)
-      }
+      runWithHeartbeat('socketio.cleanup', sweepSocketRateLimits, { slaMs: 5_000 })
     },
     5 * 60 * 1000,
   )

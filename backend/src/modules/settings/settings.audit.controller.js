@@ -7,6 +7,7 @@
  */
 const express = require('express')
 const prisma = require('../../lib/prisma')
+const log = require('../../lib/logger')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 
 const router = express.Router()
@@ -84,7 +85,10 @@ router.get('/my-audit-log', async (req, res) => {
       entries: sanitized,
     })
   } catch (err) {
-    console.error('[settings] Audit log export failed:', err.message)
+    log.error(
+      { event: 'settings.audit_log_export_failed', err: err?.message || String(err) },
+      'Audit log export failed',
+    )
     return sendError(res, 500, 'Could not export your activity log.', ERROR_CODES.INTERNAL)
   }
 })

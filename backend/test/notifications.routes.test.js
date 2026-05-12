@@ -83,20 +83,20 @@ beforeEach(() => {
 describe('notifications routes', () => {
   describe('GET /', () => {
     it('returns user notifications with unread count', async () => {
-      mocks.prisma.notification.findMany.mockResolvedValue([
-        {
-          id: 1,
-          userId: 42,
-          type: 'follow',
-          message: 'Someone followed you.',
-          read: false,
-          createdAt: new Date(),
-          actor: { id: 10, username: 'follower', avatarUrl: null },
-        },
-      ])
-      mocks.prisma.notification.count
-        .mockResolvedValueOnce(1) // total
-        .mockResolvedValueOnce(1) // unreadCount
+      const baseRow = {
+        id: 1,
+        userId: 42,
+        type: 'follow',
+        message: 'Someone followed you.',
+        read: false,
+        createdAt: new Date(),
+        actor: { id: 10, username: 'follower', avatarUrl: null },
+      }
+      // The grouping pass fetches the main page AND a parallel unread set
+      // for the badge count. Mock both calls.
+      mocks.prisma.notification.findMany
+        .mockResolvedValueOnce([baseRow])
+        .mockResolvedValueOnce([baseRow])
 
       const response = await request(app).get('/')
 
@@ -111,11 +111,159 @@ describe('notifications routes', () => {
       expect(response.body.notifications).toHaveLength(1)
     })
 
-    it('respects limit and offset query parameters', async () => {
+    it('groups distinct actors who starred the same sheet within 24h', async () => {
+      // Three different users star the same sheet within 24h — the bell
+      // should collapse them into one grouped row with actorCount=3.
+      const baseTime = new Date('2026-05-12T10:00:00Z').getTime()
+      const rows = [
+        {
+          id: 30,
+          userId: 42,
+          type: 'star',
+          message: 'starred your sheet.',
+          read: false,
+          sheetId: 7,
+          linkPath: '/sheets/7',
+          createdAt: new Date(baseTime),
+          actor: { id: 3, username: 'carol', avatarUrl: null },
+        },
+        {
+          id: 20,
+          userId: 42,
+          type: 'star',
+          message: 'starred your sheet.',
+          read: false,
+          sheetId: 7,
+          linkPath: '/sheets/7',
+          createdAt: new Date(baseTime - 60_000),
+          actor: { id: 2, username: 'bob', avatarUrl: null },
+        },
+        {
+          id: 10,
+          userId: 42,
+          type: 'star',
+          message: 'starred your sheet.',
+          read: false,
+          sheetId: 7,
+          linkPath: '/sheets/7',
+          createdAt: new Date(baseTime - 120_000),
+          actor: { id: 1, username: 'alice', avatarUrl: null },
+        },
+      ]
+      mocks.prisma.notification.findMany.mockResolvedValueOnce(rows).mockResolvedValueOnce(rows)
+
+      const response = await request(app).get('/')
+
+      expect(response.status).toBe(200)
+      // One grouped row carrying all three actors.
+      expect(response.body.notifications).toHaveLength(1)
+      const group = response.body.notifications[0]
+      expect(group.grouped).toBe(true)
+      expect(group.actorCount).toBe(3)
+      expect(group.actors).toHaveLength(3)
+      expect(group.actors.map((a) => a.username)).toEqual(['carol', 'bob', 'alice'])
+      expect(group.groupedIds.sort()).toEqual([10, 20, 30])
+      // Unread group count should be 1, not 3.
+      expect(response.body.unreadCount).toBe(1)
+      expect(response.body.unreadRawCount).toBe(3)
+    })
+
+    it('caps actors at 3 and reports overflow via actorCount', async () => {
+      const baseTime = new Date('2026-05-12T10:00:00Z').getTime()
+      const rows = [5, 4, 3, 2, 1].map((id) => ({
+        id: id * 10,
+        userId: 42,
+        type: 'star',
+        message: 'starred your sheet.',
+        read: false,
+        sheetId: 7,
+        linkPath: '/sheets/7',
+        createdAt: new Date(baseTime - (5 - id) * 60_000),
+        actor: { id, username: `user${id}`, avatarUrl: null },
+      }))
+      mocks.prisma.notification.findMany.mockResolvedValueOnce(rows).mockResolvedValueOnce(rows)
+
+      const response = await request(app).get('/')
+
+      expect(response.status).toBe(200)
+      expect(response.body.notifications).toHaveLength(1)
+      const group = response.body.notifications[0]
+      expect(group.actorCount).toBe(5)
+      expect(group.actors).toHaveLength(3)
+      expect(group.groupedIds).toHaveLength(5)
+    })
+
+    it('does NOT group critical notification types (mention, reply, comment)', async () => {
+      const baseTime = new Date('2026-05-12T10:00:00Z').getTime()
+      const rows = [
+        {
+          id: 2,
+          userId: 42,
+          type: 'mention',
+          message: 'mentioned you.',
+          read: false,
+          linkPath: '/feed/posts/9',
+          createdAt: new Date(baseTime),
+          actor: { id: 2, username: 'bob', avatarUrl: null },
+        },
+        {
+          id: 1,
+          userId: 42,
+          type: 'mention',
+          message: 'mentioned you.',
+          read: false,
+          linkPath: '/feed/posts/9',
+          createdAt: new Date(baseTime - 60_000),
+          actor: { id: 1, username: 'alice', avatarUrl: null },
+        },
+      ]
+      mocks.prisma.notification.findMany.mockResolvedValueOnce(rows).mockResolvedValueOnce(rows)
+
+      const response = await request(app).get('/')
+
+      expect(response.status).toBe(200)
+      // Each mention stays its own row — context is irreplaceable.
+      expect(response.body.notifications).toHaveLength(2)
+      expect(response.body.notifications.every((n) => !n.grouped)).toBe(true)
+    })
+
+    it('does NOT group entries older than 24h together', async () => {
+      const baseTime = new Date('2026-05-12T10:00:00Z').getTime()
+      const rows = [
+        {
+          id: 2,
+          userId: 42,
+          type: 'star',
+          message: 'starred your sheet.',
+          read: false,
+          sheetId: 7,
+          linkPath: '/sheets/7',
+          createdAt: new Date(baseTime),
+          actor: { id: 2, username: 'bob', avatarUrl: null },
+        },
+        {
+          id: 1,
+          userId: 42,
+          type: 'star',
+          message: 'starred your sheet.',
+          read: false,
+          sheetId: 7,
+          linkPath: '/sheets/7',
+          // 25h earlier — outside the 24h window.
+          createdAt: new Date(baseTime - 25 * 60 * 60 * 1000),
+          actor: { id: 1, username: 'alice', avatarUrl: null },
+        },
+      ]
+      mocks.prisma.notification.findMany.mockResolvedValueOnce(rows).mockResolvedValueOnce(rows)
+
+      const response = await request(app).get('/')
+
+      expect(response.status).toBe(200)
+      expect(response.body.notifications).toHaveLength(2)
+    })
+
+    it('respects limit and offset query parameters (after grouping)', async () => {
       mocks.prisma.notification.findMany.mockResolvedValue([])
-      mocks.prisma.notification.count
-        .mockResolvedValueOnce(50)
-        .mockResolvedValueOnce(10)
 
       const response = await request(app).get('/?limit=5&offset=10')
 
@@ -124,10 +272,12 @@ describe('notifications routes', () => {
         limit: 5,
         offset: 10,
       })
+      // Over-fetch shape: take is bounded by MAX_RAW_ROWS_FOR_GROUPING (300)
+      // and scales with offset+limit. For limit=5, offset=10 we expect 75
+      // (i.e. (10+5)*5).
       expect(mocks.prisma.notification.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          take: 5,
-          skip: 10,
+          take: 75,
         }),
       )
     })
@@ -175,6 +325,26 @@ describe('notifications routes', () => {
       const response = await request(app).patch('/1/read')
 
       expect(response.status).toBe(403)
+    })
+
+    it('sweeps the whole group when groupedIds is provided', async () => {
+      mocks.prisma.notification.findUnique.mockResolvedValue({
+        id: 1,
+        userId: 42,
+        read: false,
+      })
+      mocks.prisma.notification.updateMany.mockResolvedValue({ count: 3 })
+
+      const response = await request(app).patch('/1/read?groupedIds=2,3')
+
+      expect(response.status).toBe(200)
+      expect(response.body).toMatchObject({ id: 1, read: true, groupedIds: [2, 3] })
+      // userId scope on updateMany is the defense-in-depth guard — a forged
+      // groupedIds list must NOT sweep another user's inbox.
+      expect(mocks.prisma.notification.updateMany).toHaveBeenCalledWith({
+        where: { id: { in: [1, 2, 3] }, userId: 42 },
+        data: { read: true },
+      })
     })
   })
 

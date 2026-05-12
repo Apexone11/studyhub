@@ -5,11 +5,13 @@
 
 const Anthropic = require('@anthropic-ai/sdk')
 const prisma = require('../../lib/prisma')
+const log = require('../../lib/logger')
 const { captureError } = require('../../monitoring/sentry')
 const { createNotification } = require('../../lib/notify')
 const { buildContext, redactPII } = require('./ai.context')
 const {
   DEFAULT_MODEL,
+  FAST_MODEL,
   SYSTEM_PROMPT,
   DOCUMENT_TRUST_CLAUSE,
   DAILY_LIMITS,
@@ -38,6 +40,75 @@ function getClient() {
     _client = new Anthropic.default({ apiKey })
   }
   return _client
+}
+
+// ── Cost-aware model routing (research loop 1 gap #9) ──────────────
+
+/**
+ * Sheet-generation regex. A request that matches this pattern must
+ * stay on the high-quality model regardless of length — Haiku produces
+ * lower-quality HTML for the publish-ready sheet flow and a tiny prompt
+ * like "make a chem sheet" would otherwise be misclassified as simple.
+ *
+ * Mirrors the existing detection at the maxTokens decision site below
+ * (kept in sync deliberately so a single edit can't drift them apart).
+ */
+const SHEET_REQUEST_REGEX =
+  /\b(create|make|generate|build|write|design)\b.*\b(sheet|cheatsheet|cheat sheet|study guide|reference sheet|review sheet|formula sheet)\b/i
+
+/**
+ * Classify a user message for cost-aware model routing.
+ *
+ *   - `sheet`   → must use DEFAULT_MODEL (Sonnet). Haiku produces lower
+ *                 quality HTML; sheet generation is the flagship surface.
+ *   - `simple`  → routed to FAST_MODEL (Haiku 4.5). Heuristic: fewer
+ *                 than 30 words, no fenced code block, no "why" /
+ *                 "explain" / "how does" phrasing — i.e. short factual
+ *                 Q&A like "what's the mitochondria?" or "define mitosis".
+ *   - `complex` → DEFAULT_MODEL (Sonnet). Default for anything else.
+ *
+ * Pure function — exported for unit tests. Operates on the raw user
+ * message string only; the live `streamMessage` site additionally
+ * downgrades when attachments are present (handled at the call site,
+ * not here, because the attachment list isn't a message property).
+ *
+ * @param {string} content
+ * @returns {'sheet' | 'simple' | 'complex'}
+ */
+function classifyRequest(content) {
+  if (typeof content !== 'string' || content.trim().length === 0) {
+    // Defensive: empty / non-string falls back to complex so we never
+    // accidentally downgrade a malformed request to Haiku.
+    return 'complex'
+  }
+
+  if (SHEET_REQUEST_REGEX.test(content)) return 'sheet'
+
+  // Fenced code block → complex (code review, debugging).
+  if (/```/.test(content)) return 'complex'
+
+  // "Why" / "explain" / "how does" → complex (multi-step reasoning).
+  if (/\b(why|explain|how\s+does)\b/i.test(content)) return 'complex'
+
+  // Word count under 30 + no code block + no "why/explain/how does" = simple.
+  const wordCount = content.trim().split(/\s+/).filter(Boolean).length
+  if (wordCount < 30) return 'simple'
+
+  return 'complex'
+}
+
+/**
+ * Map a classification to a concrete Anthropic model id.
+ *
+ * Sheet requests are pinned to DEFAULT_MODEL even if a caller passes a
+ * different default, mirroring the rule baked into `classifyRequest`.
+ *
+ * @param {'sheet' | 'simple' | 'complex'} classification
+ * @returns {string}
+ */
+function selectModelForClassification(classification) {
+  if (classification === 'simple') return FAST_MODEL
+  return DEFAULT_MODEL
 }
 
 // ── Rate-limit helpers ─────────────────────────────────────────────
@@ -591,11 +662,37 @@ async function streamMessage({
   }
 
   // Determine max output tokens based on whether the user is asking for a sheet.
-  const isSheetRequest =
-    /\b(create|make|generate|build|write|design)\b.*\b(sheet|cheatsheet|cheat sheet|study guide|reference sheet|review sheet|formula sheet)\b/i.test(
-      safeContent,
-    )
+  const classification = classifyRequest(safeContent)
+  const isSheetRequest = classification === 'sheet'
   const maxTokens = isSheetRequest ? MAX_OUTPUT_TOKENS_SHEET : MAX_OUTPUT_TOKENS_QA
+
+  // Cost-aware model routing (research loop 1 gap #9). When the
+  // conversation has no explicit pinned model, route by classification;
+  // simple short Q&A goes to Haiku 4.5 (~4-5× cheaper input + output).
+  // An explicit `conversation.model` override is respected (used by the
+  // achievement / suggestion / sheet sub-paths that intentionally pin
+  // their own model) so the routing layer can't accidentally downgrade
+  // those calls.
+  //
+  // Attachments downgrade-guard: PDFs / DOCX are heavyweight reads;
+  // even a short "summarize this" prompt over a 40-page doc deserves
+  // Sonnet. So if there are resolved attachments, force complex routing.
+  const routedClassification = hasAttachments ? 'complex' : classification
+  const routedModel = selectModelForClassification(routedClassification)
+  const requestedModel = conversation.model || routedModel
+  log.info(
+    {
+      event: 'ai.model_routed',
+      model: requestedModel,
+      classification: routedClassification,
+      hadAttachments: hasAttachments,
+      wordCount:
+        typeof safeContent === 'string'
+          ? safeContent.trim().split(/\s+/).filter(Boolean).length
+          : 0,
+    },
+    'Hub AI request routed',
+  )
 
   // 5b. Daily Anthropic spend ceiling pre-flight (master plan L5-CRIT-1).
   // Estimate input tokens from prompt size + uploaded doc bytes
@@ -637,7 +734,7 @@ async function streamMessage({
   try {
     const client = getClient()
     const stream = await client.messages.stream({
-      model: conversation.model || DEFAULT_MODEL,
+      model: requestedModel,
       max_tokens: maxTokens,
       system: fullSystemPrompt,
       messages: claudeMessages,
@@ -684,7 +781,7 @@ async function streamMessage({
             conversation: { connect: { id: conversationId } },
             role: 'assistant',
             content: safeResponse,
-            model: conversation.model || DEFAULT_MODEL,
+            model: requestedModel,
             metadata: { partial: true },
           },
         })
@@ -743,7 +840,7 @@ async function streamMessage({
       role: 'assistant',
       content: safeResponse,
       tokenCount: totalTokens,
-      model: conversation.model || DEFAULT_MODEL,
+      model: requestedModel,
       metadata: msgMetadata,
       attachments: assistantAttachmentsSnapshot,
     },
@@ -788,11 +885,14 @@ async function streamMessage({
     })
   }
 
-  // 9. Send completion event.
+  // 9. Send completion event. `model` is included so the frontend can
+  // optionally surface a small "via Haiku" indicator on routed messages
+  // (loop A6, 2026-05-12).
   sendSSE(res, {
     type: 'done',
     messageId: assistantMsg.id,
     tokenCount: totalTokens,
+    model: requestedModel,
     usage: { used: usage.messageCount + 1, limit },
   })
 
@@ -801,7 +901,7 @@ async function streamMessage({
     const { EVENTS, trackServerEvent } = require('../../lib/events')
     trackServerEvent(userId, EVENTS.AI_STREAM_TTFT, {
       msToFirstToken: ttftMs,
-      model: conversation.model || DEFAULT_MODEL,
+      model: requestedModel,
       promptTokens: totalInputTokens,
     })
   }
@@ -862,4 +962,9 @@ module.exports = {
   // in Hub AI must see "quota exhausted" on the suggestion card too.
   getClient,
   incrementUsage,
+  // Cost-aware model routing (research loop 1 gap #9). Exported as
+  // pure helpers so unit tests can exercise them without spinning up
+  // Anthropic / Prisma / Express scaffolding.
+  classifyRequest,
+  selectModelForClassification,
 }

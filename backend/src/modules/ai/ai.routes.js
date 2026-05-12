@@ -457,8 +457,7 @@ router.post('/save-to-notes', requireAuth, requireTrustedOrigin, writeLimiter, a
         courseId: courseIdInt,
         title: titleStr,
         content: contentStr,
-        source: 'hub_ai_save',
-        isPublic: false,
+        private: true,
       },
       select: { id: true, title: true, courseId: true, createdAt: true },
     })

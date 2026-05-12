@@ -6,6 +6,7 @@
 
 const { captureError } = require('../../monitoring/sentry')
 const { createNotifications } = require('../../lib/notify')
+const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const log = require('../../lib/logger')
 const prisma = require('../../lib/prisma')
 const { getIO } = require('../../lib/socketio')
@@ -293,7 +294,20 @@ async function createDiscussion(req, res) {
       // so a non-moderator can't bypass the moderation queue by
       // @-mentioning specific people (Copilot review #4, 2026-05-03).
       if (isPublic) {
-        const memberAllowlist = members.map((m) => m.userId)
+        // Block-filter as defense in depth (CLAUDE.md A6) on top of the
+        // write-time block check inside createNotification. If A blocked B,
+        // an @B mention from A must never resolve.
+        let blockedIds = []
+        try {
+          blockedIds = await getBlockedUserIds(prisma, req.user.userId)
+        } catch (blockErr) {
+          log.warn(
+            { event: 'studyGroups.discussions.mention_block_filter_failed', err: blockErr.message },
+            'Block filter unavailable for mention notify; proceeding without it',
+          )
+        }
+        const blockedSet = new Set(blockedIds)
+        const memberAllowlist = members.map((m) => m.userId).filter((id) => !blockedSet.has(id))
         const { notifyMentionedUsers } = require('../../lib/mentions')
         await notifyMentionedUsers(prisma, {
           text: strippedContent,
@@ -788,13 +802,27 @@ async function createReply(req, res) {
         where: { groupId, status: 'active' },
         select: { userId: true },
       })
+      // Block-filter as defense in depth (CLAUDE.md A6).
+      let replyBlockedIds = []
+      try {
+        replyBlockedIds = await getBlockedUserIds(prisma, req.user.userId)
+      } catch (blockErr) {
+        log.warn(
+          { event: 'studyGroups.discussions.mention_block_filter_failed', err: blockErr.message },
+          'Block filter unavailable for reply mention notify; proceeding without it',
+        )
+      }
+      const replyBlockedSet = new Set(replyBlockedIds)
+      const replyAllowlist = replyMembers
+        .map((m) => m.userId)
+        .filter((id) => !replyBlockedSet.has(id))
       const { notifyMentionedUsers } = require('../../lib/mentions')
       await notifyMentionedUsers(prisma, {
         text: strippedContent,
         actorId: req.user.userId,
         actorUsername: req.user.username,
         linkPath: `/study-groups/${groupId}?tab=discussions&post=${post.id}`,
-        restrictToUserIds: replyMembers.map((m) => m.userId),
+        restrictToUserIds: replyAllowlist,
       })
     } catch (notifErr) {
       log.warn(

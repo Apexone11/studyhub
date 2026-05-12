@@ -1,15 +1,14 @@
-# NOTE: *.termly.io entries below are STILL required after Task #70's
-# self-hosted cookie consent. The legal-document embed (Terms / Privacy
-# Policy / Cookie Policy / Community Guidelines / Disclaimer rendered
-# via lib/useTermlyEmbed.js) loads from app.termly.io even though the
-# resource-blocker / consent banner moved in-house. Removing *.termly.io
-# from script-src / style-src / font-src / connect-src / frame-src
-# would break the legal pages. When (if) we self-host the legal docs
-# too, *.termly.io can come out everywhere in one sweep.
+# Termly was removed 2026-04-30 (CLAUDE.md "Don't introduce a third-party
+# iframe for legal docs / forms"). Legal docs are now self-hosted from
+# backend/src/modules/legal/content/*.txt and rendered by
+# LegalDocumentPage.jsx. The only remaining `termly-display-preferences`
+# references in the codebase are CSS class names — they don't load
+# anything from termly.io. All `*.termly.io` CSP allowlist entries were
+# stripped 2026-05-12 as part of the Loop A18 cleanup.
 /*
   X-Frame-Options: SAMEORIGIN
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
   Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://*.termly.io https://www.googletagmanager.com https://www.clarity.ms https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://accounts.google.com https://*.termly.io; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com https://*.termly.io; img-src 'self' data: blob: https: http:; media-src 'self' blob: https://*.r2.cloudflarestorage.com https://api.getstudyhub.org; connect-src 'self' https://api.getstudyhub.org wss://api.getstudyhub.org https://*.up.railway.app https://accounts.google.com https://www.google-analytics.com https://www.clarity.ms https://*.termly.io https://region1.google-analytics.com https://www.googletagmanager.com https://tenor.googleapis.com https://us.i.posthog.com https://books.google.com https://*.googleusercontent.com https://www.googleapis.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com wss://*.up.railway.app; frame-src 'self' https://api.getstudyhub.org https://sheets.getstudyhub.org https://*.up.railway.app https://accounts.google.com https://*.termly.io https://js.stripe.com https://books.google.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://checkout.stripe.com
+  Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://www.googletagmanager.com https://www.clarity.ms https://www.google-analytics.com; style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com https://accounts.google.com; font-src 'self' https://cdnjs.cloudflare.com https://fonts.gstatic.com; img-src 'self' data: blob: https: http:; media-src 'self' blob: https://*.r2.cloudflarestorage.com https://api.getstudyhub.org; connect-src 'self' https://api.getstudyhub.org wss://api.getstudyhub.org https://*.up.railway.app https://accounts.google.com https://www.google-analytics.com https://www.clarity.ms https://region1.google-analytics.com https://www.googletagmanager.com https://tenor.googleapis.com https://us.i.posthog.com https://books.google.com https://*.googleusercontent.com https://www.googleapis.com https://cdnjs.cloudflare.com https://fonts.googleapis.com https://fonts.gstatic.com wss://*.up.railway.app; frame-src 'self' https://api.getstudyhub.org https://sheets.getstudyhub.org https://*.up.railway.app https://accounts.google.com https://js.stripe.com https://books.google.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self' https://checkout.stripe.com

@@ -2,6 +2,7 @@ const express = require('express')
 const { Webhook } = require('svix')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
+const log = require('../../lib/logger')
 
 const router = express.Router()
 const WEBHOOK_PROVIDER = 'resend'
@@ -267,7 +268,10 @@ router.post(
       }
 
       captureError(error, { source: 'resendWebhookPersistence' })
-      console.error(error)
+      log.error(
+        { event: 'webhooks.resend_persistence_failed', err: error?.message || String(error) },
+        'Failed to process Resend webhook event',
+      )
       return res.status(500).json({ error: 'Failed to process webhook event.' })
     }
   },

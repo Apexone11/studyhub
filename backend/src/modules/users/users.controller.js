@@ -6,7 +6,11 @@ const { getProfileAccessDecision, PROFILE_VISIBILITY } = require('../../lib/prof
 const { getUserPII } = require('../../lib/piiVault')
 const { buildProfilePresentation, getProfileFieldVisibility } = require('../../lib/profileMetadata')
 const prisma = require('../../lib/prisma')
-const { checkAndAwardBadgesLegacy: checkAndAwardBadges } = require('../achievements')
+const {
+  checkAndAwardBadgesLegacy: checkAndAwardBadges,
+  emitAchievementEvent,
+  EVENT_KINDS,
+} = require('../achievements')
 const { getUserStreak, getWeeklyActivity } = require('../../lib/streaks')
 const { enrichUserWithBadges } = require('../../lib/userBadges')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
@@ -513,6 +517,11 @@ const followUser = async (req, res) => {
       where: { followingId: target.id, status: 'active' },
     })
     checkAndAwardBadges(prisma, target.id)
+    // Achievements V2 — typed FOLLOW_RECEIVED for the followed user so the
+    // social/community badges can react via event_match if needed.
+    void emitAchievementEvent(prisma, target.id, EVENT_KINDS.FOLLOW_RECEIVED, {
+      followerId: req.user.userId,
+    })
     res.json({ following: true, followerCount })
   } catch (err) {
     if (err.code === 'P2002')
@@ -1061,6 +1070,12 @@ const acceptFollowRequest = async (req, res) => {
     })
 
     checkAndAwardBadges(prisma, req.user.userId)
+    // Achievements V2 — the private-account accept path is the moment the
+    // follow becomes active, so FOLLOW_RECEIVED fires for the acceptor (the
+    // followed user) just like the public-account path above.
+    void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.FOLLOW_RECEIVED, {
+      followerId: requester.id,
+    })
     res.json({ accepted: true })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })

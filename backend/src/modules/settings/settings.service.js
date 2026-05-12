@@ -1,4 +1,5 @@
 const { captureError } = require('../../monitoring/sentry')
+const log = require('../../lib/logger')
 const { sendEmailVerification } = require('../../lib/email/email')
 const { isValidEmailAddress } = require('../../lib/email/emailValidation')
 const {
@@ -211,7 +212,15 @@ function handleSettingsError(req, res, error) {
     return res.status(409).json({ error: 'That username or email is already taken.' })
   }
   captureError(error, { route: req.originalUrl, method: req.method })
-  console.error(error)
+  log.error(
+    {
+      event: 'settings.request_failed',
+      route: req.originalUrl,
+      method: req.method,
+      err: error?.message || String(error),
+    },
+    'Settings request failed',
+  )
   return res.status(500).json({ error: 'Server error. Please try again.' })
 }
 

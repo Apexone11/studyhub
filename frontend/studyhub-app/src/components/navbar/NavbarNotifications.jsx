@@ -117,24 +117,36 @@ export default function NavbarNotifications() {
     setNotifications((prev) => prev.filter((n) => !n.read))
   }
 
-  async function deleteOne(e, notifId) {
+  // For grouped notifications, surface the bundle of underlying ids so the
+  // backend can sweep the whole group in one PATCH/DELETE. Returns an
+  // empty string for single rows, preserving the old endpoint shape.
+  function groupedIdsQuery(notif) {
+    if (!notif || !Array.isArray(notif.groupedIds) || notif.groupedIds.length <= 1) return ''
+    const extras = notif.groupedIds.filter((n) => n !== notif.id && Number.isInteger(n))
+    if (extras.length === 0) return ''
+    return `?groupedIds=${extras.join(',')}`
+  }
+
+  async function deleteOne(e, notif) {
     e.stopPropagation()
     if (!user) return
-    fetch(`${API}/api/notifications/${notifId}`, {
+    const suffix = groupedIdsQuery(notif)
+    fetch(`${API}/api/notifications/${notif.id}${suffix}`, {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
       credentials: 'include',
     }).catch(() => {})
     setNotifications((prev) => {
-      const removed = prev.find((n) => n.id === notifId)
+      const removed = prev.find((n) => n.id === notif.id)
       if (removed && !removed.read) setUnreadCount((c) => Math.max(0, c - 1))
-      return prev.filter((n) => n.id !== notifId)
+      return prev.filter((n) => n.id !== notif.id)
     })
   }
 
   async function markOneRead(notif) {
     if (!notif.read && user) {
-      fetch(`${API}/api/notifications/${notif.id}/read`, {
+      const suffix = groupedIdsQuery(notif)
+      fetch(`${API}/api/notifications/${notif.id}/read${suffix}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -153,6 +165,125 @@ export default function NavbarNotifications() {
     } else if (notif.actor?.username && /^[A-Za-z0-9_.-]+$/.test(notif.actor.username)) {
       navigate(`/users/${notif.actor.username}`)
     }
+  }
+
+  // Render the leading "Alice, Bob, and Carol" or "Alice and 4 others"
+  // string for a grouped notification. Falls back to the single-actor
+  // case so ungrouped rows render exactly as they did before.
+  function renderActorLabel(notif) {
+    const actors =
+      Array.isArray(notif.actors) && notif.actors.length > 0
+        ? notif.actors
+        : notif.actor
+          ? [notif.actor]
+          : []
+    const total =
+      Number.isInteger(notif.actorCount) && notif.actorCount > actors.length
+        ? notif.actorCount
+        : actors.length
+    if (actors.length === 0) return <strong>Someone</strong>
+    if (total <= 1 || actors.length === 1) {
+      return <strong>{actors[0].username || 'Someone'}</strong>
+    }
+    const shown = actors.slice(0, 3)
+    const remaining = total - shown.length
+    if (remaining <= 0) {
+      if (shown.length === 2) {
+        return (
+          <>
+            <strong>{shown[0].username}</strong> and <strong>{shown[1].username}</strong>
+          </>
+        )
+      }
+      return (
+        <>
+          <strong>{shown[0].username}</strong>, <strong>{shown[1].username}</strong>, and{' '}
+          <strong>{shown[2].username}</strong>
+        </>
+      )
+    }
+    if (shown.length === 1) {
+      return (
+        <>
+          <strong>{shown[0].username}</strong> and{' '}
+          <strong>
+            {remaining} {remaining === 1 ? 'other' : 'others'}
+          </strong>
+        </>
+      )
+    }
+    if (shown.length === 2) {
+      return (
+        <>
+          <strong>{shown[0].username}</strong>, <strong>{shown[1].username}</strong>, and{' '}
+          <strong>
+            {remaining} {remaining === 1 ? 'other' : 'others'}
+          </strong>
+        </>
+      )
+    }
+    return (
+      <>
+        <strong>{shown[0].username}</strong>, <strong>{shown[1].username}</strong>,{' '}
+        <strong>{shown[2].username}</strong>, and{' '}
+        <strong>
+          {remaining} {remaining === 1 ? 'other' : 'others'}
+        </strong>
+      </>
+    )
+  }
+
+  // Stacked avatars for grouped rows. Falls back to null for single-actor
+  // rows so the dropdown's existing icon-tile pattern keeps its rhythm.
+  function renderActorAvatars(notif) {
+    const actors =
+      Array.isArray(notif.actors) && notif.actors.length > 0
+        ? notif.actors
+        : notif.actor
+          ? [notif.actor]
+          : []
+    const shown = actors.slice(0, 3)
+    if (shown.length <= 1) return null
+    return (
+      <span
+        aria-hidden="true"
+        style={{
+          flex: '0 0 auto',
+          display: 'inline-flex',
+          marginTop: 1,
+          paddingRight: 8,
+        }}
+      >
+        {shown.map((actor, i) => {
+          const initials = (actor.username || '?').slice(0, 1).toUpperCase()
+          return (
+            <span
+              key={actor.id ?? i}
+              style={{
+                width: 24,
+                height: 24,
+                borderRadius: '50%',
+                background: 'var(--sh-soft)',
+                color: 'var(--sh-text)',
+                border: '2px solid var(--sh-dropdown-bg)',
+                marginLeft: i === 0 ? 0 : -8,
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontSize: 11,
+                fontWeight: 700,
+                overflow: 'hidden',
+                backgroundImage: actor.avatarUrl ? `url(${actor.avatarUrl})` : undefined,
+                backgroundSize: 'cover',
+                backgroundPosition: 'center',
+              }}
+            >
+              {actor.avatarUrl ? '' : initials}
+            </span>
+          )
+        })}
+      </span>
+    )
   }
 
   if (!user) return null
@@ -294,7 +425,13 @@ export default function NavbarNotifications() {
                   key={notif.id}
                   role="button"
                   tabIndex={0}
-                  aria-label={`${notif.read ? '' : 'Unread: '}${notif.actor?.username || 'Someone'} ${notif.message}`}
+                  aria-label={`${notif.read ? '' : 'Unread: '}${
+                    Array.isArray(notif.actors) && notif.actors.length > 1
+                      ? `${notif.actors[0]?.username || 'Someone'} and ${
+                          (notif.actorCount || notif.actors.length) - 1
+                        } ${(notif.actorCount || notif.actors.length) - 1 === 1 ? 'other' : 'others'}`
+                      : notif.actor?.username || 'Someone'
+                  } ${notif.message}`}
                   onClick={() => markOneRead(notif)}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
@@ -336,6 +473,16 @@ export default function NavbarNotifications() {
                     }}
                   >
                     {(() => {
+                      // Grouped rows show stacked avatars in place of the
+                      // single icon tile. Single-actor rows keep the tile
+                      // so the inbox still parses at-a-glance by type.
+                      const isGrouped =
+                        notif.grouped === true ||
+                        (Array.isArray(notif.actors) && notif.actors.length > 1)
+                      if (isGrouped) {
+                        const stacked = renderActorAvatars(notif)
+                        if (stacked) return stacked
+                      }
                       const tone = getNotificationTone(notif.type, notif.priority)
                       return (
                         <span
@@ -366,7 +513,7 @@ export default function NavbarNotifications() {
                           lineHeight: 1.4,
                         }}
                       >
-                        <strong>{notif.actor?.username || 'Someone'}</strong> {notif.message}
+                        {renderActorLabel(notif)} {notif.message}
                       </div>
                       <div style={{ fontSize: 11, color: 'var(--sh-muted)', marginTop: 2 }}>
                         {notif.timeAgoLabel || 'just now'}
@@ -375,7 +522,7 @@ export default function NavbarNotifications() {
                   </div>
                   {/* X delete button */}
                   <button
-                    onClick={(e) => deleteOne(e, notif.id)}
+                    onClick={(e) => deleteOne(e, notif)}
                     title="Delete notification"
                     aria-label="Delete notification"
                     style={{

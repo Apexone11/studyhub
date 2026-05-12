@@ -9,6 +9,7 @@ import {
   SIGNAL_BADGE_CONFIG,
   isEditableSheetStatus,
 } from './sheetsPageConstants'
+import { estimateSheetReadingMinutes } from './sheetReadingTime'
 
 export default function SheetListRow({
   sheet,
@@ -30,6 +31,10 @@ export default function SheetListRow({
     .trim()
   const signal = computeSignalBadge(sheet)
   const signalConfig = signal ? SIGNAL_BADGE_CONFIG[signal] : null
+  // 220-wpm reading-time estimate; matches the notes viewer baseline and
+  // the value rendered on the sheet viewer page. Hidden when 0 so PDF /
+  // attachment-only sheets don't show "0 min read".
+  const readMinutes = estimateSheetReadingMinutes(sheet)
 
   const handleRowKeyDown = (event) => {
     if (event.target !== event.currentTarget) return
@@ -100,6 +105,12 @@ export default function SheetListRow({
           )}
           <span aria-hidden="true">•</span>
           <span>Updated {timeAgo(sheet.updatedAt || sheet.createdAt)}</span>
+          {readMinutes > 0 ? (
+            <>
+              <span aria-hidden="true">•</span>
+              <span aria-label={`${readMinutes} minute read`}>{readMinutes} min read</span>
+            </>
+          ) : null}
           <span aria-hidden="true">•</span>
           <span className={`sh-pill sheets-repo-row__format sheets-repo-row__format--${format}`}>
             {formatBadgeText(format)}

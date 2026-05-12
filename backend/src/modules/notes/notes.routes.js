@@ -6,6 +6,7 @@ const { signatureMatchesExpected, validateMagicBytes } = require('../../lib/file
 const requireAuth = require('../../middleware/auth')
 const requireVerifiedEmail = require('../../middleware/requireVerifiedEmail')
 const optionalAuth = require('../../core/auth/optionalAuth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const {
@@ -17,11 +18,14 @@ const {
   notesChunkLimiter,
   notesRestoreLimiter,
   notesDiffLimiter,
+  noteHighlightWriteLimiter,
 } = require('../../lib/rateLimiters')
 const notesController = require('./notes.controller')
+const noteHighlightsController = require('./note.highlights.controller')
 
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
+const requireTrustedOrigin = originAllowlist()
 
 const mutateLimiter = notesMutateLimiter
 const readLimiter = notesReadLimiter
@@ -174,6 +178,36 @@ router.delete(
   requireAuth,
   commentLimiter,
   notesController.deleteNoteComment,
+)
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Note Highlights (Note Review v1 — Phase 9, 2026-05-12)
+// ═══════════════════════════════════════════════════════════════════════════
+
+// ── GET /api/notes/:noteId/highlights ────────────────────────────────────
+router.get(
+  '/:noteId/highlights',
+  requireAuth,
+  notesReadLimiter,
+  noteHighlightsController.listHighlights,
+)
+
+// ── POST /api/notes/:noteId/highlights ───────────────────────────────────
+router.post(
+  '/:noteId/highlights',
+  requireAuth,
+  requireTrustedOrigin,
+  noteHighlightWriteLimiter,
+  noteHighlightsController.createHighlight,
+)
+
+// ── DELETE /api/notes/:noteId/highlights/:id ─────────────────────────────
+router.delete(
+  '/:noteId/highlights/:id',
+  requireAuth,
+  requireTrustedOrigin,
+  noteHighlightWriteLimiter,
+  noteHighlightsController.deleteHighlight,
 )
 
 // ═══════════════════════════════════════════════════════════════════════════

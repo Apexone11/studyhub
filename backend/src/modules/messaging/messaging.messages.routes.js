@@ -12,11 +12,13 @@ const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { captureError } = require('../../monitoring/sentry')
+const log = require('../../lib/logger')
 const prisma = require('../../lib/prisma')
 const { readLimiter, messagingWriteLimiter } = require('../../lib/rateLimiters')
 const { getIO } = require('../../lib/socketio')
 const SOCKET_EVENTS = require('../../lib/socketEvents')
-const { isBlockedEitherWay } = require('../../lib/social/blockFilter')
+const { getBlockedUserIds, isBlockedEitherWay } = require('../../lib/social/blockFilter')
+const { notifyMentionedUsers, extractMentionUsernames } = require('../../lib/mentions')
 const {
   MAX_MESSAGE_LENGTH,
   sanitizeMessageContent,
@@ -344,6 +346,48 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
       captureError(err, { source: 'socketio-message-send' })
     }
 
+    // @mentions in a DM or group chat must ping the mentioned user. Without
+    // this, `@username` in a conversation does literally nothing — silent
+    // miss (loop-4 finding F2, 2026-05-11). Restrict to conversation
+    // participants so a private group DM can't ping a non-participant
+    // (mirrors the group-discussion membership boundary). Block-filter is
+    // defense-in-depth (CLAUDE.md A6) on top of createNotification's own
+    // write-time block check.
+    if (cleanContent) {
+      try {
+        const participantRows = await prisma.conversationParticipant.findMany({
+          where: { conversationId },
+          select: { userId: true },
+        })
+        const participantIds = participantRows.map((p) => p.userId)
+        if (participantIds.length > 1) {
+          let blockedIds = []
+          try {
+            blockedIds = await getBlockedUserIds(prisma, req.user.userId)
+          } catch (blockErr) {
+            log.warn(
+              { event: 'messaging.mention_block_filter_failed', err: blockErr.message },
+              'Block filter unavailable for mention notify; proceeding without it',
+            )
+          }
+          const blockedSet = new Set(blockedIds)
+          const allowlist = participantIds.filter((id) => !blockedSet.has(id))
+          await notifyMentionedUsers(prisma, {
+            text: cleanContent,
+            actorId: req.user.userId,
+            actorUsername: req.user.username,
+            linkPath: `/messages?conversation=${conversationId}`,
+            restrictToUserIds: allowlist,
+          })
+        }
+      } catch (notifyErr) {
+        log.warn(
+          { event: 'messaging.mention_notify_failed', err: notifyErr.message },
+          'Failed to fire mention notifications on message create',
+        )
+      }
+    }
+
     res.status(201).json(message)
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -440,6 +484,54 @@ router.patch('/:messageId', requireAuth, messagingWriteLimiter, async (req, res)
       io.to(`conversation:${message.conversationId}`).emit(SOCKET_EVENTS.MESSAGE_EDIT, updated)
     } catch (err) {
       captureError(err, { source: 'socketio-message-edit' })
+    }
+
+    // Fire mention notifications for users newly mentioned in the edit. The
+    // original content might already contain `@sarah`; we should NOT re-ping
+    // her on every typo fix. Diff the mention sets and only notify usernames
+    // that were not present in the pre-edit body (loop-4 finding F2,
+    // 2026-05-11). Restricted to conversation participants and block-filtered
+    // for defense-in-depth (CLAUDE.md A6).
+    try {
+      const previousMentions = new Set(extractMentionUsernames(message.content || ''))
+      const currentMentions = extractMentionUsernames(cleanContent)
+      const newMentions = currentMentions.filter((u) => !previousMentions.has(u))
+      if (newMentions.length > 0) {
+        const participantRows = await prisma.conversationParticipant.findMany({
+          where: { conversationId: message.conversationId },
+          select: { userId: true },
+        })
+        const participantIds = participantRows.map((p) => p.userId)
+        if (participantIds.length > 1) {
+          let blockedIds = []
+          try {
+            blockedIds = await getBlockedUserIds(prisma, req.user.userId)
+          } catch (blockErr) {
+            log.warn(
+              { event: 'messaging.mention_block_filter_failed', err: blockErr.message },
+              'Block filter unavailable for mention notify; proceeding without it',
+            )
+          }
+          const blockedSet = new Set(blockedIds)
+          const allowlist = participantIds.filter((id) => !blockedSet.has(id))
+          // Build a synthetic mention-only string so notifyMentionedUsers
+          // re-parses just the new handles. Each new username surfaces as
+          // `@username ` so the regex matches every entry.
+          const mentionOnlyText = newMentions.map((u) => `@${u} `).join('')
+          await notifyMentionedUsers(prisma, {
+            text: mentionOnlyText,
+            actorId: req.user.userId,
+            actorUsername: req.user.username,
+            linkPath: `/messages?conversation=${message.conversationId}`,
+            restrictToUserIds: allowlist,
+          })
+        }
+      }
+    } catch (notifyErr) {
+      log.warn(
+        { event: 'messaging.mention_notify_failed', err: notifyErr.message },
+        'Failed to fire mention notifications on message edit',
+      )
     }
 
     res.json(updated)

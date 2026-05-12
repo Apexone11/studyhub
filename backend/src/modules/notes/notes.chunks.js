@@ -1,3 +1,5 @@
+const { runWithHeartbeat } = require('../../lib/jobs/heartbeat')
+
 class ChunkBuffer {
   constructor({ ttlMs = 5 * 60 * 1000 } = {}) {
     this.sessions = new Map()
@@ -37,7 +39,9 @@ class ChunkBuffer {
 }
 
 const defaultChunkBuffer = new ChunkBuffer()
-const sweeper = setInterval(() => defaultChunkBuffer.sweep(), 60 * 1000)
+const sweeper = setInterval(() => {
+  runWithHeartbeat('notes.chunk_buffer_sweep', () => defaultChunkBuffer.sweep(), { slaMs: 5_000 })
+}, 60 * 1000)
 if (sweeper.unref) sweeper.unref()
 
 module.exports = { ChunkBuffer, defaultChunkBuffer }

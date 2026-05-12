@@ -6,6 +6,7 @@ const {
   getEmailMode,
   deliverMail,
 } = require('./emailTransport')
+const log = require('../logger')
 
 // Shared HTML email wrapper with StudyHub branding
 function htmlWrap(title, bodyHtml) {
@@ -373,7 +374,10 @@ async function sendCourseRequestNotice({
 }) {
   const adminEmail = getAdminEmail()
   if (!adminEmail) {
-    console.warn('[email] ADMIN_EMAIL not set — skipping course request notification')
+    log.warn(
+      { event: 'email.course_request_notice_skipped' },
+      'ADMIN_EMAIL not set — skipping course request notification',
+    )
     return
   }
 
@@ -428,7 +432,10 @@ async function sendCourseRequestNotice({
 async function sendHighRiskSheetAlert({ sheetId, sheetTitle, username, flags }) {
   const adminEmail = getAdminEmail()
   if (!adminEmail) {
-    console.warn('[email] ADMIN_EMAIL not set — skipping high-risk sheet alert')
+    log.warn(
+      { event: 'email.high_risk_sheet_alert_skipped' },
+      'ADMIN_EMAIL not set — skipping high-risk sheet alert',
+    )
     return
   }
 

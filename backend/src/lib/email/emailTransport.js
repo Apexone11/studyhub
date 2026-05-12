@@ -2,6 +2,7 @@ const fs = require('node:fs/promises')
 const path = require('node:path')
 const nodemailer = require('nodemailer')
 const prisma = require('../prisma')
+const log = require('../logger')
 // Service-account default. Used when neither ADMIN_EMAIL nor EMAIL_USER
 // is set. Prefer a role address ("noreply@") over a personal one so
 // outbound mail and error responses don't disclose a real human's
@@ -137,7 +138,10 @@ async function getSuppressedRecipients(toValue) {
       },
     })
   } catch (error) {
-    console.warn(`[email] suppression lookup failed: ${error.message}`)
+    log.warn(
+      { event: 'email.suppression_lookup_failed', err: error?.message || String(error) },
+      'Email suppression lookup failed',
+    )
     return []
   }
 }

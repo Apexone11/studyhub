@@ -579,6 +579,22 @@ const notesDiffLimiter = rateLimit({
 })
 
 /**
+ * Note highlight writes (POST / DELETE on /:noteId/highlights) — 30
+ * requests per minute per user. Note Review v1 (2026-05-12). Keyed on
+ * user id so a noisy classroom IP doesn't starve other writers; auth
+ * middleware always runs first so `req.user?.userId` is present
+ * (CLAUDE.md A7).
+ */
+const noteHighlightWriteLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `note-highlight-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many highlight changes. Please slow down.' },
+})
+
+/**
  * Comment reactions (likes/dislikes) — 60 requests per minute per IP.
  */
 const commentReactLimiter = rateLimit({
@@ -1406,6 +1422,7 @@ module.exports = {
   notesChunkLimiter,
   notesRestoreLimiter,
   notesDiffLimiter,
+  noteHighlightWriteLimiter,
 
   // Comment reactions (all comment types)
   commentReactLimiter,

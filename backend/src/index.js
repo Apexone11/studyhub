@@ -860,6 +860,30 @@ async function startServer() {
       7 * 24 * 60 * 60 * 1000,
     ).unref()
 
+    // Retention — daily streak sweeper at 04:00 UTC. Resets
+    // UserStreak.currentStreak to 0 for any user whose
+    // lastActiveDate is older than yesterday. Wrapped per
+    // CLAUDE.md A10. SLA 60s — the underlying UPDATE is a single
+    // indexed query. Compute the delay to the next 04:00 UTC slot
+    // and then run on a 24h interval after that first fire.
+    const { runStreakSweep } = require('./lib/jobs/streakSweeper')
+    const nowMs = Date.now()
+    const nextFourUtc = new Date()
+    nextFourUtc.setUTCHours(4, 0, 0, 0)
+    if (nextFourUtc.getTime() <= nowMs) {
+      nextFourUtc.setUTCDate(nextFourUtc.getUTCDate() + 1)
+    }
+    const msUntilNextFour = nextFourUtc.getTime() - nowMs
+    setTimeout(() => {
+      runWithHeartbeat('streak.sweep', () => runStreakSweep(), { slaMs: 60_000 })
+      setInterval(
+        () => {
+          runWithHeartbeat('streak.sweep', () => runStreakSweep(), { slaMs: 60_000 })
+        },
+        24 * 60 * 60 * 1000,
+      ).unref()
+    }, msUntilNextFour).unref()
+
     log.info({ port: PORT }, `Server running on http://localhost:${PORT}`)
   })
 
@@ -920,7 +944,10 @@ if (require.main === module) {
     })
     .catch((error) => {
       captureError(error, { source: 'serverStartup' })
-      console.error(error)
+      log.fatal(
+        { event: 'server.startup_failed', err: error?.message || String(error) },
+        'Server failed to start',
+      )
       process.exit(1)
     })
 }

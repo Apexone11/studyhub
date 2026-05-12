@@ -18,6 +18,7 @@
 
 const path = require('path')
 const fs = require('fs')
+const log = require('./logger')
 
 const DB_DIR = process.env.GEOIP_DB_DIR || path.join(__dirname, '..', '..', 'geoip')
 const CITY_DB = path.join(DB_DIR, 'GeoLite2-City.mmdb')
@@ -43,9 +44,9 @@ async function load() {
         cityReader = await mm.open(CITY_DB)
       } else if (!warnedMissing) {
         warnedMissing = true
-        console.warn(
-          `[geoip] GeoLite2-City.mmdb not found at ${CITY_DB}. Geo lookup will no-op. ` +
-            `Run: MAXMIND_LICENSE_KEY=xxx node scripts/updateGeoipDb.js`,
+        log.warn(
+          { event: 'geoip.db_missing', dbPath: CITY_DB },
+          'GeoLite2-City.mmdb not found — geo lookup will no-op. Run: MAXMIND_LICENSE_KEY=xxx node scripts/updateGeoipDb.js',
         )
       }
     } catch {

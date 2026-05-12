@@ -175,6 +175,87 @@ router.get('/analytics/ai', async (req, res) => {
   }
 })
 
+// ── GET /api/admin/ai/cache-stats ─────────────────────────────
+// Daily Anthropic prompt-cache telemetry. Returns one row per UTC day
+// for the last `days` (default 7, capped at 90) with the cache-hit
+// fraction derived from AiGlobalSpendDay. Closes Research Loop 1 gap
+// #2 — until 2026-05-12 the cache counters were structured-logged but
+// never aggregated, so we couldn't answer "what fraction of input
+// tokens this week came from cache?" without writing a one-off query.
+//
+// Cache-hit fraction formula: cacheRead / (tokensIn + cacheRead).
+// Anthropic's `input_tokens` field excludes cache-served tokens by
+// design — adding them back gives the true total input volume. A 60%+
+// hit rate on Sonnet 4 cuts daily spend ~50%; anything <50% suggests
+// a recent system-prompt edit invalidated the cache (master plan
+// L1-CRIT-2 / Research Loop 1 §1 background).
+router.get('/ai/cache-stats', async (req, res) => {
+  const rawDays = Number.parseInt(req.query.days, 10)
+  const days = Number.isInteger(rawDays) && rawDays >= 1 && rawDays <= 90 ? rawDays : 7
+  const startDate = new Date(Date.now() - days * 24 * 60 * 60 * 1000)
+  startDate.setUTCHours(0, 0, 0, 0)
+
+  try {
+    const rows = await prisma.$queryRaw`
+      SELECT
+        "date",
+        "tokensIn",
+        "tokensOut",
+        "documentTokens",
+        "cacheReadInputTokens",
+        "cacheCreationInputTokens",
+        "costUsdCents",
+        "requestCount"
+      FROM "AiGlobalSpendDay"
+      WHERE "date" >= ${startDate}
+      ORDER BY "date" ASC
+    `
+
+    const daily = rows.map((row) => {
+      // BigInt -> Number is safe here: token totals stay well below
+      // 2^53 (Sonnet 4's 200K-token window * thousands of calls/day
+      // is ~10^9, eight orders of magnitude below MAX_SAFE_INTEGER).
+      const tokensIn = Number(row.tokensIn || 0)
+      const tokensOut = Number(row.tokensOut || 0)
+      const documentTokens = Number(row.documentTokens || 0)
+      const cacheRead = Number(row.cacheReadInputTokens || 0)
+      const cacheCreation = Number(row.cacheCreationInputTokens || 0)
+      const totalInputWithCache = tokensIn + cacheRead
+      const cacheHitRate = totalInputWithCache > 0 ? cacheRead / totalInputWithCache : 0
+      return {
+        date: formatDate(row.date),
+        tokensIn,
+        tokensOut,
+        documentTokens,
+        cacheReadInputTokens: cacheRead,
+        cacheCreationInputTokens: cacheCreation,
+        cacheHitRate,
+        costUsdCents: row.costUsdCents || 0,
+        requestCount: row.requestCount || 0,
+      }
+    })
+
+    // Weighted average across the window (sum of cache reads divided
+    // by sum of total input). Simple per-day-mean would over-weight
+    // light-traffic days and miss prompt-drift regressions on busy
+    // days.
+    const totalCacheRead = daily.reduce((s, d) => s + d.cacheReadInputTokens, 0)
+    const totalInput = daily.reduce((s, d) => s + d.tokensIn + d.cacheReadInputTokens, 0)
+    const averageCacheHitRate = totalInput > 0 ? totalCacheRead / totalInput : 0
+
+    res.json({
+      days,
+      daily,
+      averageCacheHitRate,
+      totalCacheReadTokens: totalCacheRead,
+      totalInputTokens: totalInput,
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    res.status(500).json({ error: 'Server error.' })
+  }
+})
+
 // ── GET /api/admin/analytics/moderation ──────────────────────
 // Moderation case funnel
 router.get('/analytics/moderation', async (req, res) => {

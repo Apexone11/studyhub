@@ -22,6 +22,7 @@ const {
   validateTitle,
   validateDescription,
 } = require('./studyGroups.helpers')
+const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
 
 const router = express.Router({ mergeParams: true })
 
@@ -163,6 +164,14 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
         durationMins: duration,
         recurring: recurring || null,
       },
+    })
+
+    // Achievements V2 — the creator is the session host for badge purposes.
+    // Fire-and-forget; failures never bubble back to the response.
+    void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.GROUP_SESSION_HOST, {
+      groupId,
+      sessionId: session.id,
+      scheduledAt: session.scheduledAt,
     })
 
     // Notify all active group members (except creator) about the new session

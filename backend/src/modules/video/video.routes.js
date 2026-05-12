@@ -92,13 +92,18 @@ async function flushBufferIfReady(r2Key, uploadId, state, force = false) {
 // than BUFFER_TTL_MS so active uploads are never disturbed.
 const BUFFER_TTL_MS = 30 * 60 * 1000
 const BUFFER_SWEEP_INTERVAL_MS = 5 * 60 * 1000
-setInterval(() => {
+
+function sweepUploadBuffers() {
   const now = Date.now()
   for (const [uploadId, state] of uploadBuffers.entries()) {
     if (now - (state.lastTouched || 0) > BUFFER_TTL_MS) {
       uploadBuffers.delete(uploadId)
     }
   }
+}
+
+setInterval(() => {
+  runWithHeartbeat('video.upload_buffer_sweep', sweepUploadBuffers, { slaMs: 5_000 })
 }, BUFFER_SWEEP_INTERVAL_MS).unref?.()
 
 // Multer for caption uploads only (small files, memory storage)

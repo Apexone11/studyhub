@@ -8,6 +8,7 @@ const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const optionalAuth = require('../../core/auth/optionalAuth')
 const { libraryWriteLimiter, libraryReadLimiter } = require('../../lib/rateLimiters')
+const { cacheControl } = require('../../lib/cacheControl')
 
 const {
   searchBooksHandler,
@@ -35,14 +36,35 @@ const router = express.Router()
  * GET /api/library/search
  * Search and browse books from Google Books API.
  * Query params: search, category, page, sort, language
+ *
+ * 5-min browser cache. Google Books results are stable on the timescale
+ * of minutes and the upstream API is slow + rate-limited, so caching at
+ * the browser level saves both Google Books quota and our compute.
+ * Private (no shared CDN cache) per the Cloudflare/Vary caveat documented
+ * in courses.schools.controller.js.
  */
-router.get('/search', libraryReadLimiter, optionalAuth, searchBooksHandler)
+router.get(
+  '/search',
+  cacheControl(300, { staleWhileRevalidate: 600 }),
+  libraryReadLimiter,
+  optionalAuth,
+  searchBooksHandler,
+)
 
 /**
  * GET /api/library/books/:volumeId
  * Get detailed information about a specific book from Google Books.
+ *
+ * 10-min browser cache. Volume metadata changes very rarely (it's
+ * Google Books data keyed by an immutable volume ID).
  */
-router.get('/books/:volumeId', libraryReadLimiter, optionalAuth, getBookDetailsHandler)
+router.get(
+  '/books/:volumeId',
+  cacheControl(600, { staleWhileRevalidate: 1800 }),
+  libraryReadLimiter,
+  optionalAuth,
+  getBookDetailsHandler,
+)
 
 // ── ADMIN OPERATIONS ───────────────────────────────────────────────────────
 

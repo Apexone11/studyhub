@@ -3,6 +3,7 @@ const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { createNotification } = require('../../lib/notify')
 const { notifyMentionedUsers } = require('../../lib/mentions')
 const { trackActivity } = require('../../lib/activityTracker')
+const { EVENTS, trackServerEvent } = require('../../lib/events')
 const { buildAnchorContext, validateAnchorInput } = require('../../lib/noteAnchor')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const { updateFingerprint } = require('../../lib/plagiarismService')
@@ -276,7 +277,27 @@ async function createNote(req, res) {
       /* best effort */
     }
 
-    res.status(201).json(serializeNote(note, { _starred: false }))
+    // First-creation funnel event (Loop 5 finding F2). Count *after*
+    // the insert above is the authoritative "is this the user's
+    // first note" check. Surfaces a `firstCreation` flag on the
+    // response so the frontend can route into a celebration toast.
+    let firstCreation = false
+    try {
+      const noteCount = await prisma.note.count({
+        where: { userId: req.user.userId },
+      })
+      if (noteCount === 1) {
+        firstCreation = true
+        trackServerEvent(req.user.userId, EVENTS.NOTE_FIRST_CREATED, {
+          noteId: note.id,
+          private: note.private === true,
+        })
+      }
+    } catch {
+      /* best effort — never block the create */
+    }
+
+    res.status(201).json(serializeNote(note, { _starred: false, firstCreation }))
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)

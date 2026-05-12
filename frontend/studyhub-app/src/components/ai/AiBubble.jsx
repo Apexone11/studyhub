@@ -16,6 +16,7 @@ import { createPortal } from 'react-dom'
 import { IconSpark, IconX, IconPlus } from '../Icons'
 import AiMarkdown from './AiMarkdown'
 import AiThinkingDots from './AiThinkingDots'
+import AiSheetReport from './AiSheetReport'
 import { SheetPreviewBar } from './AiSheetPreview'
 import { extractHtmlFromMessage } from './aiSheetPreviewHelpers'
 import { useSharedAiChat } from '../../lib/aiChatContext'
@@ -317,6 +318,9 @@ function AiBubbleInner() {
 
           {/* Messages */}
           <div style={{ flex: 1, overflowY: 'auto', padding: '12px 14px' }}>
+            {/* Sheet-aware quick-actions card — only renders on /sheets/:id pages */}
+            <AiSheetReport />
+
             {!chat.activeConversationId && chat.messages.length === 0 && (
               <div style={{ textAlign: 'center', padding: '30px 10px' }}>
                 <IconSpark size={32} style={{ color: 'var(--sh-brand)', marginBottom: 12 }} />

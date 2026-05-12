@@ -17,6 +17,7 @@ const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../prisma')
 const { createNotification } = require('../notify')
 const { logModerationEvent } = require('./moderationLogger')
+const log = require('../logger')
 
 /* ── Lazy-initialised Anthropic client ─────────────────────────────────── */
 let _anthropic = null
@@ -485,7 +486,10 @@ async function restoreContent(caseId) {
       select: { id: true, contentType: true, contentId: true, status: true, userId: true },
     })
     if (!modCase) {
-      console.error(`[restoreContent] Case not found: caseId=${caseId}`)
+      log.error(
+        { event: 'moderation.restore_case_not_found', caseId },
+        'restoreContent: case not found',
+      )
       return { success: false, error: 'Case not found' }
     }
 
@@ -493,8 +497,9 @@ async function restoreContent(caseId) {
     const modelName = CONTENT_MODEL_MAP[contentType]
 
     if (!modelName) {
-      console.error(
-        `[restoreContent] Unknown content type: caseId=${caseId}, contentType=${contentType}`,
+      log.error(
+        { event: 'moderation.restore_unknown_content_type', caseId, contentType },
+        'restoreContent: unknown content type',
       )
       return { success: false, error: 'Unknown content type' }
     }
@@ -533,7 +538,10 @@ async function restoreContent(caseId) {
     logModerationEvent({ userId: modCase.userId, action: 'appeal_approved', caseId })
     return { success: true }
   } catch (err) {
-    console.error(`[restoreContent] Restore failed: caseId=${caseId}`, err)
+    log.error(
+      { event: 'moderation.restore_failed', caseId, err: err?.message || String(err) },
+      'restoreContent failed',
+    )
     captureError(err, { context: 'moderation-restore', caseId })
     return { success: false, error: err.message }
   }

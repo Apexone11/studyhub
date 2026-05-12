@@ -9,6 +9,7 @@
  */
 
 const crypto = require('crypto')
+const log = require('./logger')
 
 const ALGORITHM = 'aes-256-gcm'
 const IV_LENGTH = 12 // 96 bits, recommended for GCM
@@ -94,7 +95,10 @@ function decrypt(ciphertext) {
   }
 
   // Both keys failed -- return ciphertext as-is to avoid data loss
-  console.error('[fieldEncryption] Decryption failed with all available keys')
+  log.error(
+    { event: 'field_encryption.decrypt_failed' },
+    'Decryption failed with all available keys',
+  )
   return ciphertext
 }
 

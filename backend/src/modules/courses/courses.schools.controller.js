@@ -3,6 +3,7 @@ const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const { cacheControl } = require('../../lib/cacheControl')
 const prisma = require('../../lib/prisma')
+const log = require('../../lib/logger')
 const { schoolsLimiter, POPULAR_COURSES_LIMIT } = require('./courses.constants')
 
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
@@ -53,7 +54,10 @@ router.get(
         method: req.method,
       })
 
-      console.error(error)
+      log.error(
+        { event: 'courses.schools_list_failed', err: error?.message || String(error) },
+        'Failed to load schools list',
+      )
       return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
     }
   },
@@ -113,7 +117,10 @@ router.get(
       return res.json(result)
     } catch (error) {
       captureError(error, { route: req.originalUrl, method: req.method })
-      console.error(error)
+      log.error(
+        { event: 'courses.popular_list_failed', err: error?.message || String(error) },
+        'Failed to load popular courses list',
+      )
       return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
     }
   },

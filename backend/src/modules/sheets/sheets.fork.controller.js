@@ -11,6 +11,7 @@ const { serializeSheet } = require('./sheets.serializer')
 const { getUserTier } = require('../../lib/getUserPlan')
 const { PLANS } = require('../payments/payments.constants')
 const { withPreviewText } = require('../../lib/sheets/applyContentUpdate')
+const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
 
 const router = express.Router()
 
@@ -188,6 +189,16 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
       actorId: req.user.userId,
       sheetId: original.id,
       linkPath: `/sheets/${original.id}`,
+    })
+
+    // Achievements V2 — emit SHEET_FORK so the forker's `community-builder`
+    // and the original author's fan-out evaluators see the event. Fire-and-
+    // forget; the engine wraps its own body in try/catch.
+    void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.SHEET_FORK, {
+      sheetId: forked.id,
+      originalSheetId: original.id,
+      originalAuthorId: original.userId,
+      rootSheetId,
     })
 
     res.status(201).json(serializeSheet(forked))
