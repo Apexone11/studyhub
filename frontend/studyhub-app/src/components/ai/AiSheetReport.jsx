@@ -18,6 +18,7 @@ import { API } from '../../config'
 import { getStoredUser } from '../../lib/session'
 import { analyzeSheet, proposeSheetEdit, applySheetEdit } from '../../lib/aiSheetService'
 import { showToast } from '../../lib/toast'
+import { useAiPermission } from '../../lib/aiPermissionContext'
 
 const SEVERITY_COLOR = {
   high: 'var(--sh-danger, #ef4444)',
@@ -69,9 +70,8 @@ function AiSheetReportInner({ sheetId, onClose }) {
   const [proposal, setProposal] = useState(null)
   const [proposing, setProposing] = useState(false)
 
-  const [applyModalOpen, setApplyModalOpen] = useState(false)
   const [snapshotName, setSnapshotName] = useState('')
-  const [snapshotMessage, setSnapshotMessage] = useState('')
+  const [snapshotMessage] = useState('')
   const [applying, setApplying] = useState(false)
 
   // Detect ownership for the optional "Edit with AI" buttons.
@@ -95,6 +95,7 @@ function AiSheetReportInner({ sheetId, onClose }) {
   }, [sheetId])
 
   const sheetContext = { sheetId }
+  const { requestPermission } = useAiPermission()
 
   const handleAnalyze = async () => {
     setLoading(true)
@@ -122,12 +123,54 @@ function AiSheetReportInner({ sheetId, onClose }) {
   }
 
   const handleApply = async () => {
-    if (!proposal?.proposedContent || !snapshotName.trim()) return
+    if (!proposal?.proposedContent) return
+
+    // CLAUDE-CODE-STYLE PERMISSION GATE.
+    // Snapshot + write only happen after the user explicitly accepts
+    // the dialog. If they reject, NOTHING persists — the proposal
+    // stays in memory for them to modify or discard.
+    const fallbackName = snapshotName.trim() || instruction.trim().slice(0, 60) || 'AI edit'
+    const accepted = await requestPermission({
+      kind: 'sheet.edit',
+      title: 'Apply AI edit to this sheet?',
+      summary:
+        'Hub AI wants to replace the current sheet content with its proposal. A snapshot of the existing content will be saved first so you can revert from History anytime.',
+      preview: (
+        <pre
+          style={{
+            margin: 0,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            fontFamily: 'inherit',
+            fontSize: 11.5,
+            color: 'var(--sh-text)',
+            maxHeight: 200,
+            overflow: 'auto',
+          }}
+        >
+          {proposal.proposedContent.slice(0, 1200)}
+          {proposal.proposedContent.length > 1200 ? '\n…' : ''}
+        </pre>
+      ),
+      applyLabel: 'Apply edit',
+      rejectLabel: 'Discard',
+      details: {
+        snapshotName: fallbackName,
+        newLength: proposal.diffSummary?.newLength ?? proposal.proposedContent.length,
+        delta: proposal.diffSummary?.delta ?? 0,
+      },
+    })
+
+    if (!accepted) {
+      showToast('AI edit discarded. No changes were made.', 'info')
+      return
+    }
+
     setApplying(true)
     setError(null)
     const res = await applySheetEdit(sheetContext.sheetId, {
       proposedContent: proposal.proposedContent,
-      snapshotName: snapshotName.trim(),
+      snapshotName: fallbackName,
       snapshotMessage: snapshotMessage.trim() || undefined,
     })
     setApplying(false)
@@ -135,13 +178,14 @@ function AiSheetReportInner({ sheetId, onClose }) {
       setError(res.error)
       return
     }
-    showToast('AI edit applied. Snapshot saved in History.', 'success')
-    setApplyModalOpen(false)
+    const msg = res.data?.quarantined
+      ? 'AI edit submitted for review (Tier-3 content). Snapshot saved.'
+      : 'AI edit applied. Snapshot saved in History.'
+    showToast(msg, res.data?.quarantined ? 'warning' : 'success')
     setEditPanelOpen(false)
     setProposal(null)
     setInstruction('')
     setSnapshotName('')
-    setSnapshotMessage('')
     // Trigger a soft refresh of the sheet — the SheetLab page listens
     // for this custom event.
     window.dispatchEvent(
@@ -241,28 +285,17 @@ function AiSheetReportInner({ sheetId, onClose }) {
           proposal={proposal}
           onPropose={handlePropose}
           onApplyClick={() => {
-            // Default snapshot name from the first 60 chars of the
-            // instruction — the user can override.
+            // Default the snapshot name from the instruction; the
+            // permission dialog renders it in the details panel and
+            // the user sees it before accepting.
             setSnapshotName(instruction.slice(0, 60))
-            setApplyModalOpen(true)
+            handleApply()
           }}
+          applying={applying}
           onDiscard={() => {
             setProposal(null)
             setInstruction('')
           }}
-        />
-      ) : null}
-
-      {/* Apply confirmation modal */}
-      {applyModalOpen ? (
-        <ApplyModal
-          snapshotName={snapshotName}
-          setSnapshotName={setSnapshotName}
-          snapshotMessage={snapshotMessage}
-          setSnapshotMessage={setSnapshotMessage}
-          applying={applying}
-          onConfirm={handleApply}
-          onCancel={() => setApplyModalOpen(false)}
         />
       ) : null}
     </div>
@@ -340,6 +373,7 @@ function EditPanel({
   proposal,
   onPropose,
   onApplyClick,
+  applying = false,
   onDiscard,
 }) {
   return (
@@ -391,10 +425,20 @@ function EditPanel({
         </button>
         {proposal ? (
           <>
-            <button type="button" onClick={onApplyClick} style={primaryActionStyle(false)}>
-              Apply (save snapshot)
+            <button
+              type="button"
+              onClick={onApplyClick}
+              disabled={applying}
+              style={primaryActionStyle(applying)}
+            >
+              {applying ? 'Applying…' : 'Apply edit…'}
             </button>
-            <button type="button" onClick={onDiscard} style={secondaryActionStyle()}>
+            <button
+              type="button"
+              onClick={onDiscard}
+              disabled={applying}
+              style={secondaryActionStyle()}
+            >
               Discard draft
             </button>
           </>
@@ -421,97 +465,6 @@ function EditPanel({
           </div>
         </div>
       ) : null}
-    </div>
-  )
-}
-
-function ApplyModal({
-  snapshotName,
-  setSnapshotName,
-  snapshotMessage,
-  setSnapshotMessage,
-  applying,
-  onConfirm,
-  onCancel,
-}) {
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label="Save AI snapshot"
-      style={{
-        position: 'fixed',
-        inset: 0,
-        background: 'rgba(0,0,0,0.4)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        zIndex: 10001,
-        padding: 'clamp(12px, 3vw, 20px)',
-      }}
-      onClick={(e) => {
-        if (e.target === e.currentTarget) onCancel()
-      }}
-    >
-      <div
-        style={{
-          background: 'var(--sh-surface)',
-          borderRadius: 12,
-          padding: 20,
-          width: 'min(420px, 100%)',
-          maxHeight: '92vh',
-          overflowY: 'auto',
-          border: '1px solid var(--sh-border)',
-          display: 'grid',
-          gap: 10,
-        }}
-      >
-        <h3 style={{ margin: 0, fontSize: 15, color: 'var(--sh-heading)' }}>Name this snapshot</h3>
-        <p style={{ margin: 0, fontSize: 12, color: 'var(--sh-muted)', lineHeight: 1.5 }}>
-          A snapshot of your sheet&apos;s current content will be saved first, then the AI edit will
-          be applied. You can revert anytime from the History tab.
-        </p>
-        <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)' }}>
-          Snapshot name (required)
-        </label>
-        <input
-          type="text"
-          value={snapshotName}
-          onChange={(e) => setSnapshotName(e.target.value.slice(0, 120))}
-          maxLength={120}
-          placeholder="e.g. Tighten conclusion"
-          style={inputStyle}
-        />
-        <label style={{ fontSize: 11, fontWeight: 700, color: 'var(--sh-muted)' }}>
-          Notes (optional)
-        </label>
-        <textarea
-          value={snapshotMessage}
-          onChange={(e) => setSnapshotMessage(e.target.value.slice(0, 500))}
-          rows={3}
-          maxLength={500}
-          placeholder="Anything to remember about this edit?"
-          style={{ ...inputStyle, fontFamily: 'inherit', resize: 'vertical' }}
-        />
-        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6, marginTop: 4 }}>
-          <button
-            type="button"
-            onClick={onCancel}
-            disabled={applying}
-            style={secondaryActionStyle()}
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            disabled={applying || !snapshotName.trim()}
-            style={primaryActionStyle(applying || !snapshotName.trim())}
-          >
-            {applying ? 'Applying…' : 'Save snapshot + apply'}
-          </button>
-        </div>
-      </div>
     </div>
   )
 }
@@ -580,15 +533,4 @@ function secondaryActionStyle() {
     fontWeight: 600,
     cursor: 'pointer',
   }
-}
-
-const inputStyle = {
-  width: '100%',
-  padding: 8,
-  fontSize: 12,
-  borderRadius: 8,
-  border: '1px solid var(--sh-border)',
-  background: 'var(--sh-bg)',
-  color: 'var(--sh-text)',
-  boxSizing: 'border-box',
 }

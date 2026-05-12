@@ -219,27 +219,52 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
         }
       }
 
-      // Parse JSON out of the response text
+      // Parse JSON out of the response text.
+      //
+      // The model occasionally adds a preamble ("Here's the analysis:")
+      // before the JSON, even with explicit "Respond ONLY with JSON"
+      // instructions. Find the first `{` and the matching last `}`
+      // before parsing instead of trusting the model to obey perfectly.
+      // Falls back to a synthesized report so the user always sees
+      // SOMETHING useful instead of an opaque 500.
       const text =
         response.content && response.content[0] && response.content[0].type === 'text'
           ? response.content[0].text
           : ''
       let report = null
       try {
-        // Strip any markdown fence around the JSON
-        const cleaned = text.replace(/^```(?:json)?\s*|\s*```$/gim, '').trim()
-        report = JSON.parse(cleaned)
-      } catch {
+        const fenceStripped = text.replace(/^```(?:json)?\s*|\s*```$/gim, '').trim()
+        // Find the JSON object by bracket-matching from the first `{`.
+        const firstBrace = fenceStripped.indexOf('{')
+        const lastBrace = fenceStripped.lastIndexOf('}')
+        const jsonSlice =
+          firstBrace >= 0 && lastBrace > firstBrace
+            ? fenceStripped.slice(firstBrace, lastBrace + 1)
+            : fenceStripped
+        report = JSON.parse(jsonSlice)
+      } catch (parseErr) {
         log.warn(
-          { event: 'ai.sheet.analyze_parse_failed', sheetId },
-          'AI sheet analyze returned non-JSON',
+          {
+            event: 'ai.sheet.analyze_parse_failed',
+            sheetId,
+            err: parseErr?.message || String(parseErr),
+            textPreview: text.slice(0, 200),
+          },
+          'AI sheet analyze returned non-JSON — falling back to prose summary',
         )
-        return sendError(
-          res,
-          502,
-          'AI returned an unparseable response. Please try again.',
-          ERROR_CODES.INTERNAL,
-        )
+        // Graceful fallback: surface whatever the AI did say as the
+        // summary so the user gets a useful response instead of an
+        // opaque 500. Suggestions list is empty in this branch.
+        const fallbackSummary =
+          text.trim().slice(0, 600) ||
+          'AI did not return a structured response. Try asking the assistant directly in the chat below.'
+        return res.json({
+          summary: fallbackSummary,
+          issues: [],
+          suggestions: [],
+          model: DEFAULT_MODEL,
+          fallback: true,
+        })
       }
 
       // Shape guard so the frontend never blows up on a partial response
@@ -277,8 +302,34 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
       } catch {
         /* graceful */
       }
+      // Log enough detail in pino + Sentry that a developer can trace
+      // a specific 500 in production (an Anthropic 429, an auth
+      // problem, a content-filter trip, or our own bug). The response
+      // body keeps it generic so we don't leak Anthropic internals.
+      log.error(
+        {
+          event: 'ai.sheet.analyze_failed',
+          sheetId,
+          userId: req.user?.userId,
+          err: err?.message || String(err),
+          status: err?.status || null,
+          type: err?.type || null,
+        },
+        'AI sheet analyze threw',
+      )
       captureError(err, { tags: { module: 'ai', action: 'sheetAnalyze' } })
-      sendError(res, 500, 'Failed to analyze sheet.', ERROR_CODES.INTERNAL)
+      // Differentiate the error class for the frontend so the toast
+      // can be actionable (429 → "try again in a minute", 401 → "set
+      // up Anthropic key", etc.). Default to 500 for unknown errors.
+      const status = Number.isInteger(err?.status) ? err.status : 500
+      const safeStatus = status === 429 ? 429 : status === 401 ? 503 : 500
+      const message =
+        safeStatus === 429
+          ? 'AI is rate-limited right now. Please wait a moment and try again.'
+          : safeStatus === 503
+            ? 'AI service is unavailable right now. Please try again later.'
+            : 'Failed to analyze sheet. Please try again.'
+      sendError(res, safeStatus, message, ERROR_CODES.INTERNAL)
     }
   },
 )
