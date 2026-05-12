@@ -17,7 +17,13 @@ const authRoutePath = require.resolve('../src/modules/auth')
 
 const mocks = {
   prisma: {
-    user: { findUnique: () => null, findFirst: () => null, create: () => null, update: () => null, count: () => 0 },
+    user: {
+      findUnique: () => null,
+      findFirst: () => null,
+      create: () => null,
+      update: () => null,
+      count: () => 0,
+    },
     school: { findFirst: () => null },
     $transaction: (fn) => (typeof fn === 'function' ? fn(mocks.prisma) : Promise.all(fn)),
   },
@@ -29,6 +35,8 @@ const mocks = {
   activityTracker: { trackActivity: () => {} },
 }
 
+const originAllowlistMock = () => (_req, _res, next) => next()
+
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
@@ -37,6 +45,7 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/notify'), mocks.notify],
   [require.resolve('../src/lib/badges'), mocks.badges],
   [require.resolve('../src/lib/activityTracker'), mocks.activityTracker],
+  [require.resolve('../src/middleware/originAllowlist'), originAllowlistMock],
 ])
 
 const originalModuleLoad = Module._load
@@ -51,7 +60,9 @@ beforeAll(() => {
       const resolvedRequest = Module._resolveFilename(requestId, parent, isMain)
       const mockedModule = mockTargets.get(resolvedRequest)
       if (mockedModule) return mockedModule
-    } catch { /* fall through */ }
+    } catch {
+      /* fall through */
+    }
     return originalModuleLoad.apply(this, arguments)
   }
 

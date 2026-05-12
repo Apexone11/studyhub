@@ -111,6 +111,13 @@ const mocks = vi.hoisted(() => {
   }
 })
 
+const originAllowlistMock = () => (_req, _res, next) => next()
+const achievementsMock = {
+  emitAchievementEvent: () => Promise.resolve(),
+  EVENT_KINDS: new Proxy({}, { get: (_t, prop) => String(prop) }),
+  checkAndAwardBadgesLegacy: () => {},
+}
+
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/lib/email/email'), mocks.email],
@@ -118,6 +125,8 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/verification/verificationChallenges'), mocks.verification],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/trustGate'), mocks.trustGate],
+  [require.resolve('../src/middleware/originAllowlist'), originAllowlistMock],
+  [require.resolve('../src/modules/achievements'), achievementsMock],
 ])
 
 const originalModuleLoad = Module._load

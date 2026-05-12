@@ -83,6 +83,7 @@ model User {
   noteComments               NoteComment[]
   noteStars                  NoteStar[]
   noteVersions               NoteVersion[]
+  noteHighlights             NoteHighlight[]
   reactions                  Reaction[]
   feedPosts                  FeedPost[]
   feedPostComments           FeedPostComment[]
@@ -565,9 +566,29 @@ model Note {
   noteStars        NoteStar[]
   noteVersions     NoteVersion[]
   noteReactions    NoteReaction[]
+  noteHighlights   NoteHighlight[]
   materials        Material[]     @relation("MaterialNote")
   revision         Int            @default(0)
   lastSaveId       String?        @db.Uuid
+}
+
+// Range-anchored highlights for notes (Phase 9 — Note Review v1).
+// Migration: backend/prisma/migrations/20260512000001_note_highlights/
+model NoteHighlight {
+  id            Int      @id @default(autoincrement())
+  noteId        Int
+  userId        Int
+  anchorText    String
+  anchorOffset  Int
+  anchorContext String?
+  color         String   @default("yellow")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  note          Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([noteId, createdAt(sort: Desc)])
+  @@index([userId])
 }
 
 model NoteComment {

@@ -2,8 +2,8 @@ const express = require('express')
 const multer = require('multer')
 const path = require('node:path')
 const { readLimiter } = require('../../lib/rateLimiters')
-const { sendForbidden } = require('../../lib/accessControl')
 const requireAuth = require('../../middleware/auth')
+const requireAdmin = require('../../middleware/requireAdmin')
 const originAllowlist = require('../../middleware/originAllowlist')
 const requireTrustedOrigin = originAllowlist()
 const { captureError } = require('../../monitoring/sentry')
@@ -88,11 +88,10 @@ router.get('/', async (req, res) => {
 })
 
 // ── POST /api/announcements — admin only ──────────────────────
-router.post('/', requireAuth, requireTrustedOrigin, async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return sendForbidden(res, 'Admin access required.')
-  }
-
+// CLAUDE.md A1 — admin enforcement uses the centralized requireAdmin
+// middleware (DB re-check + securityEvents.access_denied log), not an
+// inline req.user.role check in the handler.
+router.post('/', requireAuth, requireAdmin, requireTrustedOrigin, async (req, res) => {
   const title = typeof req.body.title === 'string' ? req.body.title.trim() : ''
   const body = typeof req.body.body === 'string' ? req.body.body.trim() : ''
   const pinned = !!req.body.pinned
@@ -160,13 +159,8 @@ router.post('/', requireAuth, requireTrustedOrigin, async (req, res) => {
 router.post(
   '/:id/images',
   requireAuth,
+  requireAdmin,
   requireTrustedOrigin,
-  (req, res, next) => {
-    if (req.user.role !== 'admin') {
-      return sendForbidden(res, 'Admin access required.')
-    }
-    next()
-  },
   imageUpload.array('images', MAX_IMAGES),
   async (req, res) => {
     const announcementId = Number.parseInt(req.params.id, 10)
@@ -237,7 +231,12 @@ router.post(
             type: 'image',
             url,
             position: existingCount + i,
-            fileName: file.originalname,
+            // A13: file.originalname is client-supplied and untrusted —
+            // truncate to 255 chars (POSIX/NTFS filename ceiling) so the
+            // unbounded AnnouncementMedia.fileName TEXT column cannot be
+            // padded with arbitrarily large strings via multipart upload.
+            fileName:
+              typeof file.originalname === 'string' ? file.originalname.slice(0, 255) : null,
             fileSize: file.size,
           },
         })
@@ -256,55 +255,53 @@ router.post(
 )
 
 // ── DELETE /api/announcements/:id/media/:mediaId — remove a media item (admin) ─
-router.delete('/:id/media/:mediaId', requireAuth, requireTrustedOrigin, async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return sendForbidden(res, 'Admin access required.')
-  }
-
-  const announcementId = Number.parseInt(req.params.id, 10)
-  const mediaId = Number.parseInt(req.params.mediaId, 10)
-  if (
-    !Number.isInteger(announcementId) ||
-    announcementId < 1 ||
-    !Number.isInteger(mediaId) ||
-    mediaId < 1
-  ) {
-    return sendError(res, 400, 'Invalid ID.', ERROR_CODES.BAD_REQUEST)
-  }
-
-  try {
-    const media = await prisma.announcementMedia.findUnique({
-      where: { id: mediaId },
-      select: { id: true, announcementId: true, url: true, type: true },
-    })
-    if (!media || media.announcementId !== announcementId) {
-      return sendError(res, 404, 'Media not found.', ERROR_CODES.NOT_FOUND)
+router.delete(
+  '/:id/media/:mediaId',
+  requireAuth,
+  requireAdmin,
+  requireTrustedOrigin,
+  async (req, res) => {
+    const announcementId = Number.parseInt(req.params.id, 10)
+    const mediaId = Number.parseInt(req.params.mediaId, 10)
+    if (
+      !Number.isInteger(announcementId) ||
+      announcementId < 1 ||
+      !Number.isInteger(mediaId) ||
+      mediaId < 1
+    ) {
+      return sendError(res, 400, 'Invalid ID.', ERROR_CODES.BAD_REQUEST)
     }
 
-    // Try to delete from R2 if it's an image with a URL
-    if (media.type === 'image' && media.url && r2.isR2Configured()) {
-      const key = r2.extractObjectKeyFromUrl(media.url)
-      try {
-        if (key) await r2.deleteObject(key)
-      } catch {
-        /* best effort */
+    try {
+      const media = await prisma.announcementMedia.findUnique({
+        where: { id: mediaId },
+        select: { id: true, announcementId: true, url: true, type: true },
+      })
+      if (!media || media.announcementId !== announcementId) {
+        return sendError(res, 404, 'Media not found.', ERROR_CODES.NOT_FOUND)
       }
-    }
 
-    await prisma.announcementMedia.delete({ where: { id: mediaId } })
-    res.json({ message: 'Media removed.' })
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
-  }
-})
+      // Try to delete from R2 if it's an image with a URL
+      if (media.type === 'image' && media.url && r2.isR2Configured()) {
+        const key = r2.extractObjectKeyFromUrl(media.url)
+        try {
+          if (key) await r2.deleteObject(key)
+        } catch {
+          /* best effort */
+        }
+      }
+
+      await prisma.announcementMedia.delete({ where: { id: mediaId } })
+      res.json({ message: 'Media removed.' })
+    } catch (err) {
+      captureError(err, { route: req.originalUrl, method: req.method })
+      sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 // ── POST /api/announcements/:id/video — attach video (admin only) ─────
-router.post('/:id/video', requireAuth, requireTrustedOrigin, async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return sendForbidden(res, 'Admin access required.')
-  }
-
+router.post('/:id/video', requireAuth, requireAdmin, requireTrustedOrigin, async (req, res) => {
   const announcementId = Number.parseInt(req.params.id, 10)
   const videoIdRaw = req.body.videoId
   const videoId =
@@ -379,31 +376,26 @@ router.post('/:id/video', requireAuth, requireTrustedOrigin, async (req, res) =>
 })
 
 // ── DELETE /api/announcements/:id — admin only ───────────────
-router.delete('/:id', requireAuth, requireTrustedOrigin, async (req, res) => {
-  if (req.user.role !== 'admin') {
-    return sendForbidden(res, 'Admin access required.')
-  }
-
+router.delete('/:id', requireAuth, requireAdmin, requireTrustedOrigin, async (req, res) => {
   const announcementId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(announcementId) || announcementId < 1)
     return sendError(res, 400, 'Invalid ID.', ERROR_CODES.BAD_REQUEST)
 
   try {
-    // Clean up R2 images before deleting
+    // Clean up R2 images before deleting. Parallel best-effort deletes —
+    // each object is a separate signed HTTP round-trip to R2, so the
+    // previous sequential `for` loop blocked the handler on N sequential
+    // round-trips. allSettled tolerates per-key failures.
     if (r2.isR2Configured()) {
       const mediaItems = await prisma.announcementMedia.findMany({
         where: { announcementId, type: 'image' },
         select: { url: true },
       })
-      for (const item of mediaItems) {
-        if (item.url) {
-          const key = r2.extractObjectKeyFromUrl(item.url)
-          try {
-            if (key) await r2.deleteObject(key)
-          } catch {
-            /* best effort */
-          }
-        }
+      const keys = mediaItems
+        .map((item) => (item.url ? r2.extractObjectKeyFromUrl(item.url) : null))
+        .filter(Boolean)
+      if (keys.length > 0) {
+        await Promise.allSettled(keys.map((key) => r2.deleteObject(key)))
       }
     }
 

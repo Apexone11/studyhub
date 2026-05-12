@@ -1,7 +1,8 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import UserAvatar from '../../components/UserAvatar'
+import { Skeleton, SkeletonCard } from '../../components/Skeleton'
 import { API } from '../../config'
 
 // ── Inject premium keyframe animations ──────────────────────────────────
@@ -91,6 +92,15 @@ export default function SupportersPage() {
     }
   }, [paymentStatus, setSearchParams])
 
+  // Bump `reloadKey` to re-trigger the data fetch from the inline retry
+  // button, so transient network errors recover without a page reload.
+  const [reloadKey, setReloadKey] = useState(0)
+  const retry = useCallback(() => {
+    setError('')
+    setLoading(true)
+    setReloadKey((k) => k + 1)
+  }, [])
+
   useEffect(() => {
     let cancelled = false
 
@@ -113,7 +123,7 @@ export default function SupportersPage() {
           }
         }
       } catch (err) {
-        if (!cancelled) setError('Failed to load supporter data.')
+        if (!cancelled) setError('We could not reach the supporter leaderboard.')
         console.error('[supporters]', err)
       } finally {
         if (!cancelled) setLoading(false)
@@ -124,7 +134,7 @@ export default function SupportersPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [reloadKey])
 
   return (
     <div style={s.page}>
@@ -169,12 +179,71 @@ export default function SupportersPage() {
       </section>
 
       {loading ? (
-        <section style={s.loadingSection}>
-          <div style={s.loadingText}>Loading supporters...</div>
+        <section style={s.section} aria-busy="true" aria-live="polite">
+          <div style={s.sectionInner}>
+            <span className="sr-only">Loading supporters…</span>
+            <Skeleton width={220} height={24} borderRadius={8} style={{ margin: '0 auto 8px' }} />
+            <Skeleton width={320} height={14} borderRadius={6} style={{ margin: '0 auto 32px' }} />
+            <div style={s.leaderboardGrid}>
+              <SkeletonCard />
+              <SkeletonCard />
+              <SkeletonCard />
+            </div>
+          </div>
         </section>
       ) : error ? (
-        <section style={s.loadingSection}>
-          <div style={s.errorText}>{error}</div>
+        <section style={s.section}>
+          <div
+            role="alert"
+            style={{
+              maxWidth: 560,
+              margin: '0 auto',
+              padding: '24px 28px',
+              borderRadius: 16,
+              background: 'var(--sh-danger-bg)',
+              border: '1px solid var(--sh-danger-border)',
+              textAlign: 'center',
+            }}
+          >
+            <h2
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: 'var(--sh-danger-text)',
+                margin: '0 0 6px',
+              }}
+            >
+              We could not load the supporters list
+            </h2>
+            <p
+              style={{
+                fontSize: 14,
+                color: 'var(--sh-danger-text)',
+                margin: '0 0 18px',
+                lineHeight: 1.6,
+                opacity: 0.9,
+              }}
+            >
+              {error} Check your connection and try again.
+            </p>
+            <button
+              type="button"
+              onClick={retry}
+              style={{
+                background: 'var(--sh-brand)',
+                color: 'var(--sh-on-dark)',
+                border: 'none',
+                borderRadius: 999,
+                padding: '10px 24px',
+                fontSize: 13,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: "'Plus Jakarta Sans', sans-serif",
+              }}
+            >
+              Try again
+            </button>
+          </div>
         </section>
       ) : (
         <>

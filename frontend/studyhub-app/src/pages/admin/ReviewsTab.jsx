@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { API } from '../../config'
 import UserAvatar from '../../components/UserAvatar'
+import { Skeleton } from '../../components/Skeleton'
 import {
   FONT,
   formatDateTime,
@@ -124,7 +125,7 @@ function ReviewsList() {
   }, [page, filter])
 
   useEffect(() => {
-    void loadReviews()
+    Promise.resolve().then(loadReviews)
   }, [loadReviews])
 
   async function handleAction(id, status) {
@@ -213,12 +214,35 @@ function ReviewsList() {
       )}
 
       {loading && !reviews.length ? (
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13, padding: 20 }}>
-          Loading reviews...
+        <div style={{ display: 'grid', gap: 8, padding: 8 }} aria-busy="true" aria-live="polite">
+          <span className="sr-only">Loading reviews…</span>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} width="100%" height={56} borderRadius={10} />
+          ))}
         </div>
       ) : !reviews.length ? (
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13, padding: 20, textAlign: 'center' }}>
-          No reviews found.
+        <div
+          style={{
+            padding: '32px 20px',
+            borderRadius: 12,
+            background: 'var(--sh-soft)',
+            border: '1px dashed var(--sh-border)',
+            textAlign: 'center',
+          }}
+        >
+          <div
+            style={{
+              fontSize: 14,
+              fontWeight: 700,
+              color: 'var(--sh-heading)',
+              marginBottom: 4,
+            }}
+          >
+            No user reviews yet
+          </div>
+          <div style={{ fontSize: 13, color: 'var(--sh-muted)' }}>
+            Approved reviews appear on the public Reviews page once users start submitting feedback.
+          </div>
         </div>
       ) : (
         <>
@@ -676,7 +700,7 @@ function AIReportsPanel() {
   }, [])
 
   useEffect(() => {
-    void loadReports()
+    Promise.resolve().then(loadReports)
   }, [loadReports])
 
   async function handleGenerate() {
@@ -800,8 +824,11 @@ function AIReportsPanel() {
       )}
 
       {loading ? (
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13, padding: 20 }}>
-          Loading reports...
+        <div style={{ display: 'grid', gap: 10, padding: 8 }} aria-busy="true" aria-live="polite">
+          <span className="sr-only">Loading AI review reports…</span>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Skeleton key={i} width="100%" height={84} borderRadius={12} />
+          ))}
         </div>
       ) : !reports.length ? (
         <div

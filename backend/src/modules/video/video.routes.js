@@ -211,6 +211,15 @@ router.post('/upload/init', requireAuth, videoUploadInitLimiter, async (req, res
       return res.status(400).json({ error: 'fileName, fileSize, and mimeType are required.' })
     }
 
+    // A13: cap fileName length so it can't blow up the R2 key generator
+    // or whatever the client supplies to us. 255 matches the common
+    // POSIX/NTFS filename ceiling and is plenty for any real upload.
+    if (typeof fileName !== 'string' || fileName.length > 255) {
+      return res
+        .status(400)
+        .json({ error: 'fileName must be a string of 255 characters or fewer.' })
+    }
+
     if (!ALLOWED_VIDEO_MIMES.has(mimeType)) {
       return res.status(400).json({ error: 'Unsupported video format. Allowed: MP4, WebM, MOV.' })
     }
@@ -863,6 +872,20 @@ router.post('/:id/captions', requireAuth, captionUpload.single('file'), async (r
     const { language, label } = req.body || {}
     if (!language || !label) {
       return res.status(400).json({ error: 'language and label are required.' })
+    }
+
+    // A13: VideoCaption.language is @db.VarChar(10) and BCP-47 codes
+    // never exceed ~12 chars; reject anything longer to avoid a
+    // P2000 column-overflow error from Prisma. `label` is the human
+    // readable name shown in the player track list and is unbounded
+    // TEXT in the schema, so cap it before the DB write.
+    if (typeof language !== 'string' || language.length > 10) {
+      return res
+        .status(400)
+        .json({ error: 'language must be a BCP-47 code of 10 characters or fewer.' })
+    }
+    if (typeof label !== 'string' || label.length > 80) {
+      return res.status(400).json({ error: 'label must be 80 characters or fewer.' })
     }
 
     if (!req.file) {

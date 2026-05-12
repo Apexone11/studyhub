@@ -215,7 +215,20 @@ router.patch('/schools/:id', async (req, res) => {
       if (raw === null || raw === '') {
         data.emailDomain = null
       } else if (typeof raw === 'string' && raw.trim().length > 0) {
-        data.emailDomain = raw.trim().toLowerCase()
+        const normalized = raw.trim().toLowerCase()
+        // A13: RFC 1035 caps a DNS name at 253 chars. Reject overlong
+        // values rather than silently store them in the TEXT column —
+        // an oversize emailDomain would make every later domain-match
+        // query unboundedly large.
+        if (normalized.length > 253) {
+          return sendError(
+            res,
+            400,
+            'emailDomain must be 253 characters or fewer.',
+            ERROR_CODES.UPLOAD_INVALID,
+          )
+        }
+        data.emailDomain = normalized
       }
     }
 

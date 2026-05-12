@@ -257,7 +257,16 @@ export default function EmailSuppressionsTab({
           ) : null}
 
           {auditState.loading && !auditState.loaded ? (
-            <div style={{ color: 'var(--sh-subtext)', fontSize: 12 }}>Loading audit timeline…</div>
+            <div style={{ display: 'grid', gap: 6 }} aria-busy="true" aria-live="polite">
+              <span className="sr-only">Loading audit timeline…</span>
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div
+                  key={i}
+                  className="sh-skeleton"
+                  style={{ height: 38, borderRadius: 10, width: '100%' }}
+                />
+              ))}
+            </div>
           ) : auditState.entries.length ? (
             <div style={{ display: 'grid', gap: 8 }}>
               {auditState.entries.map((entry) => (

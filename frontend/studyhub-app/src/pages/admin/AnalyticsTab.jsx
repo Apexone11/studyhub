@@ -17,6 +17,7 @@ import {
 import { API } from '../../config'
 import { FONT } from './adminConstants'
 import UserAvatar from '../../components/UserAvatar'
+import { Skeleton } from '../../components/Skeleton'
 
 const PERIODS = [
   { value: '7d', label: '7 days' },
@@ -378,7 +379,9 @@ export default function AnalyticsTab() {
   }, [])
 
   useEffect(() => {
-    void fetchAnalytics(period)
+    // Defer out of the synchronous effect body so the React Compiler
+    // doesn't flag setState-in-effect inside fetchAnalytics.
+    Promise.resolve().then(() => fetchAnalytics(period))
   }, [period, fetchAnalytics])
 
   /* Derived data for pie charts */
@@ -474,8 +477,23 @@ export default function AnalyticsTab() {
       ) : null}
 
       {loading && !activeUsers ? (
-        <div style={{ ...SECTION_STYLE, color: 'var(--sh-subtext)', fontSize: 13 }}>
-          Loading analytics data...
+        <div style={SECTION_STYLE} aria-busy="true" aria-live="polite">
+          <span className="sr-only">Loading analytics data…</span>
+          <Skeleton width="32%" height={18} borderRadius={6} style={{ marginBottom: 8 }} />
+          <Skeleton width="60%" height={12} borderRadius={4} style={{ marginBottom: 18 }} />
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: 10,
+              marginBottom: 14,
+            }}
+          >
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} width="100%" height={84} borderRadius={12} />
+            ))}
+          </div>
+          <Skeleton width="100%" height={220} borderRadius={12} />
         </div>
       ) : null}
 

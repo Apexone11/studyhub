@@ -1,5 +1,6 @@
 const express = require('express')
 const { authLimiter } = require('../../lib/rateLimiters')
+const originAllowlist = require('../../middleware/originAllowlist')
 const registerController = require('./auth.register.controller')
 const loginController = require('./auth.login.controller')
 const loginChallengeController = require('./login.challenge.controller')
@@ -13,6 +14,17 @@ const panicController = require('./panic.controller')
 const usernameController = require('./auth.username.controller')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — CSRF defense in depth.
+// The global `index.js` Origin/Referer check fails open when neither
+// header is present (curl, server-to-server). Auth writes are too
+// sensitive for that — apply originAllowlist() at the router level so
+// every POST/PATCH/PUT/DELETE under /api/auth requires a trusted Origin
+// even when the global check passes through.
+//
+// originAllowlist() short-circuits GET/HEAD/OPTIONS, so the read-side
+// /check-username + GET /sessions endpoints still flow normally.
+router.use(originAllowlist())
 
 // Rate limit all auth endpoints — 15 req / 15 min per IP.
 // Username check has its OWN read-tier limiter inside the controller

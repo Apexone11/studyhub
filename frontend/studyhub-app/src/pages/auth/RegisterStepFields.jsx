@@ -4,6 +4,7 @@
 
 import { useState } from 'react'
 import GoogleSignInButton from '../../components/GoogleSignInButton'
+import SubmitSpinner from '../../components/SubmitSpinner'
 import { GOOGLE_CLIENT_ID } from '../../config'
 import LegalAcceptanceModal from './LegalAcceptanceModal'
 
@@ -71,7 +72,16 @@ export function StepIndicator({ steps, step }) {
 /* ══════════════════════════════════════════════════════════════════════════
  * STEP 1: Account Creation
  * ══════════════════════════════════════════════════════════════════════════ */
-export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess, setError }) {
+export function AccountStep({
+  form,
+  setField,
+  loading,
+  onSubmit,
+  onGoogleSuccess,
+  setError,
+  fieldErrors = {},
+  getFieldProps = () => ({}),
+}) {
   const [showLegalModal, setShowLegalModal] = useState(false)
   const [pendingGoogleCredential, setPendingGoogleCredential] = useState(null)
 
@@ -136,13 +146,20 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
         </label>
         <input
           id="register-username"
+          {...getFieldProps('username', { id: 'register-username' })}
           value={form.username}
           onChange={(event) => setField('username', event.target.value)}
           placeholder="Choose a username"
           autoComplete="username"
           className="register-input"
         />
-        <div className="register-hint">3-20 chars, letters/numbers/_</div>
+        {fieldErrors.username ? (
+          <p id="register-username-error" className="sh-field-error" role="alert">
+            {fieldErrors.username}
+          </p>
+        ) : (
+          <div className="register-hint">3-20 chars, letters/numbers/_</div>
+        )}
       </div>
 
       {/* Email */}
@@ -153,13 +170,20 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
         <input
           id="register-email"
           type="email"
+          {...getFieldProps('email', { id: 'register-email' })}
           value={form.email}
           onChange={(event) => setField('email', event.target.value)}
           placeholder="you@university.edu"
           autoComplete="email"
           className="register-input"
         />
-        <div className="register-hint">We&apos;ll send a verification code to confirm.</div>
+        {fieldErrors.email ? (
+          <p id="register-email-error" className="sh-field-error" role="alert">
+            {fieldErrors.email}
+          </p>
+        ) : (
+          <div className="register-hint">We&apos;ll send a verification code to confirm.</div>
+        )}
       </div>
 
       {/* Password + Confirm row */}
@@ -171,12 +195,18 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
           <input
             id="register-password"
             type="password"
+            {...getFieldProps('password', { id: 'register-password' })}
             value={form.password}
             onChange={(event) => setField('password', event.target.value)}
             placeholder="Create a password"
             autoComplete="new-password"
             className="register-input"
           />
+          {fieldErrors.password && (
+            <p id="register-password-error" className="sh-field-error" role="alert">
+              {fieldErrors.password}
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="register-confirm-password" className="register-label">
@@ -185,12 +215,18 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
           <input
             id="register-confirm-password"
             type="password"
+            {...getFieldProps('confirmPassword', { id: 'register-confirm-password' })}
             value={form.confirmPassword}
             onChange={(event) => setField('confirmPassword', event.target.value)}
             placeholder="Re-enter password"
             autoComplete="new-password"
             className="register-input"
           />
+          {fieldErrors.confirmPassword && (
+            <p id="register-confirm-password-error" className="sh-field-error" role="alert">
+              {fieldErrors.confirmPassword}
+            </p>
+          )}
         </div>
       </div>
 
@@ -315,8 +351,15 @@ export function AccountStep({ form, setField, loading, onSubmit, onGoogleSuccess
         }}
       />
 
+      {fieldErrors.termsAccepted && (
+        <p id="register-terms-error" className="sh-field-error" role="alert">
+          {fieldErrors.termsAccepted}
+        </p>
+      )}
+
       <button type="submit" disabled={loading} className="register-btn-primary">
-        {loading ? 'Creating account...' : 'Create Account'}
+        {loading && <SubmitSpinner label="Creating account" />}
+        {loading ? 'Creating account…' : 'Create Account'}
       </button>
     </form>
   )
@@ -384,7 +427,8 @@ export function VerifyStep({
         disabled={loading || verificationCode.length !== 6}
         className="register-btn-primary"
       >
-        {loading ? 'Verifying...' : 'Verify Email'}
+        {loading && <SubmitSpinner label="Verifying" />}
+        {loading ? 'Verifying…' : 'Verify Email'}
       </button>
 
       <div className="register-center-text" style={{ marginTop: 16 }}>

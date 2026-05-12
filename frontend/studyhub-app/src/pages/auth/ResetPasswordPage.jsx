@@ -2,6 +2,8 @@ import Navbar from '../../components/navbar/Navbar'
 import { Link, useNavigate } from 'react-router-dom'
 import { useState, useEffect } from 'react'
 import { API } from '../../config'
+import SubmitSpinner from '../../components/SubmitSpinner'
+import { useFormValidation } from '../../lib/useFormValidation'
 
 const FONT = "'Plus Jakarta Sans', sans-serif"
 
@@ -14,30 +16,35 @@ function ResetPasswordPage() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+  const { errors, setErrors, clearFieldError, focusFirstError, getFieldProps } = useFormValidation()
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const t = params.get('token')
-    if (!t) setError('No reset token found. Please request a new reset link.')
-    else setToken(t)
+    Promise.resolve().then(() => {
+      if (!t) setError('No reset token found. Please request a new reset link.')
+      else setToken(t)
+    })
   }, [])
 
   async function handleSubmit(e) {
     e.preventDefault()
-    if (!newPassword || !confirmPassword) {
-      setError('Please fill in all fields.')
-      return
-    }
-    if (newPassword.length < 8) {
-      setError('Password must be at least 8 characters.')
-      return
-    }
-    if (newPassword !== confirmPassword) {
-      setError('Passwords do not match.')
+    const nextErrors = {}
+    if (!newPassword) nextErrors.newPassword = 'Enter a new password.'
+    else if (newPassword.length < 8)
+      nextErrors.newPassword = 'Password must be at least 8 characters.'
+    if (!confirmPassword) nextErrors.confirmPassword = 'Re-enter the new password.'
+    else if (newPassword && newPassword !== confirmPassword)
+      nextErrors.confirmPassword = 'Passwords do not match.'
+    if (Object.keys(nextErrors).length > 0) {
+      setErrors(nextErrors)
+      setError('')
+      focusFirstError(nextErrors)
       return
     }
 
     setError('')
+    setErrors({})
     setLoading(true)
     try {
       const res = await fetch(`${API}/api/auth/reset-password`, {
@@ -108,14 +115,20 @@ function ResetPasswordPage() {
                     id="newPassword"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="At least 8 characters"
+                    {...getFieldProps('newPassword', { id: 'newPassword' })}
                     value={newPassword}
                     onChange={(e) => {
                       setNewPassword(e.target.value)
                       setError('')
+                      clearFieldError('newPassword')
                     }}
                     style={{ ...styles.input, paddingRight: 44 }}
-                    onFocus={(e) => (e.target.style.borderColor = 'var(--sh-brand)')}
-                    onBlur={(e) => (e.target.style.borderColor = 'var(--sh-input-border)')}
+                    onFocus={(e) => {
+                      if (!errors.newPassword) e.target.style.borderColor = 'var(--sh-brand)'
+                    }}
+                    onBlur={(e) => {
+                      if (!errors.newPassword) e.target.style.borderColor = 'var(--sh-input-border)'
+                    }}
                   />
                   <button
                     type="button"
@@ -125,6 +138,11 @@ function ResetPasswordPage() {
                     <i className={showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'}></i>
                   </button>
                 </div>
+                {errors.newPassword && (
+                  <p id="newPassword-error" className="sh-field-error" role="alert">
+                    {errors.newPassword}
+                  </p>
+                )}
               </div>
 
               <div style={styles.formGroup}>
@@ -137,16 +155,28 @@ function ResetPasswordPage() {
                     id="confirmPassword"
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Re-enter new password"
+                    {...getFieldProps('confirmPassword', { id: 'confirmPassword' })}
                     value={confirmPassword}
                     onChange={(e) => {
                       setConfirmPassword(e.target.value)
                       setError('')
+                      clearFieldError('confirmPassword')
                     }}
                     style={styles.input}
-                    onFocus={(e) => (e.target.style.borderColor = 'var(--sh-brand)')}
-                    onBlur={(e) => (e.target.style.borderColor = 'var(--sh-input-border)')}
+                    onFocus={(e) => {
+                      if (!errors.confirmPassword) e.target.style.borderColor = 'var(--sh-brand)'
+                    }}
+                    onBlur={(e) => {
+                      if (!errors.confirmPassword)
+                        e.target.style.borderColor = 'var(--sh-input-border)'
+                    }}
                   />
                 </div>
+                {errors.confirmPassword && (
+                  <p id="confirmPassword-error" className="sh-field-error" role="alert">
+                    {errors.confirmPassword}
+                  </p>
+                )}
               </div>
 
               <button
@@ -160,6 +190,7 @@ function ResetPasswordPage() {
                   if (!loading && token) e.target.style.background = 'var(--sh-brand)'
                 }}
               >
+                {loading && <SubmitSpinner label="Saving" />}
                 {loading ? 'Saving…' : 'Set New Password'}
               </button>
 

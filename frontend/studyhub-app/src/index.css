@@ -4679,3 +4679,46 @@ html[data-reduced-motion='on'] *::after {
     animation: none !important;
   }
 }
+
+/* P3 form-validation polish (2026-05-12) — see lib/useFormValidation.js */
+@keyframes sh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.sh-submit-spinner {
+  animation: sh-spin 0.7s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sh-submit-spinner {
+    animation: none;
+  }
+}
+
+input[aria-invalid='true'],
+select[aria-invalid='true'],
+textarea[aria-invalid='true'],
+.sh-input--invalid {
+  border-color: var(--sh-danger) !important;
+  box-shadow: 0 0 0 1px var(--sh-danger);
+}
+
+input[aria-invalid='true']:focus,
+select[aria-invalid='true']:focus,
+textarea[aria-invalid='true']:focus,
+.sh-input--invalid:focus {
+  box-shadow:
+    0 0 0 1px var(--sh-danger),
+    0 0 0 3px var(--sh-danger-bg);
+  outline: none;
+}
+
+.sh-field-error {
+  margin: 6px 0 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sh-danger-text);
+  line-height: 1.4;
+}

@@ -207,6 +207,11 @@ router.patch('/sheets/:id/review', async (req, res) => {
   if (!['approve', 'reject'].includes(action)) {
     return res.status(400).json({ error: 'Action must be "approve" or "reject".' })
   }
+  // A13: reject oversized review reasons rather than silently truncating
+  // — the moderator should see the limit and shorten it themselves.
+  if (reason.length > 500) {
+    return res.status(400).json({ error: 'Review reason must be 500 characters or fewer.' })
+  }
   const effectiveReason =
     reason || (action === 'approve' ? 'Approved by admin.' : 'Rejected by admin (quick reject).')
 
@@ -322,7 +327,7 @@ router.delete('/sheets/:id', async (req, res) => {
           actorId: req.user.userId,
           // Link to the user's own sheets list — the sheet itself no
           // longer exists, and routing to the actor's profile would be
-          // confusing per the feature-loop finding 2026-05-03.
+          // confusing.
           linkPath: '/sheets?mine=1',
           priority: 'high',
         })

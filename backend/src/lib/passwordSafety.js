@@ -61,4 +61,11 @@ async function checkPasswordBreach(password) {
   }
 }
 
-module.exports = { checkPasswordBreach }
+// Alias for the controller-side import name. Both names resolve to the
+// same HIBP k-anonymity check; the alias exists because callers like
+// `auth.password.controller.js` and `auth.service.js` historically
+// imported `isPasswordPwned` and removing that name would break the
+// /api/auth/set-password runtime path.
+const isPasswordPwned = checkPasswordBreach
+
+module.exports = { checkPasswordBreach, isPasswordPwned }

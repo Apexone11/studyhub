@@ -10,6 +10,14 @@ const { adminLimiter, readLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
+// A13: bound the FeatureFlag.name + description String columns so admin
+// writes can't grow them unboundedly. `name` is the canonical lookup
+// key, so 80 is generous (the seeded `design_v2_*` set is < 40 chars).
+// `description` is human-readable copy shown in the admin UI; 500 keeps
+// it short enough to render without truncation.
+const FEATURE_FLAG_NAME_MAX = 80
+const FEATURE_FLAG_DESCRIPTION_MAX = 500
+
 // GET /api/flags — List all flags (admin only)
 router.get('/', adminLimiter, requireAuth, requireAdmin, async (req, res) => {
   try {
@@ -30,11 +38,32 @@ router.post('/', adminLimiter, requireAuth, requireAdmin, async (req, res) => {
   if (!name || typeof name !== 'string' || name.trim().length === 0) {
     return sendError(res, 400, 'Flag name is required.', ERROR_CODES.UPLOAD_INVALID)
   }
+  const trimmedName = name.trim()
+  if (trimmedName.length > FEATURE_FLAG_NAME_MAX) {
+    return sendError(
+      res,
+      400,
+      `Flag name must be ${FEATURE_FLAG_NAME_MAX} characters or fewer.`,
+      ERROR_CODES.VALIDATION,
+    )
+  }
+  if (
+    description !== undefined &&
+    description !== null &&
+    (typeof description !== 'string' || description.length > FEATURE_FLAG_DESCRIPTION_MAX)
+  ) {
+    return sendError(
+      res,
+      400,
+      `description must be a string of ${FEATURE_FLAG_DESCRIPTION_MAX} characters or fewer.`,
+      ERROR_CODES.VALIDATION,
+    )
+  }
 
   try {
     const flag = await prisma.featureFlag.create({
       data: {
-        name: name.trim(),
+        name: trimmedName,
         description: description || undefined,
         enabled: typeof enabled === 'boolean' ? enabled : false,
         rolloutPercentage: typeof rolloutPercentage === 'number' ? rolloutPercentage : 0,
@@ -55,6 +84,19 @@ router.post('/', adminLimiter, requireAuth, requireAdmin, async (req, res) => {
 router.put('/:name', adminLimiter, requireAuth, requireAdmin, async (req, res) => {
   const { name } = req.params
   const { description, enabled, rolloutPercentage, conditions } = req.body
+
+  if (
+    description !== undefined &&
+    description !== null &&
+    (typeof description !== 'string' || description.length > FEATURE_FLAG_DESCRIPTION_MAX)
+  ) {
+    return sendError(
+      res,
+      400,
+      `description must be a string of ${FEATURE_FLAG_DESCRIPTION_MAX} characters or fewer.`,
+      ERROR_CODES.VALIDATION,
+    )
+  }
 
   const data = {}
   if (typeof description === 'string') data.description = description

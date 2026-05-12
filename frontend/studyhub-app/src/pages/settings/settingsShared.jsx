@@ -102,7 +102,7 @@ export function Message({ tone = 'error', children }) {
   )
 }
 
-export function FormField({ label, children, hint }) {
+export function FormField({ label, children, hint, error, errorId }) {
   return (
     <div style={{ marginBottom: 16 }}>
       <label
@@ -111,7 +111,24 @@ export function FormField({ label, children, hint }) {
         <span style={{ display: 'block', marginBottom: 6 }}>{label}</span>
         {children}
       </label>
-      {hint && <div style={{ marginTop: 5, fontSize: 12, color: 'var(--sh-muted)' }}>{hint}</div>}
+      {error ? (
+        <p
+          id={errorId}
+          className="sh-field-error"
+          role="alert"
+          style={{
+            margin: '6px 0 0',
+            fontSize: 12,
+            fontWeight: 600,
+            color: 'var(--sh-danger-text)',
+            lineHeight: 1.4,
+          }}
+        >
+          {error}
+        </p>
+      ) : hint ? (
+        <div style={{ marginTop: 5, fontSize: 12, color: 'var(--sh-muted)' }}>{hint}</div>
+      ) : null}
     </div>
   )
 }
