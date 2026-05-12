@@ -35,6 +35,12 @@ const log = require('../../lib/logger')
 const { DEFAULT_MODEL, SYSTEM_PROMPT, AI_RATE_LIMIT_RPM } = require('./ai.constants')
 const { redactPII } = require('./ai.context')
 const { reserveSpend, refundSpendDelta, recordActualUsage } = require('./ai.spendCeiling')
+const {
+  validateHtmlForSubmission,
+  scanHtmlContentForPersistence,
+} = require('../../lib/html/htmlDraftValidation')
+const { RISK_TIER } = require('../../lib/html/htmlSecurity')
+const { SHEET_STATUS } = require('../sheets/sheets.constants')
 
 const router = express.Router()
 const requireTrustedOrigin = originAllowlist()
@@ -437,55 +443,106 @@ router.post(
         return sendError(res, 403, 'Only the sheet owner can apply edits.', ERROR_CODES.FORBIDDEN)
       }
 
-      // 1. Take a snapshot of the CURRENT (old) content — this is what
-      //    the user reverts to if they don't like the AI's edit.
+      // ── HTML scan pipeline (Codex P1 fix) ──────────────────────────
+      // If the sheet is HTML format, the AI-proposed content MUST go
+      // through the same validation + risk-tier classifier that the
+      // regular sheets.update.controller uses. Without this, the AI
+      // could persist unsafe content (script tags, event handlers,
+      // miner signatures) directly, bypassing the Tier 0-3 quarantine
+      // pipeline that every other write path honors. CLAUDE.md §"HTML
+      // Security Policy" + A6 (defense in depth).
+      let htmlScanFields = null
+      let nextStatus = sheet.status
+      const contentFormat = sheet.contentFormat || 'markdown'
+      if (contentFormat === 'html' && proposedContent.trim()) {
+        const validation = validateHtmlForSubmission(proposedContent)
+        if (!validation.ok) {
+          return sendError(
+            res,
+            400,
+            validation.issues[0] || 'Proposed HTML failed validation.',
+            ERROR_CODES.VALIDATION,
+            { issues: validation.issues },
+          )
+        }
+        try {
+          htmlScanFields = await scanHtmlContentForPersistence(proposedContent)
+        } catch (scanErr) {
+          captureError(scanErr, { tags: { module: 'ai', action: 'sheetApplyEdit.scan' } })
+          return sendError(
+            res,
+            500,
+            'HTML scan failed for the AI proposal. Please try again.',
+            ERROR_CODES.INTERNAL,
+          )
+        }
+        // Tier-3 (quarantined) AI content lands in the moderation queue
+        // instead of going live, matching the normal sheet-write contract.
+        if (htmlScanFields.htmlRiskTier === RISK_TIER.QUARANTINED) {
+          nextStatus = SHEET_STATUS.QUARANTINED
+        }
+      }
+
+      // ── Single-transaction write (Codex P2 fix) ────────────────────
+      // Compose all three dependent writes inside one `$transaction` so
+      // a transient DB error mid-flight can't leave the sheet body
+      // updated while one of the surrounding SheetCommit rows is
+      // missing. The reversible audit trail this endpoint promises only
+      // holds if all three rows commit together or none do.
+      const oldContent = sheet.content || ''
+      const snapshotChecksum = computeChecksum(oldContent)
+      const appliedChecksum = computeChecksum(proposedContent)
       const latestCommit = await prisma.sheetCommit.findFirst({
         where: { sheetId },
         orderBy: { createdAt: 'desc' },
         select: { id: true },
       })
 
-      const oldContent = sheet.content || ''
-      const snapshotChecksum = computeChecksum(oldContent)
-      const snapshotCommit = await prisma.sheetCommit.create({
-        data: {
-          sheetId,
-          userId: req.user.userId,
-          kind: 'ai_pre_apply',
-          message: `Before AI edit: ${snapshotName}${
-            snapshotMessage ? ` — ${snapshotMessage}` : ''
-          }`,
-          content: oldContent,
-          contentFormat: sheet.contentFormat || 'markdown',
-          checksum: snapshotChecksum,
-          parentId: latestCommit ? latestCommit.id : null,
-        },
-        select: { id: true, message: true, createdAt: true, kind: true, checksum: true },
-      })
+      const result = await prisma.$transaction(async (tx) => {
+        const snap = await tx.sheetCommit.create({
+          data: {
+            sheetId,
+            userId: req.user.userId,
+            kind: 'ai_pre_apply',
+            message: `Before AI edit: ${snapshotName}${
+              snapshotMessage ? ` — ${snapshotMessage}` : ''
+            }`,
+            content: oldContent,
+            contentFormat,
+            checksum: snapshotChecksum,
+            parentId: latestCommit ? latestCommit.id : null,
+          },
+          select: { id: true, message: true, createdAt: true, kind: true, checksum: true },
+        })
 
-      // 2. Apply the proposed content to the sheet
-      const updated = await prisma.studySheet.update({
-        where: { id: sheetId },
-        data: { content: proposedContent, updatedAt: new Date() },
-        select: { id: true, content: true, contentFormat: true, updatedAt: true },
-      })
-
-      // 3. Take a second commit recording the AI-applied state (so the
-      //    timeline shows both "before" and "after" snapshots and the
-      //    user can revert in one click).
-      const appliedChecksum = computeChecksum(proposedContent)
-      const appliedCommit = await prisma.sheetCommit.create({
-        data: {
-          sheetId,
-          userId: req.user.userId,
-          kind: 'ai_applied',
-          message: snapshotName,
+        const sheetUpdateData = {
           content: proposedContent,
-          contentFormat: sheet.contentFormat || 'markdown',
-          checksum: appliedChecksum,
-          parentId: snapshotCommit.id,
-        },
-        select: { id: true, message: true, createdAt: true, kind: true, checksum: true },
+          updatedAt: new Date(),
+          status: nextStatus,
+        }
+        if (htmlScanFields) Object.assign(sheetUpdateData, htmlScanFields)
+
+        const updated = await tx.studySheet.update({
+          where: { id: sheetId },
+          data: sheetUpdateData,
+          select: { id: true, content: true, contentFormat: true, status: true, updatedAt: true },
+        })
+
+        const applied = await tx.sheetCommit.create({
+          data: {
+            sheetId,
+            userId: req.user.userId,
+            kind: 'ai_applied',
+            message: snapshotName,
+            content: proposedContent,
+            contentFormat,
+            checksum: appliedChecksum,
+            parentId: snap.id,
+          },
+          select: { id: true, message: true, createdAt: true, kind: true, checksum: true },
+        })
+
+        return { snap, applied, updated }
       })
 
       log.info(
@@ -493,13 +550,20 @@ router.post(
           event: 'ai.sheet.applied_edit',
           sheetId,
           ownerId: sheet.userId,
-          snapshotCommitId: snapshotCommit.id,
-          appliedCommitId: appliedCommit.id,
+          snapshotCommitId: result.snap.id,
+          appliedCommitId: result.applied.id,
+          htmlRiskTier: htmlScanFields?.htmlRiskTier || null,
+          quarantined: nextStatus === SHEET_STATUS.QUARANTINED,
         },
         'AI sheet edit applied',
       )
 
-      res.json({ sheet: updated, snapshotCommit, appliedCommit })
+      res.json({
+        sheet: result.updated,
+        snapshotCommit: result.snap,
+        appliedCommit: result.applied,
+        quarantined: nextStatus === SHEET_STATUS.QUARANTINED,
+      })
     } catch (err) {
       captureError(err, { tags: { module: 'ai', action: 'sheetApplyEdit' } })
       sendError(res, 500, 'Failed to apply AI edit.', ERROR_CODES.INTERNAL)
