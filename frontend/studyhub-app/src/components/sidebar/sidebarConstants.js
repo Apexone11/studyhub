@@ -20,6 +20,7 @@ import {
   IconHeart,
   IconLink,
   IconSettings,
+  IconScroll,
 } from '../Icons'
 
 export const FOCUSABLE_DRAWER_SELECTORS = [
@@ -35,6 +36,7 @@ export const NAV_LINKS = [
   { icon: IconFeed, label: 'Feed', to: '/feed' },
   { icon: IconSheets, label: 'Study Sheets', to: '/sheets' },
   { icon: IconBook, label: 'Library', to: '/library' },
+  { icon: IconScroll, label: 'Scholar', to: '/scholar' },
   { icon: IconTests, label: 'Practice Tests', to: '/tests', comingSoon: true },
   { icon: IconNotes, label: 'My Notes', to: '/notes' },
   { icon: IconMessages, label: 'Messages', to: '/messages' },
@@ -69,6 +71,7 @@ export const SIDEBAR_SECTIONS = [
       { icon: IconFeed, label: 'Feed', to: '/feed' },
       { icon: IconSheets, label: 'Study Sheets', to: '/sheets' },
       { icon: IconBook, label: 'Library', to: '/library' },
+      { icon: IconScroll, label: 'Scholar', to: '/scholar' },
       { icon: IconTests, label: 'Practice Tests', to: '/tests', comingSoon: true },
       { icon: IconMessages, label: 'Messages', to: '/messages' },
       { icon: IconUsers, label: 'Study Groups', to: '/study-groups' },

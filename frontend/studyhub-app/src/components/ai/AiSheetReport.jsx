@@ -71,7 +71,6 @@ function AiSheetReportInner({ sheetId, onClose }) {
   const [proposing, setProposing] = useState(false)
 
   const [snapshotName, setSnapshotName] = useState('')
-  const [snapshotMessage] = useState('')
   const [applying, setApplying] = useState(false)
 
   // Detect ownership for the optional "Edit with AI" buttons.
@@ -171,7 +170,6 @@ function AiSheetReportInner({ sheetId, onClose }) {
     const res = await applySheetEdit(sheetContext.sheetId, {
       proposedContent: proposal.proposedContent,
       snapshotName: fallbackName,
-      snapshotMessage: snapshotMessage.trim() || undefined,
     })
     setApplying(false)
     if (!res.ok) {

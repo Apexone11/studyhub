@@ -1,0 +1,477 @@
+/**
+ * ScholarSearchPage.css — StudyHub-native chrome for /scholar/search.
+ *
+ * Identity: Plus Jakarta Sans, blue #2563eb accent, warm #f6f5f2 page bg.
+ * All colors via var(--sh-*) tokens. NO editorial serif here — sans-serif
+ * headings only (the rest of the Scholar surface uses --font-paper, but
+ * the search page is the primary user journey and adopts the rest of the
+ * app's sans chrome).
+ */
+
+.scholar-search-page {
+  min-height: 100dvh;
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}
+
+/* ── Sticky search bar ─────────────────────────────────────────────── */
+.scholar-search-page__sticky-bar {
+  position: sticky;
+  top: 64px;
+  z-index: 5;
+  background: var(--sh-page-bg);
+  padding: 12px 0 14px;
+  margin-bottom: 18px;
+  border-bottom: 1px solid var(--sh-border);
+}
+
+.scholar-search-page__bar {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  width: 100%;
+}
+
+.scholar-search-page__input-wrap {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 52px;
+  padding: 0 16px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  min-width: 0;
+}
+
+.scholar-search-page__input-wrap:focus-within {
+  border-color: var(--sh-brand);
+  box-shadow: 0 0 0 4px var(--sh-brand-soft);
+}
+
+.scholar-search-page__icon {
+  flex: 0 0 auto;
+  width: 18px;
+  height: 18px;
+  color: var(--sh-muted);
+}
+
+.scholar-search-page__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: var(--sh-text);
+  /* ≥16px keeps iOS Safari from auto-zooming on focus. */
+  font-size: 16px;
+  font-family: inherit;
+  outline: none;
+}
+
+.scholar-search-page__input::placeholder {
+  color: var(--sh-muted);
+}
+
+.scholar-search-page__kbd {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: var(--sh-subtext);
+  letter-spacing: 0.02em;
+}
+
+@media (max-width: 640px) {
+  .scholar-search-page__kbd {
+    display: none;
+  }
+}
+
+.scholar-search-page__clear-btn {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 0;
+  background: transparent;
+  color: var(--sh-subtext);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: inherit;
+  font-size: 18px;
+  line-height: 1;
+}
+.scholar-search-page__clear-btn:hover {
+  background: var(--sh-soft);
+  color: var(--sh-text);
+}
+
+/* ── Filter chip strip ─────────────────────────────────────────────── */
+.scholar-search-page__filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+  align-items: center;
+}
+
+.scholar-search-page__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.scholar-search-page__chip:hover {
+  background: var(--sh-soft);
+}
+
+.scholar-search-page__chip[aria-pressed='true'] {
+  background: var(--sh-brand-soft);
+  border-color: var(--sh-brand);
+  color: var(--sh-pill-text, var(--sh-brand));
+}
+
+.scholar-search-page__chip--more {
+  border-style: dashed;
+  color: var(--sh-subtext);
+}
+
+.scholar-search-page__chip-select {
+  height: 34px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  font-size: 13px;
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.scholar-search-page__chip-clear {
+  margin-left: auto;
+  background: transparent;
+  border: 0;
+  color: var(--sh-subtext);
+  font-size: 13px;
+  font-family: inherit;
+  cursor: pointer;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+.scholar-search-page__chip-clear:hover {
+  background: var(--sh-soft);
+  color: var(--sh-text);
+}
+
+/* ── Result-count + duration strip ─────────────────────────────────── */
+.scholar-search-page__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin: 10px 0 14px;
+  font-size: 13px;
+  color: var(--sh-subtext);
+  flex-wrap: wrap;
+}
+
+.scholar-search-page__throttled {
+  font-size: 12px;
+  color: var(--sh-warning-text);
+  background: var(--sh-warning-bg);
+  padding: 3px 10px;
+  border-radius: 999px;
+}
+
+/* ── Result grid ───────────────────────────────────────────────────── */
+.scholar-search-page__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .scholar-search-page__grid--two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* ── Skeleton card ─────────────────────────────────────────────────── */
+.scholar-search-page__skeleton {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+  padding: 20px;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scholar-search-page__skeleton-bar {
+  height: 12px;
+  background: linear-gradient(90deg, var(--sh-soft) 0%, var(--sh-border) 50%, var(--sh-soft) 100%);
+  background-size: 200% 100%;
+  border-radius: 6px;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-search-page__skeleton-bar {
+    animation: scholar-search-shimmer 1.4s linear infinite;
+  }
+}
+
+@keyframes scholar-search-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ── Empty / no-results states ─────────────────────────────────────── */
+.scholar-search-page__empty {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 16px;
+  padding: 36px 24px;
+  text-align: center;
+  margin-top: 24px;
+}
+
+.scholar-search-page__empty-title {
+  font-size: 18px;
+  font-weight: 600;
+  color: var(--sh-heading);
+  margin: 0 0 6px;
+  font-family: inherit;
+}
+
+.scholar-search-page__empty-sub {
+  color: var(--sh-subtext);
+  font-size: 14px;
+  margin: 0 0 22px;
+}
+
+.scholar-search-page__example-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+.scholar-search-page__example {
+  min-height: 44px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  font-family: inherit;
+  font-size: 14px;
+  cursor: pointer;
+  text-align: left;
+}
+.scholar-search-page__example:hover {
+  background: var(--sh-brand-soft);
+  border-color: var(--sh-brand);
+  color: var(--sh-pill-text, var(--sh-brand));
+}
+
+.scholar-search-page__suggestions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+  margin-top: 6px;
+  color: var(--sh-subtext);
+  font-size: 14px;
+}
+
+.scholar-search-page__suggestions a {
+  color: var(--sh-brand);
+  text-decoration: none;
+}
+.scholar-search-page__suggestions a:hover {
+  text-decoration: underline;
+}
+
+/* ── Error banner ──────────────────────────────────────────────────── */
+.scholar-search-page__error {
+  background: var(--sh-danger-bg);
+  border: 1px solid var(--sh-danger-border);
+  color: var(--sh-danger-text);
+  padding: 12px 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+/* ── Compare banner ────────────────────────────────────────────────── */
+.scholar-search-page__compare-bar {
+  position: sticky;
+  bottom: calc(env(safe-area-inset-bottom, 0) + 16px);
+  z-index: 6;
+  margin: 24px auto 0;
+  max-width: 720px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-brand);
+  border-radius: 999px;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: var(--shadow-md, 0 8px 24px rgba(0, 0, 0, 0.12));
+  font-size: 14px;
+}
+
+.scholar-search-page__compare-bar-count {
+  color: var(--sh-text);
+  font-weight: 600;
+}
+
+.scholar-search-page__compare-bar-spacer {
+  flex: 1;
+}
+
+.scholar-search-page__compare-go {
+  height: 36px;
+  padding: 0 16px;
+  border-radius: 999px;
+  border: 0;
+  background: var(--sh-brand);
+  color: var(--sh-on-brand, #fff);
+  font-family: inherit;
+  font-weight: 600;
+  font-size: 13px;
+  cursor: pointer;
+}
+.scholar-search-page__compare-go:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.scholar-search-page__compare-clear {
+  background: transparent;
+  border: 0;
+  color: var(--sh-subtext);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 8px;
+}
+.scholar-search-page__compare-clear:hover {
+  background: var(--sh-soft);
+  color: var(--sh-text);
+}
+
+/* ── Card-level compare checkbox overlay ───────────────────────────── */
+.scholar-search-page__card-wrap {
+  position: relative;
+}
+
+.scholar-search-page__compare-toggle {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  /* Tap targets ≥ 44×44 per WCAG 2.5.5. */
+  min-width: 44px;
+  min-height: 44px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.scholar-search-page__compare-toggle:hover {
+  background: var(--sh-soft);
+}
+.scholar-search-page__compare-toggle[aria-pressed='true'] {
+  background: var(--sh-brand-soft);
+  border-color: var(--sh-brand);
+  color: var(--sh-pill-text, var(--sh-brand));
+}
+
+/* ── "Why this paper?" tooltip ─────────────────────────────────────── */
+.scholar-search-page__why {
+  position: absolute;
+  bottom: 8px;
+  right: 12px;
+  z-index: 2;
+}
+
+.scholar-search-page__why-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-subtext);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: help;
+}
+
+.scholar-search-page__why-pop {
+  position: absolute;
+  right: 0;
+  bottom: 36px;
+  width: 240px;
+  background: var(--sh-text);
+  color: var(--sh-page-bg);
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  pointer-events: none;
+}
+
+/* ── Sentinel + end-of-results ─────────────────────────────────────── */
+.scholar-search-page__sentinel {
+  height: 60px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sh-subtext);
+  font-size: 13px;
+}
+
+.scholar-search-page__end {
+  text-align: center;
+  color: var(--sh-subtext);
+  font-size: 13px;
+  padding: 24px 0;
+}
