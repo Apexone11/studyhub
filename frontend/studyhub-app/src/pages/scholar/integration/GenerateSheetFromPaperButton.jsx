@@ -6,9 +6,10 @@
  *
  * Click flow:
  *   1. Open AiPermissionDialog ("Generate study sheet from this paper?").
- *   2. On accept → POST /api/scholar/papers/:id/generate-sheet which
- *      returns `{ context, suggestedPrompt, quotaCostMessages }` only
- *      (no AI call yet — that's the master plan's single-spend-point rule).
+ *   2. On accept → POST /api/scholar/ai/generate-sheet with body
+ *      { paperId } which returns `{ context, suggestedPrompt,
+ *      quotaCostMessages }` only (no AI call yet — that's the master
+ *      plan's single-spend-point rule).
  *   3. Forward to POST /api/ai/messages with the suggestedPrompt + the
  *      Scholar context block, stream the SSE response, and read the
  *      `sheet:created` event (or final `done` payload) for the new
@@ -107,10 +108,15 @@ export default function GenerateSheetFromPaperButton({ paper, children, classNam
 
     setBusy(true)
     try {
-      const ctxRes = await fetch(
-        `${API}/api/scholar/papers/${encodeURIComponent(paper.id)}/generate-sheet`,
-        { method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' } },
-      )
+      // Real backend route is /api/scholar/ai/generate-sheet (body
+      // carries paperId). Earlier nested-REST path was a wave-4 hallucination
+      // that 404'd; audit Loop S11 caught it on 2026-05-13.
+      const ctxRes = await fetch(`${API}/api/scholar/ai/generate-sheet`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ paperId: paper.id }),
+      })
 
       if (ctxRes.status === 404) {
         showToast('Feature coming soon', 'info')

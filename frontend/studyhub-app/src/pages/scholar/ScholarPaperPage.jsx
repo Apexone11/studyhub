@@ -42,6 +42,11 @@ import CiteModal from './cite/CiteModal'
 import DiscussionThread from './discussion/DiscussionThread'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
 import ScholarShell from './ScholarShell'
+import SimilarInLibraryBadge from './integration/SimilarInLibraryBadge'
+import useScholarShortcuts from './shortcuts/useScholarShortcuts'
+import ScholarKeyboardShortcutsModal, {
+  ScholarShortcutsHint,
+} from './shortcuts/ScholarKeyboardShortcutsModal'
 import './ScholarPage.css'
 import './ScholarPaperPage.css'
 
@@ -381,6 +386,7 @@ export default function ScholarPaperPage() {
   const [citeOpen, setCiteOpen] = useState(false)
   const [showPdfViewer, setShowPdfViewer] = useState(false)
   const [titleBarVisible, setTitleBarVisible] = useState(false)
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   // Reset the local override whenever the paper changes, so navigating
   // between papers doesn't leak the previous paper's "Saved" toggle.
@@ -519,42 +525,36 @@ export default function ScholarPaperPage() {
     }
     setIsGenerating(true)
     try {
-      const res = await fetch(
-        `${API}/api/scholar/papers/${encodeURIComponent(validId)}/generate-sheet`,
-        {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ paperId: validId }),
-        },
-      )
-      // Fallback to the existing /api/scholar/ai/generate-sheet path
-      // when the new route is not yet deployed.
-      let payload = null
-      if (res.status === 404) {
-        const fallback = await fetch(`${API}/api/scholar/ai/generate-sheet`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json', ...authHeaders() },
-          body: JSON.stringify({ paperId: validId }),
-        })
-        if (!fallback.ok) throw new Error(`Sheet prep failed (${fallback.status})`)
-        payload = await fallback.json()
-      } else if (!res.ok) {
+      // Real backend route: POST /api/scholar/ai/generate-sheet with
+      // { paperId }. Earlier code POSTed to a nested-REST path that
+      // didn't exist (404), fell back to this path. We go straight to
+      // the real path — audit Loop S11 (2026-05-13).
+      const res = await fetch(`${API}/api/scholar/ai/generate-sheet`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json', ...authHeaders() },
+        body: JSON.stringify({ paperId: validId }),
+      })
+      if (!res.ok) {
         throw new Error(`Sheet prep failed (${res.status})`)
-      } else {
-        payload = await res.json()
       }
+      const payload = await res.json()
       const prompt = payload?.suggestedPrompt || `Generate a study sheet for paperId ${validId}`
+      const context = payload?.context || null
+      // `/api/ai/messages` expects { content, currentPage, mode } and
+      // returns an SSE stream. Earlier code sent { prompt, context,
+      // paperId, intent } and read .json() — both wrong.
+      const composed = context
+        ? `${prompt}\n\n---\nPaper context:\n${JSON.stringify(context, null, 2)}`
+        : prompt
       const aiRes = await fetch(`${API}/api/ai/messages`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json', ...authHeaders() },
         body: JSON.stringify({
-          prompt,
-          context: payload?.context || null,
-          paperId: validId,
-          intent: 'generate_sheet',
+          content: composed,
+          currentPage: `/scholar/paper/${validId}`,
+          mode: 'generate-sheet',
         }),
       })
       if (!aiRes.ok) {
@@ -563,16 +563,43 @@ export default function ScholarPaperPage() {
         navigate(`/ai?paperId=${encodeURIComponent(validId)}&prompt=${encodeURIComponent(prompt)}`)
         return
       }
-      let aiJson = null
+      // Stream the SSE body and look for the new sheet id. Cap at 1 MB so
+      // a malformed stream doesn't grow the buffer unboundedly.
+      let newSheetId = null
       try {
-        aiJson = await aiRes.json()
+        const reader = aiRes.body?.getReader?.()
+        if (reader) {
+          const decoder = new TextDecoder()
+          let buf = ''
+          let received = 0
+          const MAX = 1024 * 1024
+          while (true) {
+            const chunk = await reader.read().catch(() => ({ done: true }))
+            if (chunk.done) break
+            received += chunk.value?.byteLength || 0
+            buf += decoder.decode(chunk.value, { stream: true })
+            if (received > MAX) break
+            const m = buf.match(/"sheetId"\s*:\s*"?([A-Za-z0-9_-]+)"?/)
+            if (m && m[1]) {
+              newSheetId = m[1]
+              break
+            }
+          }
+          try {
+            reader.cancel()
+          } catch {
+            /* best-effort */
+          }
+        }
       } catch {
-        /* streaming-only endpoint */
+        /* graceful: fall through to the /ai handoff below */
       }
-      const newSheetId = aiJson?.sheet?.id || aiJson?.sheetId || aiJson?.studySheetId || null
       if (newSheetId) {
         navigate(`/sheets/${newSheetId}/lab`)
       } else {
+        // No sheet id in the stream — open Hub AI so the user can review
+        // whatever the model produced.
+        showToast('Sheet drafted — open Hub AI to review the result.', 'info')
         navigate(`/ai?paperId=${encodeURIComponent(validId)}&prompt=${encodeURIComponent(prompt)}`)
       }
     } catch (err) {
@@ -581,6 +608,22 @@ export default function ScholarPaperPage() {
       setIsGenerating(false)
     }
   }, [validId, isGenerating, requestPermission, paper, navigate])
+
+  // Keyboard shortcuts (wave-7 wiring 2026-05-13): `?` opens help,
+  // `s` saves, `a` jumps to Annotations, `c` opens the cite modal,
+  // `g` triggers generate-sheet, `Escape` closes overlays. Hook is
+  // no-op when the user is typing in an input (built into the hook).
+  useScholarShortcuts({
+    onShowHelp: () => setShortcutsOpen(true),
+    onSave: () => handleSave(),
+    onAnnotate: () => handleAnnotate(),
+    onCite: () => setCiteOpen(true),
+    onGenerateSheet: () => handleGenerateSheet(),
+    onCloseOverlay: () => {
+      if (citeOpen) setCiteOpen(false)
+      else if (shortcutsOpen) setShortcutsOpen(false)
+    },
+  })
 
   // ── Render guards ────────────────────────────────────────────────────
   if (!validId) {
@@ -932,6 +975,11 @@ export default function ScholarPaperPage() {
 
           {/* TODO v2: D3 force-directed similarity graph */}
 
+          {/* "N in your library" chip — silent no-op when the user has
+              no saved papers similar to this one, so safe to render
+              unconditionally. */}
+          {paper ? <SimilarInLibraryBadge paper={paper} /> : null}
+
           <div className="scholar-paper__sidebar-card">
             <h3 className="scholar-paper__sidebar-card-title">Recently viewed</h3>
             {recentlyViewed.length === 0 ? (
@@ -978,6 +1026,9 @@ export default function ScholarPaperPage() {
       {citeOpen && validId && (
         <CiteModal paperId={validId} paperTitle={paper?.title} onClose={() => setCiteOpen(false)} />
       )}
+
+      <ScholarKeyboardShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <ScholarShortcutsHint onOpen={() => setShortcutsOpen(true)} />
     </ScholarShell>
   )
 }

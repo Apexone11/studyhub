@@ -490,25 +490,34 @@ export default function PaperCard({
         </div>
       )}
 
-      {/* Action bar */}
+      {/* Action bar — each icon button is only rendered when the parent
+          provided the matching handler. Earlier code rendered Save +
+          Cite unconditionally, which made them look interactive but
+          silently no-op when the parent forgot to wire the callback
+          (audit Loop S11, 2026-05-13). Conditional render is the same
+          contract `onShare` already used. */}
       <div className="paper-card__action-bar" role="group" aria-label="Paper actions">
-        <button
-          type="button"
-          className={`paper-card__action${saved ? ' is-active' : ''}`}
-          aria-label={saved ? 'Remove from saved' : 'Save paper'}
-          aria-pressed={saved ? 'true' : 'false'}
-          onClick={handleAction(onSave)}
-        >
-          <IconStar filled={saved} />
-        </button>
-        <button
-          type="button"
-          className="paper-card__action"
-          aria-label="Cite paper"
-          onClick={handleAction(onCite)}
-        >
-          <IconQuote />
-        </button>
+        {typeof onSave === 'function' && (
+          <button
+            type="button"
+            className={`paper-card__action${saved ? ' is-active' : ''}`}
+            aria-label={saved ? 'Remove from saved' : 'Save paper'}
+            aria-pressed={saved ? 'true' : 'false'}
+            onClick={handleAction(onSave)}
+          >
+            <IconStar filled={saved} />
+          </button>
+        )}
+        {typeof onCite === 'function' && (
+          <button
+            type="button"
+            className="paper-card__action"
+            aria-label="Cite paper"
+            onClick={handleAction(onCite)}
+          >
+            <IconQuote />
+          </button>
+        )}
         <Link
           to={href}
           className="paper-card__action paper-card__action--link"

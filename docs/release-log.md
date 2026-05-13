@@ -28,6 +28,25 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-7 Scholar feature wiring (2026-05-13)
+
+The wave-4 Scholar revival shipped 5 integration components, a keyboard-shortcuts hook, and a `SimilarInLibraryBadge` — none of them were imported by any page. Wave-7 wires the most impactful ones into the live pages so users actually see them:
+
+- **Generate-sheet-from-paper now works end to end.** The inline handler on `ScholarPaperPage` was POSTing to a non-existent `/api/scholar/papers/:id/generate-sheet`, falling back to the real route but then sending `{ prompt, context, paperId, intent }` to `/api/ai/messages` and reading `.json()` on what is actually a Server-Sent Events stream. Rewrote the handler to POST `{ paperId }` to the real `/api/scholar/ai/generate-sheet` route, send `{ content, currentPage, mode: 'generate-sheet' }` to `/api/ai/messages`, and scan the SSE stream (1 MB cap) for the new sheet id. On success → navigate to `/sheets/:id/lab`. On no sheet id in the stream → hand off to `/ai` so the user can review the model output. Same fix mirrored into the standalone `GenerateSheetFromPaperButton` component.
+- **Keyboard shortcuts are alive.** `useScholarShortcuts` hook + `ScholarKeyboardShortcutsModal` + `ScholarShortcutsHint` are now mounted on both `ScholarPaperPage` and `ScholarSearchPage`. Active bindings: `?` opens the help modal, `s` saves, `a` jumps to Annotations, `c` opens the cite modal, `g` triggers generate-sheet, `/` and `Cmd/Ctrl+K` focus the search input, `Escape` closes the topmost overlay. The hook's built-in typing-in-input guard prevents the bindings from firing while the user is typing.
+- **"N in your library" chip on paper detail.** `SimilarInLibraryBadge` mounted on the paper detail right sidebar. Silently renders nothing when the user has no saved papers similar to the current one OR the backend `/api/scholar/saved?similarTo=` endpoint isn't deployed yet — graceful no-op until the corresponding backend route lands in a future wave.
+- **PaperCard Save / Cite buttons no longer render as no-op clicks.** Earlier code rendered both buttons unconditionally. Parents never wired `onSave` or `onCite`, so the buttons looked interactive but did nothing. Now they follow the same conditional render contract `onShare` already used — only rendered when the parent supplies the handler. Until parents wire the callbacks, the in-card icons disappear; users still get the working buttons via the paper detail page.
+
+**Audit-deferred to a future wave** (acknowledged here so future agents don't re-discover them):
+
+- Wire `onSave` / `onCite` / `onShare` callbacks from `ScholarPage` + `ScholarSearchPage` + `ScholarTopicPage` parents so the card icons re-appear with working behavior. Needs a small shared `usePaperCardActions(paper)` hook lifted into each page.
+- Add backend `GET /api/scholar/saved?similarTo=:paperId` endpoint so `SimilarInLibraryBadge` shows a real count instead of silently hiding.
+- Swap inline localStorage reads on `ScholarPage` for the existing `RecentlyViewedPapers` component (functional today either way; cleanup only).
+- Wire `CiteIntoNoteButton` into the paper sidebar (it's a self-contained alternative to the Cite modal route).
+- Wire `ShareToStudyGroupButton` into `ScholarPaperPage` action stack (it owns its own popover so no parent state lift is needed).
+
+**Verification.** `npm --prefix backend run lint` clean. `npm --prefix frontend/studyhub-app run build` clean. `npm --prefix backend test -- scholar` 9 files / 114 tests pass.
+
 ### Wave-6 critical bug fixes + UI polish + dep updates (2026-05-13)
 
 Founder-reported screenshots showed 3 user-visible production bugs + Scholar UI rough edges + dep-version drift. 20-loop sweep covered:
