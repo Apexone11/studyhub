@@ -27,6 +27,12 @@
  * 102+, Safari 15.5+, Firefox 112+) honour `inert` directly; we set
  * both for older-browser safety.
  *
+ * Loop M17 (2026-05-13) — mobile polish. The `mobileLayout` prop flips
+ * the panel into a bottom-sheet (auto / default), fullscreen (crop
+ * modals), or stays centered (confirm dialogs, achievement celebration)
+ * at phone widths (≤ 767px). On bottom-sheet mode the user can swipe
+ * the panel down to dismiss. Desktop layout is unchanged.
+ *
  * Usage:
  *
  *   <FocusTrappedDialog
@@ -35,6 +41,7 @@
  *     ariaLabelledBy="my-dialog-title"
  *     initialFocusSelector="[data-autofocus]"
  *     clickOutsideDeactivates={false}     // forms with state
+ *     mobileLayout="centered"             // M17 — opt out of bottom-sheet
  *     overlayStyle={{...}}                 // optional override
  *     panelStyle={{...}}                   // optional override
  *   >
@@ -46,6 +53,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import FocusTrap from 'focus-trap-react'
+import useBottomSheetOnMobile from '../../lib/useBottomSheetOnMobile'
 
 const DEFAULT_OVERLAY_STYLE = {
   position: 'fixed',
@@ -82,6 +90,14 @@ export default function FocusTrappedDialog({
   overlayStyle,
   panelStyle,
   panelClassName,
+  // Loop M17 — mobile layout strategy on phone widths (<= 767px).
+  //   'auto' (default): content-heavy dialogs slide up as a bottom-sheet.
+  //   'centered'      : stay centered (use for confirms and celebrations).
+  //   'fullscreen'    : take over the whole viewport (crop modals).
+  // Desktop layout is unchanged regardless of value.
+  mobileLayout = 'auto',
+  // Disable swipe-down-to-dismiss for modals carrying unsaved state.
+  disableSwipeDismiss = false,
   children,
 }) {
   // Per-instance ref so the inert effect can identify THIS dialog's
@@ -156,12 +172,65 @@ export default function FocusTrappedDialog({
     ],
   )
 
+  // Loop M17 — mobile bottom-sheet / fullscreen flip. Inert on desktop.
+  const sheet = useBottomSheetOnMobile({
+    onDismiss: clickOutsideDeactivates ? onClose : undefined,
+    disabled: disableSwipeDismiss || mobileLayout === 'centered',
+  })
+
+  // Loop M17 — keep the focused input visible above the soft keyboard.
+  useEffect(() => {
+    if (!open || !sheet.isMobile) return undefined
+    const handleFocusIn = (event) => {
+      const t = event.target
+      if (!t || typeof t.scrollIntoView !== 'function') return
+      const tag = t.tagName
+      if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') return
+      requestAnimationFrame(() => {
+        try {
+          t.scrollIntoView({ block: 'center', behavior: sheet.reducedMotion ? 'auto' : 'smooth' })
+        } catch {
+          /* older Safari */
+        }
+      })
+    }
+    document.addEventListener('focusin', handleFocusIn)
+    return () => document.removeEventListener('focusin', handleFocusIn)
+  }, [open, sheet.isMobile, sheet.reducedMotion])
+
   if (!open) return null
 
-  const mergedOverlay = overlayStyle
-    ? { ...DEFAULT_OVERLAY_STYLE, ...overlayStyle }
-    : DEFAULT_OVERLAY_STYLE
-  const mergedPanel = panelStyle ? { ...DEFAULT_PANEL_STYLE, ...panelStyle } : DEFAULT_PANEL_STYLE
+  const fullscreenMobile = sheet.isMobile && mobileLayout === 'fullscreen'
+  const bottomSheetMobile = sheet.isMobile && mobileLayout === 'auto'
+
+  const overlayMobileExtra = fullscreenMobile
+    ? { alignItems: 'stretch', justifyContent: 'stretch', padding: 0 }
+    : bottomSheetMobile
+      ? sheet.overlayMobileFlip
+      : null
+  const panelMobileExtra = fullscreenMobile
+    ? {
+        width: '100vw',
+        maxWidth: '100vw',
+        minWidth: 0,
+        height: '100vh',
+        maxHeight: '100vh',
+        borderRadius: 0,
+      }
+    : bottomSheetMobile
+      ? sheet.panelMobileFlip
+      : null
+
+  const mergedOverlay = {
+    ...DEFAULT_OVERLAY_STYLE,
+    ...(overlayStyle || null),
+    ...(overlayMobileExtra || null),
+  }
+  const mergedPanel = {
+    ...DEFAULT_PANEL_STYLE,
+    ...(panelStyle || null),
+    ...(panelMobileExtra || null),
+  }
 
   // The `aria-labelledby` / `aria-label` distinction matters: prefer
   // -labelledby (points at a visible heading) per W3C; fall back to
@@ -172,6 +241,11 @@ export default function FocusTrappedDialog({
       ? { 'aria-label': ariaLabel }
       : {}
 
+  // Compose className: caller's value + entrance-animation hook.
+  const panelClasses = []
+  if (panelClassName) panelClasses.push(panelClassName)
+  if (bottomSheetMobile) panelClasses.push('sh-bottom-sheet-enter')
+
   return createPortal(
     <FocusTrap focusTrapOptions={focusTrapOptions}>
       <div
@@ -181,6 +255,7 @@ export default function FocusTrappedDialog({
         {...dialogA11y}
         {...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {})}
         data-focustrap-active="true"
+        className={bottomSheetMobile ? 'sh-bottom-sheet-overlay-enter' : undefined}
         // The overlay handles backdrop clicks. focus-trap-react's
         // clickOutsideDeactivates also fires on overlay click, so this
         // onClick is redundant — kept defensively for browsers that
@@ -193,12 +268,18 @@ export default function FocusTrappedDialog({
         style={mergedOverlay}
       >
         <div
+          ref={bottomSheetMobile ? sheet.setPanelRef : undefined}
           // Stop propagation so a click inside the panel doesn't bubble
           // to the overlay's backdrop-close handler.
           onClick={(event) => event.stopPropagation()}
-          className={panelClassName}
-          style={mergedPanel}
+          {...(bottomSheetMobile ? sheet.swipeHandlers : null)}
+          className={panelClasses.length ? panelClasses.join(' ') : undefined}
+          style={{
+            ...mergedPanel,
+            position: bottomSheetMobile ? 'relative' : mergedPanel.position,
+          }}
         >
+          {bottomSheetMobile ? sheet.dragHandleNode : null}
           {children}
         </div>
       </div>

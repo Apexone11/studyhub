@@ -28,6 +28,16 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-4 mobile/tablet web polish + reconciliation (2026-05-13)
+
+- **30-loop mobile/tablet polish sweep landed.** Browser-based phone/tablet experience (not Capacitor — that's frozen). Adds `useDeviceClass` hook + device matrix, `MobileBottomNav` (touch-target ≥ 44×44, safe-area-inset-bottom), `DesktopOnlyGate` + `DesktopOnlyNoticeBanner` for surfaces that genuinely need a keyboard (SheetLab editor, admin tables, multi-pane diffs), `InstallPrompt` for PWA add-to-home-screen, `SlowNetworkNotice` + `SafeImage` + `fetchWithRetry` for flaky-network resilience, `OnboardingResumePrompt` for cross-device draft pickup, `useBottomSheetOnMobile` for sheet-on-phone modal flip, `useResizeObserver`, `usePullToRefresh`, share/clipboard/haptics/battery/networkStatus libs.
+- **Universal Claude-Code-style AI permission framework** (`useAiPermission` hook + `AiPermissionDialog` modal). Every AI write action (sheet apply-edit, notes apply-edit, save-to-notes, sheet-lab open, snapshot-revert) routes through `requestPermission(payload) => Promise<boolean>`. Concurrent-request guard auto-rejects the prior promise so rapid double-clicks never hang the UI. Falls back to `window.confirm` if the provider isn't mounted. Backend still enforces independently per CLAUDE.md A6 — dialog is UX, not the security boundary.
+- **Bug fixes from wave 3 bot review.** Apply-edit now wraps the 3 dependent writes in `prisma.$transaction` (Codex P2). HTML scan pipeline (`validateHtmlForSubmission` + `scanHtmlContentForPersistence` → Tier-3 quarantine) runs on AI-edited content before it lands in the sheet (Codex P1). MessageMentionMenu popover maxHeight now consumes the tracked `visualViewport.height` so the iOS keyboard doesn't cover it.
+- **Zod schemas extracted to `backend/src/lib/zodSchemas/`** as a shared library for runtime contract validation. Library only — no route handlers wired yet; future loops migrate inline `parseInt + isInteger + slice` chains over.
+- **Perf indexes migration `20260513000001_perf_indexes`** adds covering indexes for high-traffic query patterns (idempotent, `IF NOT EXISTS` guards per CLAUDE.md A5).
+- **Integration + load test scaffolding.** `backend/test/integration/ai-edit-permission-flow.integ.test.js` covers the full propose → dialog → apply → snapshot → revert loop. `backend/test/load/` adds harness + 6 load scripts (ai-analyze, feed-list, messaging-unread, notifications, search, sheets-list).
+- **Playwright mobile config + smoke specs.** `playwright.mobile.config.js` runs the messaging mobile smoke + mobile-ai-flows specs against an iPhone-class viewport with touch emulation.
+
 ### Cleanup + perf polish (2026-05-12 — Loop A18)
 
 - **Removed dead backend deps `file-type`, `domelementtype`, `domhandler`, `domutils`.** Loop 5 audit confirmed zero `require()` / `import` sites; only stale comment references remained. Backend package.json now declares 29 deps instead of 33.

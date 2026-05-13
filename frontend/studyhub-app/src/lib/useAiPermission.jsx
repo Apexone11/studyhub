@@ -38,6 +38,20 @@ export function AiPermissionProvider({ children, Dialog }) {
 
   const requestPermission = useCallback((payload) => {
     return new Promise((resolve) => {
+      // Concurrent-request guard (Sourcery + Codex finding, restored
+      // by Loop V4 — the implementation was lost from a prior cycle
+      // while the test stayed in tree). If a previous request is still
+      // awaiting a decision when a new one comes in, auto-reject the
+      // old one so its caller resolves (with `false`) instead of
+      // hanging forever. A permission dialog is a singleton — the user
+      // can only make one decision at a time — so superseding is the
+      // right semantics. Rapid double-clicks or two components racing
+      // both get clean `false` results on the loser side and a fresh
+      // dialog for the winner.
+      const previousResolver = resolveRef.current
+      if (typeof previousResolver === 'function') {
+        previousResolver(false)
+      }
       resolveRef.current = resolve
       setRequest({
         kind: payload?.kind || 'generic',

@@ -41,6 +41,7 @@ const {
 } = require('../../lib/html/htmlDraftValidation')
 const { RISK_TIER } = require('../../lib/html/htmlSecurity')
 const { SHEET_STATUS } = require('../sheets/sheets.constants')
+const { MAX_INSTRUCTION_LENGTH } = require('../../lib/zodSchemas')
 
 const router = express.Router()
 const requireTrustedOrigin = originAllowlist()
@@ -57,7 +58,6 @@ function getClient() {
 }
 
 const MAX_SHEET_CONTENT_FOR_AI = 12000
-const MAX_INSTRUCTION_LENGTH = 2000
 
 /**
  * Truncate sheet content to keep prompts within budget. Adds a tag at

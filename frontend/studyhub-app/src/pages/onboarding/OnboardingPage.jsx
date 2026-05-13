@@ -2,6 +2,8 @@
  * OnboardingPage -- Guided onboarding flow (7 steps)
  *
  * Thin orchestrator: renders Navbar, progress bar, and the active step.
+ * Mobile polish (Loop M13): see OnboardingPage.css — sticky progress bar
+ * and full-bleed card on phones (<768px).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useMemo, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
@@ -12,6 +14,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { useSession } from '../../lib/session-context'
 import { useOnboardingState } from '../../features/onboarding/useOnboardingState'
 import { isSelfLearner } from '../../lib/roleCopy'
+import OnboardingProgressBar from './OnboardingProgressBar'
 import StepWelcome from './StepWelcome'
 import StepSchool from './StepSchool'
 import StepCourses from './StepCourses'

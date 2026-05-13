@@ -79,7 +79,7 @@ const StepCourses = forwardRef(function StepCourses({ onNext, onSkip, submitting
           No courses available yet. You can skip this step and add courses later.
         </div>
       ) : (
-        <div style={styles.grid}>
+        <div className="onboarding-courses-grid">
           {courses.map((course) => {
             const isSelected = selectedIds.includes(course.id)
             const isDisabled = !isSelected && selectedIds.length >= MAX_COURSES
@@ -173,14 +173,6 @@ const styles = {
     textAlign: 'center',
     padding: 'var(--space-8) 0',
   },
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))',
-    gap: 'var(--space-3)',
-    maxHeight: 320,
-    overflowY: 'auto',
-    padding: '2px',
-  },
   courseCard: {
     position: 'relative',
     display: 'flex',
@@ -193,6 +185,7 @@ const styles = {
     textAlign: 'left',
     transition: 'border-color 0.15s, background 0.15s',
     fontFamily: 'inherit',
+    minHeight: 44,
   },
   courseCode: {
     fontSize: 'var(--type-sm)',

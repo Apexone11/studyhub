@@ -1,0 +1,265 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+ * studyGroupsMobile.css — Mobile polish for the Study Groups surface
+ *
+ * Loop M8 (2026-05-13). Applies responsive overrides to:
+ *   - Browse page grid (single column phone, 2-col tablet, sticky filters).
+ *   - Detail page tabs (horizontal scroll on phone with underline active state).
+ *   - Session cards (stacked date/time, full-width RSVP, icon-only calendar).
+ *   - Resources list (single column, 44x44 touch targets).
+ *   - Discussions list (feed-style cards on phone).
+ *   - Forms (labels stack above inputs, native datetime-local pickers).
+ *   - Members tab (horizontal avatar rail with View all on phone).
+ *   - Discussion composer (auto-grow textarea, sticky bottom with safe-area).
+ *
+ * Inline styles drive desktop layout; these mobile rules layer on top via
+ * `sh-group-*` class hooks added to the JSX. Tokens stay var(--sh-*).
+ * prefers-reduced-motion respected on every transitioned element.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Tablet: 2-column group cards (768px-1024px) ──────────────────────── */
+@media (min-width: 768px) and (max-width: 1023.98px) {
+  .sh-group-list-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+  }
+}
+
+/* ── Phone (<768px) shared rules ──────────────────────────────────────── */
+@media (max-width: 767.98px) {
+  /* Browse: single-column grid */
+  .sh-group-list-grid {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 12px !important;
+  }
+
+  /* Browse: sticky search/filter bar so it stays reachable while scrolling
+     a long list. Sits just below the global navbar. */
+  .sh-group-list-filters {
+    position: sticky;
+    top: var(--nav-height, 56px);
+    z-index: 6;
+    /* Solid background so the cards behind it don't bleed through. */
+    background: var(--sh-surface);
+    border-radius: var(--radius-card);
+  }
+
+  /* Title row stacks; create button takes the row below. */
+  .sh-group-list-title-row {
+    flex-direction: column !important;
+    align-items: stretch !important;
+  }
+  .sh-group-list-title-row > button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* Filter chips wrap into a scroll-row for one-handed thumb access. */
+  .sh-group-list-filters .sh-group-list-filter-row {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    padding-bottom: 4px;
+  }
+  .sh-group-list-filters .sh-group-list-filter-row::-webkit-scrollbar {
+    display: none;
+  }
+  .sh-group-list-filters .sh-group-list-filter-row > * {
+    flex-shrink: 0;
+  }
+
+  /* ── Detail page header polish ─────────────────────────────────────── */
+  .sh-group-detail-action-buttons {
+    flex-direction: column !important;
+    width: 100%;
+  }
+  .sh-group-detail-action-buttons > button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* ── Tabs: horizontal scrolling row with active underline ─────────── */
+  .sh-group-detail-tabbar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 0 !important;
+    padding: 0 8px !important;
+  }
+  .sh-group-detail-tabbar::-webkit-scrollbar {
+    display: none;
+  }
+  .sh-group-detail-tabbar > button {
+    flex-shrink: 0;
+    min-height: 48px;
+    padding: 12px 14px !important;
+  }
+
+  /* On phone the discussions tab is single-pane: hide the right rail. */
+  .sh-group-discussions-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .sh-group-discussions-rail {
+    display: none !important;
+  }
+
+  /* ── Session card: stacked date/time, full-width RSVP ──────────────── */
+  .sh-group-session-card .sh-group-session-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .sh-group-session-card .sh-group-session-details {
+    gap: 6px;
+  }
+  .sh-group-session-rsvp-row {
+    flex-direction: column !important;
+    gap: 8px !important;
+  }
+  .sh-group-session-rsvp-row > button {
+    width: 100%;
+    min-height: 44px;
+  }
+  /* Calendar add icon: 44x44 touch target with hidden label. */
+  .sh-group-session-cal-btn {
+    width: 44px;
+    height: 44px;
+    align-self: flex-end;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .sh-group-session-cal-btn .sh-group-session-cal-label {
+    /* Visually hide but keep for assistive tech. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  /* ── Resources list: single column, 44x44 download button ──────────── */
+  .sh-group-resource-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+  .sh-group-resource-row .sh-group-resource-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .sh-group-resource-row .sh-group-resource-actions > button {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  .sh-group-resource-download {
+    min-width: 44px;
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* ── Discussions: feed-style compact cards ─────────────────────────── */
+  .sh-group-discussion-card {
+    padding: 12px !important;
+    border-radius: 14px;
+  }
+  .sh-group-discussion-card .sh-group-discussion-header {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .sh-group-discussion-card .sh-group-discussion-title {
+    font-size: var(--type-sm);
+    line-height: 1.35;
+  }
+
+  /* ── Forms: labels stack above inputs (already do — enforce on phone),
+        plus widen tap targets. ─────────────────────────────────────── */
+  .sh-group-form-grid-2col {
+    grid-template-columns: minmax(0, 1fr) !important;
+  }
+  .sh-group-form-group label {
+    display: block;
+    margin-bottom: 8px;
+  }
+  .sh-group-form-group input,
+  .sh-group-form-group select,
+  .sh-group-form-group textarea {
+    min-height: 44px;
+    font-size: 16px; /* prevent iOS Safari zoom-on-focus */
+  }
+  .sh-group-form-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+  }
+  .sh-group-form-actions > button {
+    width: 100%;
+    min-height: 44px;
+  }
+
+  /* ── Member grid: horizontal avatar rail with View all ─────────────── */
+  .sh-group-member-rail {
+    display: flex;
+    flex-direction: row;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    gap: 10px;
+    padding-bottom: 4px;
+  }
+  .sh-group-member-rail::-webkit-scrollbar {
+    display: none;
+  }
+  .sh-group-member-rail .sh-group-member-card {
+    flex-shrink: 0;
+    width: 132px;
+  }
+
+  /* ── Discussion composer: sticky bottom with safe-area ─────────────── */
+  .sh-group-discussion-composer {
+    position: sticky;
+    bottom: 0;
+    background: var(--sh-surface);
+    border-top: 1px solid var(--sh-border);
+    padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+    margin: 0 calc(-1 * var(--card-pad, 16px)) calc(-1 * var(--card-pad, 16px));
+    z-index: 4;
+  }
+  .sh-group-discussion-composer textarea {
+    width: 100%;
+    min-height: 44px;
+    max-height: 40vh;
+    resize: none;
+    /* auto-grow is handled by inline rows/cols + a small JS hook, but
+       this baseline keeps the field tappable without any JS. */
+  }
+}
+
+/* ── Auto-grow textarea helper (all viewports) ─────────────────────────── */
+.sh-group-autogrow {
+  overflow: hidden;
+  resize: none;
+}
+
+/* ── Reduced motion respect ─────────────────────────────────────────────
+   Inline-style transitions across the studyGroups surface should not run
+   for users who opted out of animation. Strip the transition from the
+   class-hooked buttons / tabs / cards on the phone breakpoint and
+   everywhere else (the cost is purely a transition delete; no layout
+   change). */
+@media (prefers-reduced-motion: reduce) {
+  .sh-group-detail-tabbar > button,
+  .sh-group-session-card,
+  .sh-group-resource-row,
+  .sh-group-discussion-card,
+  .sh-group-member-card,
+  .sh-group-list-filters .sh-group-list-filter-row > * {
+    transition: none !important;
+    animation: none !important;
+  }
+}

@@ -1,0 +1,207 @@
+/* ═══════════════════════════════════════════════════════════════════
+ * OnboardingPage — Mobile polish (Loop M13, 2026-05-13)
+ *
+ * Desktop layout (>=768px) uses the inline style values defined in
+ * OnboardingPage.jsx. These rules selectively override layout for
+ * phones (<768px) to deliver a full-bleed card, sticky progress bar,
+ * and stacked CTAs without rewriting the desktop code.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+.onboarding-page {
+  min-height: 100vh;
+  background: var(--sh-bg);
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+}
+
+.onboarding-container {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: var(--space-8) var(--page-gutter) var(--space-16);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+}
+
+.onboarding-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.onboarding-card {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: var(--radius-card);
+  padding: var(--card-pad);
+  box-shadow: var(--shadow-sm);
+}
+
+.onboarding-skip-link {
+  align-self: center;
+  padding: 8px 16px;
+  font-size: var(--type-sm);
+  color: var(--sh-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+  /* Phone-friendly touch target */
+  min-height: 44px;
+}
+
+/* ── Mobile (<768px): full-bleed + sticky progress + stacked CTAs ── */
+
+@media (max-width: 767px) {
+  .onboarding-container {
+    /* Full-bleed: collapse the gutter, let the card span the viewport. */
+    padding: 0 0 var(--space-12);
+    gap: 0;
+    max-width: 100%;
+  }
+
+  .onboarding-progress-wrap {
+    /* Sticky at the top so the user always knows where they are in the
+     * 7-step flow. Uses the same nav offset the rest of the app uses. */
+    position: sticky;
+    top: var(--sh-nav-h, 56px);
+    z-index: 5;
+    background: var(--sh-bg);
+    padding: var(--space-3) var(--page-gutter);
+    border-bottom: 1px solid var(--sh-border);
+    margin: 0;
+  }
+
+  .onboarding-card {
+    /* Edge-to-edge: no border-radius/border on phone — the surface fills
+     * the viewport so taps near the edge stay on the card. */
+    border-radius: 0;
+    border-left: none;
+    border-right: none;
+    border-top: none;
+    padding: var(--space-6) var(--page-gutter) var(--space-8);
+    box-shadow: none;
+  }
+
+  .onboarding-skip-link {
+    margin: var(--space-4) auto 0;
+    /* 44 tall touch target. */
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
+}
+
+/* prefers-reduced-motion is already honoured by OnboardingProgressBar
+ * itself; this stylesheet adds no animation. */
+
+/* ═══════════════════════════════════════════════════════════════════
+ * Step-specific mobile polish (shared CSS used by individual steps).
+ * The base styles live as inline JSX styles in each step; these
+ * media queries layer mobile-only overrides on top.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+/* StepCourses — phone: stack the course grid vertically. */
+.onboarding-courses-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-3);
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 2px;
+}
+
+@media (max-width: 767px) {
+  .onboarding-courses-grid {
+    grid-template-columns: 1fr;
+    max-height: 60vh;
+  }
+}
+
+.onboarding-courses-add-btn {
+  width: 100%;
+  padding: 12px 20px;
+  font-size: var(--type-sm);
+  font-weight: 600;
+  color: var(--sh-link);
+  background: var(--sh-soft);
+  border: 1px dashed var(--sh-border);
+  border-radius: var(--radius-control);
+  cursor: pointer;
+  min-height: 44px;
+  font-family: inherit;
+}
+
+.onboarding-courses-add-btn:hover {
+  background: var(--sh-brand-soft-bg);
+  border-color: var(--sh-brand-border);
+}
+
+/* StepInvite — phone: stack email inputs, big touch targets, add-row icon button. */
+.onboarding-invite-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.onboarding-invite-input {
+  flex: 1;
+  padding: 10px 14px;
+  font-size: var(--type-sm);
+  color: var(--sh-input-text);
+  background: var(--sh-input-bg);
+  border: 1px solid var(--sh-input-border);
+  border-radius: var(--radius-control);
+  outline: none;
+  font-family: inherit;
+  /* 44px minimum on phones for thumb-friendly editing. */
+  min-height: 44px;
+  box-sizing: border-box;
+}
+
+.onboarding-invite-input:focus {
+  border-color: var(--sh-brand);
+  box-shadow: var(--sh-focus-ring);
+}
+
+.onboarding-invite-icon-btn {
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  border-radius: var(--radius-control);
+  color: var(--sh-muted);
+  cursor: pointer;
+  font-size: 18px;
+  font-weight: 700;
+  font-family: inherit;
+}
+
+.onboarding-invite-icon-btn:hover {
+  background: var(--sh-brand-soft-bg);
+  border-color: var(--sh-brand-border);
+  color: var(--sh-brand);
+}
+
+.onboarding-invite-icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* StepDone — phone: stack quick-start cards vertically. */
+.onboarding-done-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--space-3);
+  width: 100%;
+  margin-top: var(--space-4);
+}
+
+@media (max-width: 767px) {
+  .onboarding-done-grid {
+    grid-template-columns: 1fr;
+  }
+}
