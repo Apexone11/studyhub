@@ -1,0 +1,486 @@
+/* ScholarLists.css — shared layout for Saved/Shelves and Topic list pages.
+ * Cards inherit the existing .paper-card chrome from ScholarPage.css; this
+ * file only governs the page-level chrome (sidebar, header rail, bulk bar,
+ * shelf chips) that those two pages need. */
+
+/* ── Saved page two-column shell (sidebar + grid) ───────────────────────── */
+.scholar-saved__layout {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 1023px) {
+  .scholar-saved__layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+}
+
+/* ── Shelf rail (desktop) ───────────────────────────────────────────────── */
+.scholar-saved__rail {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  padding: 14px;
+  position: sticky;
+  top: 80px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 1023px) {
+  .scholar-saved__rail {
+    display: none;
+  }
+}
+
+.scholar-saved__rail-heading {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sh-subtext);
+  font-size: var(--type-xs);
+  font-weight: 600;
+  padding: 6px 8px 10px;
+}
+
+.scholar-saved__rail-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 10px 12px;
+  background: transparent;
+  border: 0;
+  border-radius: 8px;
+  color: var(--sh-text);
+  font-size: var(--type-sm);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  text-decoration: none;
+  min-height: 44px;
+  width: 100%;
+}
+
+.scholar-saved__rail-btn:hover {
+  background: var(--sh-soft);
+}
+
+.scholar-saved__rail-btn[aria-current='page'] {
+  background: var(--sh-brand-soft);
+  color: var(--sh-brand);
+  font-weight: 600;
+}
+
+.scholar-saved__rail-count {
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+  font-variant-numeric: tabular-nums;
+}
+
+.scholar-saved__rail-btn[aria-current='page'] .scholar-saved__rail-count {
+  color: var(--sh-brand);
+}
+
+.scholar-saved__rail-divider {
+  height: 1px;
+  background: var(--sh-border);
+  margin: 8px 4px;
+}
+
+.scholar-saved__rail-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: transparent;
+  border: 1px dashed var(--sh-border);
+  border-radius: 8px;
+  color: var(--sh-subtext);
+  font-size: var(--type-sm);
+  font-family: inherit;
+  cursor: pointer;
+  text-align: left;
+  min-height: 44px;
+  width: 100%;
+  margin-top: 4px;
+}
+
+.scholar-saved__rail-add:hover {
+  background: var(--sh-soft);
+  color: var(--sh-text);
+}
+
+/* ── Mobile chip strip ──────────────────────────────────────────────────── */
+.scholar-saved__chips {
+  display: none;
+}
+
+@media (max-width: 1023px) {
+  .scholar-saved__chips {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding: 4px 0 12px;
+    margin-bottom: 8px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .scholar-saved__chips::-webkit-scrollbar {
+    height: 0;
+  }
+}
+
+.scholar-saved__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 999px;
+  color: var(--sh-text);
+  font-size: var(--type-sm);
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  min-height: 44px;
+}
+
+.scholar-saved__chip[aria-current='page'] {
+  background: var(--sh-brand-soft);
+  border-color: var(--sh-brand);
+  color: var(--sh-brand);
+}
+
+/* ── Header rail (title + sort/filter controls) ─────────────────────────── */
+.scholar-list__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.scholar-list__controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.scholar-list__select {
+  appearance: none;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 10px;
+  padding: 8px 32px 8px 12px;
+  color: var(--sh-text);
+  font-size: var(--type-sm);
+  font-family: inherit;
+  font-weight: 500;
+  cursor: pointer;
+  min-height: 44px;
+  min-width: 44px;
+  background-image:
+    linear-gradient(45deg, transparent 50%, var(--sh-subtext) 50%),
+    linear-gradient(135deg, var(--sh-subtext) 50%, transparent 50%);
+  background-position:
+    calc(100% - 16px) calc(50% - 2px),
+    calc(100% - 11px) calc(50% - 2px);
+  background-size:
+    5px 5px,
+    5px 5px;
+  background-repeat: no-repeat;
+}
+
+.scholar-list__select:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+}
+
+/* ── Grid (paper cards) ─────────────────────────────────────────────────── */
+.scholar-list__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 16px;
+}
+
+@media (min-width: 768px) {
+  .scholar-list__grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+
+/* ── Saved-paper card (own variant — needs checkbox overlay) ────────────── */
+.scholar-saved__card {
+  position: relative;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  padding: 18px 18px 18px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-saved__card {
+    transition:
+      transform 150ms ease-out,
+      box-shadow 150ms ease-out,
+      border-color 150ms ease-out;
+  }
+  .scholar-saved__card:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.scholar-saved__card[data-selected='true'] {
+  border-color: var(--sh-brand);
+  box-shadow: 0 0 0 1px var(--sh-brand);
+}
+
+.scholar-saved__checkbox {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--sh-brand);
+  cursor: pointer;
+}
+
+/* Hit area for the checkbox is intentionally enlarged via an invisible
+   wrapper so phone taps register reliably without overlapping the link. */
+.scholar-saved__checkbox-hit {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.scholar-saved__card-title {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: var(--type-md);
+  color: var(--sh-heading);
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 0;
+  text-decoration: none;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.scholar-saved__card-meta {
+  color: var(--sh-subtext);
+  font-size: var(--type-sm);
+  line-height: 1.4;
+}
+
+.scholar-saved__card-footer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 4px;
+  flex-wrap: wrap;
+}
+
+.scholar-saved__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--type-xs);
+  font-weight: 600;
+  background: var(--sh-soft);
+  color: var(--sh-subtext);
+  border: 1px solid var(--sh-border);
+}
+
+.scholar-saved__badge--unread {
+  background: var(--sh-brand-soft);
+  color: var(--sh-brand);
+  border-color: transparent;
+}
+
+.scholar-saved__badge--annotations {
+  background: var(--sh-warning-bg, var(--sh-soft));
+  color: var(--sh-warning-text, var(--sh-subtext));
+  border-color: transparent;
+}
+
+/* ── Bulk action bar ────────────────────────────────────────────────────── */
+.scholar-bulk-bar {
+  position: sticky;
+  bottom: calc(16px + env(safe-area-inset-bottom));
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-top: 20px;
+  box-shadow: var(--shadow-md);
+  flex-wrap: wrap;
+}
+
+.scholar-bulk-bar__count {
+  font-size: var(--type-sm);
+  font-weight: 600;
+  color: var(--sh-text);
+  margin-right: auto;
+}
+
+/* ── Empty / loading state cards ────────────────────────────────────────── */
+.scholar-list__empty {
+  color: var(--sh-subtext);
+  background: var(--sh-soft);
+  padding: 32px 24px;
+  border-radius: 14px;
+  border: 1px solid var(--sh-border);
+  text-align: center;
+}
+
+.scholar-list__empty-cta {
+  display: inline-block;
+  margin-top: 12px;
+  color: var(--sh-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.scholar-list__empty-cta:hover {
+  text-decoration: underline;
+}
+
+/* ── Skeleton placeholders ──────────────────────────────────────────────── */
+.scholar-list__skeleton-card {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  padding: 18px;
+  height: 132px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scholar-list__skeleton-line {
+  background: var(--sh-soft);
+  border-radius: 6px;
+  height: 12px;
+}
+
+.scholar-list__skeleton-line--title {
+  height: 18px;
+  width: 70%;
+}
+
+.scholar-list__skeleton-line--meta {
+  width: 50%;
+}
+
+.scholar-list__skeleton-line--abstract {
+  width: 90%;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-list__skeleton-line {
+    background: linear-gradient(
+      90deg,
+      var(--sh-soft) 0%,
+      var(--sh-border) 50%,
+      var(--sh-soft) 100%
+    );
+    background-size: 200% 100%;
+    animation: scholar-list-shimmer 1.4s ease-in-out infinite;
+  }
+
+  @keyframes scholar-list-shimmer {
+    0% {
+      background-position: 100% 0;
+    }
+    100% {
+      background-position: -100% 0;
+    }
+  }
+}
+
+/* ── Topic page header ──────────────────────────────────────────────────── */
+.scholar-topic-v2__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.scholar-topic-v2__title {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 28px;
+  line-height: 1.2;
+  margin: 0;
+  color: var(--sh-heading);
+  font-weight: 700;
+}
+
+.scholar-topic-v2__desc {
+  color: var(--sh-subtext);
+  margin: 6px 0 0;
+  max-width: 720px;
+  line-height: 1.55;
+}
+
+.scholar-topic-v2__follow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--sh-brand);
+  background: var(--sh-surface);
+  color: var(--sh-brand);
+  font-family: inherit;
+  font-size: var(--type-sm);
+  font-weight: 600;
+  cursor: pointer;
+  min-height: 44px;
+}
+
+.scholar-topic-v2__follow[aria-pressed='true'] {
+  background: var(--sh-brand);
+  color: white;
+}
+
+.scholar-topic-v2__follow:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+}
+
+/* Ensure page min height + safe area on mobile */
+.scholar-list__page {
+  min-height: 100dvh;
+  /* fallback chained via the wrapping shell; this keeps the inner column tall
+     enough to anchor the sticky bulk bar on phones */
+}

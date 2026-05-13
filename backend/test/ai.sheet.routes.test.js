@@ -307,12 +307,18 @@ describe('POST /sheets/:sheetId/analyze', () => {
     expect(mocks.messagesCreate).not.toHaveBeenCalled()
   })
 
-  it('returns 502 when AI returns unparseable JSON', async () => {
+  it('falls back gracefully when AI returns unparseable JSON', async () => {
+    // Behavior change: instead of 502, we now return 200 with the
+    // AI's raw text as `summary` + a `fallback: true` flag. Users
+    // see SOMETHING useful instead of an opaque error. The structured
+    // path still works for well-formed responses.
     mocks.prisma.studySheet.findUnique.mockResolvedValueOnce(publishedSheetOwnedBy(1))
     mocks.messagesCreate.mockResolvedValueOnce(anthropicTextResponse('this is not json at all'))
     const res = await request(app).post('/sheets/10/analyze').send({})
-    expect(res.status).toBe(502)
-    expect(res.body.error).toMatch(/unparseable/i)
+    expect(res.status).toBe(200)
+    expect(res.body.fallback).toBe(true)
+    expect(res.body.summary).toMatch(/this is not json/i)
+    expect(res.body.issues).toEqual([])
   })
 
   it('returns 200 + shaped report on happy path', async () => {

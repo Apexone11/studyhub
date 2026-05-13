@@ -33,7 +33,32 @@ function MessageMentionMenuImpl(
 ) {
   const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(false)
+  // Visible viewport height. On iOS Safari, `window.innerHeight` reports the
+  // pre-keyboard layout viewport, so a `100vh`-based maxHeight overflows
+  // behind the keyboard. `visualViewport.height` reports the actually-
+  // visible region; we clamp maxHeight to that minus a small composer
+  // buffer so the popover always renders ABOVE the keyboard.
+  const [visibleHeight, setVisibleHeight] = useState(() =>
+    typeof window === 'undefined' ? 800 : window.innerHeight || 800,
+  )
   const listRef = useRef(null)
+
+  useEffect(() => {
+    if (!open) return undefined
+    if (typeof window === 'undefined') return undefined
+    const vv = window.visualViewport
+    if (!vv) return undefined
+    function update() {
+      setVisibleHeight(Math.round(vv.height || window.innerHeight || 0))
+    }
+    update()
+    vv.addEventListener('resize', update)
+    vv.addEventListener('scroll', update)
+    return () => {
+      vv.removeEventListener('resize', update)
+      vv.removeEventListener('scroll', update)
+    }
+  }, [open])
 
   // Debounced search. The leading `@` is stripped before we send the query.
   const q = (query || '').replace(/^@/, '').trim()
@@ -114,7 +139,7 @@ function MessageMentionMenuImpl(
         bottom: 'calc(100% + 8px)',
         left: 0,
         width: 'min(280px, calc(100vw - 32px))',
-        maxHeight: 'min(240px, calc(100vh - 140px))',
+        maxHeight: `min(240px, ${Math.max(120, visibleHeight - 140)}px)`,
         overflowY: 'auto',
         background: 'var(--sh-surface)',
         border: '1px solid var(--sh-border)',

@@ -1,0 +1,40 @@
+/* ═══════════════════════════════════════════════════════════════════
+ * RolePickerPage — Mobile polish (Loop M13).
+ * Desktop layout is owned by the inline JSX styles; this stylesheet
+ * adds phone-only overrides: 44×44 touch targets on radio cards,
+ * 16px input font (no iOS focus-zoom), full-width primary CTA,
+ * stacked button row.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 767px) {
+  .rolepicker-main {
+    margin: 24px auto !important;
+    padding: 0 var(--page-gutter) 80px !important;
+  }
+
+  .rolepicker-input {
+    font-size: 16px !important;
+    min-height: 44px !important;
+    padding: 12px 14px !important;
+  }
+
+  /* Each "I am a…" card becomes a tall, easy-to-tap radio tile. */
+  .rolepicker-role-label {
+    min-height: 56px !important;
+    padding: 16px !important;
+  }
+
+  /* Continue / Cancel stack vertically with full-width buttons. */
+  .rolepicker-actions {
+    flex-direction: column-reverse !important;
+    align-items: stretch !important;
+    gap: var(--space-3) !important;
+  }
+
+  .rolepicker-actions button {
+    width: 100% !important;
+    min-height: 44px !important;
+    padding: 12px 20px !important;
+    font-size: 15px !important;
+  }
+}

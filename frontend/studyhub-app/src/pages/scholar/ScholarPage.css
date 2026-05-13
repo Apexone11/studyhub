@@ -1045,3 +1045,497 @@
   min-height: 600px;
   border-radius: 10px;
 }
+
+/* ════════════════════════════════════════════════════════════════════════
+ * Scholar LANDING — redesigned 2026-05-12.
+ *
+ * Goals (per design brief 2026-05-12):
+ *  - Sans-serif chrome (Plus Jakarta Sans via var(--font)) — no editorial
+ *    serif on titles. Serif is reserved for Reading Mode body text.
+ *  - Match FeedPage / LibraryPage rhythm: 12px card radius, --shadow-sm
+ *    baseline, --sh-surface cards on --sh-page-bg background.
+ *  - Native StudyHub feel — no gradient hero, no glass blur, no oversize
+ *    centered marketing copy. Reads like an app surface, not a landing
+ *    page inside a landing page.
+ *  - All colors via var(--sh-*) tokens.
+ *  - prefers-reduced-motion honored.
+ *  - Touch targets ≥ 44×44, inputs ≥ 16px font.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+.scholar-landing {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 28px;
+  /* Override the legacy .scholar-shell page bottom-padding context. */
+  padding-bottom: max(48px, env(safe-area-inset-bottom));
+}
+
+@media (min-width: 1024px) {
+  .scholar-landing {
+    grid-template-columns: minmax(0, 1fr) 300px;
+    gap: 32px;
+    align-items: start;
+  }
+}
+
+.scholar-landing__primary {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+/* ── Block 1: Hero search ──────────────────────────────────────────────── */
+
+.scholar-landing-hero {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  padding: clamp(24px, 4vw, 36px);
+}
+
+.scholar-landing-hero__title {
+  font-family: var(--font);
+  font-size: clamp(1.5rem, 1.1rem + 1.2vw, 1.875rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sh-heading);
+  margin: 0 0 8px;
+  line-height: 1.2;
+}
+
+.scholar-landing-hero__sub {
+  font-family: var(--font);
+  font-size: var(--type-sm);
+  color: var(--sh-subtext);
+  margin: 0 0 20px;
+  line-height: 1.55;
+  max-width: 60ch;
+}
+
+.scholar-landing-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  padding: 6px 6px 6px 14px;
+  transition:
+    border-color 150ms ease-out,
+    box-shadow 150ms ease-out;
+}
+
+.scholar-landing-search:focus-within {
+  border-color: var(--sh-brand);
+  box-shadow: 0 0 0 3px var(--sh-brand-soft);
+}
+
+.scholar-landing-search__icon {
+  color: var(--sh-muted);
+  flex-shrink: 0;
+}
+
+.scholar-landing-search__input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  /* 16px floor prevents iOS auto-zoom on focus. */
+  font-size: 16px;
+  font-family: inherit;
+  color: var(--sh-text);
+  outline: none;
+  padding: 12px 4px;
+  min-height: 44px;
+}
+
+.scholar-landing-search__input::placeholder {
+  color: var(--sh-muted);
+}
+
+.scholar-landing-search__submit {
+  flex-shrink: 0;
+  padding: 0 18px;
+  min-height: 44px;
+  background: var(--sh-brand);
+  color: var(--sh-surface);
+  border: 0;
+  border-radius: 8px;
+  font-family: inherit;
+  font-size: var(--type-sm);
+  font-weight: 600;
+  cursor: pointer;
+  letter-spacing: 0.01em;
+}
+
+.scholar-landing-search__submit:disabled {
+  background: var(--sh-border-strong);
+  color: var(--sh-muted);
+  cursor: not-allowed;
+}
+
+.scholar-landing-search__submit:not(:disabled):hover {
+  background: var(--sh-brand-hover);
+}
+
+.scholar-landing-search__submit:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+}
+
+/* ── Section scaffolding ───────────────────────────────────────────────── */
+
+.scholar-landing-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.scholar-landing-section__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.scholar-landing-section__title {
+  font-family: var(--font);
+  font-size: var(--type-lg);
+  font-weight: 600;
+  color: var(--sh-heading);
+  letter-spacing: -0.01em;
+  margin: 0;
+}
+
+.scholar-landing-section__sub {
+  font-family: var(--font);
+  font-size: var(--type-sm);
+  color: var(--sh-subtext);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Block 2: Recently viewed strip ────────────────────────────────────── */
+
+.scholar-recent-strip {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.scholar-recent-strip__item {
+  display: flex;
+  min-width: 0;
+}
+
+.scholar-recent-chip {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 36px 10px 14px;
+  min-height: 44px;
+  max-width: 280px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  text-decoration: none;
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-recent-chip {
+    transition:
+      transform 150ms ease-out,
+      box-shadow 150ms ease-out,
+      border-color 150ms ease-out;
+  }
+  .scholar-recent-chip:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+    border-color: var(--sh-border-strong);
+  }
+}
+
+.scholar-recent-chip__title {
+  font-size: var(--type-sm);
+  font-weight: 600;
+  color: var(--sh-heading);
+  line-height: 1.35;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 230px;
+}
+
+.scholar-recent-chip__sub {
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 230px;
+}
+
+.scholar-recent-chip__dismiss {
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  border-radius: 6px;
+  color: var(--sh-muted);
+  cursor: pointer;
+  opacity: 0;
+  font-family: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-recent-chip__dismiss {
+    transition:
+      opacity 120ms ease-out,
+      background 120ms ease-out,
+      color 120ms ease-out;
+  }
+}
+
+.scholar-recent-chip:hover .scholar-recent-chip__dismiss,
+.scholar-recent-chip:focus-within .scholar-recent-chip__dismiss {
+  opacity: 1;
+}
+
+.scholar-recent-chip__dismiss:hover,
+.scholar-recent-chip__dismiss:focus-visible {
+  background: var(--sh-soft);
+  color: var(--sh-text);
+  outline: none;
+}
+
+/* Touch devices: no hover, so always show the dismiss target. */
+@media (hover: none) {
+  .scholar-recent-chip__dismiss {
+    opacity: 1;
+    width: 44px;
+    height: 44px;
+  }
+  .scholar-recent-chip {
+    padding-right: 52px;
+  }
+}
+
+/* ── Blocks 3 + 4: Discover grids ──────────────────────────────────────── */
+
+.scholar-landing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  gap: 16px;
+}
+
+.scholar-landing-empty {
+  background: var(--sh-soft);
+  border: 1px dashed var(--sh-border);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  color: var(--sh-subtext);
+  font-size: var(--type-sm);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.scholar-landing-empty p {
+  margin: 0;
+}
+
+.scholar-landing-empty__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 16px;
+  min-height: 44px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 8px;
+  color: var(--sh-text);
+  font-size: var(--type-sm);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.scholar-landing-empty__cta:hover {
+  background: var(--sh-brand-soft);
+  border-color: var(--sh-brand-border);
+  color: var(--sh-pill-text);
+}
+
+.scholar-landing-empty__cta:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+}
+
+/* ── Block 5: Topic tiles ─────────────────────────────────────────────── */
+
+.scholar-topic-tiles {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.scholar-topic-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  min-height: 64px;
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  text-decoration: none;
+  color: inherit;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-topic-tile {
+    transition:
+      background 150ms ease-out,
+      border-color 150ms ease-out,
+      transform 150ms ease-out;
+  }
+  .scholar-topic-tile:hover {
+    background: var(--sh-brand-soft);
+    border-color: var(--sh-brand-border);
+    transform: translateY(-1px);
+  }
+}
+
+.scholar-topic-tile:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+}
+
+.scholar-topic-tile__label {
+  font-family: var(--font);
+  font-size: var(--type-sm);
+  font-weight: 600;
+  color: var(--sh-heading);
+  letter-spacing: -0.005em;
+}
+
+.scholar-topic-tile__count {
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+}
+
+/* ── Block 6: Side rail ─────────────────────────────────────────────────
+ * Hidden below 1024px to keep mobile single-column. The card content is
+ * reachable from elsewhere in the app (Saved page link in sidebar, citation
+ * styles in the paper-detail composer), so we're not hiding load-bearing
+ * functionality on small screens. */
+
+.scholar-landing__rail {
+  display: none;
+}
+
+@media (min-width: 1024px) {
+  .scholar-landing__rail {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    position: sticky;
+    top: 88px;
+    align-self: start;
+  }
+}
+
+.scholar-rail-card {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scholar-rail-card__title {
+  font-family: var(--font);
+  font-size: var(--type-sm);
+  font-weight: 600;
+  color: var(--sh-heading);
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+
+.scholar-rail-card__body {
+  font-family: var(--font);
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+  margin: 0;
+  line-height: 1.55;
+}
+
+.scholar-rail-card__cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 8px 12px;
+  min-height: 36px;
+  background: var(--sh-brand-soft);
+  border: 1px solid var(--sh-brand-border);
+  border-radius: 8px;
+  color: var(--sh-pill-text);
+  font-size: var(--type-xs);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.scholar-rail-card__cta:hover {
+  background: var(--sh-brand);
+  color: var(--sh-surface);
+  border-color: var(--sh-brand);
+}
+
+.scholar-rail-card__cta:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+}
+
+.scholar-rail-card__chips {
+  list-style: none;
+  margin: 4px 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.scholar-rail-card__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  background: var(--sh-soft);
+  border: 1px solid var(--sh-border);
+  border-radius: 999px;
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+  font-weight: 500;
+}

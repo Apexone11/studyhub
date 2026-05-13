@@ -1,219 +1,315 @@
 /**
  * ScholarTopicPage.jsx — `/scholar/topic/:slug`.
  *
- * Implements Figma §23.6: eyebrow, title, follow + stat strip, sort
- * tabs (Trending / Recent / Most Cited), paper card list, related-
- * topics rail, top-contributors rail.
+ * Topic feed redesign: large sans-serif header, follow pill, sort tabs
+ * (Latest / Most cited / Trending / Recently at your school), responsive
+ * 1-col phone / 2-col tablet+ paper grid.
+ *
+ * Endpoints (all 404-tolerant — page renders empty state instead of crash):
+ *   - GET /api/scholar/topic/:slug?sort=... (existing) is used as the
+ *     primary feed source.
+ *   - GET /api/scholar/topics/:slug/papers?sort=... (preferred per brief)
+ *     is attempted first; falls back to `/topic/:slug` on 404.
+ *   - POST /api/scholar/topics/:slug/follow toggles follow state.
+ *   - GET /api/scholar/topics/:slug/follow reads current follow state.
  */
-import { useEffect, useState, useMemo } from 'react'
-import { useParams, useSearchParams, Link } from 'react-router-dom'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link, useParams, useSearchParams } from 'react-router-dom'
 import { usePageTitle } from '../../lib/usePageTitle'
+import useFetch from '../../lib/useFetch'
 import { API } from '../../config'
+import { authHeaders } from '../shared/pageUtils'
+import { showToast } from '../../lib/toast'
 import PaperCard from './paperCard/PaperCard'
 import { POPULAR_TOPICS } from './scholarConstants'
 import ScholarShell from './ScholarShell'
 import './ScholarPage.css'
+import './ScholarLists.css'
 
 const SORT_OPTIONS = [
+  { id: 'recent', label: 'Latest' },
+  { id: 'mostCited', label: 'Most cited' },
   { id: 'trending', label: 'Trending' },
-  { id: 'recent', label: 'Recent' },
-  { id: 'mostCited', label: 'Most Cited' },
+  { id: 'school', label: 'Recently at your school' },
 ]
+
+const TOPIC_DESCRIPTIONS = {
+  medicine:
+    'Clinical research, drug efficacy, public health interventions, and patient-care methodology.',
+  'machine-learning':
+    'Statistical learning, neural architectures, training techniques, and benchmarks.',
+  engineering:
+    'Applied research across electrical, mechanical, civil, and software engineering disciplines.',
+  'physics-general': 'Theoretical and experimental physics, from condensed matter to particles.',
+  nlp: 'Natural language processing, large language models, parsing, and dialogue systems.',
+  'public-health': 'Population-scale interventions, epidemiology, and health-system research.',
+  chemistry: 'Synthesis, reaction mechanisms, analytical chemistry, and materials.',
+  'materials-science':
+    'Engineering of metals, polymers, ceramics, and emerging functional materials.',
+  'cell-biology': 'Cellular mechanisms, signaling, organelles, and developmental biology.',
+  psychology: 'Cognition, behavior, mental health, and experimental social psychology.',
+  'computer-vision': 'Image and video understanding, recognition, generation, and 3D vision.',
+  economics: 'Macroeconomics, microeconomics, econometrics, and applied policy research.',
+  mathematics: 'Pure and applied math, algebra, analysis, geometry, and discrete math.',
+  neuroscience: 'Brain function, neural circuits, neurodegeneration, and cognitive systems.',
+  astrophysics: 'Cosmology, stellar physics, galaxies, and high-energy astrophysical phenomena.',
+  biochemistry: 'Protein structure, enzymes, metabolic pathways, and molecular function.',
+  genomics: 'Genome biology, sequencing, variant analysis, and functional genomics.',
+  sociology: 'Social structure, inequality, networks, and quantitative sociological methods.',
+  statistics: 'Inference, experimental design, Bayesian methods, and statistical learning.',
+  'climate-science': 'Climate dynamics, modeling, attribution, and mitigation research.',
+  'earth-science': 'Geology, oceanography, atmospheric science, and planetary geoscience.',
+  'quantum-physics': 'Quantum mechanics, quantum information, and condensed matter physics.',
+  education: 'Pedagogy, learning sciences, assessment, and education policy.',
+  linguistics: 'Phonology, syntax, semantics, sociolinguistics, and computational linguistics.',
+}
+
+function SkeletonGrid() {
+  return (
+    <div className="scholar-list__grid" aria-hidden="true">
+      {Array.from({ length: 4 }).map((_, i) => (
+        <div key={i} className="scholar-list__skeleton-card">
+          <div className="scholar-list__skeleton-line scholar-list__skeleton-line--title" />
+          <div className="scholar-list__skeleton-line scholar-list__skeleton-line--meta" />
+          <div className="scholar-list__skeleton-line scholar-list__skeleton-line--abstract" />
+        </div>
+      ))}
+    </div>
+  )
+}
 
 export default function ScholarTopicPage() {
   const { slug } = useParams()
+  const safeSlug = (slug || '').toLowerCase()
   const [params, setParams] = useSearchParams()
-  const sort = SORT_OPTIONS.some((s) => s.id === params.get('sort'))
-    ? params.get('sort')
-    : 'trending'
+  const requestedSort = params.get('sort')
+  const sort = SORT_OPTIONS.some((s) => s.id === requestedSort) ? requestedSort : 'recent'
 
   const topicLabel = useMemo(() => {
-    const lower = (slug || '').toLowerCase()
-    const match = POPULAR_TOPICS.find((t) => t.slug === lower)
+    const match = POPULAR_TOPICS.find((t) => t.slug === safeSlug)
     if (match) return match.label
-    // Title-case fallback.
-    return (slug || '')
+    return safeSlug
       .split('-')
       .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
       .join(' ')
-  }, [slug])
+  }, [safeSlug])
+
+  const topicDescription = TOPIC_DESCRIPTIONS[safeSlug] || ''
 
   usePageTitle(topicLabel ? `${topicLabel} — Scholar` : 'Scholar topic')
 
-  // Single state object so the effect only writes once per fetch
-  // (lint: react-hooks/set-state-in-effect requires no synchronous
-  // pre-fetch reset). `forKey` records which (slug, sort) the data
-  // belongs to so a stale fetch never paints over a fresh selection.
-  const fetchKey = `${slug}|${sort}`
-  const [state, setState] = useState({
-    items: [],
-    loading: true,
-    error: null,
-    forKey: '',
+  // Primary feed source — tries the preferred /topics/:slug/papers endpoint
+  // and falls back to /topic/:slug on 404. SWR keeps the previous data
+  // painted during sort switches so the page never flashes a skeleton.
+  const preferredPath = `/api/scholar/topics/${encodeURIComponent(safeSlug)}/papers?sort=${sort}&limit=20`
+  const {
+    data: preferredData,
+    error: preferredError,
+    loading: preferredLoading,
+  } = useFetch(preferredPath, {
+    skip: !safeSlug,
+    swr: 30000,
+    cacheKey: `scholar-topic:preferred:${safeSlug}:${sort}`,
   })
-  const results = state.forKey === fetchKey ? state.items : []
-  const loading = state.forKey !== fetchKey || state.loading
-  const error = state.forKey === fetchKey ? state.error : null
+
+  const fallbackPath = `/api/scholar/topic/${encodeURIComponent(safeSlug)}?sort=${sort}&limit=20`
+  const {
+    data: fallbackData,
+    error: fallbackError,
+    loading: fallbackLoading,
+  } = useFetch(fallbackPath, {
+    skip: !safeSlug || (!!preferredData && !preferredError),
+    swr: 30000,
+    cacheKey: `scholar-topic:fallback:${safeSlug}:${sort}`,
+  })
+
+  const results = useMemo(() => {
+    const src = preferredData && !preferredError ? preferredData : fallbackData
+    if (!src) return []
+    const arr = Array.isArray(src.results)
+      ? src.results
+      : Array.isArray(src.papers)
+        ? src.papers
+        : Array.isArray(src.items)
+          ? src.items
+          : []
+    return arr
+  }, [preferredData, preferredError, fallbackData])
+
+  const loading = !!safeSlug && (preferredLoading || fallbackLoading) && results.length === 0
+  const error = preferredError && fallbackError ? fallbackError : null
+
+  const setSort = useCallback(
+    (next) => {
+      const nextParams = new URLSearchParams(params)
+      nextParams.set('sort', next)
+      setParams(nextParams, { replace: true })
+    },
+    [params, setParams],
+  )
+
+  // Follow state — read once on mount, optimistic toggle on click.
+  // 404 on the GET means "not implemented yet" — the button still functions
+  // and toggles purely client-side until the endpoint exists.
+  const [followed, setFollowed] = useState(false)
+  const [followBusy, setFollowBusy] = useState(false)
 
   useEffect(() => {
-    if (!slug) return
+    if (!safeSlug) return undefined
     let aborted = false
-    const url = new URL(`${API}/api/scholar/topic/${encodeURIComponent(slug)}`)
-    url.searchParams.set('sort', sort)
-    url.searchParams.set('limit', '20')
-    fetch(url.toString(), { credentials: 'include' })
-      .then((res) => {
-        if (!res.ok) throw new Error(`Topic load failed (${res.status})`)
-        return res.json()
-      })
+    fetch(`${API}/api/scholar/topics/${encodeURIComponent(safeSlug)}/follow`, {
+      credentials: 'include',
+      headers: authHeaders(),
+    })
+      .then((res) => (res.ok ? res.json() : null))
       .then((json) => {
-        if (aborted) return
-        setState({
-          items: Array.isArray(json.results) ? json.results : [],
-          loading: false,
-          error: null,
-          forKey: fetchKey,
-        })
+        if (aborted || !json) return
+        // Defer the state write to the next microtask so it does not run
+        // inside an effect's synchronous body (React Compiler lint).
+        Promise.resolve().then(() => setFollowed(!!json.following))
       })
-      .catch((err) => {
-        if (aborted) return
-        setState({
-          items: [],
-          loading: false,
-          error: err.message || 'Topic load failed',
-          forKey: fetchKey,
-        })
+      .catch(() => {
+        // Treat any failure as "not followed yet" — non-fatal.
       })
     return () => {
       aborted = true
     }
-  }, [slug, sort, fetchKey])
+  }, [safeSlug])
 
-  const setSort = (next) => {
-    const nextParams = new URLSearchParams(params)
-    nextParams.set('sort', next)
-    setParams(nextParams, { replace: true })
-  }
+  const toggleFollow = useCallback(async () => {
+    if (!safeSlug || followBusy) return
+    setFollowBusy(true)
+    const previous = followed
+    setFollowed(!previous) // optimistic; reverted on failure
+    try {
+      const res = await fetch(`${API}/api/scholar/topics/${encodeURIComponent(safeSlug)}/follow`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: authHeaders(),
+        body: JSON.stringify({ follow: !previous }),
+      })
+      if (res.status === 404) {
+        // Endpoint not built — keep optimistic state, show one-time hint.
+        showToast(
+          previous ? 'Removed from followed topics.' : 'Following — saved locally for now.',
+          'info',
+        )
+        return
+      }
+      if (!res.ok) throw new Error(`Follow failed (${res.status})`)
+      const json = await res.json().catch(() => ({}))
+      const persisted = typeof json.following === 'boolean' ? json.following : !previous
+      setFollowed(persisted)
+      showToast(persisted ? `Following ${topicLabel}.` : `Unfollowed ${topicLabel}.`, 'success')
+    } catch (err) {
+      setFollowed(previous)
+      showToast(err.message || 'Could not update follow state.', 'error')
+    } finally {
+      setFollowBusy(false)
+    }
+  }, [safeSlug, followBusy, followed, topicLabel])
 
   return (
     <ScholarShell mainId="scholar-topic-main">
-      <div className="scholar-shell" style={{ paddingTop: 0 }}>
-        <div className="scholar-topic__layout">
-          {/* L17-HIGH-5: layout class collapses to single column &lt;1024px
-              via ScholarPage.css. Inline grid was causing horizontal scroll
-              on tablets. */}
-          <section aria-label="Topic feed">
-            <div className="scholar-section__eyebrow">Topic</div>
-            <h1
+      <div
+        className="scholar-shell scholar-list__page"
+        style={{ paddingTop: 0, paddingBottom: 'calc(48px + env(safe-area-inset-bottom))' }}
+      >
+        <section aria-label="Topic feed">
+          <div
+            style={{
+              fontSize: 'var(--type-xs)',
+              fontWeight: 600,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+              color: 'var(--sh-subtext)',
+              marginBottom: 4,
+            }}
+          >
+            Topic
+          </div>
+          <div className="scholar-topic-v2__header">
+            <div style={{ minWidth: 0, flex: '1 1 320px' }}>
+              <h1 className="scholar-topic-v2__title">{topicLabel}</h1>
+              <p className="scholar-topic-v2__desc">
+                {topicDescription
+                  ? topicDescription
+                  : `Explore recent and influential papers tagged ${topicLabel}.`}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="scholar-topic-v2__follow"
+              aria-pressed={followed}
+              disabled={followBusy}
+              onClick={toggleFollow}
+            >
+              {followed ? 'Following' : 'Save topic'}
+            </button>
+          </div>
+
+          <div role="tablist" className="scholar-tabs" style={{ marginTop: 20 }}>
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                role="tab"
+                type="button"
+                aria-selected={sort === opt.id}
+                className="scholar-tab"
+                onClick={() => setSort(opt.id)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
+          {loading && (
+            <div style={{ marginTop: 16 }}>
+              <SkeletonGrid />
+            </div>
+          )}
+
+          {!loading && error && (
+            <div
               style={{
-                fontFamily: 'var(--font-paper)',
-                fontSize: 'var(--type-xl)',
-                margin: '4px 0 8px',
-                color: 'var(--sh-heading)',
+                color: 'var(--sh-danger-text)',
+                background: 'var(--sh-danger-bg)',
+                padding: 12,
+                borderRadius: 8,
+                border: '1px solid var(--sh-border)',
+                marginTop: 16,
               }}
             >
-              {topicLabel}
-            </h1>
-            <p style={{ color: 'var(--sh-subtext)', margin: 0 }}>
-              Explore recent and influential papers tagged {topicLabel}.
-            </p>
-
-            <div role="tablist" className="scholar-tabs" style={{ marginTop: 24 }}>
-              {SORT_OPTIONS.map((opt) => (
-                <button
-                  key={opt.id}
-                  role="tab"
-                  type="button"
-                  aria-selected={sort === opt.id}
-                  className="scholar-tab"
-                  onClick={() => setSort(opt.id)}
-                >
-                  {opt.label}
-                </button>
-              ))}
+              Could not load this topic right now. Try again in a moment.
             </div>
+          )}
 
-            {loading && <div style={{ color: 'var(--sh-subtext)' }}>Loading…</div>}
-            {error && (
-              <div
-                style={{
-                  color: 'var(--sh-danger-text)',
-                  background: 'var(--sh-danger-bg)',
-                  padding: 12,
-                  borderRadius: 8,
-                }}
-              >
-                {error}
-              </div>
-            )}
-            {!loading && !error && results.length === 0 && (
-              <div
-                style={{
-                  color: 'var(--sh-subtext)',
-                  background: 'var(--sh-soft)',
-                  padding: 24,
-                  borderRadius: 14,
-                  border: '1px solid var(--sh-border)',
-                }}
-              >
-                No papers in this topic yet. The cache fills as users search.
-              </div>
-            )}
-            <div className="paper-card-grid paper-card-grid--list" style={{ marginTop: 16 }}>
+          {!loading && !error && results.length === 0 && (
+            <div className="scholar-list__empty" style={{ marginTop: 16 }}>
+              <p style={{ margin: 0, fontSize: 'var(--type-md)', color: 'var(--sh-text)' }}>
+                No papers in this topic yet.
+              </p>
+              <p style={{ margin: '8px 0 0' }}>
+                The topic cache fills as users search Scholar. Try another topic or run a search.
+              </p>
+              <Link to="/scholar/search" className="scholar-list__empty-cta">
+                Search Scholar →
+              </Link>
+            </div>
+          )}
+
+          {!loading && !error && results.length > 0 && (
+            <div className="scholar-list__grid" style={{ marginTop: 16 }}>
               {results.map((paper) => (
                 <PaperCard key={paper.id} paper={paper} variant="full" />
               ))}
             </div>
-          </section>
+          )}
 
-          <aside
-            aria-label="Related topics"
-            style={{
-              alignSelf: 'start',
-              position: 'sticky',
-              top: 80,
-              background: 'var(--sh-surface)',
-              border: '1px solid var(--sh-border)',
-              borderRadius: 14,
-              padding: 18,
-            }}
-          >
-            <h2
-              style={{
-                fontFamily: 'var(--font-paper)',
-                fontSize: 'var(--type-md)',
-                color: 'var(--sh-heading)',
-                margin: '0 0 12px',
-              }}
-            >
-              Related topics
-            </h2>
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
-              {POPULAR_TOPICS.filter((t) => t.slug !== slug)
-                .slice(0, 8)
-                .map((t) => (
-                  <Link
-                    key={t.slug}
-                    to={`/scholar/topic/${t.slug}`}
-                    style={{
-                      padding: '6px 12px',
-                      background: 'var(--sh-brand-soft)',
-                      color: 'var(--sh-pill-text, var(--sh-brand))',
-                      borderRadius: 999,
-                      textDecoration: 'none',
-                      fontSize: 'var(--type-xs)',
-                      border: '1px solid var(--sh-border)',
-                    }}
-                  >
-                    {t.label}
-                  </Link>
-                ))}
-            </div>
+          <div style={{ marginTop: 32 }}>
             <Link
               to="/scholar"
               style={{
-                display: 'inline-block',
-                marginTop: 16,
                 color: 'var(--sh-brand)',
                 textDecoration: 'none',
                 fontSize: 'var(--type-sm)',
@@ -221,8 +317,8 @@ export default function ScholarTopicPage() {
             >
               ← Back to Scholar
             </Link>
-          </aside>
-        </div>
+          </div>
+        </section>
       </div>
     </ScholarShell>
   )

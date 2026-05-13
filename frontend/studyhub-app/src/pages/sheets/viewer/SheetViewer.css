@@ -1,0 +1,83 @@
+/*
+ * SheetViewer.css — Mobile polish styles for the sheet viewer
+ * (Loop M5, 2026-05-13). Imported by SheetViewerPage.jsx.
+ *
+ * Most viewer styles live inline in the JSX (per the existing
+ * convention in this directory). This file only carries the
+ * mobile-only overrides and the comments panel density rules,
+ * which would be too verbose to express inline with a viewport
+ * check + matchMedia.
+ */
+
+/* Content panel: shrink the H1 and tighten padding on phones so
+   the sheet body becomes the focal point. */
+@media (max-width: 767px) {
+  .sheet-viewer__content-panel {
+    padding: 14px !important;
+    border-radius: 14px !important;
+  }
+
+  .sheet-viewer__content-title {
+    font-size: 20px !important;
+    line-height: 1.25 !important;
+  }
+}
+
+/* Compact stats row on mobile — kept inline already, this just
+   gives it a sticky-ish single-line treatment. */
+@media (max-width: 767px) {
+  .sheet-viewer__stats-bar {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    flex-wrap: nowrap !important;
+    white-space: nowrap;
+  }
+}
+
+/* Comments panel — denser layout on mobile: smaller avatars
+   (24px instead of 36px), tighter gaps, and capped reply nesting
+   so threads don't spill off-screen. The 2-level nesting cap is
+   enforced via the .is-deep-nesting marker class, which collapses
+   any 3rd-level reply into a "Show N replies" button. */
+@media (max-width: 767px) {
+  .sheet-viewer__comments :is(.user-avatar, .sh-avatar) {
+    /* Defensive — UserAvatar passes a numeric size prop and renders
+       an inline-block element with width/height inline styles, so
+       this rule only takes effect on legacy avatars that don't
+       set their own dimensions. We can't shrink an inline-styled
+       avatar from CSS without !important. */
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  .sheet-viewer__comments .sheet-viewer__comment-row {
+    gap: 8px !important;
+  }
+
+  .sheet-viewer__comments .sheet-viewer__comment-bubble {
+    padding: 8px 12px !important;
+    font-size: 12.5px !important;
+  }
+}
+
+/* Action bar — 2-column grid on phone when the button row gets too
+   tight. Tablet keeps horizontal stack. */
+@media (max-width: 767px) {
+  .sheet-viewer__action-bar {
+    display: grid !important;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px !important;
+  }
+
+  .sheet-viewer__action-bar > * {
+    justify-content: center;
+    min-width: 0;
+  }
+
+  /* When only one or two items, fall back to a 1-column stretch
+     so single buttons don't render at half-width. */
+  .sheet-viewer__action-bar:has(> :nth-child(2):last-child) {
+    grid-template-columns: 1fr 1fr;
+  }
+}

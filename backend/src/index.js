@@ -73,6 +73,7 @@ const docsRoutes = require('./modules/docs')
 const sharingRoutes = require('./modules/sharing')
 const aiRoutes = require('./modules/ai')
 const libraryRoutes = require('./modules/library')
+const scholarRoutes = require('./modules/scholar')
 const videoRoutes = require('./modules/video')
 const paymentsRoutes = require('./modules/payments')
 const reviewsRoutes = require('./modules/reviews')
@@ -701,6 +702,9 @@ app.use('/api/ai', aiRoutes)
 
 // Library module endpoints under /api/library.
 app.use('/api/library', libraryRoutes)
+
+// Scholar v1 endpoints under /api/scholar (master plan §18).
+app.use('/api/scholar', scholarRoutes)
 
 // Video module endpoints under /api/video.
 app.use('/api/video', videoRoutes)

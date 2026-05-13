@@ -1,0 +1,445 @@
+/* ════════════════════════════════════════════════════════════════════════
+ * PaperCard — scoped styles for the redesigned Scholar paper card.
+ *
+ * Loads alongside ScholarPage.css (which still owns the grid wrapper +
+ * legacy `.paper-card` block). The selectors here are net-new and use
+ * BEM-style names so they cannot collide with existing rules.
+ *
+ * All colors via var(--sh-*) tokens. No emoji in chrome.
+ * ════════════════════════════════════════════════════════════════════════ */
+
+/* ── Default-variant card ─────────────────────────────────────────────── */
+
+.paper-card--default {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 14px;
+  padding: 20px;
+  color: var(--sh-text);
+  box-shadow: var(--shadow-sm);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .paper-card--default {
+    transition:
+      transform 150ms ease-out,
+      box-shadow 150ms ease-out,
+      border-color 150ms ease-out;
+  }
+  .paper-card--default:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-md);
+  }
+}
+
+.paper-card--selectable.is-selected {
+  border-color: var(--sh-brand);
+  box-shadow: 0 0 0 2px var(--sh-brand-soft);
+}
+
+/* ── Selection checkbox ───────────────────────────────────────────────── */
+
+.paper-card__select {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  cursor: pointer;
+}
+.paper-card__select input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+.paper-card__select span {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: 1.5px solid var(--sh-border);
+  background: var(--sh-surface);
+  display: inline-block;
+}
+.paper-card__select input:checked + span {
+  background: var(--sh-brand);
+  border-color: var(--sh-brand);
+  background-image:
+    linear-gradient(45deg, transparent 45%, var(--sh-surface) 45% 55%, transparent 55%),
+    linear-gradient(-45deg, transparent 45%, var(--sh-surface) 45% 55%, transparent 55%);
+}
+.paper-card__select input:focus-visible + span {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+}
+.paper-card--selectable .paper-card__meta-row,
+.paper-card--selectable .paper-card__title-link {
+  padding-left: 32px;
+}
+
+/* ── Top meta row ─────────────────────────────────────────────────────── */
+
+.paper-card__meta-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+}
+
+.paper-card__source-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: var(--sh-soft);
+  color: var(--sh-text);
+  border-radius: 999px;
+  font-size: var(--type-xs);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.paper-card__meta-item {
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+}
+
+.paper-card__meta-venue {
+  max-width: 24ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.paper-card__oa-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  background: var(--sh-success-bg);
+  color: var(--sh-success-text);
+  border: 1px solid var(--sh-success-border);
+  border-radius: 999px;
+  font-size: var(--type-xs);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+/* ── Why this paper? ──────────────────────────────────────────────────── */
+
+.paper-card__why-wrap {
+  position: relative;
+  margin-left: auto;
+}
+
+.paper-card__why {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--sh-subtext);
+  cursor: pointer;
+  padding: 0;
+}
+.paper-card__why:hover,
+.paper-card__why:focus-visible {
+  background: var(--sh-soft);
+  color: var(--sh-text);
+  outline: none;
+}
+.paper-card__why:focus-visible {
+  border-color: var(--sh-brand);
+}
+
+.paper-card__why-tooltip {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  max-width: 260px;
+  padding: 10px 12px;
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  border: 1px solid var(--sh-border);
+  border-radius: 10px;
+  box-shadow: var(--shadow-md);
+  font-size: var(--type-xs);
+  line-height: 1.45;
+  white-space: normal;
+}
+
+/* ── Title ────────────────────────────────────────────────────────────── */
+
+.paper-card__title-link {
+  text-decoration: none;
+  color: inherit;
+}
+.paper-card__title-link:hover .paper-card__title,
+.paper-card__title-link:focus-visible .paper-card__title {
+  text-decoration: underline;
+}
+.paper-card__title-link:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.paper-card__title {
+  margin: 0;
+  font-family: var(--font);
+  font-size: 1.1rem;
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--sh-heading);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Authors ──────────────────────────────────────────────────────────── */
+
+.paper-card__authors-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 4px;
+  font-size: var(--type-sm);
+  color: var(--sh-subtext);
+}
+
+.paper-card__author-link {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  color: var(--sh-subtext);
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+}
+.paper-card__author-link:hover,
+.paper-card__author-link:focus-visible {
+  color: var(--sh-brand);
+  text-decoration: underline;
+  outline: none;
+}
+.paper-card__author-link::after {
+  content: ', ';
+}
+.paper-card__author-link:last-of-type::after {
+  content: '';
+}
+
+.paper-card__author-more {
+  color: var(--sh-subtext);
+}
+
+/* ── Body / TLDR / abstract ───────────────────────────────────────────── */
+
+.paper-card__body {
+  margin: 0;
+  font-size: var(--type-sm);
+  color: var(--sh-subtext);
+  line-height: 1.55;
+}
+.paper-card__body--tldr {
+  background: var(--sh-soft);
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: var(--sh-text);
+}
+
+.paper-card__tldr-tag {
+  display: inline-block;
+  margin-right: 8px;
+  font-size: var(--type-xs);
+  font-weight: 700;
+  color: var(--sh-brand);
+  letter-spacing: 0.05em;
+}
+
+.paper-card__body-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.paper-card__showmore {
+  display: inline;
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 6px;
+  color: var(--sh-brand);
+  font: inherit;
+  font-size: var(--type-xs);
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ── Citation strip ──────────────────────────────────────────────────── */
+
+.paper-card__cite-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+}
+
+.paper-card__cite-count-link {
+  color: var(--sh-subtext);
+  text-decoration: none;
+  font-weight: 600;
+}
+.paper-card__cite-count-link:hover,
+.paper-card__cite-count-link:focus-visible {
+  color: var(--sh-brand);
+  text-decoration: underline;
+  outline: none;
+}
+
+.citation-sparkline {
+  display: inline-block;
+  vertical-align: middle;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .citation-sparkline__line {
+    stroke-dasharray: 120;
+    stroke-dashoffset: 120;
+    animation: paper-card-spark-draw 700ms ease-out forwards;
+  }
+}
+@keyframes paper-card-spark-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* ── Sentiment pills ──────────────────────────────────────────────────── */
+
+.paper-card__sentiment {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.paper-card__sentiment-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: var(--type-xs);
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+.paper-card__sentiment-pill--support {
+  background: var(--sh-success-bg);
+  color: var(--sh-success-text);
+  border-color: var(--sh-success-border);
+}
+.paper-card__sentiment-pill--contrast {
+  background: var(--sh-danger-bg);
+  color: var(--sh-danger-text);
+  border-color: var(--sh-danger-border);
+}
+.paper-card__sentiment-pill--mention {
+  background: var(--sh-soft);
+  color: var(--sh-subtext);
+  border-color: var(--sh-border);
+}
+
+/* ── Action bar ──────────────────────────────────────────────────────── */
+
+.paper-card__action-bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: auto;
+  padding-top: 12px;
+  border-top: 1px solid var(--sh-border);
+}
+
+.paper-card__action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sh-subtext);
+  cursor: pointer;
+  padding: 0;
+  text-decoration: none;
+}
+.paper-card__action:hover,
+.paper-card__action:focus-visible {
+  background: var(--sh-soft);
+  color: var(--sh-text);
+  outline: none;
+}
+.paper-card__action:focus-visible {
+  border-color: var(--sh-brand);
+}
+.paper-card__action.is-active {
+  color: var(--sh-warning-text, var(--sh-brand));
+}
+
+/* ── Compact variant ─────────────────────────────────────────────────── */
+
+.paper-card--compact {
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 10px;
+  padding: 12px 14px;
+}
+.paper-card__compact-link {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-decoration: none;
+  color: inherit;
+}
+.paper-card__compact-link:hover .paper-card__title--compact,
+.paper-card__compact-link:focus-visible .paper-card__title--compact {
+  text-decoration: underline;
+}
+.paper-card__title--compact {
+  font-size: var(--type-sm);
+  font-weight: 600;
+  margin: 0;
+  color: var(--sh-heading);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.paper-card__compact-meta {
+  display: flex;
+  gap: 6px;
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+}
+.paper-card__compact-year::before {
+  content: '· ';
+}

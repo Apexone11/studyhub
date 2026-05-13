@@ -220,9 +220,68 @@ async function getStats(_req, res) {
   }
 }
 
+// ── Discover feed (Wave-5 reconciliation, 2026-05-13) ───────────────────
+//
+// The Scholar landing hub (ScholarPage.jsx) calls
+// `/api/scholar/discover?scope=&limit=` to populate "Recent at your school"
+// and "Trending in the network" sections. Without this endpoint the hub
+// renders empty in production — graceful fallback, but no content. This
+// controller maps the scope to existing ScholarPaper queries:
+//
+//   scope=trending → order by citationCount desc, then publishedAt desc
+//   scope=recent   → order by publishedAt desc
+//   scope=school   → for v1, falls back to recent; the school-scope filter
+//                    needs ScholarPaper↔School linking that's tracked in
+//                    v2 (master plan §18.9). Returning "recent" papers
+//                    means the section has CONTENT instead of being empty.
+//
+// `viewer.schoolId` is read off `req.user` but not yet used (no school
+// linkage on ScholarPaper). Documented here so the next iteration that
+// adds the join knows where to plug it in.
+const DISCOVER_SCOPE_ALLOWLIST = new Set(['trending', 'recent', 'school'])
+const DISCOVER_DEFAULT_LIMIT = 8
+const DISCOVER_MAX_LIMIT = 24
+
+async function discoverPapers(req, res) {
+  try {
+    const rawScope = typeof req.query.scope === 'string' ? req.query.scope.toLowerCase() : ''
+    const scope = DISCOVER_SCOPE_ALLOWLIST.has(rawScope) ? rawScope : 'trending'
+
+    let limit = Number.parseInt(req.query.limit, 10)
+    if (!Number.isInteger(limit) || limit < 1) limit = DISCOVER_DEFAULT_LIMIT
+    if (limit > DISCOVER_MAX_LIMIT) limit = DISCOVER_MAX_LIMIT
+
+    const orderBy =
+      scope === 'recent' || scope === 'school'
+        ? [{ publishedAt: 'desc' }, { citationCount: 'desc' }]
+        : [{ citationCount: 'desc' }, { publishedAt: 'desc' }]
+
+    // Only papers with a title — keeps the hub clean of partial/stub rows
+    // from search caching that don't yet have full metadata.
+    const rows = await prisma.scholarPaper.findMany({
+      where: { title: { not: null } },
+      orderBy,
+      take: limit,
+    })
+
+    return res.json({
+      scope,
+      limit,
+      results: rows.map(_serializePaper),
+    })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    log.error({ err, event: 'scholar.discover.failed' }, 'Scholar discover failed')
+    // Return an empty result set rather than 500 — the hub page degrades
+    // gracefully on `results: []` (shows the empty-state CTA).
+    return res.json({ scope: 'trending', limit: DISCOVER_DEFAULT_LIMIT, results: [] })
+  }
+}
+
 module.exports = {
   getTopicFeed,
   getStats,
+  discoverPapers,
   _validateSlug,
   _validateYear,
 }

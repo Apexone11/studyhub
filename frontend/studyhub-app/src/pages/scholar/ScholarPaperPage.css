@@ -1,0 +1,449 @@
+/* ============================================================================
+ * ScholarPaperPage.css — reading-mode + paper detail page styles.
+ *
+ * Only place in StudyHub where SERIF body text is allowed (paper reading
+ * mode). See CLAUDE.md "CSS and Styling" — reading-mode exception.
+ * ============================================================================ */
+
+.scholar-paper {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  gap: 28px;
+  align-items: start;
+}
+
+@media (max-width: 1023px) {
+  .scholar-paper {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+  }
+}
+
+/* ── Left column: paper body ───────────────────────────────────────────── */
+.scholar-paper__main {
+  min-width: 0;
+  max-width: 760px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.scholar-paper__header {
+  padding: 8px 0 18px;
+  border-bottom: 1px solid var(--sh-border);
+  margin-bottom: 18px;
+}
+
+.scholar-paper__title {
+  font-family: var(--font-paper, 'Noto Serif', Georgia, serif);
+  font-weight: 700;
+  font-size: clamp(22px, 3vw, 30px);
+  line-height: 1.25;
+  color: var(--sh-heading);
+  margin: 0 0 10px;
+  letter-spacing: -0.01em;
+}
+
+.scholar-paper__byline {
+  font-size: 14px;
+  color: var(--sh-subtext);
+  margin: 0 0 6px;
+  line-height: 1.5;
+}
+
+.scholar-paper__meta {
+  font-size: 13px;
+  color: var(--sh-subtext);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.scholar-paper__meta a {
+  color: var(--sh-brand);
+  text-decoration: none;
+}
+.scholar-paper__meta a:hover {
+  text-decoration: underline;
+}
+
+/* ── tldr card ─────────────────────────────────────────────────────────── */
+.scholar-paper__tldr {
+  background: var(--sh-brand-soft, var(--sh-soft));
+  border: 1px solid var(--sh-border);
+  border-left: 3px solid var(--sh-brand);
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin: 16px 0 22px;
+}
+
+.scholar-paper__tldr-label {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-brand);
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.scholar-paper__tldr-body {
+  font-size: 15px;
+  color: var(--sh-text);
+  line-height: 1.55;
+  margin: 0;
+}
+
+/* ── Reading body (serif exception) ─────────────────────────────────────── */
+.scholar-paper__reading {
+  font-family: 'Noto Serif', Georgia, 'Times New Roman', serif;
+  font-size: 18px;
+  line-height: 1.7;
+  color: var(--sh-ink, #111);
+  max-width: 64ch;
+  margin: 0 auto;
+}
+
+.scholar-paper__reading--sans {
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.scholar-paper__reading p {
+  margin: 0 0 1em;
+}
+
+@media (max-width: 767px) {
+  .scholar-paper__reading {
+    font-size: 16px;
+    max-width: 100%;
+    padding: 0 4px;
+  }
+}
+
+/* ── Font toggle row ───────────────────────────────────────────────────── */
+.scholar-paper__reading-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 14px 0 12px;
+}
+
+.scholar-paper__font-toggle {
+  display: inline-flex;
+  border: 1px solid var(--sh-border);
+  border-radius: 999px;
+  padding: 2px;
+  background: var(--sh-surface);
+}
+
+.scholar-paper__font-toggle button {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 6px 14px;
+  font-size: 13px;
+  border-radius: 999px;
+  color: var(--sh-subtext);
+  cursor: pointer;
+  min-height: 32px;
+  font-family: inherit;
+}
+
+.scholar-paper__font-toggle button[aria-pressed='true'] {
+  background: var(--sh-brand-soft, var(--sh-soft));
+  color: var(--sh-brand);
+  font-weight: 600;
+}
+
+/* ── Tabs ──────────────────────────────────────────────────────────────── */
+.scholar-paper__tabs {
+  display: flex;
+  gap: 2px;
+  border-bottom: 1px solid var(--sh-border);
+  margin: 24px 0 18px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.scholar-paper__tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.scholar-paper__tab {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  padding: 10px 14px;
+  font-size: 14px;
+  color: var(--sh-subtext);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+  font-family: inherit;
+  min-height: 44px;
+}
+
+.scholar-paper__tab[aria-selected='true'] {
+  color: var(--sh-text);
+  border-bottom-color: var(--sh-brand);
+  font-weight: 600;
+}
+
+/* ── Right sidebar ─────────────────────────────────────────────────────── */
+.scholar-paper__sidebar {
+  position: sticky;
+  top: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-self: start;
+}
+
+@media (max-width: 1023px) {
+  .scholar-paper__sidebar {
+    position: static;
+  }
+}
+
+.scholar-paper__action-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+}
+
+.scholar-paper__action {
+  appearance: none;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  padding: 10px 14px;
+  font-size: 14px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-family: inherit;
+  min-height: 44px;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  transition: background 120ms ease;
+}
+
+.scholar-paper__action:hover:not(:disabled) {
+  background: var(--sh-soft);
+}
+
+.scholar-paper__action:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.scholar-paper__action--primary {
+  background: var(--sh-brand);
+  border-color: var(--sh-brand);
+  color: #fff;
+}
+.scholar-paper__action--primary:hover:not(:disabled) {
+  filter: brightness(0.95);
+  background: var(--sh-brand);
+}
+
+.scholar-paper__action--active {
+  background: var(--sh-brand-soft, var(--sh-soft));
+  border-color: var(--sh-brand);
+  color: var(--sh-brand);
+  font-weight: 600;
+}
+
+.scholar-paper__sidebar-card {
+  padding: 14px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 12px;
+}
+
+.scholar-paper__sidebar-card-title {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-subtext);
+  font-weight: 600;
+  margin: 0 0 10px;
+}
+
+.scholar-paper__recent-item {
+  display: block;
+  font-size: 13px;
+  color: var(--sh-text);
+  text-decoration: none;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--sh-border);
+  line-height: 1.4;
+}
+.scholar-paper__recent-item:last-child {
+  border-bottom: 0;
+}
+.scholar-paper__recent-item:hover {
+  color: var(--sh-brand);
+}
+
+/* ── Mobile sticky title bar ───────────────────────────────────────────── */
+.scholar-paper__mobile-titlebar {
+  display: none;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  background: var(--sh-surface);
+  border-bottom: 1px solid var(--sh-border);
+  padding: 10px 14px;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--sh-text);
+}
+
+.scholar-paper__mobile-titlebar--visible {
+  display: flex;
+}
+
+.scholar-paper__mobile-titlebar-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+@media (min-width: 1024px) {
+  .scholar-paper__mobile-titlebar {
+    display: none !important;
+  }
+}
+
+/* ── Mobile sticky action bar ──────────────────────────────────────────── */
+.scholar-paper__mobile-action-bar {
+  display: none;
+}
+
+@media (max-width: 767px) {
+  .scholar-paper__mobile-action-bar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 30;
+    gap: 6px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom)) 10px;
+    background: var(--sh-surface);
+    border-top: 1px solid var(--sh-border);
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .scholar-paper__mobile-action-bar::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scholar-paper__mobile-action-bar button,
+  .scholar-paper__mobile-action-bar a {
+    flex: 0 0 auto;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0 14px;
+    border-radius: 999px;
+    border: 1px solid var(--sh-border);
+    background: var(--sh-surface);
+    color: var(--sh-text);
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-family: inherit;
+  }
+
+  .scholar-paper__mobile-action-bar .scholar-paper__action--primary {
+    background: var(--sh-brand);
+    border-color: var(--sh-brand);
+    color: #fff;
+  }
+
+  /* Reserve space at the bottom of the page so the fixed bar doesn't
+     cover the last line of content. */
+  .scholar-paper__main {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom));
+  }
+}
+
+/* ── Mini-graph placeholder ────────────────────────────────────────────── */
+.scholar-paper__minigraph {
+  height: 140px;
+  border-radius: 8px;
+  background: repeating-linear-gradient(
+    45deg,
+    var(--sh-soft),
+    var(--sh-soft) 8px,
+    var(--sh-surface) 8px,
+    var(--sh-surface) 16px
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sh-subtext);
+  font-size: 12px;
+  text-align: center;
+  padding: 10px;
+}
+
+/* ── Reduced motion ────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .scholar-paper__action,
+  .scholar-paper__tab,
+  .scholar-paper__font-toggle button {
+    transition: none;
+  }
+}
+
+/* ── Skeleton block ────────────────────────────────────────────────────── */
+.scholar-paper__skeleton {
+  display: block;
+  background: linear-gradient(90deg, var(--sh-soft), var(--sh-surface), var(--sh-soft));
+  background-size: 200% 100%;
+  border-radius: 6px;
+  height: 14px;
+  margin: 8px 0;
+  animation: scholarPaperPulse 1.4s ease-in-out infinite;
+}
+.scholar-paper__skeleton--title {
+  height: 28px;
+  width: 75%;
+}
+.scholar-paper__skeleton--line {
+  width: 100%;
+}
+.scholar-paper__skeleton--line-short {
+  width: 60%;
+}
+
+@keyframes scholarPaperPulse {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scholar-paper__skeleton {
+    animation: none;
+  }
+}

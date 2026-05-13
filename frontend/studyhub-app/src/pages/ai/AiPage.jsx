@@ -22,7 +22,8 @@ import { useResponsiveAppLayout } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { useSharedAiChat } from '../../lib/aiChatContext'
 import { showToast } from '../../lib/toast'
-import { PAGE_FONT } from '../shared/pageUtils'
+import { flattenSchoolsToCourses } from '../../lib/courses.js'
+import { PAGE_FONT, authHeaders } from '../shared/pageUtils'
 import { pageShell } from '../../lib/ui'
 import { API as API_BASE } from '../../config'
 import { useState, useRef, useEffect } from 'react'
@@ -171,17 +172,53 @@ export default function AiPage() {
     setChatAreaKey((k) => k + 1)
   }, [promptParam])
 
-  // ── Scholar deep-link support is disabled in production.
-  // If a stale /ai?paperId=... link arrives, we drop the parameter and
-  // do not call the removed /api/scholar backend surface.
+  // ── Scholar deep-link support (re-enabled 2026-05-13, wave-5).
+  // /ai?paperId=<canonical-id> fetches the paper context and shows the
+  // PaperContextBanner so the user can start a chat about that paper.
+  // Scholar was removed in commit 69ef2080 and reactivated in commit
+  // e2f5e53d; this re-wires the deep-link to the real backend.
   const paperIdParam = searchParams.get('paperId') || ''
   const [paperContext, setPaperContext] = useState(null)
   const [paperContextError, setPaperContextError] = useState(null)
   useEffect(() => {
-    if (!paperIdParam) return
+    if (!paperIdParam) return undefined
+    const ctrl = new AbortController()
+    fetch(`${API_BASE}/api/scholar/paper/${encodeURIComponent(paperIdParam)}`, {
+      headers: authHeaders(),
+      credentials: 'include',
+      signal: ctrl.signal,
+    })
+      .then(async (response) => {
+        if (response.status === 404) throw new Error('Paper not found')
+        if (!response.ok) throw new Error(`Failed to load paper (${response.status})`)
+        const text = await response.text()
+        if (!text) throw new Error('Empty paper response')
+        return JSON.parse(text)
+      })
+      .then((data) => {
+        const paper = data?.paper || data
+        if (paper?.id || paper?.title) {
+          setPaperContext({
+            id: paper.id || paperIdParam,
+            title: paper.title || 'this paper',
+            authors: paper.authors || [],
+            year:
+              paper.year ||
+              (paper.publishedAt ? new Date(paper.publishedAt).getUTCFullYear() : null),
+            venue: paper.venue || null,
+          })
+          setPaperContextError(null)
+        } else {
+          throw new Error('Malformed paper response')
+        }
+      })
+      .catch((err) => {
+        if (err.name === 'AbortError') return
+        setPaperContext(null)
+        setPaperContextError(err.message || 'Could not load paper context.')
+      })
+    // Strip the param so a refresh doesn't re-fetch and the URL stays clean.
     queueMicrotask(() => {
-      setPaperContext(null)
-      setPaperContextError(null)
       setSearchParams(
         (prev) => {
           const next = new URLSearchParams(prev)
@@ -191,7 +228,42 @@ export default function AiPage() {
         { replace: true },
       )
     })
+    return () => ctrl.abort()
   }, [paperIdParam, setSearchParams])
+
+  // User's enrolled-course list for the "Save as note" Course dropdown
+  // on each AI message. Without this, the dropdown only renders
+  // "No course" and the user can't tag the saved note with a course.
+  // We mirror the NotesPage pattern (useNotesData.js): hit
+  // /api/courses/schools once when auth is ready, flatten + dedupe
+  // through the shared helper so two users at different schools can't
+  // collide on the same course code. Failures swallow silently — the
+  // dropdown gracefully degrades to "No course" only, which is the
+  // same as the broken state.
+  const [aiCourses, setAiCourses] = useState([])
+  useEffect(() => {
+    if (authStatus !== 'ready') return undefined
+    const ctrl = new AbortController()
+    fetch(`${API_BASE}/api/courses/schools`, {
+      headers: authHeaders(),
+      credentials: 'include',
+      cache: 'no-cache',
+      signal: ctrl.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error('schools fetch failed')
+        const text = await response.text()
+        if (!text) throw new Error('schools fetch returned empty body')
+        return JSON.parse(text)
+      })
+      .then((data) => {
+        setAiCourses(flattenSchoolsToCourses(data))
+      })
+      .catch(() => {
+        // Quiet failure — dropdown stays at "No course" only.
+      })
+    return () => ctrl.abort()
+  }, [authStatus])
 
   // All hooks MUST run before any early return (rules-of-hooks).
   const [density, setDensity] = useState(() => loadDensity())
@@ -338,6 +410,7 @@ export default function AiPage() {
                     setPaperContext(null)
                     setPaperContextError(null)
                   }}
+                  courses={aiCourses}
                 />
               )}
             </div>
@@ -764,6 +837,7 @@ function ChatArea({
   paperContext,
   paperContextError,
   onDismissPaperContext,
+  courses,
 }) {
   const messagesEndRef = useRef(null)
   // initialPrompt is consumed on mount by AiComposer; the parent resets
@@ -1013,7 +1087,7 @@ function ChatArea({
         )}
 
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} />
+          <MessageBubble key={msg.id} message={msg} courses={courses} />
         ))}
 
         {/* Streaming indicator */}
@@ -1345,7 +1419,7 @@ function DeleteConfirmModal({ title, onCancel, onConfirm }) {
 /* ═══════════════════════════════════════════════════════════════════════════
  * Message Bubble
  * ═══════════════════════════════════════════════════════════════════════════ */
-function MessageBubble({ message }) {
+function MessageBubble({ message, courses = [] }) {
   const isUser = message.role === 'user'
 
   return (
@@ -1404,7 +1478,11 @@ function MessageBubble({ message }) {
               return html ? <SheetPreviewBar html={html} conversationTitle={null} /> : null
             })()}
             <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-              <AiSaveToNotesButton messageId={message.id} content={message.content} />
+              <AiSaveToNotesButton
+                messageId={message.id}
+                content={message.content}
+                courses={courses}
+              />
             </div>
           </>
         )}

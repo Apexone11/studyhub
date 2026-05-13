@@ -46,9 +46,16 @@ function _tagAll(block, name) {
 }
 
 function _parseEntry(block) {
-  // arXiv entry id looks like http://arxiv.org/abs/2401.12345v1
+  // arXiv IDs use two schemes:
+  //   - post-2007: http://arxiv.org/abs/2401.12345v1
+  //   - pre-2007:  http://arxiv.org/abs/hep-th/9711200
+  //                http://arxiv.org/abs/math.AG/0211159
+  // Try the new format first (more common); fall back to old format so
+  // pre-2007 physics / math papers aren't silently dropped.
   const idText = _tag(block, 'id')
-  const arxivMatch = idText.match(/abs\/([0-9]{4}\.[0-9]{4,5}(v\d+)?)/i)
+  const arxivMatchNew = idText.match(/abs\/(\d{4}\.\d{4,5}(?:v\d+)?)/i)
+  const arxivMatchOld = idText.match(/abs\/([a-z][a-z-]*(?:\.[A-Z]{2})?\/\d{7}(?:v\d+)?)/)
+  const arxivMatch = arxivMatchNew || arxivMatchOld
   if (!arxivMatch) return null
   const arxivId = arxivMatch[1]
   if (!ARXIV_RE.test(arxivId)) return null

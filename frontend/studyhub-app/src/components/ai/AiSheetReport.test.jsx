@@ -182,7 +182,12 @@ describe('AiSheetReport', () => {
     })
   })
 
-  it('opens the Apply-snapshot modal and disables Save when the snapshot name is empty', async () => {
+  it('shows the Apply-edit button after a draft is ready (permission-gated)', async () => {
+    // The old "snapshot-naming modal" inside the component was replaced
+    // by the universal AiPermissionDialog (useAiPermission) at the App
+    // root. This test asserts the new flow: draft → Apply-edit button
+    // visible. The permission dialog itself is exercised via its own
+    // unit test in AiPermissionDialog.test.jsx.
     getStoredUserMock.mockReturnValue({ id: 7, role: 'admin' })
     globalThis.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -197,31 +202,15 @@ describe('AiSheetReport', () => {
     })
 
     renderAt('/sheets/42')
-    // Wait for owner detection.
     await waitFor(() => {
       expect(screen.getByRole('button', { name: /edit with ai/i })).toBeInTheDocument()
     })
     fireEvent.click(screen.getByRole('button', { name: /edit with ai/i }))
-    // Enter an instruction so the Draft edit button enables.
     const textarea = screen.getByPlaceholderText(/tighten the conclusion/i)
     fireEvent.change(textarea, { target: { value: 'Polish the intro paragraph.' } })
     fireEvent.click(screen.getByRole('button', { name: /draft edit/i }))
-    // Apply button appears after a draft.
     await waitFor(() => {
-      expect(screen.getByRole('button', { name: /apply \(save snapshot\)/i })).toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /apply edit/i })).toBeInTheDocument()
     })
-    fireEvent.click(screen.getByRole('button', { name: /apply \(save snapshot\)/i }))
-    // Modal renders. Default snapshot name is pre-filled from the first 60
-    // chars of the instruction, so it's already "valid".
-    const modal = await screen.findByRole('dialog', { name: /save ai snapshot/i })
-    expect(modal).toBeInTheDocument()
-    // Clear the snapshot name and assert the Save button is disabled.
-    const nameInput = screen.getByPlaceholderText(/tighten conclusion/i)
-    fireEvent.change(nameInput, { target: { value: '' } })
-    const save = screen.getByRole('button', { name: /save snapshot \+ apply/i })
-    expect(save).toBeDisabled()
-    // Typing a name re-enables.
-    fireEvent.change(nameInput, { target: { value: 'My snapshot' } })
-    expect(save).not.toBeDisabled()
   })
 })

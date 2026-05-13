@@ -61,6 +61,11 @@ const AiPage = lazy(() => import('./pages/ai/AiPage'))
 const LibraryPage = lazy(() => import('./pages/library/LibraryPage'))
 const BookDetailPage = lazy(() => import('./pages/library/BookDetailPage'))
 const BookReaderPage = lazy(() => import('./pages/library/BookReaderPage'))
+const ScholarPage = lazy(() => import('./pages/scholar/ScholarPage'))
+const ScholarSearchPage = lazy(() => import('./pages/scholar/ScholarSearchPage'))
+const ScholarPaperPage = lazy(() => import('./pages/scholar/ScholarPaperPage'))
+const ScholarSavedPage = lazy(() => import('./pages/scholar/ScholarSavedPage'))
+const ScholarTopicPage = lazy(() => import('./pages/scholar/ScholarTopicPage'))
 const PlaygroundPage = lazy(() => import('./pages/playground/PlaygroundPage'))
 const ReviewPage = lazy(() => import('./pages/review/ReviewPage'))
 const OnboardingPage = lazy(() => import('./pages/onboarding/OnboardingPage'))
@@ -81,6 +86,8 @@ const FocusTrapHarnessPage = import.meta.env.DEV
 import ScrollToTop from './components/ScrollToTop'
 import ToastContainer from './components/Toast'
 import FirstCreationCelebration from './components/FirstCreationCelebration'
+import AiPermissionDialog from './components/ai/AiPermissionDialog'
+import { AiPermissionProvider } from './lib/useAiPermission'
 import OfflineIndicator from './components/OfflineIndicator'
 import LegalAcceptanceEnforcementModal from './components/LegalAcceptanceEnforcementModal'
 import CookieConsentBanner from './components/CookieConsentBanner'
@@ -161,6 +168,9 @@ const ROUTE_TITLES = {
   '/invite': 'Invite Classmates',
   '/pricing': 'Pricing',
   '/library': 'Library',
+  '/scholar': 'Scholar',
+  '/scholar/search': 'Scholar search',
+  '/scholar/saved': 'Saved papers',
   '/playground': 'Code Playground',
   '/review': 'Leave a Review',
   '/onboarding': 'Onboarding',
@@ -386,399 +396,453 @@ function AppRoutes() {
           <CookieConsentBanner />
           <AuthenticatedAiProvider>
             <ChatPanelProvider>
-              <Suspense fallback={<RouteFallback />}>
-                <Routes>
-                  {/* ── public (unauthenticated) ─────────────────────────── */}
-                  <Route
-                    path="/"
-                    element={
-                      <PublicRoute>
-                        <HomePage />
-                      </PublicRoute>
-                    }
-                  />
-                  <Route
-                    path="/login"
-                    element={
-                      <PublicRoute>
-                        <LoginPage />
-                      </PublicRoute>
-                    }
-                  />
-                  <Route
-                    path="/login/challenge/:id"
-                    element={
-                      <PublicRoute>
-                        <LoginChallengePage />
-                      </PublicRoute>
-                    }
-                  />
-                  <Route
-                    path="/register"
-                    element={
-                      <PublicRoute>
-                        <RegisterScreen />
-                      </PublicRoute>
-                    }
-                  />
-                  <Route
-                    path="/signup/role"
-                    element={
-                      <PublicRoute>
-                        <RolePickerPage />
-                      </PublicRoute>
-                    }
-                  />
-                  <Route path="/terms" element={<TermsPage />} />
-                  <Route path="/privacy" element={<PrivacyPage />} />
-                  <Route path="/guidelines" element={<GuidelinesPage />} />
-                  <Route path="/cookies" element={<CookiePolicyPage />} />
-                  <Route path="/disclaimer" element={<DisclaimerPage />} />
-                  <Route path="/data-request" element={<DataRequestPage />} />
-                  <Route path="/about" element={<AboutPage />} />
-                  {/* Public feature catalog — v2 design refresh Week 2 */}
-                  <Route path="/docs" element={<DocsPage />} />
-                  <Route path="/docs/:slug" element={<DocsFeaturePage />} />
-                  <Route path="/pricing" element={<PricingPage />} />
-                  <Route path="/supporters" element={<SupportersPage />} />
-                  <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-                  <Route path="/reset-password" element={<ResetPasswordPage />} />
+              {/* Wrap the whole authenticated tree so any descendant
+                  can call `useAiPermission()` to gate an AI write
+                  action behind a Claude-Code-style approval dialog. */}
+              <AiPermissionProvider Dialog={AiPermissionDialog}>
+                <Suspense fallback={<RouteFallback />}>
+                  <Routes>
+                    {/* ── public (unauthenticated) ─────────────────────────── */}
+                    <Route
+                      path="/"
+                      element={
+                        <PublicRoute>
+                          <HomePage />
+                        </PublicRoute>
+                      }
+                    />
+                    <Route
+                      path="/login"
+                      element={
+                        <PublicRoute>
+                          <LoginPage />
+                        </PublicRoute>
+                      }
+                    />
+                    <Route
+                      path="/login/challenge/:id"
+                      element={
+                        <PublicRoute>
+                          <LoginChallengePage />
+                        </PublicRoute>
+                      }
+                    />
+                    <Route
+                      path="/register"
+                      element={
+                        <PublicRoute>
+                          <RegisterScreen />
+                        </PublicRoute>
+                      }
+                    />
+                    <Route
+                      path="/signup/role"
+                      element={
+                        <PublicRoute>
+                          <RolePickerPage />
+                        </PublicRoute>
+                      }
+                    />
+                    <Route path="/terms" element={<TermsPage />} />
+                    <Route path="/privacy" element={<PrivacyPage />} />
+                    <Route path="/guidelines" element={<GuidelinesPage />} />
+                    <Route path="/cookies" element={<CookiePolicyPage />} />
+                    <Route path="/disclaimer" element={<DisclaimerPage />} />
+                    <Route path="/data-request" element={<DataRequestPage />} />
+                    <Route path="/about" element={<AboutPage />} />
+                    {/* Public feature catalog — v2 design refresh Week 2 */}
+                    <Route path="/docs" element={<DocsPage />} />
+                    <Route path="/docs/:slug" element={<DocsFeaturePage />} />
+                    <Route path="/pricing" element={<PricingPage />} />
+                    <Route path="/supporters" element={<SupportersPage />} />
+                    <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+                    <Route path="/reset-password" element={<ResetPasswordPage />} />
 
-                  {/* ── authenticated ────────────────────────────────────── */}
-                  <Route
-                    path="/feed"
-                    element={
-                      <PrivateRoute>
-                        <FeedPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/sheets"
-                    element={
-                      <PrivateRoute>
-                        <SheetsPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  {/* Teacher workspace — v2 design refresh Week 2. Non-
+                    {/* ── authenticated ────────────────────────────────────── */}
+                    <Route
+                      path="/feed"
+                      element={
+                        <PrivateRoute>
+                          <FeedPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/sheets"
+                      element={
+                        <PrivateRoute>
+                          <SheetsPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    {/* Teacher workspace — v2 design refresh Week 2. Non-
                      teachers are redirected inside the component to /sheets.
                      Bare `/teach` redirects to the materials index so a
                      direct URL or a sidebar shortcut without the segment
                      doesn't 404. */}
-                  <Route path="/teach" element={<Navigate to="/teach/materials" replace />} />
-                  {/* Bare `/signup` is a common URL the OAuth role picker
+                    <Route path="/teach" element={<Navigate to="/teach/materials" replace />} />
+                    {/* Bare `/signup` is a common URL the OAuth role picker
                      and external links land on. Without this redirect, the
                      Cancel button on the role picker (which navigates to
                      `/signup`) 404s instead of returning the user to the
                      register form. */}
-                  <Route path="/signup" element={<Navigate to="/register" replace />} />
-                  <Route
-                    path="/teach/materials"
-                    element={
-                      <PrivateRoute>
-                        <TeachMaterialsPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/sheets/upload"
-                    element={
-                      <PrivateRoute>
-                        <UploadSheetPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/sheets/new/lab"
-                    element={
-                      <PrivateRoute>
-                        <AiSheetSetupPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/sheets/:id/edit"
-                    element={
-                      <PrivateRoute>
-                        <EditRedirect />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/sheets/:id/lab"
-                    element={
-                      <PrivateRoute>
-                        <SheetLabPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/sheets/:id/plagiarism"
-                    element={
-                      <PrivateRoute>
-                        <PlagiarismReportPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/sheets/:id"
-                    element={
-                      <PrivateRoute>
-                        <SheetViewerPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/sheets/preview/html/:id"
-                    element={
-                      <PrivateRoute>
-                        <SheetHtmlPreviewPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/preview/:scope/:id"
-                    element={
-                      <PrivateRoute>
-                        <AttachmentPreviewPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/tests"
-                    element={
-                      <PrivateRoute>
-                        <TestsPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/tests/:id"
-                    element={
-                      <PrivateRoute>
-                        <TestTakerPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/notes"
-                    element={
-                      <PrivateRoute>
-                        <NotesPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/messages"
-                    element={
-                      <PrivateRoute>
-                        <MessagesPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/study-groups"
-                    element={
-                      <PrivateRoute>
-                        <StudyGroupsPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/study-groups/:id"
-                    element={
-                      <PrivateRoute>
-                        <StudyGroupsPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/ai"
-                    element={
-                      <PrivateRoute>
-                        <AiPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/library"
-                    element={
-                      <PrivateRoute>
-                        <LibraryPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/library/:volumeId/read"
-                    element={
-                      <PrivateRoute>
-                        <BookReaderPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/library/:volumeId"
-                    element={
-                      <PrivateRoute>
-                        <BookDetailPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/playground"
-                    element={
-                      <PrivateRoute>
-                        <PlaygroundPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/notes/:id"
-                    element={
-                      <PrivateRoute>
-                        <NoteViewerPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/announcements"
-                    element={
-                      <PrivateRoute>
-                        <AnnouncementsPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/notifications"
-                    element={
-                      <PrivateRoute>
-                        <NotificationsPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  {/* Achievements V2 (2026-04-30) — full gallery + detail page. */}
-                  <Route
-                    path="/achievements"
-                    element={
-                      <PrivateRoute>
-                        <AchievementsPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/achievements/:slug"
-                    element={
-                      <PrivateRoute>
-                        <AchievementDetailPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/submit"
-                    element={
-                      <PrivateRoute>
-                        <SubmitPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/my-courses"
-                    element={
-                      <PrivateRoute>
-                        <MyCoursesPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/invite"
-                    element={
-                      <PrivateRoute>
-                        <InvitePage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/review"
-                    element={
-                      <PrivateRoute>
-                        <ReviewPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/admin"
-                    element={
-                      <PrivateRoute>
-                        <AdminPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/dashboard"
-                    element={
-                      <PrivateRoute>
-                        <DashboardRedirect />
-                      </PrivateRoute>
-                    }
-                  />
-                  <Route
-                    path="/settings"
-                    element={
-                      <PrivateRoute>
-                        <SettingsPage />
-                      </PrivateRoute>
-                    }
-                  />
-                  {/* Admin MFA enforcement gate landing page. The login
+                    <Route path="/signup" element={<Navigate to="/register" replace />} />
+                    <Route
+                      path="/teach/materials"
+                      element={
+                        <PrivateRoute>
+                          <TeachMaterialsPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/sheets/upload"
+                      element={
+                        <PrivateRoute>
+                          <UploadSheetPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/sheets/new/lab"
+                      element={
+                        <PrivateRoute>
+                          <AiSheetSetupPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/sheets/:id/edit"
+                      element={
+                        <PrivateRoute>
+                          <EditRedirect />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/sheets/:id/lab"
+                      element={
+                        <PrivateRoute>
+                          <SheetLabPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/sheets/:id/plagiarism"
+                      element={
+                        <PrivateRoute>
+                          <PlagiarismReportPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/sheets/:id"
+                      element={
+                        <PrivateRoute>
+                          <SheetViewerPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/sheets/preview/html/:id"
+                      element={
+                        <PrivateRoute>
+                          <SheetHtmlPreviewPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/preview/:scope/:id"
+                      element={
+                        <PrivateRoute>
+                          <AttachmentPreviewPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/tests"
+                      element={
+                        <PrivateRoute>
+                          <TestsPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/tests/:id"
+                      element={
+                        <PrivateRoute>
+                          <TestTakerPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/notes"
+                      element={
+                        <PrivateRoute>
+                          <NotesPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/messages"
+                      element={
+                        <PrivateRoute>
+                          <MessagesPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/study-groups"
+                      element={
+                        <PrivateRoute>
+                          <StudyGroupsPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/study-groups/:id"
+                      element={
+                        <PrivateRoute>
+                          <StudyGroupsPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/ai"
+                      element={
+                        <PrivateRoute>
+                          <AiPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/library"
+                      element={
+                        <PrivateRoute>
+                          <LibraryPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/library/:volumeId/read"
+                      element={
+                        <PrivateRoute>
+                          <BookReaderPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/library/:volumeId"
+                      element={
+                        <PrivateRoute>
+                          <BookDetailPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    {/* Scholar v1 + v1.5 — peer-reviewed papers (master plan §18) */}
+                    <Route
+                      path="/scholar"
+                      element={
+                        <PrivateRoute>
+                          <ScholarPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/scholar/search"
+                      element={
+                        <PrivateRoute>
+                          <ScholarSearchPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/scholar/saved"
+                      element={
+                        <PrivateRoute>
+                          <ScholarSavedPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/scholar/shelf/:id"
+                      element={
+                        <PrivateRoute>
+                          <ScholarSavedPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/scholar/topic/:slug"
+                      element={
+                        <PrivateRoute>
+                          <ScholarTopicPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/scholar/paper/:id"
+                      element={
+                        <PrivateRoute>
+                          <ScholarPaperPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/playground"
+                      element={
+                        <PrivateRoute>
+                          <PlaygroundPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/notes/:id"
+                      element={
+                        <PrivateRoute>
+                          <NoteViewerPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/announcements"
+                      element={
+                        <PrivateRoute>
+                          <AnnouncementsPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/notifications"
+                      element={
+                        <PrivateRoute>
+                          <NotificationsPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    {/* Achievements V2 (2026-04-30) — full gallery + detail page. */}
+                    <Route
+                      path="/achievements"
+                      element={
+                        <PrivateRoute>
+                          <AchievementsPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/achievements/:slug"
+                      element={
+                        <PrivateRoute>
+                          <AchievementDetailPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/submit"
+                      element={
+                        <PrivateRoute>
+                          <SubmitPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/my-courses"
+                      element={
+                        <PrivateRoute>
+                          <MyCoursesPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/invite"
+                      element={
+                        <PrivateRoute>
+                          <InvitePage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/review"
+                      element={
+                        <PrivateRoute>
+                          <ReviewPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/admin"
+                      element={
+                        <PrivateRoute>
+                          <AdminPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/dashboard"
+                      element={
+                        <PrivateRoute>
+                          <DashboardRedirect />
+                        </PrivateRoute>
+                      }
+                    />
+                    <Route
+                      path="/settings"
+                      element={
+                        <PrivateRoute>
+                          <SettingsPage />
+                        </PrivateRoute>
+                      }
+                    />
+                    {/* Admin MFA enforcement gate landing page. The login
                       flow returns 403 MFA_SETUP_REQUIRED with this path
                       when an admin needs to enable 2FA. */}
-                  <Route
-                    path="/settings/security/setup-2fa"
-                    element={
-                      <PrivateRoute>
-                        <Setup2FAPage />
-                      </PrivateRoute>
-                    }
-                  />
+                    <Route
+                      path="/settings/security/setup-2fa"
+                      element={
+                        <PrivateRoute>
+                          <Setup2FAPage />
+                        </PrivateRoute>
+                      }
+                    />
 
-                  <Route
-                    path="/onboarding"
-                    element={
-                      <PrivateRoute>
-                        <OnboardingPage />
-                      </PrivateRoute>
-                    }
-                  />
+                    <Route
+                      path="/onboarding"
+                      element={
+                        <PrivateRoute>
+                          <OnboardingPage />
+                        </PrivateRoute>
+                      }
+                    />
 
-                  {/* ── public user profiles ─────────────────────────────── */}
-                  <Route path="/users/:username" element={<UserProfilePage />} />
+                    {/* ── public user profiles ─────────────────────────────── */}
+                    <Route path="/users/:username" element={<UserProfilePage />} />
 
-                  {/* Dev-only Playwright focus-trap harness. The route +
+                    {/* Dev-only Playwright focus-trap harness. The route +
                       element are tree-shaken from prod bundles via the
                       import.meta.env.DEV gate above. */}
-                  {FocusTrapHarnessPage && (
-                    <Route path="/__a11y/dialog" element={<FocusTrapHarnessPage />} />
-                  )}
+                    {FocusTrapHarnessPage && (
+                      <Route path="/__a11y/dialog" element={<FocusTrapHarnessPage />} />
+                    )}
 
-                  {/* ── catch-all ────────────────────────────────────────── */}
-                  <Route path="*" element={<NotFoundPage />} />
-                </Routes>
-              </Suspense>
-              <ScrollToTop />
-              <ToastContainer />
-              <FirstCreationCelebration />
-              <OfflineIndicator />
-              {/* Achievements V2 — celebration modal for ?celebrate=:slug
+                    {/* ── catch-all ────────────────────────────────────────── */}
+                    <Route path="*" element={<NotFoundPage />} />
+                  </Routes>
+                </Suspense>
+                <ScrollToTop />
+                <ToastContainer />
+                <FirstCreationCelebration />
+                <OfflineIndicator />
+                {/* Achievements V2 — celebration modal for ?celebrate=:slug
                   fires globally so unlocks anywhere in the app surface a
                   visible moment without per-page mounting. The listener
                   bridges the dedicated `achievement:unlock` Socket.io
                   event into the same URL-param flow. */}
-              <AchievementUnlockListenerBridge />
-              <Suspense fallback={null}>
-                <AchievementUnlockModal />
-              </Suspense>
-              <AuthenticatedBubble />
+                <AchievementUnlockListenerBridge />
+                <Suspense fallback={null}>
+                  <AchievementUnlockModal />
+                </Suspense>
+                <AuthenticatedBubble />
+              </AiPermissionProvider>
             </ChatPanelProvider>
           </AuthenticatedAiProvider>
           {PerfOverlay && (

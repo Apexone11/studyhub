@@ -38,7 +38,7 @@ const StepDone = forwardRef(function StepDone({ onNext, submitting }, ref) {
       </h2>
       <p style={styles.subtext}>Your study hub is ready. Here is where to go next.</p>
 
-      <div style={styles.linkGrid}>
+      <div className="onboarding-done-grid">
         {NEXT_STEPS.map((item) => (
           <button
             key={item.path}

@@ -33,7 +33,8 @@ const PDF_FETCH_ALLOWLIST = Object.freeze([
 
 // ── Canonical paper-id regex (L3-MED-4) ─────────────────────────────────
 
-// Format: doi:10.<digits>/<token> | arxiv:<YYYY.NNNN[v#]> | ss:<sha-like hex>
+// Format: doi:10.<digits>/<token> | arxiv:<YYYY.NNNNN[v#]> |
+//         arxiv:<category[.subcat]/YYMMNNN[v#]> | ss:<sha-like hex>
 //
 // Note on the DOI suffix character class: we use an explicit
 // printable-ASCII allowlist instead of `[^\s]` because JavaScript's `\s`
@@ -43,15 +44,23 @@ const PDF_FETCH_ALLOWLIST = Object.freeze([
 // The allowlist below matches the DOI Foundation's "Suggested URI" syntax
 // (RFC 3986 unreserved + sub-delims + a few service-friendly extras like
 // `:`, `;`, `(`, `)`, `<`, `>`).
+//
+// arXiv supports two ID schemes: post-2007 (`2401.12345v3`) and pre-2007
+// (`hep-th/9711200`, `math.AG/0211159`). Both branches are accepted —
+// the audit found pre-2007 papers (~30 years of physics / math literature)
+// were being silently dropped.
 const CANONICAL_ID_RE =
-  /^(doi:10\.\d{4,9}\/[A-Za-z0-9._\-/:;()<>+]{1,200}|arxiv:\d{4}\.\d{4,5}(v\d+)?|ss:[a-f0-9]{32,64}|oa:W\d{4,12})$/i
+  /^(doi:10\.\d{4,9}\/[A-Za-z0-9._\-/:;()<>+]{1,200}|arxiv:\d{4}\.\d{4,5}(v\d+)?|arxiv:[a-z][a-z-]*(\.[A-Z]{2})?\/\d{7}(v\d+)?|ss:[a-f0-9]{32,64}|oa:W\d{4,12})$/i
 
 // Standalone DOI without prefix (used inside JSON payloads). Same
 // printable-ASCII allowlist as above.
 const DOI_RE = /^10\.\d{4,9}\/[A-Za-z0-9._\-/:;()<>+]{1,200}$/
 
-// Standalone arXiv id (post-2007 format).
-const ARXIV_RE = /^\d{4}\.\d{4,5}(v\d+)?$/
+// Standalone arXiv id. Matches both new format (YYYY.NNNNN[v#]) and the
+// old pre-2007 format (category[.subcategory]/YYMMNNN[v#]). Pre-2007
+// categories may contain hyphens (hep-th, gr-qc, cond-mat, math-ph,
+// nucl-th, astro-ph, etc.) so the category class is [a-z][a-z-]*.
+const ARXIV_RE = /^(\d{4}\.\d{4,5}(v\d+)?|[a-z][a-z-]*(\.[A-Z]{2})?\/\d{7}(v\d+)?)$/
 
 // ── Search input bounds ─────────────────────────────────────────────────
 

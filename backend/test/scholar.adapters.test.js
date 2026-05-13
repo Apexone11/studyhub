@@ -133,6 +133,55 @@ describe('scholar/sources/arxiv._parseEntry', () => {
     expect(out.authors[0].name).toBe('First Author')
     expect(out.pdfExternalUrl).toContain('arxiv.org/pdf')
   })
+
+  it('parses old-format arXiv IDs (pre-2007 category/YYMMNNN)', () => {
+    // Pre-2007 arXiv IDs were category-prefixed instead of date-prefixed.
+    // Before the fix, these were silently dropped by the post-2007-only
+    // regex — ~30 years of physics / math / CS literature became
+    // unreachable. Loop S11 (2026-05-13) caught it.
+    const entry = `
+      <entry>
+        <id>http://arxiv.org/abs/hep-th/9711200</id>
+        <title>The Large N limit of superconformal field theories</title>
+        <summary>Abstract.</summary>
+        <published>1997-11-27T00:00:00Z</published>
+        <author><name>Juan Maldacena</name></author>
+      </entry>`
+    const out = arxiv._parseEntry(entry)
+    expect(out).not.toBeNull()
+    expect(out.arxivId).toBe('hep-th/9711200')
+    expect(out.id).toBe('arxiv:hep-th/9711200')
+  })
+
+  it('parses old-format arXiv IDs with subcategory (math.AG/0211159)', () => {
+    const entry = `
+      <entry>
+        <id>http://arxiv.org/abs/math.AG/0211159</id>
+        <title>The geometry of algebraic varieties</title>
+        <summary>Abstract.</summary>
+        <published>2002-11-11T00:00:00Z</published>
+        <author><name>Grigori Perelman</name></author>
+      </entry>`
+    const out = arxiv._parseEntry(entry)
+    expect(out).not.toBeNull()
+    expect(out.arxivId).toBe('math.AG/0211159')
+    expect(out.id).toBe('arxiv:math.AG/0211159')
+  })
+
+  it('parses old-format arXiv IDs with version suffix (gr-qc/9508031v1)', () => {
+    const entry = `
+      <entry>
+        <id>http://arxiv.org/abs/gr-qc/9508031v1</id>
+        <title>Pre-2007 paper with revision</title>
+        <summary>Abstract.</summary>
+        <published>1995-08-15T00:00:00Z</published>
+        <author><name>Author Name</name></author>
+      </entry>`
+    const out = arxiv._parseEntry(entry)
+    expect(out).not.toBeNull()
+    expect(out.arxivId).toBe('gr-qc/9508031v1')
+    expect(out.id).toBe('arxiv:gr-qc/9508031v1')
+  })
 })
 
 describe('scholar/sources/unpaywall._normalize', () => {
