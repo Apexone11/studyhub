@@ -148,7 +148,9 @@
     overflow-x: auto;
     padding: 4px 0 12px;
     margin-bottom: 8px;
-    -webkit-overflow-scrolling: touch;
+    /* iOS Safari 13+ does momentum scroll automatically; the legacy
+       `-webkit-overflow-scrolling: touch` was removed (it's a no-op
+       on every other browser and shows as "unsupported" in linters). */
   }
 
   .scholar-saved__chips::-webkit-scrollbar {

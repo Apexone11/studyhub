@@ -107,8 +107,10 @@
   border: 1px solid var(--sh-border);
   border-radius: 14px;
   box-shadow: var(--shadow-sm);
-  backdrop-filter: blur(8px);
+  /* -webkit- prefix MUST precede the unprefixed property for Safari
+     <16 to recognise both declarations as the same cascade entry. */
   -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 .scholar-search-box:focus-within {
@@ -490,8 +492,8 @@
   padding: 12px 24px;
   background: var(--sh-surface);
   border-bottom: 1px solid var(--sh-border);
-  backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
 }
 
 @media (max-width: 1023px) {

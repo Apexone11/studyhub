@@ -163,6 +163,9 @@
   border-bottom: 1px solid var(--sh-border);
   margin: 24px 0 18px;
   overflow-x: auto;
+  /* Hide scrollbar without losing scroll: standard property (Firefox,
+     Chrome 121+, Safari 18.2+) + WebKit fallback below for older Chrome
+     and Samsung Internet. */
   scrollbar-width: none;
 }
 .scholar-paper__tabs::-webkit-scrollbar {
@@ -399,6 +402,9 @@
     background: var(--sh-surface);
     border-top: 1px solid var(--sh-border);
     overflow-x: auto;
+    /* Same scrollbar-hide pattern as .scholar-paper__tabs — standard
+       property + WebKit fallback. Chrome <121 / Samsung Internet pick
+       up the ::-webkit-scrollbar rule below. */
     scrollbar-width: none;
   }
   .scholar-paper__mobile-action-bar::-webkit-scrollbar {
