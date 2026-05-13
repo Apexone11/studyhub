@@ -159,9 +159,13 @@ async function getSimilar(req, res) {
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
     log.error({ err, event: 'scholar.similar.failed' }, 'Scholar similar failed')
-    // Empty result rather than 500 — the tab renders a clean empty
-    // state instead of an error toast that masks all the working tabs.
-    return res.json({ similar: [] })
+    // Soft-fail to 200 with an empty list so the Similar tab renders a
+    // clean empty state instead of an error toast that masks all the
+    // working tabs. We tag the response with `reason: 'internal_error'`
+    // so the frontend (and our metrics) can distinguish a genuine
+    // "no similar papers" result from a backend failure without
+    // changing the UX shape. Sourcery bot review 2026-05-13.
+    return res.json({ similar: [], reason: 'internal_error' })
   }
 }
 

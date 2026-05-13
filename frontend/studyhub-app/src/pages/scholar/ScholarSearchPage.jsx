@@ -406,7 +406,7 @@ export default function ScholarSearchPage() {
   // ── Keyboard shortcuts (wave-7 wiring 2026-05-13) ──────────────────
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   useScholarShortcuts({
-    onShowHelp: () => setShortcutsOpen(true),
+    onOpenShortcuts: () => setShortcutsOpen(true),
     onFocusSearch: () => {
       inputRef.current?.focus()
       inputRef.current?.select?.()

@@ -23,6 +23,7 @@ import { useNavigate } from 'react-router-dom'
 import { API } from '../../../config'
 import { showToast } from '../../../lib/toast'
 import { useAiPermission } from '../../../lib/aiPermissionContext'
+import parseSseForSheetId from './parseSseForSheetId'
 
 const BTN_STYLE = {
   display: 'inline-flex',
@@ -43,40 +44,9 @@ const BTN_STYLE = {
   textDecoration: 'none',
 }
 
-async function parseSseForSheetId(response) {
-  // The /api/ai/messages SSE stream uses pino-style line-delimited events.
-  // We only need to find the `sheetId` once, so we read the full body
-  // (capped) and scan for either a `sheet:created` event with a JSON
-  // payload `{ sheetId }`, or a final `done` event carrying the same.
-  // Defensive: if neither shows up, return null and the caller toasts a
-  // friendly fallback rather than navigating to a broken URL.
-  const reader = response.body?.getReader?.()
-  if (!reader) return null
-  const decoder = new TextDecoder()
-  let buf = ''
-  const MAX = 1024 * 1024 // 1 MB cap — sheet HTML can be large but a single id is well under this.
-  let received = 0
-  let sheetId = null
-  while (true) {
-    const chunk = await reader.read().catch(() => ({ done: true }))
-    if (chunk.done) break
-    received += chunk.value?.byteLength || 0
-    buf += decoder.decode(chunk.value, { stream: true })
-    if (received > MAX) break
-    // Look for "sheetId":... or sheet:created event in the buffered text.
-    const m = buf.match(/"sheetId"\s*:\s*"?([A-Za-z0-9_-]+)"?/)
-    if (m && m[1]) {
-      sheetId = m[1]
-      break
-    }
-  }
-  try {
-    reader.cancel()
-  } catch {
-    // Ignore — the stream may already be closed; cancel is best-effort.
-  }
-  return sheetId
-}
+// SSE parser extracted to ./parseSseForSheetId.js (shared with
+// ScholarPaperPage.jsx's inline generate flow). Sourcery bot review
+// 2026-05-13 flagged the duplication.
 
 export default function GenerateSheetFromPaperButton({ paper, children, className, style }) {
   const navigate = useNavigate()

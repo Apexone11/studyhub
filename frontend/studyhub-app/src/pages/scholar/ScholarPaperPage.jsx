@@ -43,6 +43,7 @@ import DiscussionThread from './discussion/DiscussionThread'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
 import ScholarShell from './ScholarShell'
 import SimilarInLibraryBadge from './integration/SimilarInLibraryBadge'
+import parseSseForSheetId from './integration/parseSseForSheetId'
 import useScholarShortcuts from './shortcuts/useScholarShortcuts'
 import ScholarKeyboardShortcutsModal, {
   ScholarShortcutsHint,
@@ -563,37 +564,12 @@ export default function ScholarPaperPage() {
         navigate(`/ai?paperId=${encodeURIComponent(validId)}&prompt=${encodeURIComponent(prompt)}`)
         return
       }
-      // Stream the SSE body and look for the new sheet id. Cap at 1 MB so
-      // a malformed stream doesn't grow the buffer unboundedly.
-      let newSheetId = null
-      try {
-        const reader = aiRes.body?.getReader?.()
-        if (reader) {
-          const decoder = new TextDecoder()
-          let buf = ''
-          let received = 0
-          const MAX = 1024 * 1024
-          while (true) {
-            const chunk = await reader.read().catch(() => ({ done: true }))
-            if (chunk.done) break
-            received += chunk.value?.byteLength || 0
-            buf += decoder.decode(chunk.value, { stream: true })
-            if (received > MAX) break
-            const m = buf.match(/"sheetId"\s*:\s*"?([A-Za-z0-9_-]+)"?/)
-            if (m && m[1]) {
-              newSheetId = m[1]
-              break
-            }
-          }
-          try {
-            reader.cancel()
-          } catch {
-            /* best-effort */
-          }
-        }
-      } catch {
-        /* graceful: fall through to the /ai handoff below */
-      }
+      // Stream the SSE body and look for the new sheet id via the
+      // shared helper (also used by GenerateSheetFromPaperButton).
+      // Returns null on no-body / no-match — handled below by handing
+      // off to /ai. Sourcery bot review 2026-05-13 flagged the prior
+      // duplicated inline parser.
+      const newSheetId = await parseSseForSheetId(aiRes).catch(() => null)
       if (newSheetId) {
         navigate(`/sheets/${newSheetId}/lab`)
       } else {
@@ -614,7 +590,7 @@ export default function ScholarPaperPage() {
   // `g` triggers generate-sheet, `Escape` closes overlays. Hook is
   // no-op when the user is typing in an input (built into the hook).
   useScholarShortcuts({
-    onShowHelp: () => setShortcutsOpen(true),
+    onOpenShortcuts: () => setShortcutsOpen(true),
     onSave: () => handleSave(),
     onAnnotate: () => handleAnnotate(),
     onCite: () => setCiteOpen(true),

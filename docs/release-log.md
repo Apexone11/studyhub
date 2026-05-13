@@ -28,6 +28,17 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Bot review fixes — Codex P2 + Sourcery 3x (2026-05-13)
+
+GitHub review on the wave-7 commit (`73a35bcb`) flagged 4 items. Each vetted per CLAUDE.md A21:
+
+- **Codex P2 (REAL):** the `?` keyboard shortcut was non-functional on both `ScholarPaperPage` and `ScholarSearchPage`. The `useScholarShortcuts` hook dispatches the `?` key via `onOpenShortcuts`, but wave-7 wired callbacks named `onShowHelp` — the hook never invoked them. Renamed both call sites' callback key to `onOpenShortcuts`. The advertised `?` → help-modal behavior now actually fires.
+- **Sourcery #1 (REAL):** `getSimilar` was returning `200 { similar: [] }` on every caught error, indistinguishable from a genuine "no similar papers found" result. The frontend rendered the same clean empty state in both cases — UX correct — but monitoring lost the signal. Now returns `200 { similar: [], reason: 'internal_error' }` on caught errors so pino + metric counters can distinguish failures without changing the UX shape.
+- **Sourcery #2 (REAL):** the SSE `sheetId` parser was duplicated in `ScholarPaperPage` and `GenerateSheetFromPaperButton`. Both copies were ~25 lines of intricate stream-read + regex + buffer-cap logic. Extracted into `pages/scholar/integration/parseSseForSheetId.js` and replaced both inline copies. Behavior is now consistent and unit-testable.
+- **Sourcery #3 (REAL):** `ScholarSavedPage` was writing `data-empty='true' | 'false'` on 5 sites (rail buttons + shelf chips), but the CSS only selects on `[data-empty='true']` — the `'false'` value did nothing in either the DOM or the cascade. Cleaned to `data-empty={count === 0 ? 'true' : undefined}` so React omits the attribute entirely when non-empty.
+
+**Verification:** backend lint clean · frontend build clean · 9 Scholar test files / 114 tests pass.
+
 ### Wave-7 Scholar feature wiring (2026-05-13)
 
 The wave-4 Scholar revival shipped 5 integration components, a keyboard-shortcuts hook, and a `SimilarInLibraryBadge` — none of them were imported by any page. Wave-7 wires the most impactful ones into the live pages so users actually see them:

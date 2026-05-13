@@ -515,7 +515,7 @@ export default function ScholarSavedPage() {
                 type="button"
                 role="tab"
                 aria-current={activeShelfId === shelf.id ? 'page' : undefined}
-                data-empty={count === 0 ? 'true' : 'false'}
+                data-empty={count === 0 ? 'true' : undefined}
                 className="scholar-saved__chip"
                 onClick={() => goToShelf(shelf.id)}
               >
@@ -533,7 +533,7 @@ export default function ScholarSavedPage() {
               type="button"
               className="scholar-saved__rail-btn"
               aria-current={activeShelfId === null && filter === 'all' ? 'page' : undefined}
-              data-empty={allRows.length === 0 ? 'true' : 'false'}
+              data-empty={allRows.length === 0 ? 'true' : undefined}
               onClick={() => {
                 setFilter('all')
                 goToShelf(null)
@@ -546,7 +546,7 @@ export default function ScholarSavedPage() {
               type="button"
               className="scholar-saved__rail-btn"
               aria-current={activeShelfId === null && sort === 'recent' ? 'page' : undefined}
-              data-empty={recentCount === 0 ? 'true' : 'false'}
+              data-empty={recentCount === 0 ? 'true' : undefined}
               onClick={() => {
                 setSort('recent')
                 goToShelf(null)
@@ -559,7 +559,7 @@ export default function ScholarSavedPage() {
               type="button"
               className="scholar-saved__rail-btn"
               aria-current={filter === 'unread' ? 'page' : undefined}
-              data-empty={unreadCount === 0 ? 'true' : 'false'}
+              data-empty={unreadCount === 0 ? 'true' : undefined}
               onClick={() => {
                 setFilter('unread')
                 goToShelf(null)
@@ -590,7 +590,7 @@ export default function ScholarSavedPage() {
                   type="button"
                   className="scholar-saved__rail-btn"
                   aria-current={activeShelfId === shelf.id ? 'page' : undefined}
-                  data-empty={count === 0 ? 'true' : 'false'}
+                  data-empty={count === 0 ? 'true' : undefined}
                   onClick={() => goToShelf(shelf.id)}
                 >
                   <span
