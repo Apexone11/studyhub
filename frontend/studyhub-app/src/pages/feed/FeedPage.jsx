@@ -107,8 +107,9 @@ export default function FeedPage() {
     [setQueryParam],
   )
   // Sync local search state if URL changes externally (e.g. filter reset).
+  // Defer via queueMicrotask per React Compiler set-state-in-effect rule.
   useEffect(() => {
-    setLocalSearch(search)
+    queueMicrotask(() => setLocalSearch(search))
   }, [search])
 
   const visibleItems = useMemo(() => {
@@ -215,7 +216,8 @@ export default function FeedPage() {
                       fontSize: 24,
                       fontWeight: 800,
                       color: 'var(--sh-heading)',
-                      letterSpacing: '-0.02em',
+                      letterSpacing: '-0.025em',
+                      lineHeight: 1.2,
                     }}
                   >
                     Welcome back, {user.displayName || user.username}.
@@ -294,9 +296,14 @@ export default function FeedPage() {
                       cursor: 'pointer',
                       fontSize: 18,
                       color: 'var(--sh-text-secondary)',
-                      padding: '2px 4px',
                       lineHeight: 1,
                       fontFamily: FONT,
+                      minWidth: 44,
+                      minHeight: 44,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      borderRadius: 8,
                     }}
                   >
                     &#x2715;

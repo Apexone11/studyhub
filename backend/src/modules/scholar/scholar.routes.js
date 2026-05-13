@@ -91,6 +91,12 @@ router.get(
   cacheControl(300, { staleWhileRevalidate: 3600 }),
   paperController.getReferences,
 )
+router.get(
+  '/paper/:id/similar',
+  scholarReadLimiter,
+  cacheControl(300, { staleWhileRevalidate: 3600 }),
+  paperController.getSimilar,
+)
 router.get('/paper/:id/pdf', scholarReadLimiter, paperController.getPdf)
 
 // ── Save / unsave ───────────────────────────────────────────────────────

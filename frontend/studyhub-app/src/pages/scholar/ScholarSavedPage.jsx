@@ -388,7 +388,11 @@ export default function ScholarSavedPage() {
         })
         if (res.ok) {
           const json = await res.json()
-          if (json?.citation) lines.push(json.citation)
+          // Backend returns `{ formatted, contentType, filename, style }`
+          // (scholar.cite.controller.js). Accept the legacy `citation`
+          // alias too in case an older route shape ever ships.
+          const text = json?.formatted || json?.citation
+          if (text) lines.push(text)
         }
       } catch {
         // Best-effort — partial success still surfaces below.
@@ -453,17 +457,7 @@ export default function ScholarSavedPage() {
       >
         <header className="scholar-list__header">
           <div>
-            <h1
-              style={{
-                fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-                fontSize: 28,
-                fontWeight: 700,
-                margin: 0,
-                color: 'var(--sh-heading)',
-              }}
-            >
-              {activeShelfName}
-            </h1>
+            <h1 className="scholar-saved__h1">{activeShelfName}</h1>
             <p style={{ color: 'var(--sh-subtext)', margin: '6px 0 0' }}>
               {visibleRows.length} {visibleRows.length === 1 ? 'paper' : 'papers'}
             </p>
@@ -513,18 +507,22 @@ export default function ScholarSavedPage() {
           >
             All saved <span style={{ opacity: 0.7 }}>({allRows.length})</span>
           </button>
-          {shelves.map((shelf) => (
-            <button
-              key={shelf.id}
-              type="button"
-              role="tab"
-              aria-current={activeShelfId === shelf.id ? 'page' : undefined}
-              className="scholar-saved__chip"
-              onClick={() => goToShelf(shelf.id)}
-            >
-              {shelf.name} <span style={{ opacity: 0.7 }}>({shelfCounts.get(shelf.id) || 0})</span>
-            </button>
-          ))}
+          {shelves.map((shelf) => {
+            const count = shelfCounts.get(shelf.id) || 0
+            return (
+              <button
+                key={shelf.id}
+                type="button"
+                role="tab"
+                aria-current={activeShelfId === shelf.id ? 'page' : undefined}
+                data-empty={count === 0 ? 'true' : 'false'}
+                className="scholar-saved__chip"
+                onClick={() => goToShelf(shelf.id)}
+              >
+                {shelf.name} <span style={{ opacity: 0.7 }}>({count})</span>
+              </button>
+            )
+          })}
         </div>
 
         <div className="scholar-saved__layout">
@@ -535,6 +533,7 @@ export default function ScholarSavedPage() {
               type="button"
               className="scholar-saved__rail-btn"
               aria-current={activeShelfId === null && filter === 'all' ? 'page' : undefined}
+              data-empty={allRows.length === 0 ? 'true' : 'false'}
               onClick={() => {
                 setFilter('all')
                 goToShelf(null)
@@ -547,6 +546,7 @@ export default function ScholarSavedPage() {
               type="button"
               className="scholar-saved__rail-btn"
               aria-current={activeShelfId === null && sort === 'recent' ? 'page' : undefined}
+              data-empty={recentCount === 0 ? 'true' : 'false'}
               onClick={() => {
                 setSort('recent')
                 goToShelf(null)
@@ -559,6 +559,7 @@ export default function ScholarSavedPage() {
               type="button"
               className="scholar-saved__rail-btn"
               aria-current={filter === 'unread' ? 'page' : undefined}
+              data-empty={unreadCount === 0 ? 'true' : 'false'}
               onClick={() => {
                 setFilter('unread')
                 goToShelf(null)
@@ -581,26 +582,30 @@ export default function ScholarSavedPage() {
                 No shelves yet.
               </div>
             )}
-            {shelves.map((shelf) => (
-              <button
-                key={shelf.id}
-                type="button"
-                className="scholar-saved__rail-btn"
-                aria-current={activeShelfId === shelf.id ? 'page' : undefined}
-                onClick={() => goToShelf(shelf.id)}
-              >
-                <span
-                  style={{
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    whiteSpace: 'nowrap',
-                  }}
+            {shelves.map((shelf) => {
+              const count = shelfCounts.get(shelf.id) || 0
+              return (
+                <button
+                  key={shelf.id}
+                  type="button"
+                  className="scholar-saved__rail-btn"
+                  aria-current={activeShelfId === shelf.id ? 'page' : undefined}
+                  data-empty={count === 0 ? 'true' : 'false'}
+                  onClick={() => goToShelf(shelf.id)}
                 >
-                  {shelf.name}
-                </span>
-                <span className="scholar-saved__rail-count">{shelfCounts.get(shelf.id) || 0}</span>
-              </button>
-            ))}
+                  <span
+                    style={{
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {shelf.name}
+                  </span>
+                  <span className="scholar-saved__rail-count">{count}</span>
+                </button>
+              )
+            })}
 
             <button
               type="button"
@@ -631,15 +636,27 @@ export default function ScholarSavedPage() {
             )}
 
             {!loading && !hasError && visibleRows.length === 0 && (
-              <div className="scholar-list__empty">
-                <p style={{ margin: 0, fontSize: 'var(--type-md)', color: 'var(--sh-text)' }}>
-                  No saved papers match this view.
-                </p>
-                <p style={{ margin: '8px 0 0' }}>
+              <div className="scholar-saved__empty">
+                <h2 className="scholar-saved__empty-headline">No saved papers match this view</h2>
+                <p className="scholar-saved__empty-body">
                   Open a paper from search and click Save to start building a reading list.
                 </p>
-                <Link to="/scholar/search" className="scholar-list__empty-cta">
-                  Browse Scholar →
+                <Link to="/scholar/search" className="scholar-saved__empty-cta-primary">
+                  Browse Scholar
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path d="M5 12h14M13 5l7 7-7 7" />
+                  </svg>
                 </Link>
               </div>
             )}

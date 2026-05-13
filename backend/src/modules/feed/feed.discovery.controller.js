@@ -258,11 +258,12 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     } catch {
       blockedIds = []
     }
-    const excludeUserIds = new Set(
-      [userId, ...blockedIds].filter((id) => id != null && id !== undefined),
-    )
 
-    // Get followed user IDs
+    // Get followed user IDs FIRST so we can exclude them from the
+    // People You May Know suggestions. Earlier code built
+    // `excludeUserIds` before this fetch, so users you already followed
+    // kept showing up in "People You May Know" — exactly the bug
+    // reported on 2026-05-13.
     let followedUserIds = []
     try {
       const follows = await prisma.userFollow.findMany({
@@ -280,6 +281,26 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
         throw err
       }
     }
+
+    // Exclude self + blocked-either-way + already-followed. We also
+    // exclude PENDING follow requests so the user isn't shown someone
+    // they just asked to follow (the request might be days old; UX
+    // promise is "people you may know," not "pending decisions").
+    let pendingFollowIds = []
+    try {
+      const pending = await prisma.userFollow.findMany({
+        where: { followerId: userId, status: 'pending' },
+        select: { followingId: true },
+      })
+      pendingFollowIds = pending.map((f) => f.followingId)
+    } catch {
+      pendingFollowIds = []
+    }
+    const excludeUserIds = new Set(
+      [userId, ...blockedIds, ...followedUserIds, ...pendingFollowIds].filter(
+        (id) => id != null && id !== undefined,
+      ),
+    )
 
     // Get starred sheets
     const starredIds = await prisma.starredSheet.findMany({

@@ -327,11 +327,12 @@ export default function ScholarPaperPage() {
     validId && activeTab === 'similar'
       ? `/api/scholar/paper/${encodeURIComponent(validId)}/similar?limit=20`
       : null
-  const {
-    data: similarData,
-    loading: similarLoading,
-    error: similarError,
-  } = useFetch(similarUrl, { skip: !similarUrl })
+  // `similarError` intentionally omitted — the Similar tab degrades to the
+  // friendly empty-state card on any failure (per design brief, no error
+  // toasts on this tab).
+  const { data: similarData, loading: similarLoading } = useFetch(similarUrl, {
+    skip: !similarUrl,
+  })
   const similar = useMemo(() => {
     if (!similarData) return []
     if (Array.isArray(similarData?.similar)) return similarData.similar
@@ -339,6 +340,12 @@ export default function ScholarPaperPage() {
     if (Array.isArray(similarData)) return similarData
     return []
   }, [similarData])
+  // Backend may respond with `{ similar: [], reason: 'no_topics' }` when the
+  // paper has no topic vector yet — treat that as an empty state, not an error.
+  const similarReason =
+    similarData && typeof similarData === 'object' && !Array.isArray(similarData)
+      ? similarData.reason || null
+      : null
 
   // The real backend endpoint is `GET /api/scholar/annotations?paperId=...`
   // (scholar.routes.js line 206) — NOT `/paper/:id/annotations`. Wave-5
@@ -442,32 +449,39 @@ export default function ScholarPaperPage() {
   const handleSave = useCallback(async () => {
     if (!validId) return
     const desired = !isSaved
-    try {
-      const res = await fetch(`${API}/api/scholar/papers/${encodeURIComponent(validId)}/save`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json', ...authHeaders() },
-        body: JSON.stringify({ saved: desired }),
-      })
-      if (res.status === 404) {
-        // Fallback path for older backend that exposed /api/scholar/save.
-        const fallback = await fetch(`${API}/api/scholar/save`, {
+    // Real backend routes:
+    //   POST   /api/scholar/save           body: { paperId }  → save
+    //   DELETE /api/scholar/save/:paperId                    → unsave
+    // Prior code always POSTed to /papers/:id/save (404) and
+    // fell back to POST /save regardless of `desired`, so unsaving
+    // never actually removed the row. Audit Loop S11 (2026-05-13)
+    // surfaced this — the bulk Saved-page unsave worked, but the
+    // single-paper Save button on the detail page didn't.
+    const url = desired
+      ? `${API}/api/scholar/save`
+      : `${API}/api/scholar/save/${encodeURIComponent(validId)}`
+    const init = desired
+      ? {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json', ...authHeaders() },
           body: JSON.stringify({ paperId: validId }),
-        })
-        if (!fallback.ok) throw new Error(`Save failed (${fallback.status})`)
-      } else if (!res.ok) {
-        throw new Error(`Save failed (${res.status})`)
-      }
+        }
+      : {
+          method: 'DELETE',
+          credentials: 'include',
+          headers: authHeaders(),
+        }
+    try {
+      const res = await fetch(url, init)
+      if (!res.ok) throw new Error(`${desired ? 'Save' : 'Unsave'} failed (${res.status})`)
       // Trust server echo if present, otherwise apply requested value.
       let persisted = desired
       try {
         const json = await res.clone().json()
         if (json && typeof json.saved === 'boolean') persisted = json.saved
       } catch {
-        /* ignore */
+        /* graceful: server returned no body */
       }
       setSavedOverride(persisted)
       showToast(persisted ? 'Saved to your shelf' : 'Removed from shelf', 'success')
@@ -818,23 +832,39 @@ export default function ScholarPaperPage() {
                 )}
 
                 {activeTab === 'similar' && (
-                  <div>
+                  <div data-similar-reason={similarReason || undefined}>
                     {similarLoading && <PaperSkeleton />}
-                    {similarError && (
-                      <div
-                        role="alert"
-                        style={{
-                          color: 'var(--sh-danger-text)',
-                          background: 'var(--sh-danger-bg)',
-                          padding: 12,
-                          borderRadius: 8,
-                          fontSize: 14,
-                        }}
-                      >
-                        {similarError}
+                    {/* `no_topics` is a documented, non-error empty state
+                        (paper has no topic vector yet). Render the same
+                        friendly empty card; never surface an error toast. */}
+                    {!similarLoading && similar.length === 0 && (
+                      <div className="scholar-paper__similar-empty" role="status">
+                        <p className="scholar-paper__similar-empty-title">
+                          No similar papers found yet.
+                        </p>
+                        <p className="scholar-paper__similar-empty-sub">
+                          Try the References or Citations tabs — they&rsquo;re computed from the
+                          paper&rsquo;s own metadata.
+                        </p>
+                        <div className="scholar-paper__similar-empty-actions">
+                          <button
+                            type="button"
+                            className="scholar-paper__similar-empty-link"
+                            onClick={() => setActiveTab('references')}
+                          >
+                            View references
+                          </button>
+                          <button
+                            type="button"
+                            className="scholar-paper__similar-empty-link"
+                            onClick={() => setActiveTab('citations')}
+                          >
+                            View citations
+                          </button>
+                        </div>
                       </div>
                     )}
-                    {!similarLoading && !similarError && (
+                    {!similarLoading && similar.length > 0 && (
                       <ReferenceList items={similar} emptyLabel="No similar papers found yet." />
                     )}
                   </div>
@@ -853,15 +883,14 @@ export default function ScholarPaperPage() {
                     />
                     {annotationsLoading && <PaperSkeleton />}
                     {!annotationsLoading && annotations.length === 0 && (
-                      <div
-                        style={{
-                          color: 'var(--sh-subtext)',
-                          fontSize: 14,
-                          padding: '12px 0',
-                        }}
-                      >
-                        Highlight text in the reading view to start an annotation. Your annotations
-                        are private by default and will appear here.
+                      <div className="scholar-paper__annotations-empty" role="status">
+                        <p className="scholar-paper__annotations-empty-title">
+                          Select text in the paper body to add the first annotation.
+                        </p>
+                        <p className="scholar-paper__annotations-empty-sub">
+                          Highlights are private by default. You can change visibility per
+                          annotation after saving.
+                        </p>
                       </div>
                     )}
                     {!annotationsLoading && annotations.length > 0 && (
@@ -901,22 +930,21 @@ export default function ScholarPaperPage() {
             layout="desktop"
           />
 
-          <div className="scholar-paper__sidebar-card">
-            <h3 className="scholar-paper__sidebar-card-title">Connected work</h3>
-            {/* TODO: replace with the D3 mini-graph once the visualization
-                implementation lands in a follow-up loop. For now we render
-                a striped placeholder so the layout slot is reserved and
-                the empty space doesn't read as "broken." */}
-            <div className="scholar-paper__minigraph" aria-hidden="true">
-              Mini-graph coming soon
-            </div>
-          </div>
+          {/* TODO v2: D3 force-directed similarity graph */}
 
           <div className="scholar-paper__sidebar-card">
             <h3 className="scholar-paper__sidebar-card-title">Recently viewed</h3>
             {recentlyViewed.length === 0 ? (
-              <div style={{ color: 'var(--sh-subtext)', fontSize: 13 }}>
-                Papers you open will appear here.
+              <div className="scholar-paper__recent-empty">
+                <p>Papers you open will appear here — start by saving this one.</p>
+                <button
+                  type="button"
+                  className="scholar-paper__recent-save-shortcut"
+                  onClick={handleSave}
+                  aria-pressed={isSaved}
+                >
+                  {isSaved ? 'Saved to shelf' : 'Save this paper'}
+                </button>
               </div>
             ) : (
               recentlyViewed.slice(0, 5).map((entry) => (

@@ -203,6 +203,7 @@ export default function MessagesPage() {
     >
       {authError && (
         <div
+          role="alert"
           style={{
             background: 'var(--sh-warning-bg)',
             border: '1px solid var(--sh-warning-border)',
@@ -211,6 +212,7 @@ export default function MessagesPage() {
             padding: '10px 14px',
             marginBottom: 12,
             fontSize: 13,
+            lineHeight: 1.5,
           }}
         >
           {authError}

@@ -1347,44 +1347,109 @@
   background: var(--sh-soft);
   border: 1px dashed var(--sh-border);
   border-radius: 12px;
-  padding: 24px;
+  padding: 32px 24px;
   text-align: center;
   color: var(--sh-subtext);
   font-size: var(--type-sm);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
 }
 
 .scholar-landing-empty p {
   margin: 0;
 }
 
-.scholar-landing-empty__cta {
+.scholar-landing-empty__headline {
+  margin: 0;
+  font-family: var(--font);
+  font-size: var(--type-md);
+  font-weight: 600;
+  color: var(--sh-heading);
+  letter-spacing: -0.005em;
+  line-height: 1.3;
+  max-width: 46ch;
+}
+
+.scholar-landing-empty__body {
+  margin: 0;
+  font-family: var(--font);
+  font-size: var(--type-sm);
+  color: var(--sh-subtext);
+  line-height: 1.55;
+  max-width: 52ch;
+}
+
+/* StudyHub Brand button — primary CTA used on landing empty states.
+   Matches the project-wide brand-button spec: var(--sh-brand) bg, white text,
+   10px radius, 36px min height, 16/14 px padding, 13px / semibold. */
+.scholar-landing-empty__cta-primary {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 10px 16px;
+  /* 44px touch target on top of the 36px brand-button min height
+     so we stay WCAG 2.5.5 compliant without breaking the design spec. */
+  padding: 11px 16px;
   min-height: 44px;
-  background: var(--sh-surface);
-  border: 1px solid var(--sh-border);
-  border-radius: 8px;
-  color: var(--sh-text);
-  font-size: var(--type-sm);
-  font-weight: 500;
+  background: var(--sh-brand);
+  color: #fff;
+  border: 1px solid var(--sh-brand);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
   text-decoration: none;
+  cursor: pointer;
+  margin-top: 6px;
 }
 
-.scholar-landing-empty__cta:hover {
-  background: var(--sh-brand-soft);
-  border-color: var(--sh-brand-border);
-  color: var(--sh-pill-text);
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-landing-empty__cta-primary {
+    transition:
+      background 150ms ease-out,
+      box-shadow 150ms ease-out,
+      transform 150ms ease-out;
+  }
+  .scholar-landing-empty__cta-primary:hover {
+    background: var(--sh-brand-hover, var(--sh-brand));
+    box-shadow: 0 6px 18px rgb(from var(--sh-brand) r g b / 0.35);
+    transform: translateY(-1px);
+  }
 }
 
-.scholar-landing-empty__cta:focus-visible {
+.scholar-landing-empty__cta-primary:focus-visible {
   outline: 2px solid var(--sh-brand);
   outline-offset: 2px;
+}
+
+@media (forced-colors: active) {
+  .scholar-landing-empty__cta-primary {
+    border: 1px solid LinkText;
+    color: ButtonText;
+    background: ButtonFace;
+  }
+}
+
+/* Fade-in transition for the first render of the discover grids and the
+   recently-viewed strip. Single-shot, gated on prefers-reduced-motion. */
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-landing-grid--fade-in,
+  .scholar-recent-strip--fade-in {
+    animation: scholar-landing-fade-in 240ms ease-out both;
+  }
+}
+
+@keyframes scholar-landing-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 /* ── Block 5: Topic tiles ─────────────────────────────────────────────── */

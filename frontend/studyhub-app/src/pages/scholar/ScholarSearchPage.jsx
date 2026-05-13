@@ -465,6 +465,15 @@ export default function ScholarSearchPage() {
               </button>
             ) : (
               <>
+                {!source &&
+                  !yearFrom &&
+                  !yearTo &&
+                  !openAccess &&
+                  (!sort || sort === 'relevance') && (
+                    <span className="scholar-search-page__filters-hint" aria-hidden="true">
+                      Refine results
+                    </span>
+                  )}
                 <button
                   type="button"
                   className="scholar-search-page__chip"
@@ -545,15 +554,19 @@ export default function ScholarSearchPage() {
         {/* Result count + duration + throttled banner */}
         {q && !loading && !error && results.length > 0 && (
           <div className="scholar-search-page__meta">
-            <span>
-              {results.length.toLocaleString()} result{results.length === 1 ? '' : 's'}
-              {duration ? ` · ${duration}ms` : ''}
-            </span>
+            <span className="scholar-search-page__meta-spacer" aria-hidden="true" />
             {throttled.length > 0 && (
               <span className="scholar-search-page__throttled">
                 {throttled.join(', ')} throttled
               </span>
             )}
+            <span
+              className="scholar-search-page__meta-chip"
+              aria-label={`${results.length} result${results.length === 1 ? '' : 's'}${duration ? `, ${duration} milliseconds` : ''}`}
+            >
+              {results.length.toLocaleString()} result{results.length === 1 ? '' : 's'}
+              {duration ? ` · ${duration}ms` : ''}
+            </span>
           </div>
         )}
 
@@ -696,8 +709,9 @@ export default function ScholarSearchPage() {
               type="button"
               className="scholar-search-page__compare-clear"
               onClick={clearCompare}
+              aria-label="Clear compare selection"
             >
-              Clear
+              Clear selection
             </button>
             <button
               type="button"

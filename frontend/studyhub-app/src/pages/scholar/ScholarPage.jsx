@@ -224,7 +224,7 @@ export default function ScholarPage() {
                   Recently viewed
                 </h2>
               </header>
-              <ul className="scholar-recent-strip" role="list">
+              <ul className="scholar-recent-strip scholar-recent-strip--fade-in" role="list">
                 {recentlyViewed.map((paper) => {
                   const sub = [firstAuthorName(paper), venueOrYear(paper)]
                     .filter(Boolean)
@@ -286,13 +286,32 @@ export default function ScholarPage() {
               </div>
             ) : schoolPapers.length === 0 ? (
               <div className="scholar-landing-empty">
-                <p>No recent activity from your school yet.</p>
-                <Link to="/scholar/search" className="scholar-landing-empty__cta">
-                  Browse all papers
+                <h3 className="scholar-landing-empty__headline">
+                  Be the first to seed Scholar at your school
+                </h3>
+                <p className="scholar-landing-empty__body">
+                  Search for a paper — your classmates will see it here next time they visit.
+                </p>
+                <Link to="/scholar/search" className="scholar-landing-empty__cta-primary">
+                  Search papers
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path d="M5 12h14M13 5l7 7-7 7" />
+                  </svg>
                 </Link>
               </div>
             ) : (
-              <div className="scholar-landing-grid">
+              <div className="scholar-landing-grid scholar-landing-grid--fade-in">
                 {schoolPapers.slice(0, 8).map((paper) => (
                   <PaperCard key={paper.id} paper={paper} />
                 ))}
@@ -318,13 +337,33 @@ export default function ScholarPage() {
               </div>
             ) : trendingPapers.length === 0 ? (
               <div className="scholar-landing-empty">
-                <p>No trending papers yet — try a search to seed the feed.</p>
-                <Link to="/scholar/search" className="scholar-landing-empty__cta">
-                  Open search
+                <h3 className="scholar-landing-empty__headline">
+                  The trending feed warms up as people search
+                </h3>
+                <p className="scholar-landing-empty__body">
+                  Every search across StudyHub feeds the trending list. Run one to seed what your
+                  peers are about to discover.
+                </p>
+                <Link to="/scholar/search" className="scholar-landing-empty__cta-primary">
+                  Search 200M+ papers
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path d="M5 12h14M13 5l7 7-7 7" />
+                  </svg>
                 </Link>
               </div>
             ) : (
-              <div className="scholar-landing-grid">
+              <div className="scholar-landing-grid scholar-landing-grid--fade-in">
                 {trendingPapers.slice(0, 8).map((paper) => (
                   <PaperCard key={paper.id} paper={paper} />
                 ))}

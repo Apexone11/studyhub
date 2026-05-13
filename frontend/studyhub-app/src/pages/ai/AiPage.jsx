@@ -519,19 +519,23 @@ function ConversationSidebar({
           <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--sh-heading)' }}>Hub AI</span>
         </div>
         <button
+          type="button"
           onClick={onNew}
+          aria-label="Start a new conversation"
           style={{
             background: 'var(--sh-brand)',
             color: '#fff',
             border: 'none',
             borderRadius: 8,
-            padding: '6px 12px',
+            padding: '8px 12px',
+            minHeight: 32,
             fontSize: 12,
             fontWeight: 600,
             cursor: 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: 4,
+            transition: 'opacity 0.18s ease',
           }}
         >
           <IconPlus size={13} /> New
