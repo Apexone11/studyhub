@@ -28,11 +28,24 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-8 bot-review fixes — Codex P1 + P2, Sourcery 2× (2026-05-13)
+
+GitHub review on the wave-8 commit (`9e6a0a3`) flagged 4 actionable items. Each vetted per CLAUDE.md A21:
+
+- **Codex P1 (REAL — stale streak):** `getUserStreak` short-circuited on `denormalized.currentStreak > 0` without validating that `lastActiveDate` was today or yesterday. If the 04:00 UTC sweeper failed to run, profile / dashboard widgets reported a non-zero streak after it should have lapsed. Fast path now demands `lastActiveDate` fresh (today or yesterday); anything older falls through to the authoritative `UserDailyActivity` scan. Added regression test for the 3-days-stale case.
+- **Codex P2 (REAL — binary in source):** `messaging.reactions.routes.js` line 35 stored the reaction control-character regex with **literal** `0x00`, `0x1F`, and `0x7F` bytes embedded in the JS file. The bytes made the file display as binary to some Git/text tooling and were invisible in diff / blame / search. Replaced with `\xNN` escape sequences (`/[\x00-\x1F\x7F]/`); reaction validation behavior is identical, all 18 messaging-reactions tests still pass.
+- **Sourcery (REAL — double JSON.parse):** `persistFollowedToLocal` in `ScholarTopicPage` ran `JSON.parse(raw)` twice inside an `Array.isArray(...) ? ...` ternary on every follow toggle. Parsed once into a local; checked the parsed value. Net: half the parse work, clearer control flow.
+- **Sourcery (REAL — doc typo):** release-log entry referenced the `VarChar(16)` column; corrected to the canonical SQL spelling `VARCHAR(16)`.
+
+**Rejected (style preferences, not bugs):** Sourcery suggested centralizing `fakeOriginAllowlistFactory` (out of scope, would be its own design pass), hoisting `FOLLOW_KEY` to module scope (idiomatic const-in-render, micro-opt), and adding a `queueMicrotask` polyfill (full support in every browser React 19 targets).
+
+**Verification:** backend lint clean · frontend lint clean · frontend build clean · streaks tests 5/5 (incl. new regression case) · messaging.reactions tests 18/18.
+
 ### Wave-8 planned-feature backlog drain (2026-05-13)
 
 Six contained features from the planning docs landed without new env vars / API keys / schema changes:
 
-- **Reaction emoji length now matches the `VarChar(16)` column.** `POST /messages/:id/reactions` rejected at 32 chars while Postgres truncated at 16, producing silent data loss and upsert key collisions. Route + tests now enforce 16-char cap and additionally reject ASCII control characters (NUL, BEL, DEL, etc.) that rendered as invisible glyphs in the reactions strip. Research-loop-4 F11.
+- **Reaction emoji length now matches the `VARCHAR(16)` column.** `POST /messages/:id/reactions` rejected at 32 chars while Postgres truncated at 16, producing silent data loss and upsert key collisions. Route + tests now enforce 16-char cap and additionally reject ASCII control characters (NUL, BEL, DEL, etc.) that rendered as invisible glyphs in the reactions strip. Research-loop-4 F11.
 - **Notifications dropdown gets server-side filters.** `GET /api/notifications` now accepts `?type=mention|reply|social|study_group|moderation` and `?onlyUnread=true`, mapped against a curated allowlist (rejects unknown values silently per Postel). `unreadCount` still reports the global count so the bell badge stays consistent regardless of the active tab. Research-loop-4 F12.
 - **`/api/notifications` opts into 15s private cache + 30s SWR.** Absorbs the sidebar bell's natural double-mount on SPA route changes. `Vary: Cookie, Authorization` per `cacheControl` default so a cached body cannot leak across sessions. Research-loop-3 P2 #14.
 - **`/api/dashboard/summary` opts into 60s private cache + 5min SWR.** Cuts DB load on rapid back-and-forth navigation (profile ↔ feed ↔ dashboard). Per-user; same `Vary` defaults. Research-loop-3 P2 #15.

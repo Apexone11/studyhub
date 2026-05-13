@@ -61,16 +61,22 @@ async function getUserStreak(prisma, userId) {
     if (denormalized && denormalized.currentStreak > 0) {
       const today = getTodayDate()
       const last = denormalized.lastActiveDate ? new Date(denormalized.lastActiveDate) : null
-      const todayActive = last
-        ? last.getUTCFullYear() === today.getUTCFullYear() &&
-          last.getUTCMonth() === today.getUTCMonth() &&
-          last.getUTCDate() === today.getUTCDate()
-        : false
-      return {
-        currentStreak: denormalized.currentStreak,
-        longestStreak: denormalized.longestStreak,
-        lastActiveDate: last,
-        todayActive,
+      // Trust the denormalized counter only when `lastActiveDate` is today
+      // or yesterday. If it's older, the streak has lapsed but the daily
+      // 04:00 UTC sweeper hasn't reset the row yet (failed run, clock
+      // skew, brand-new deploy). Falling through to the legacy scan lets
+      // it compute the correct 0 instead of reporting a stale number.
+      const yesterday = new Date(today)
+      yesterday.setDate(yesterday.getDate() - 1)
+      const lastIsFresh =
+        last && (last.getTime() === today.getTime() || last.getTime() === yesterday.getTime())
+      if (lastIsFresh) {
+        return {
+          currentStreak: denormalized.currentStreak,
+          longestStreak: denormalized.longestStreak,
+          lastActiveDate: last,
+          todayActive: last.getTime() === today.getTime(),
+        }
       }
     }
 

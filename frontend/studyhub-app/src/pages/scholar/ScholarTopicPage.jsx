@@ -177,7 +177,8 @@ export default function ScholarTopicPage() {
       if (typeof window === 'undefined' || !slug) return
       try {
         const raw = window.localStorage.getItem(FOLLOW_KEY)
-        const list = Array.isArray(JSON.parse(raw)) ? JSON.parse(raw) : []
+        const parsed = raw ? JSON.parse(raw) : []
+        const list = Array.isArray(parsed) ? parsed : []
         const set = new Set(list)
         if (next) set.add(slug)
         else set.delete(slug)

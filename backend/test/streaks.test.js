@@ -96,4 +96,30 @@ describe('getUserStreak (denormalized fast path)', () => {
     expect(result.currentStreak).toBe(3)
     expect(result.todayActive).toBe(false)
   })
+
+  it('falls back to the legacy scan when lastActiveDate is older than yesterday', async () => {
+    // If the 04:00 UTC sweeper failed to run (or hasn't run yet on a fresh
+    // deploy), a stale UserStreak row can still carry a positive
+    // currentStreak. Returning it would lie to the user. Bot-review fix
+    // (2026-05-13, Codex P1) — the fast path must validate freshness;
+    // anything older than yesterday falls back to the authoritative scan.
+    const threeDaysAgo = new Date()
+    threeDaysAgo.setHours(0, 0, 0, 0)
+    threeDaysAgo.setUTCDate(threeDaysAgo.getUTCDate() - 3)
+    const prisma = makePrisma({
+      userStreakRow: {
+        userId: 42,
+        currentStreak: 9,
+        longestStreak: 14,
+        lastActiveDate: threeDaysAgo,
+      },
+      activities: [], // scan returns "no activity" → currentStreak=0
+    })
+
+    const result = await getUserStreak(prisma, 42)
+
+    expect(prisma.userDailyActivity.findMany).toHaveBeenCalledTimes(1)
+    expect(result.currentStreak).toBe(0)
+    expect(result.lastActiveDate).toBeNull()
+  })
 })
