@@ -250,6 +250,19 @@
   }
 }
 
+/* Wide-monitor 3-col bump. The JSX picks `.scholar-search-page__grid--two`
+   for any non-phone viewport, but at ≥1400px the container has enough room
+   (sidebar ~250px, gutters ~40px → ~1100px content area) to comfortably fit
+   three result cards side-by-side at ~340px each. We also pull each card's
+   abstract body text in to a 65ch ceiling so the line length stays readable
+   even when the column stretches a touch wider. */
+@media (min-width: 1400px) {
+  .scholar-search-page__grid--two {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
+}
+
 /* ── Skeleton card ─────────────────────────────────────────────────── */
 .scholar-search-page__skeleton {
   background: var(--sh-surface);

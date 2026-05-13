@@ -323,16 +323,33 @@ export default function DiscussionThread({ paperId }) {
           {!composerOpen && !replyParentId ? (
             <button
               type="button"
-              onClick={() => setComposerOpen(true)}
-              disabled={!canStart}
+              onClick={() => {
+                if (canStart) {
+                  setComposerOpen(true)
+                  return
+                }
+                // Surface a clear toast instead of a silent no-op. Founder
+                // 2026-05-13: clicking "New thread" did nothing when the
+                // user wasn't enrolled in a school — the disabled state
+                // wasn't obvious enough.
+                showToast(
+                  'Join a school to start a discussion thread. Discussions are scoped to your school.',
+                  'info',
+                )
+              }}
+              aria-disabled={!canStart}
               className="scholar-action-btn scholar-action-btn--primary"
               style={{
                 minHeight: 44,
                 padding: '0 16px',
-                opacity: canStart ? 1 : 0.55,
-                cursor: canStart ? 'pointer' : 'not-allowed',
+                opacity: canStart ? 1 : 0.7,
+                cursor: 'pointer',
               }}
-              aria-label="Start a new discussion thread"
+              aria-label={
+                canStart
+                  ? 'Start a new discussion thread'
+                  : 'Join a school to start a discussion thread'
+              }
             >
               New thread
             </button>

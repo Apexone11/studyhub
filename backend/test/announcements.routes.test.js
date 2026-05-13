@@ -14,6 +14,15 @@ const mocks = vi.hoisted(() => {
       create: vi.fn(),
       delete: vi.fn(),
     },
+    // requireAdmin middleware double-checks the role via prisma.user.findUnique.
+    // Without this the call hits `undefined.findUnique` → 500.
+    user: {
+      findUnique: vi
+        .fn()
+        .mockImplementation(({ where }) =>
+          Promise.resolve({ id: where?.id || 42, role: state.role }),
+        ),
+    },
   }
 
   return {
@@ -34,11 +43,22 @@ const mocks = vi.hoisted(() => {
   }
 })
 
+// originAllowlist factory mock — without it, write-route tests see 403
+// because no Origin header is set. See ai.routes.test.js for the pattern.
+function fakeOriginAllowlistFactory() {
+  return function fakeOriginAllowlist(_req, _res, next) {
+    next()
+  }
+}
+fakeOriginAllowlistFactory.normalizeOrigin = (v) => v
+fakeOriginAllowlistFactory.buildTrustedOrigins = () => new Set()
+
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/middleware/auth'), mocks.auth],
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/accessControl'), mocks.accessControl],
+  [require.resolve('../src/middleware/originAllowlist'), fakeOriginAllowlistFactory],
 ])
 
 const originalModuleLoad = Module._load
@@ -165,9 +185,7 @@ describe('announcements routes', () => {
     it('validates body is required', async () => {
       mocks.state.role = 'admin'
 
-      const response = await request(app)
-        .post('/')
-        .send({ title: 'Has Title', body: '' })
+      const response = await request(app).post('/').send({ title: 'Has Title', body: '' })
 
       expect(response.status).toBe(400)
       expect(response.body).toMatchObject({ error: 'Body is required.' })

@@ -50,6 +50,19 @@ function fakeRateLimiter(_req, _res, next) {
 }
 fakeRateLimiter.default = fakeRateLimiter
 
+// Stub originAllowlist — the real factory returns a middleware that
+// 403s when no Origin/Referer header is set. Tests don't carry one,
+// so without this every write-route assertion sees 403 instead of the
+// real handler's status. Pattern lifted from ai.sheet.routes.test.js
+// which already had this mock and passes cleanly.
+function fakeOriginAllowlistFactory() {
+  return function fakeOriginAllowlist(_req, _res, next) {
+    next()
+  }
+}
+fakeOriginAllowlistFactory.normalizeOrigin = (v) => v
+fakeOriginAllowlistFactory.buildTrustedOrigins = () => new Set()
+
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/modules/ai/ai.service'), mocks.aiService],
@@ -78,6 +91,7 @@ const mockTargets = new Map([
     },
   ],
   [require.resolve('express-rate-limit'), () => fakeRateLimiter],
+  [require.resolve('../src/middleware/originAllowlist'), fakeOriginAllowlistFactory],
 ])
 
 const originalModuleLoad = Module._load

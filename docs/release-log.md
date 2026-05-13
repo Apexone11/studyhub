@@ -28,6 +28,19 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-8 planned-feature backlog drain (2026-05-13)
+
+Six contained features from the planning docs landed without new env vars / API keys / schema changes:
+
+- **Reaction emoji length now matches the `VarChar(16)` column.** `POST /messages/:id/reactions` rejected at 32 chars while Postgres truncated at 16, producing silent data loss and upsert key collisions. Route + tests now enforce 16-char cap and additionally reject ASCII control characters (NUL, BEL, DEL, etc.) that rendered as invisible glyphs in the reactions strip. Research-loop-4 F11.
+- **Notifications dropdown gets server-side filters.** `GET /api/notifications` now accepts `?type=mention|reply|social|study_group|moderation` and `?onlyUnread=true`, mapped against a curated allowlist (rejects unknown values silently per Postel). `unreadCount` still reports the global count so the bell badge stays consistent regardless of the active tab. Research-loop-4 F12.
+- **`/api/notifications` opts into 15s private cache + 30s SWR.** Absorbs the sidebar bell's natural double-mount on SPA route changes. `Vary: Cookie, Authorization` per `cacheControl` default so a cached body cannot leak across sessions. Research-loop-3 P2 #14.
+- **`/api/dashboard/summary` opts into 60s private cache + 5min SWR.** Cuts DB load on rapid back-and-forth navigation (profile ↔ feed ↔ dashboard). Per-user; same `Vary` defaults. Research-loop-3 P2 #15.
+- **`getUserStreak` prefers the denormalized `UserStreak` row (O(1) vs O(366)).** Reads the row first and short-circuits when `currentStreak > 0`. Falls back to the legacy `UserDailyActivity` scan when the row is missing or has been reset by the daily sweeper so pre-2026-05-12 accounts still resolve. Loop A2 follow-up.
+- **Socket.io `CONVERSATION_LEAVE` is now rate-limited (30/min).** Mirrors `CONVERSATION_JOIN`. Blocks a malicious client from spamming join/leave to fan out `USER_LEFT` notification storms to every conversation participant. Research-loop-3 P1 #11.
+
+Verification: `npm --prefix backend run lint` clean; `npm --prefix backend test` for the touched files passes (`notifications.routes.test.js` 21/21, `messaging.reactions.deep.test.js` 18/18, `messaging.socket.deep.test.js` + dashboard 19/19, new `streaks.test.js` 4/4). No new dependencies introduced (CLAUDE.md "v2.1 dependency exception" not invoked).
+
 ### Bot review fixes — Codex P2 + Sourcery 3x (2026-05-13)
 
 GitHub review on the wave-7 commit (`73a35bcb`) flagged 4 items. Each vetted per CLAUDE.md A21:

@@ -252,6 +252,17 @@
   }
 }
 
+/* Wide-monitor 3-col bump. After the app sidebar (~250px) and the saved
+   page's own 240px shelf rail, a ≥1400px viewport leaves ~830-870px in the
+   card column — enough for three cards at ~270px each. The saved cards are
+   denser than search results (no abstract / TLDR), so 3-col reads cleanly. */
+@media (min-width: 1400px) {
+  .scholar-list__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 20px;
+  }
+}
+
 /* ── Saved-paper card (own variant — needs checkbox overlay) ────────────── */
 .scholar-saved__card {
   position: relative;

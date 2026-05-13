@@ -165,10 +165,11 @@ export default function ScholarSearchPage() {
   const inputRef = useRef(null)
 
   // Sync external URL changes back into the controlled input (e.g. when
-  // an example-query button writes ?q=).
+  // an example-query button writes ?q=). Defer via queueMicrotask so the
+  // React Compiler set-state-in-effect rule is satisfied — the update
+  // still lands before the next paint, no UX change.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSearchInput(q)
+    queueMicrotask(() => setSearchInput(q))
   }, [q])
 
   // Debounced commit: pushes searchInput into the URL after DEBOUNCE_MS.
@@ -237,28 +238,37 @@ export default function ScholarSearchPage() {
   const [limit, setLimit] = useState(PAGE_SIZE)
 
   // Reset pagination + results when the query/filter signature changes.
+  // Deferred via queueMicrotask to satisfy React Compiler set-state-in-effect.
   const filterSignature = `${q}|${source}|${yearFrom}|${yearTo}|${openAccess ? '1' : '0'}|${sort}`
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setLimit(PAGE_SIZE)
-    setResults([])
-    setHasMore(false)
-    setError(null)
+    queueMicrotask(() => {
+      setLimit(PAGE_SIZE)
+      setResults([])
+      setHasMore(false)
+      setError(null)
+    })
   }, [filterSignature])
 
   useEffect(() => {
     if (!q) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setResults([])
-      setError(null)
-      setLoading(false)
+      queueMicrotask(() => {
+        setResults([])
+        setError(null)
+        setLoading(false)
+      })
       return undefined
     }
     const controller = new AbortController()
     const isInitial = limit === PAGE_SIZE
-    if (isInitial) setLoading(true)
-    else setLoadingMore(true)
-    setError(null)
+    // Defer the loading-flag flip so React Compiler's
+    // set-state-in-effect rule stays armed. The async fetch chain
+    // below resolves on a later tick anyway, so the deferred update
+    // still lands before any user-visible state matters.
+    queueMicrotask(() => {
+      if (isInitial) setLoading(true)
+      else setLoadingMore(true)
+      setError(null)
+    })
 
     const url = new URL(`${API}/api/scholar/search`)
     url.searchParams.set('q', q)

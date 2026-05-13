@@ -307,11 +307,15 @@ function initSocketIO(httpServer) {
         }
       })
 
-      // Handle conversation leave
+      // Handle conversation leave (rate limited: max 30 per minute)
+      // Research-loop-3 P1 #11 — mirrors the CONVERSATION_JOIN limit so a
+      // client can't spam join/leave to flood other participants with
+      // USER_LEFT notifications.
       socket.on(SOCKET_EVENTS.CONVERSATION_LEAVE, async (data) => {
         try {
           const { conversationId } = data
           if (!conversationId) return
+          if (isSocketRateLimited(socket.id, 'leave', 30)) return
           const room = `conversation:${conversationId}`
 
           // Leaving a room should only notify real participants in rooms this

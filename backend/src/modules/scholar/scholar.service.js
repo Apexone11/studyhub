@@ -558,8 +558,26 @@ function _serializePaper(row) {
     openAlexId: row.openAlexId,
     pubmedId: row.pubmedId,
     license: row.license,
+    // Loop S11 fix #1: surface OA flag + license type for the frontend
+    // "Open PDF" gate. The frontend reads `paper.openAccess` and
+    // `paper.licenseType` to decide whether to render the in-app reader.
+    // `licenseType` is a normalized alias of `license` so client code
+    // doesn't have to learn two field names — it's "open_access" when
+    // the row is genuinely OA (allowlisted license OR null+openAccess=true)
+    // and falls back to the raw license string otherwise.
+    licenseType: isOpenAccessLicense(row.license)
+      ? 'open_access'
+      : row.openAccess
+        ? 'open_access'
+        : row.license || null,
     openAccess: Boolean(row.openAccess),
     pdfCachedKey: row.pdfCachedKey || null,
+    // `pdfUrl` is the signed/served URL the frontend reader iframes.
+    // Lazy resolution lives in the controller (`getPaper`) so we only
+    // pay the R2 signature cost when the user actually opens the page,
+    // not on every list serialization. The serializer leaves it null;
+    // the controller attaches it.
+    pdfUrl: null,
     pdfExternalUrl: row.pdfExternalUrl,
     citationCount: row.citationCount || 0,
     viewCount: row.viewCount || 0,

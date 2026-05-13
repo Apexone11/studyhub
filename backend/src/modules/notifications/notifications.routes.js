@@ -4,6 +4,7 @@ const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
+const { cacheControl } = require('../../lib/cacheControl')
 const prisma = require('../../lib/prisma')
 
 const router = express.Router()
@@ -147,8 +148,43 @@ async function computeUnreadGroupCount(userId) {
 // can't burn through 200 mark-all-read calls per minute.
 router.use(requireAuth)
 
+// Filter categories exposed to the inbox dropdown (research-loop-4 F12).
+// Maps a short query-param value → the underlying `Notification.type`
+// strings the backend persists. Anything not listed here is rejected so
+// the dropdown's tab strip can't be coerced into an arbitrary `where`
+// clause. Categories mirror NotificationsTab preference groups in the
+// frontend settings page so the user model is consistent.
+const TYPE_FILTERS = {
+  mention: ['mention', 'comment_mention', 'note_mention'],
+  reply: ['reply', 'comment_reply', 'thread_reply'],
+  social: ['star', 'fork', 'follow', 'follow_request', 'badge_unlocked'],
+  study_group: [
+    'group_invite',
+    'group_join_request',
+    'group_member_added',
+    'group_session_scheduled',
+    'group_session_starting',
+    'group_session_canceled',
+    'group_discussion_reply',
+  ],
+  moderation: [
+    'moderation_takedown',
+    'moderation_warning',
+    'moderation_appeal',
+    'sheet_review',
+    'sheet_rejected',
+    'group_report',
+  ],
+}
+const TYPE_FILTER_KEYS = new Set(Object.keys(TYPE_FILTERS))
+
 // ── GET /api/notifications ─────────────────────────────────────
-router.get('/', readLimiter, async (req, res) => {
+// 15s private cache + 30s SWR absorbs the sidebar bell's natural double-
+// mount on SPA route changes without serving stale read receipts. The
+// list is per-user; `cacheControl` adds `Vary: Cookie, Authorization` so
+// a cached response can never leak to a different session. Research-loop
+// -3 P2 #14.
+router.get('/', readLimiter, cacheControl(15, { staleWhileRevalidate: 30 }), async (req, res) => {
   // Clamp limit to [1, 50] and offset to >=0 per CLAUDE.md A12. Without
   // this a negative offset reached Prisma's skip clause and threw, and a
   // NaN limit silently degraded to undefined.
@@ -156,14 +192,28 @@ router.get('/', readLimiter, async (req, res) => {
   const rawOffset = Number.parseInt(req.query.offset, 10)
   const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 50) : 20
   const offset = Number.isInteger(rawOffset) && rawOffset > 0 ? rawOffset : 0
+
+  // F12 inbox filters. `type` restricts to one of the curated buckets
+  // (mention / reply / social / study_group / moderation). `onlyUnread`
+  // skips the read rows so power users with 200 unread notifications can
+  // surface the 3 mentions without paging the whole inbox. Both are
+  // additive — a filter that yields zero rows is a legal empty list,
+  // never a 400.
+  const typeFilterRaw = typeof req.query.type === 'string' ? req.query.type.toLowerCase() : null
+  const typeFilter = typeFilterRaw && TYPE_FILTER_KEYS.has(typeFilterRaw) ? typeFilterRaw : null
+  const onlyUnread = req.query.onlyUnread === 'true' || req.query.onlyUnread === '1'
+
   try {
     // Over-fetch raw rows so grouping collapse doesn't leave the visible
     // page short. The cap (MAX_RAW_ROWS_FOR_GROUPING) bounds the worst
     // case — a viral sheet with 500 stars in 24h still returns one row.
     const rawTake = Math.min(MAX_RAW_ROWS_FOR_GROUPING, (offset + limit) * 5)
+    const where = { userId: req.user.userId }
+    if (typeFilter) where.type = { in: TYPE_FILTERS[typeFilter] }
+    if (onlyUnread) where.read = false
     const [rawNotifications, unreadStats] = await Promise.all([
       prisma.notification.findMany({
-        where: { userId: req.user.userId },
+        where,
         include: { actor: { select: { id: true, username: true, avatarUrl: true } } },
         orderBy: { createdAt: 'desc' },
         take: rawTake,
@@ -179,10 +229,15 @@ router.get('/', readLimiter, async (req, res) => {
       // Raw counts are exposed alongside for parity with older clients.
       total: grouped.length,
       totalRaw: rawNotifications.length,
+      // unreadCount/unreadRawCount remain the global counts so the bell
+      // badge stays consistent regardless of which tab is active. The
+      // grouped page total above already reflects the active filter.
       unreadCount: unreadStats.unreadGroupCount,
       unreadRawCount: unreadStats.unreadRawCount,
       limit,
       offset,
+      filter: typeFilter,
+      onlyUnread,
     })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })
@@ -335,4 +390,6 @@ module.exports.__internal = {
   GROUPABLE_TYPES,
   GROUP_WINDOW_MS,
   MAX_ACTORS_IN_GROUP,
+  TYPE_FILTERS,
+  TYPE_FILTER_KEYS,
 }

@@ -481,9 +481,9 @@ function ScholarSubNav({ isCompact, showBreadcrumb, breadcrumb }) {
       <div
         style={{
           width: '100%',
-          maxWidth: 1200,
+          maxWidth: 1320,
           margin: '0 auto',
-          padding: '0 clamp(16px, 2.5vw, 24px)',
+          padding: '0 clamp(16px, 2vw, 20px)',
         }}
       >
         <div
@@ -576,9 +576,9 @@ export default function ScholarShell({ children, mainId = 'scholar-main', mainSt
               <div
                 style={{
                   width: '100%',
-                  maxWidth: 1200,
+                  maxWidth: 1320,
                   margin: '0 auto',
-                  padding: '24px clamp(16px, 2.5vw, 24px)',
+                  padding: '24px clamp(16px, 2vw, 20px)',
                   fontFamily: FONT_STACK,
                 }}
               >

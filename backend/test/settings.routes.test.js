@@ -97,6 +97,15 @@ const mocks = vi.hoisted(() => {
   }
 })
 
+// originAllowlist factory mock — see ai.routes.test.js for context.
+function fakeOriginAllowlistFactory() {
+  return function fakeOriginAllowlist(_req, _res, next) {
+    next()
+  }
+}
+fakeOriginAllowlistFactory.normalizeOrigin = (v) => v
+fakeOriginAllowlistFactory.buildTrustedOrigins = () => new Set()
+
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/middleware/auth'), mocks.auth],
@@ -108,6 +117,7 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/email/emailValidation'), mocks.emailValidation],
   [require.resolve('../src/lib/googleAuth'), mocks.googleAuth],
   [require.resolve('../src/lib/piiVault'), mocks.piiVault],
+  [require.resolve('../src/middleware/originAllowlist'), fakeOriginAllowlistFactory],
 ])
 
 const originalModuleLoad = Module._load
@@ -267,35 +277,33 @@ describe('settings routes', () => {
 
   describe('PATCH /profile', () => {
     it('updates public profile metadata and visibility settings', async () => {
-      mocks.prisma.user.findUnique
-        .mockResolvedValueOnce({ id: 42 })
-        .mockResolvedValueOnce({
-          id: 42,
-          username: 'test_user',
-          role: 'student',
-          email: 'test@studyhub.test',
-          emailVerified: true,
-          displayName: 'Study Hero',
-          bio: 'Building better notes every week.',
-          avatarUrl: null,
-          coverImageUrl: null,
-          profileLinks: [{ label: 'Instagram', url: 'https://instagram.com/studyhub' }],
-          isPrivate: false,
-          authProvider: 'local',
-          accountType: 'student',
-          googleId: null,
-          createdAt: new Date('2026-01-01T00:00:00.000Z'),
-          preferences: {
-            profileFieldVisibility: {
-              displayName: 'public',
-              age: 'private',
-              location: 'private',
-              socialLinks: 'public',
-            },
+      mocks.prisma.user.findUnique.mockResolvedValueOnce({ id: 42 }).mockResolvedValueOnce({
+        id: 42,
+        username: 'test_user',
+        role: 'student',
+        email: 'test@studyhub.test',
+        emailVerified: true,
+        displayName: 'Study Hero',
+        bio: 'Building better notes every week.',
+        avatarUrl: null,
+        coverImageUrl: null,
+        profileLinks: [{ label: 'Instagram', url: 'https://instagram.com/studyhub' }],
+        isPrivate: false,
+        authProvider: 'local',
+        accountType: 'student',
+        googleId: null,
+        createdAt: new Date('2026-01-01T00:00:00.000Z'),
+        preferences: {
+          profileFieldVisibility: {
+            displayName: 'public',
+            age: 'private',
+            location: 'private',
+            socialLinks: 'public',
           },
-          enrollments: [],
-          _count: { studySheets: 5, enrollments: 2 },
-        })
+        },
+        enrollments: [],
+        _count: { studySheets: 5, enrollments: 2 },
+      })
 
       mocks.prisma.user.update.mockResolvedValue({ id: 42 })
       mocks.prisma.userPreferences.upsert.mockResolvedValue({ userId: 42 })
@@ -420,17 +428,15 @@ describe('settings routes', () => {
         inAppStudyGroups: false,
       })
 
-      const response = await request(app)
-        .patch('/preferences')
-        .send({
-          profileVisibility: 'private',
-          theme: 'dark',
-          emailDigest: false,
-          emailComments: false,
-          emailSocial: false,
-          inAppMentions: false,
-          inAppStudyGroups: false,
-        })
+      const response = await request(app).patch('/preferences').send({
+        profileVisibility: 'private',
+        theme: 'dark',
+        emailDigest: false,
+        emailComments: false,
+        emailSocial: false,
+        inAppMentions: false,
+        inAppStudyGroups: false,
+      })
 
       expect(response.status).toBe(200)
       expect(response.body).toMatchObject({
@@ -469,9 +475,7 @@ describe('settings routes', () => {
     })
 
     it('rejects when no valid preference fields are provided', async () => {
-      const response = await request(app)
-        .patch('/preferences')
-        .send({ invalidKey: 'value' })
+      const response = await request(app).patch('/preferences').send({ invalidKey: 'value' })
 
       expect(response.status).toBe(400)
       expect(response.body).toMatchObject({
@@ -519,9 +523,7 @@ describe('settings routes', () => {
     })
 
     it('requires password', async () => {
-      const response = await request(app)
-        .delete('/account')
-        .send({ reason: 'leaving' })
+      const response = await request(app).delete('/account').send({ reason: 'leaving' })
 
       expect(response.status).toBe(400)
       expect(response.body).toMatchObject({
@@ -530,9 +532,7 @@ describe('settings routes', () => {
     })
 
     it('requires reason', async () => {
-      const response = await request(app)
-        .delete('/account')
-        .send({ password: 'Password123' })
+      const response = await request(app).delete('/account').send({ password: 'Password123' })
 
       expect(response.status).toBe(400)
       expect(response.body).toMatchObject({

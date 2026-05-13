@@ -306,15 +306,29 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
       // Categorize the error. Anthropic SDK errors carry a `.status`
       // and `.type` we trust; plain `Error` thrown from getClient when
       // ANTHROPIC_API_KEY is missing carries a recognisable message;
-      // anything else falls through to "internal".
+      // node fetch network errors carry a `.code` like ECONNRESET /
+      // ENOTFOUND / ECONNREFUSED / ETIMEDOUT, or a `.cause.code`. We
+      // surface those as 503 rather than 500 so the user sees a
+      // useful retry message. Founder feedback 2026-05-13: every
+      // analyze attempt was returning the generic "Failed to analyze
+      // sheet" toast and we couldn't tell why.
       const errMsg = err?.message || String(err)
       const errStatus = Number.isInteger(err?.status) ? err.status : null
       const errType = typeof err?.type === 'string' ? err.type : null
+      const errCode = err?.code || err?.cause?.code || null
       const isMissingApiKey = /ANTHROPIC_API_KEY is not set/i.test(errMsg)
       const isAnthropicAuth = errStatus === 401 || errStatus === 403
       const isAnthropicRate = errStatus === 429
       const isAnthropicServer = errStatus && errStatus >= 500 && errStatus < 600
       const isAnthropicOverloaded = errType === 'overloaded_error' || errStatus === 529
+      const isNetworkFailure =
+        errCode === 'ECONNRESET' ||
+        errCode === 'ENOTFOUND' ||
+        errCode === 'ECONNREFUSED' ||
+        errCode === 'ETIMEDOUT' ||
+        errCode === 'EAI_AGAIN' ||
+        err?.name === 'AbortError' ||
+        /fetch failed/i.test(errMsg)
 
       // Structured log + Sentry capture with enough context to triage
       // the next 500 in production. err.stack is critical when the
@@ -327,6 +341,7 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
           err: errMsg,
           status: errStatus,
           type: errType,
+          code: errCode,
           stack: err?.stack ? String(err.stack).slice(0, 2000) : null,
           // Best-effort cause classifier so we can grep alerts by class.
           cause: isMissingApiKey
@@ -339,7 +354,9 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
                   ? 'anthropic_overloaded'
                   : isAnthropicServer
                     ? 'anthropic_server'
-                    : 'unknown',
+                    : isNetworkFailure
+                      ? 'network_failure'
+                      : 'unknown',
         },
         'AI sheet analyze threw',
       )
@@ -383,6 +400,14 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
           res,
           503,
           'AI service is overloaded right now. Please try again in a minute.',
+          ERROR_CODES.INTERNAL,
+        )
+      }
+      if (isNetworkFailure) {
+        return sendError(
+          res,
+          503,
+          'Could not reach the AI service. Check your connection and try again.',
           ERROR_CODES.INTERNAL,
         )
       }

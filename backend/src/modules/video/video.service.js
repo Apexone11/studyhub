@@ -224,7 +224,7 @@ function transcodeToPreset(inputPath, outputPath, preset, sourceInfo, watermarkF
       '-maxrate',
       preset.videoBitrate,
       '-bufsize',
-      String(parseInt(preset.videoBitrate) * 2) + 'k',
+      String(Number.parseInt(preset.videoBitrate, 10) * 2) + 'k',
       '-vf',
       `scale=${preset.width}:${preset.height}:force_original_aspect_ratio=decrease,pad=${preset.width}:${preset.height}:(ow-iw)/2:(oh-ih)/2${watermarkFilter ? ',' + watermarkFilter : ''}`,
       // Audio encoding

@@ -6,8 +6,15 @@
 // `?paperId=` deep links before fetching (L3-LOW-5). The DOI suffix uses
 // an explicit printable-ASCII allowlist (no `[^\s]`) to defend against
 // null-byte injection per Week 4's hardened regex.
+//
+// Wave-8 fix (2026-05-13, bot review): the post-2007-only arXiv branch
+// silently dropped 30 years of physics / math / CS literature (pre-2007
+// IDs like `arxiv:hep-th/9711200`, `arxiv:math.AG/0211159`). Frontend
+// `isValidPaperId()` returned false, so the page hit the "Invalid paper"
+// error guard before any fetch. Backend `CANONICAL_ID_RE` already had
+// the fix in wave-5; this brings the frontend regex in sync.
 export const PAPER_ID_REGEX =
-  /^(doi:10\.\d{4,9}\/[A-Za-z0-9._\-/:;()<>+]{1,200}|arxiv:\d{4}\.\d{4,5}(v\d+)?|ss:[a-f0-9]{32,64}|oa:W\d{4,12})$/i
+  /^(doi:10\.\d{4,9}\/[A-Za-z0-9._\-/:;()<>+]{1,200}|arxiv:\d{4}\.\d{4,5}(v\d+)?|arxiv:[a-z][a-z-]*(\.[A-Z]{2})?\/\d{7}(v\d+)?|ss:[a-f0-9]{32,64}|oa:W\d{4,12})$/i
 
 export const TRY_CHIPS = [
   'transformer attention',

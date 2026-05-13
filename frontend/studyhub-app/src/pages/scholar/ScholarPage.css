@@ -22,9 +22,9 @@
 }
 
 .scholar-shell {
-  max-width: 1200px;
+  max-width: 1320px;
   margin: 0 auto;
-  padding: 0 24px 64px;
+  padding: 0 clamp(16px, 2vw, 20px) 64px;
 }
 
 /* ── Hero ──────────────────────────────────────────────────────────────── */
@@ -1120,6 +1120,9 @@
   display: flex;
   align-items: center;
   gap: 8px;
+  /* Cap the hero input width at 720px even when the hub card is wider —
+     reading line-length for the placeholder + typed query stays comfortable. */
+  max-width: 720px;
   background: var(--sh-soft);
   border: 1px solid var(--sh-border);
   border-radius: 12px;
@@ -1341,8 +1344,19 @@
 
 .scholar-landing-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 320px), 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
   gap: 16px;
+}
+
+/* Wide-desktop bump: with the right rail (~300px) consuming the row, the
+   discover grid still gets ~900-960px at ≥1280px viewport widths after the
+   global app sidebar (~250px) and outer gutters. A 3-col grid at that size
+   keeps card width ~280-300px — same density the SheetsPage grid uses. */
+@media (min-width: 1280px) {
+  .scholar-landing-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 18px;
+  }
 }
 
 .scholar-landing-empty {
@@ -1461,16 +1475,26 @@
   margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+/* Wide-desktop: 12 tiles in 4 columns means three rows of four — denser than
+   the auto-fill default at this width and gives each tile real estate to
+   breathe without looking stretched. */
+@media (min-width: 1280px) {
+  .scholar-topic-tiles {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 14px;
+  }
 }
 
 .scholar-topic-tile {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  padding: 14px 16px;
-  min-height: 64px;
+  gap: 6px;
+  padding: 16px 18px;
+  min-height: 72px;
   background: var(--sh-soft);
   border: 1px solid var(--sh-border);
   border-radius: 12px;
