@@ -184,21 +184,57 @@
 /* ── Result-count + duration strip ─────────────────────────────────── */
 .scholar-search-page__meta {
   display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 12px;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
   margin: 10px 0 14px;
   font-size: 13px;
   color: var(--sh-subtext);
   flex-wrap: wrap;
 }
 
+.scholar-search-page__meta-spacer {
+  flex: 1;
+  min-width: 0;
+}
+
+.scholar-search-page__meta-chip {
+  display: inline-flex;
+  align-items: center;
+  background: var(--sh-soft);
+  color: var(--sh-muted, var(--sh-subtext));
+  font-size: 11px;
+  font-weight: 500;
+  padding: 4px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
 .scholar-search-page__throttled {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--sh-warning-text);
   background: var(--sh-warning-bg);
-  padding: 3px 10px;
+  padding: 4px 10px;
   border-radius: 999px;
+  white-space: nowrap;
+}
+
+/* "Refine results" hint shown only on desktop when no filters are active. */
+.scholar-search-page__filters-hint {
+  display: none;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--sh-muted, var(--sh-subtext));
+  letter-spacing: 0.02em;
+  margin-right: 4px;
+  align-self: center;
+}
+
+@media (min-width: 768px) {
+  .scholar-search-page__filters-hint {
+    display: inline-flex;
+  }
 }
 
 /* ── Result grid ───────────────────────────────────────────────────── */
@@ -374,16 +410,24 @@
 .scholar-search-page__compare-clear {
   background: transparent;
   border: 0;
-  color: var(--sh-subtext);
+  color: var(--sh-brand);
   cursor: pointer;
   font-family: inherit;
   font-size: 13px;
+  font-weight: 500;
   padding: 6px 8px;
   border-radius: 8px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }
 .scholar-search-page__compare-clear:hover {
   background: var(--sh-soft);
-  color: var(--sh-text);
+  color: var(--sh-brand);
+}
+.scholar-search-page__compare-clear:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+  text-decoration: none;
 }
 
 /* ── Card-level compare checkbox overlay ───────────────────────────── */

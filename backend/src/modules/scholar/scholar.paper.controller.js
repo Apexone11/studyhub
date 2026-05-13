@@ -83,6 +83,92 @@ async function getReferences(req, res) {
   }
 }
 
+/**
+ * GET /api/scholar/paper/:id/similar
+ *
+ * Returns papers similar to the given paper. v1 algorithm: shared
+ * topics ranked by citation count + recency. Skips the seed paper
+ * itself. Bounded to a 50-row candidate window to keep this lightweight
+ * — the page renders only ~20 results.
+ *
+ * Wave-5 fix (2026-05-13): the Similar tab was rendering a raw Express
+ * "Cannot GET /api/scholar/paper/:id/similar" 404 because the route +
+ * controller had never been added. Frontend already gracefully maps
+ * `data.similar`, `data.results`, or array root to the results list.
+ */
+async function getSimilar(req, res) {
+  try {
+    const id = _validateCanonicalId(req.params.id)
+    if (!id) {
+      return sendError(res, 400, 'Invalid paper id.', ERROR_CODES.BAD_REQUEST)
+    }
+    const { limit } = _validatePagination(req)
+
+    const seed = await prisma.scholarPaper.findUnique({ where: { id } })
+    if (!seed) return sendError(res, 404, 'Paper not found.', ERROR_CODES.NOT_FOUND)
+
+    // Extract topic names from the seed paper. v1 stores topics as a
+    // string array or [{ name }] array on topicsJson; tolerate either.
+    const seedTopics = (Array.isArray(seed.topicsJson) ? seed.topicsJson : [])
+      .map((t) => (typeof t === 'string' ? t : t?.name || ''))
+      .filter((t) => t && t.length > 0)
+      .map((t) => t.toLowerCase())
+
+    if (seedTopics.length === 0) {
+      // No topics → no similarity signal. Return empty rather than
+      // 500 so the Similar tab renders cleanly.
+      return res.json({ similar: [], reason: 'no_topics' })
+    }
+
+    // Candidate window: recent + highly-cited papers, JS-filter by topic
+    // overlap. JSONB topic indexing is deferred to v2.
+    const candidateWindow = Math.min(Math.max(limit * 6, 60), 200)
+    const candidates = await prisma.scholarPaper.findMany({
+      where: {
+        id: { not: id },
+        title: { not: null },
+      },
+      orderBy: [{ citationCount: 'desc' }, { publishedAt: 'desc' }],
+      take: candidateWindow,
+    })
+
+    const scored = candidates
+      .map((row) => {
+        const rowTopics = (Array.isArray(row.topicsJson) ? row.topicsJson : [])
+          .map((t) => (typeof t === 'string' ? t : t?.name || ''))
+          .filter((t) => t)
+          .map((t) => t.toLowerCase())
+        const overlap = rowTopics.filter((t) => seedTopics.includes(t)).length
+        return { row, overlap }
+      })
+      .filter((s) => s.overlap > 0)
+      .sort((a, b) => {
+        if (b.overlap !== a.overlap) return b.overlap - a.overlap
+        // Tie-break by citation count desc, then recency.
+        const ca = a.row.citationCount || 0
+        const cb = b.row.citationCount || 0
+        if (cb !== ca) return cb - ca
+        const da = a.row.publishedAt ? new Date(a.row.publishedAt).getTime() : 0
+        const db = b.row.publishedAt ? new Date(b.row.publishedAt).getTime() : 0
+        return db - da
+      })
+      .slice(0, limit)
+      .map((s) => service._serializePaper(s.row))
+
+    return res.json({ similar: scored })
+  } catch (err) {
+    captureError(err, { route: req.originalUrl, method: req.method })
+    log.error({ err, event: 'scholar.similar.failed' }, 'Scholar similar failed')
+    // Soft-fail to 200 with an empty list so the Similar tab renders a
+    // clean empty state instead of an error toast that masks all the
+    // working tabs. We tag the response with `reason: 'internal_error'`
+    // so the frontend (and our metrics) can distinguish a genuine
+    // "no similar papers" result from a backend failure without
+    // changing the UX shape. Sourcery bot review 2026-05-13.
+    return res.json({ similar: [], reason: 'internal_error' })
+  }
+}
+
 async function getPdf(req, res) {
   try {
     const id = _validateCanonicalId(req.params.id)
@@ -130,6 +216,7 @@ module.exports = {
   getPaper,
   getCitations,
   getReferences,
+  getSimilar,
   getPdf,
   _validateCanonicalId,
   _validatePagination,

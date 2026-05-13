@@ -168,8 +168,9 @@ export default function ForYouSection({ onSwitchToAll }) {
                 type="button"
                 onClick={onSwitchToAll}
                 style={{
-                  padding: '8px 20px',
-                  borderRadius: 8,
+                  padding: '8px 16px',
+                  minHeight: 36,
+                  borderRadius: 10,
                   border: 'none',
                   background: 'var(--sh-brand)',
                   color: '#fff',
@@ -177,6 +178,7 @@ export default function ForYouSection({ onSwitchToAll }) {
                   fontWeight: 700,
                   cursor: 'pointer',
                   fontFamily: FONT,
+                  transition: 'opacity 0.18s ease',
                 }}
               >
                 Browse All Posts
@@ -591,9 +593,10 @@ const authorRowStyle = {
 function primaryBtnStyle(disabled) {
   return {
     width: '100%',
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: 700,
-    padding: '8px 14px',
+    padding: '10px 14px',
+    minHeight: 40,
     borderRadius: 10,
     border: 'none',
     background: 'var(--sh-brand)',
@@ -602,12 +605,20 @@ function primaryBtnStyle(disabled) {
     opacity: disabled ? 0.6 : 1,
     fontFamily: FONT,
     letterSpacing: '0.1px',
+    transition: 'opacity 0.18s ease',
   }
+}
+
+function prefersReducedMotion() {
+  if (typeof window === 'undefined' || !window.matchMedia) return false
+  return window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
 function applyHover(e) {
   const el = e.currentTarget
-  el.style.transform = 'translateY(-2px)'
+  if (!prefersReducedMotion()) {
+    el.style.transform = 'translateY(-2px)'
+  }
   el.style.borderColor = 'var(--sh-brand)'
   el.style.boxShadow = '0 6px 18px rgba(37,99,235,0.12)'
 }

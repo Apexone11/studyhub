@@ -37,6 +37,10 @@ import { API } from '../../config'
 import PaperCard from './paperCard/PaperCard'
 import ScholarShell from './ScholarShell'
 import ScholarFiltersDrawer from './ScholarFiltersDrawer'
+import useScholarShortcuts from './shortcuts/useScholarShortcuts'
+import ScholarKeyboardShortcutsModal, {
+  ScholarShortcutsHint,
+} from './shortcuts/ScholarKeyboardShortcutsModal'
 import { useResponsiveAppLayout } from '../../lib/ui'
 import { SCHOLAR_SOURCES, SCHOLAR_SORTS } from './scholarConstants'
 import './ScholarPage.css'
@@ -399,6 +403,20 @@ export default function ScholarSearchPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const drawerTriggerRef = useRef(null)
 
+  // ── Keyboard shortcuts (wave-7 wiring 2026-05-13) ──────────────────
+  const [shortcutsOpen, setShortcutsOpen] = useState(false)
+  useScholarShortcuts({
+    onOpenShortcuts: () => setShortcutsOpen(true),
+    onFocusSearch: () => {
+      inputRef.current?.focus()
+      inputRef.current?.select?.()
+    },
+    onCloseOverlay: () => {
+      if (drawerOpen) setDrawerOpen(false)
+      else if (shortcutsOpen) setShortcutsOpen(false)
+    },
+  })
+
   // ── Render helpers ─────────────────────────────────────────────────
   const arxivLikely = q && ARXIV_ID_RE.test(q.trim())
   const gridCols = layout.isPhone ? 1 : 2
@@ -465,6 +483,15 @@ export default function ScholarSearchPage() {
               </button>
             ) : (
               <>
+                {!source &&
+                  !yearFrom &&
+                  !yearTo &&
+                  !openAccess &&
+                  (!sort || sort === 'relevance') && (
+                    <span className="scholar-search-page__filters-hint" aria-hidden="true">
+                      Refine results
+                    </span>
+                  )}
                 <button
                   type="button"
                   className="scholar-search-page__chip"
@@ -545,15 +572,19 @@ export default function ScholarSearchPage() {
         {/* Result count + duration + throttled banner */}
         {q && !loading && !error && results.length > 0 && (
           <div className="scholar-search-page__meta">
-            <span>
-              {results.length.toLocaleString()} result{results.length === 1 ? '' : 's'}
-              {duration ? ` · ${duration}ms` : ''}
-            </span>
+            <span className="scholar-search-page__meta-spacer" aria-hidden="true" />
             {throttled.length > 0 && (
               <span className="scholar-search-page__throttled">
                 {throttled.join(', ')} throttled
               </span>
             )}
+            <span
+              className="scholar-search-page__meta-chip"
+              aria-label={`${results.length} result${results.length === 1 ? '' : 's'}${duration ? `, ${duration} milliseconds` : ''}`}
+            >
+              {results.length.toLocaleString()} result{results.length === 1 ? '' : 's'}
+              {duration ? ` · ${duration}ms` : ''}
+            </span>
           </div>
         )}
 
@@ -696,8 +727,9 @@ export default function ScholarSearchPage() {
               type="button"
               className="scholar-search-page__compare-clear"
               onClick={clearCompare}
+              aria-label="Clear compare selection"
             >
-              Clear
+              Clear selection
             </button>
             <button
               type="button"
@@ -716,6 +748,9 @@ export default function ScholarSearchPage() {
         onClose={() => setDrawerOpen(false)}
         returnFocusRef={drawerTriggerRef}
       />
+
+      <ScholarKeyboardShortcutsModal open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <ScholarShortcutsHint onOpen={() => setShortcutsOpen(true)} />
     </ScholarShell>
   )
 }

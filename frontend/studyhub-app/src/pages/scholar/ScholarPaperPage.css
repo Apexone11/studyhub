@@ -163,6 +163,9 @@
   border-bottom: 1px solid var(--sh-border);
   margin: 24px 0 18px;
   overflow-x: auto;
+  /* Hide scrollbar without losing scroll: standard property (Firefox,
+     Chrome 121+, Safari 18.2+) + WebKit fallback below for older Chrome
+     and Samsung Internet. */
   scrollbar-width: none;
 }
 .scholar-paper__tabs::-webkit-scrollbar {
@@ -292,6 +295,48 @@
   color: var(--sh-brand);
 }
 
+/* Recently-viewed empty state with inline Save shortcut. */
+.scholar-paper__recent-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.scholar-paper__recent-empty p {
+  font-size: 13px;
+  color: var(--sh-subtext);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.scholar-paper__recent-save-shortcut {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-soft);
+  color: var(--sh-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.scholar-paper__recent-save-shortcut:hover {
+  background: var(--sh-brand-soft, var(--sh-soft));
+  border-color: var(--sh-brand);
+  color: var(--sh-brand);
+}
+.scholar-paper__recent-save-shortcut[aria-pressed='true'] {
+  background: var(--sh-brand-soft, var(--sh-soft));
+  border-color: var(--sh-brand);
+  color: var(--sh-brand);
+}
+
 /* ── Mobile sticky title bar ───────────────────────────────────────────── */
 .scholar-paper__mobile-titlebar {
   display: none;
@@ -305,6 +350,19 @@
   gap: 10px;
   font-size: 14px;
   color: var(--sh-text);
+}
+
+/* Polished translucent blur backdrop — only when motion is acceptable.
+   Gracefully degrades to solid surface when reduced motion is set or the
+   browser lacks backdrop-filter (still has the solid background above). */
+@media (prefers-reduced-motion: no-preference) {
+  @supports (backdrop-filter: blur(12px)) or (-webkit-backdrop-filter: blur(12px)) {
+    .scholar-paper__mobile-titlebar {
+      background: color-mix(in srgb, var(--sh-surface) 78%, transparent);
+      -webkit-backdrop-filter: saturate(160%) blur(14px);
+      backdrop-filter: saturate(160%) blur(14px);
+    }
+  }
 }
 
 .scholar-paper__mobile-titlebar--visible {
@@ -344,6 +402,9 @@
     background: var(--sh-surface);
     border-top: 1px solid var(--sh-border);
     overflow-x: auto;
+    /* Same scrollbar-hide pattern as .scholar-paper__tabs — standard
+       property + WebKit fallback. Chrome <121 / Samsung Internet pick
+       up the ::-webkit-scrollbar rule below. */
     scrollbar-width: none;
   }
   .scholar-paper__mobile-action-bar::-webkit-scrollbar {
@@ -383,24 +444,111 @@
   }
 }
 
-/* ── Mini-graph placeholder ────────────────────────────────────────────── */
-.scholar-paper__minigraph {
-  height: 140px;
-  border-radius: 8px;
-  background: repeating-linear-gradient(
-    45deg,
-    var(--sh-soft),
-    var(--sh-soft) 8px,
-    var(--sh-surface) 8px,
-    var(--sh-surface) 16px
-  );
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--sh-subtext);
-  font-size: 12px;
+/* ── Similar tab empty state ───────────────────────────────────────────── */
+.scholar-paper__similar-empty {
+  border: 1px solid var(--sh-border);
+  background: var(--sh-soft);
+  border-radius: 12px;
+  padding: 24px 20px;
   text-align: center;
-  padding: 10px;
+  margin: 12px 0;
+}
+
+.scholar-paper__similar-empty-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sh-text);
+  margin: 0 0 6px;
+  line-height: 1.4;
+}
+
+.scholar-paper__similar-empty-sub {
+  font-size: 13px;
+  color: var(--sh-subtext);
+  margin: 0 0 14px;
+  line-height: 1.5;
+  max-width: 44ch;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.scholar-paper__similar-empty-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.scholar-paper__similar-empty-link {
+  appearance: none;
+  min-height: 36px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-brand);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.scholar-paper__similar-empty-link:hover {
+  background: var(--sh-brand-soft, var(--sh-soft));
+  border-color: var(--sh-brand);
+}
+
+/* ── Annotations tab empty state ───────────────────────────────────────── */
+.scholar-paper__annotations-empty {
+  border: 1px dashed var(--sh-border);
+  background: var(--sh-surface);
+  border-radius: 12px;
+  padding: 18px 18px;
+  margin: 12px 0;
+}
+
+.scholar-paper__annotations-empty-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sh-text);
+  margin: 0 0 4px;
+  line-height: 1.4;
+}
+
+.scholar-paper__annotations-empty-sub {
+  font-size: 13px;
+  color: var(--sh-subtext);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ── Discussion "New thread" CTA: promote to primary brand style ───────── */
+/* The DiscussionThread component renders the trigger with
+   `.scholar-action-btn--primary`; we scope this override to the paper
+   detail page's discussion tabpanel so it doesn't bleed elsewhere. */
+[id='scholar-tab-panel-discussion'] .scholar-action-btn.scholar-action-btn--primary {
+  background: var(--sh-brand);
+  border: 1px solid var(--sh-brand);
+  color: #fff;
+  border-radius: 999px;
+  font-weight: 600;
+  font-size: 14px;
+  letter-spacing: 0.005em;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: filter 120ms ease;
+}
+[id='scholar-tab-panel-discussion']
+  .scholar-action-btn.scholar-action-btn--primary:hover:not(:disabled) {
+  filter: brightness(0.95);
+}
+[id='scholar-tab-panel-discussion'] .scholar-action-btn.scholar-action-btn--primary:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [id='scholar-tab-panel-discussion'] .scholar-action-btn.scholar-action-btn--primary {
+    transition: none;
+  }
 }
 
 /* ── Reduced motion ────────────────────────────────────────────────────── */

@@ -302,34 +302,98 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
       } catch {
         /* graceful */
       }
-      // Log enough detail in pino + Sentry that a developer can trace
-      // a specific 500 in production (an Anthropic 429, an auth
-      // problem, a content-filter trip, or our own bug). The response
-      // body keeps it generic so we don't leak Anthropic internals.
+
+      // Categorize the error. Anthropic SDK errors carry a `.status`
+      // and `.type` we trust; plain `Error` thrown from getClient when
+      // ANTHROPIC_API_KEY is missing carries a recognisable message;
+      // anything else falls through to "internal".
+      const errMsg = err?.message || String(err)
+      const errStatus = Number.isInteger(err?.status) ? err.status : null
+      const errType = typeof err?.type === 'string' ? err.type : null
+      const isMissingApiKey = /ANTHROPIC_API_KEY is not set/i.test(errMsg)
+      const isAnthropicAuth = errStatus === 401 || errStatus === 403
+      const isAnthropicRate = errStatus === 429
+      const isAnthropicServer = errStatus && errStatus >= 500 && errStatus < 600
+      const isAnthropicOverloaded = errType === 'overloaded_error' || errStatus === 529
+
+      // Structured log + Sentry capture with enough context to triage
+      // the next 500 in production. err.stack is critical when the
+      // failure point isn't obvious from the message alone.
       log.error(
         {
           event: 'ai.sheet.analyze_failed',
           sheetId,
           userId: req.user?.userId,
-          err: err?.message || String(err),
-          status: err?.status || null,
-          type: err?.type || null,
+          err: errMsg,
+          status: errStatus,
+          type: errType,
+          stack: err?.stack ? String(err.stack).slice(0, 2000) : null,
+          // Best-effort cause classifier so we can grep alerts by class.
+          cause: isMissingApiKey
+            ? 'missing_api_key'
+            : isAnthropicAuth
+              ? 'anthropic_auth'
+              : isAnthropicRate
+                ? 'anthropic_rate'
+                : isAnthropicOverloaded
+                  ? 'anthropic_overloaded'
+                  : isAnthropicServer
+                    ? 'anthropic_server'
+                    : 'unknown',
         },
         'AI sheet analyze threw',
       )
-      captureError(err, { tags: { module: 'ai', action: 'sheetAnalyze' } })
-      // Differentiate the error class for the frontend so the toast
-      // can be actionable (429 → "try again in a minute", 401 → "set
-      // up Anthropic key", etc.). Default to 500 for unknown errors.
-      const status = Number.isInteger(err?.status) ? err.status : 500
-      const safeStatus = status === 429 ? 429 : status === 401 ? 503 : 500
-      const message =
-        safeStatus === 429
-          ? 'AI is rate-limited right now. Please wait a moment and try again.'
-          : safeStatus === 503
-            ? 'AI service is unavailable right now. Please try again later.'
-            : 'Failed to analyze sheet. Please try again.'
-      sendError(res, safeStatus, message, ERROR_CODES.INTERNAL)
+      captureError(err, {
+        tags: {
+          module: 'ai',
+          action: 'sheetAnalyze',
+          anthropicStatus: errStatus ? String(errStatus) : 'none',
+        },
+      })
+
+      // Pick a safe HTTP status + actionable message for the frontend.
+      // The toast shows the message verbatim, so it must be human
+      // readable and avoid leaking Anthropic internals.
+      if (isMissingApiKey) {
+        return sendError(
+          res,
+          503,
+          'AI is not configured in this environment. Reach out to the StudyHub team if you see this in production.',
+          ERROR_CODES.INTERNAL,
+        )
+      }
+      if (isAnthropicAuth) {
+        return sendError(
+          res,
+          503,
+          'AI service is unavailable right now. Please try again later.',
+          ERROR_CODES.INTERNAL,
+        )
+      }
+      if (isAnthropicRate) {
+        return sendError(
+          res,
+          429,
+          'AI is rate-limited right now. Please wait a moment and try again.',
+          ERROR_CODES.RATE_LIMITED,
+        )
+      }
+      if (isAnthropicOverloaded || isAnthropicServer) {
+        return sendError(
+          res,
+          503,
+          'AI service is overloaded right now. Please try again in a minute.',
+          ERROR_CODES.INTERNAL,
+        )
+      }
+      // Unknown error class — keep the 500 but give the user a hint
+      // that this is unexpected (so they know retry is worth trying).
+      return sendError(
+        res,
+        500,
+        'Failed to analyze sheet. Please try again. If this keeps happening, share the sheet URL with the StudyHub team.',
+        ERROR_CODES.INTERNAL,
+      )
     }
   },
 )

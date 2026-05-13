@@ -285,16 +285,39 @@ export default function ScholarTopicPage() {
           )}
 
           {!loading && !error && results.length === 0 && (
-            <div className="scholar-list__empty" style={{ marginTop: 16 }}>
-              <p style={{ margin: 0, fontSize: 'var(--type-md)', color: 'var(--sh-text)' }}>
-                No papers in this topic yet.
+            <div className="scholar-topic-v2__empty" style={{ marginTop: 16 }}>
+              <h2 className="scholar-topic-v2__empty-headline">
+                No {topicLabel} papers cached yet
+              </h2>
+              <p className="scholar-topic-v2__empty-body">
+                The topic feed fills in as students search Scholar. Run a search and the next
+                visitor will see results here.
               </p>
-              <p style={{ margin: '8px 0 0' }}>
-                The topic cache fills as users search Scholar. Try another topic or run a search.
-              </p>
-              <Link to="/scholar/search" className="scholar-list__empty-cta">
-                Search Scholar →
-              </Link>
+              <div className="scholar-topic-v2__empty-actions">
+                <Link
+                  to={`/scholar/search?q=${encodeURIComponent(topicLabel)}`}
+                  className="scholar-topic-v2__empty-cta-primary"
+                >
+                  Search for {topicLabel}
+                  <svg
+                    width="14"
+                    height="14"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                    focusable="false"
+                  >
+                    <path d="M5 12h14M13 5l7 7-7 7" />
+                  </svg>
+                </Link>
+                <Link to="/scholar" className="scholar-topic-v2__empty-cta-secondary">
+                  Back to topics
+                </Link>
+              </div>
             </div>
           )}
 

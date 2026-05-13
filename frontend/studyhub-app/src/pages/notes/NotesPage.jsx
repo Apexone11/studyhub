@@ -80,14 +80,16 @@ export default function NotesPage() {
     >
       {authError ? (
         <div
+          role="alert"
           style={{
-            background: 'var(--sh-warning-bg, #fef9c3)',
-            border: '1px solid var(--sh-warning-border, #fde68a)',
-            color: 'var(--sh-warning-text, #92400e)',
+            background: 'var(--sh-warning-bg)',
+            border: '1px solid var(--sh-warning-border)',
+            color: 'var(--sh-warning-text)',
             borderRadius: 8,
             padding: '10px 14px',
             marginBottom: 12,
             fontSize: 13,
+            lineHeight: 1.5,
           }}
         >
           {authError}
@@ -156,6 +158,7 @@ export default function NotesPage() {
         <button
           type="button"
           onClick={tutorial.restart}
+          aria-label="Show tutorial"
           title="Show tutorial"
           style={{
             position: 'fixed',
@@ -166,11 +169,11 @@ export default function NotesPage() {
             borderRadius: '50%',
             border: 'none',
             background: 'var(--sh-brand)',
-            color: 'var(--sh-surface)',
+            color: '#fff',
             fontSize: 18,
             fontWeight: 800,
             cursor: 'pointer',
-            boxShadow: '0 4px 14px var(--sh-brand-shadow, rgba(59,130,246,0.4))',
+            boxShadow: 'var(--sh-btn-primary-shadow, 0 4px 14px rgba(59,130,246,0.4))',
             zIndex: 50,
             display: 'grid',
             placeItems: 'center',
