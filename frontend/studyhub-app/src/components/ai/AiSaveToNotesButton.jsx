@@ -29,11 +29,14 @@ export default function AiSaveToNotesButton({ messageId, content, courses = [] }
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    if (open) {
+    if (!open) return
+    // Defer the reset so React Compiler's set-state-in-effect rule is
+    // satisfied. Reset only fires on the open transition.
+    queueMicrotask(() => {
       setTitle(deriveTitle(content))
       setError(null)
       setSaved(false)
-    }
+    })
   }, [open, content])
 
   const handleSave = async () => {

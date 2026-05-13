@@ -202,6 +202,17 @@ router.get(
   topicController.getTopicFeed,
 )
 
+// ── Discover feed (2026-05-13) ──────────────────────────────────────────
+// Powers the /scholar landing hub "Recent at your school" + "Trending in
+// the network" sections. Without this the hub renders empty in
+// production. scope=trending|recent|school.
+router.get(
+  '/discover',
+  scholarReadLimiter,
+  cacheControl(120, { staleWhileRevalidate: 600 }),
+  topicController.discoverPapers,
+)
+
 // ── Annotations (Week 5, v1.5) ──────────────────────────────────────────
 router.get('/annotations', scholarReadLimiter, annotationController.listAnnotations)
 router.post(

@@ -28,6 +28,16 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-5 production-readiness reconciliation (2026-05-13)
+
+- **Hub AI "Save as note" Course dropdown is now populated.** The dropdown was always stuck at "No course" because `AiSaveToNotesButton` accepted a `courses` prop with default `[]` but the parent (`AiPage`) never fetched the user's enrolled courses. Wired `/api/courses/schools` (same pattern as `useNotesData.js`), flattened through `flattenSchoolsToCourses` so two users at different schools can't collide on a shared course code, and threaded the list through `ChatArea` → `MessageBubble` → `AiSaveToNotesButton`. Silent failure on fetch error — the dropdown gracefully degrades to "No course" only.
+- **Backend `GET /api/scholar/discover` endpoint added.** `ScholarPage.jsx` (the landing hub) was calling this endpoint to populate "Recent at your school" and "Trending in the network" — it didn't exist on the backend (wave-4 agent S2 wrote against a path agent S15 was supposed to add but didn't). Production hub would have rendered as two empty sections. New `discoverPapers` controller in `scholar.topic.controller.js` maps `scope=trending|recent|school` to `ScholarPaper` queries by `citationCount` / `publishedAt`. The school-scope filter falls back to `recent` for v1 since `ScholarPaper` doesn't yet carry a school linkage — documented inline for the v2 join. Cache-Control 120s + SWR 600s.
+- **Annotations URL fixed in `ScholarPaperPage.jsx`.** Agent S4 + S8 assumed nested REST (`/paper/:id/annotations`) but the real route is `GET /api/scholar/annotations?paperId=...` (scholar.routes.js:206). The Annotations tab would have been empty. Now matches the live route.
+- **`/ai?paperId=...` Scholar deep-link re-enabled.** Wave-3 disabled it when Scholar was removed in commit `69ef2080`. Now that Scholar is reactivated (commit `e2f5e53d`), the deep-link fetches `GET /api/scholar/paper/:id` and renders the existing `PaperContextBanner` so users can start a chat about a paper.
+- **Cross-feature wiring audit.** Inventoried every `/api/scholar/...` URL the new frontend files call. Endpoints with graceful 404 fallback (`/api/scholar/saved` → `/api/library/shelves`, `/api/scholar/papers/:id/save` → `/api/scholar/save`, topic follow silent-degrade, similar-papers empty state) were left as-is — production-acceptable degradation paths.
+- **Feature flag verified.** `flag_scholar_enabled` is in `SHIPPED_DESIGN_V2_FLAGS` (well, `SHIPPED_FLAGS`) in `seedFeatureFlags.js` — `npm --prefix backend run seed:flags` must run on deploy or every Scholar route returns 503 per CLAUDE.md §12 fail-closed.
+- **Verification.** `npm --prefix backend run lint` clean. `npm --prefix frontend/studyhub-app run build` clean. `npm --prefix backend test -- scholar` 9 files / 114 tests pass.
+
 ### Scholar revival + UI/UX overhaul (2026-05-13 — 15-loop sweep)
 
 - **Scholar reactivated.** The 2026-05-05 removal (commit `69ef2080`) was reverted: backend route mount restored in `backend/src/index.js`, frontend lazy routes re-added in `App.jsx`, sidebar nav link restored in `sidebarConstants.js`. `/scholar`, `/scholar/search`, `/scholar/paper/:id`, `/scholar/saved`, `/scholar/topic/:slug` all reachable again.

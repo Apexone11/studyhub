@@ -340,9 +340,13 @@ export default function ScholarPaperPage() {
     return []
   }, [similarData])
 
+  // The real backend endpoint is `GET /api/scholar/annotations?paperId=...`
+  // (scholar.routes.js line 206) — NOT `/paper/:id/annotations`. Wave-5
+  // reconciliation fix: agents S4 + S8 assumed REST-nested paths; the
+  // real route nests `paperId` as a query param.
   const annotationsUrl =
     validId && activeTab === 'annotations'
-      ? `/api/scholar/paper/${encodeURIComponent(validId)}/annotations`
+      ? `/api/scholar/annotations?paperId=${encodeURIComponent(validId)}`
       : null
   const { data: annotationsData, loading: annotationsLoading } = useFetch(annotationsUrl, {
     skip: !annotationsUrl,
