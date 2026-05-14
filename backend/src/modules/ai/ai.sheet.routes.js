@@ -73,16 +73,20 @@ function clampSheetContent(content) {
  * Check whether `viewer` may write a new revision to `sheet`.
  *
  * Allowed:
- *   - Owner
- *   - Admin
+ *   - Owner only.
  *
- * (Forkers editing their own forks already have ownership of the fork
- * sheet, so they hit the "owner" branch — no fork-source mutation
- * needed. CLAUDE.md A6 — defense in depth.)
+ * Admins are explicitly NOT allowed (founder directive 2026-05-13:
+ * admin is a moderator role, not a creator role; admins must not
+ * mutate other users' content via AI apply-edit). Moderation actions
+ * — unpublish, reject, delete — live on the dedicated admin routes
+ * and continue to require admin role there. CLAUDE.md A6 — defense
+ * in depth.
+ *
+ * Forkers editing their own forks already own the fork sheet, so
+ * they hit this branch — no fork-source mutation needed.
  */
 function canEdit(sheet, viewer) {
   if (!sheet || !viewer) return false
-  if (viewer.role === 'admin') return true
   return sheet.userId === viewer.userId
 }
 
@@ -321,6 +325,16 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
       const isAnthropicRate = errStatus === 429
       const isAnthropicServer = errStatus && errStatus >= 500 && errStatus < 600
       const isAnthropicOverloaded = errType === 'overloaded_error' || errStatus === 529
+      // 404 not_found_error means we asked Anthropic for a model it
+      // doesn't know about (deprecation, typo, regional). Surface a
+      // distinct alert tag so on-call can fix the constant fast — this
+      // was the silent cause of every "Failed to analyze sheet" toast
+      // during the 2026-05-13 stale-model-id incident.
+      const isModelNotFound =
+        (errStatus === 404 || errStatus === 400) &&
+        (errType === 'not_found_error' ||
+          /model[^.]*not (?:found|available)/i.test(errMsg) ||
+          /unknown model/i.test(errMsg))
       const isNetworkFailure =
         errCode === 'ECONNRESET' ||
         errCode === 'ENOTFOUND' ||
@@ -346,17 +360,19 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
           // Best-effort cause classifier so we can grep alerts by class.
           cause: isMissingApiKey
             ? 'missing_api_key'
-            : isAnthropicAuth
-              ? 'anthropic_auth'
-              : isAnthropicRate
-                ? 'anthropic_rate'
-                : isAnthropicOverloaded
-                  ? 'anthropic_overloaded'
-                  : isAnthropicServer
-                    ? 'anthropic_server'
-                    : isNetworkFailure
-                      ? 'network_failure'
-                      : 'unknown',
+            : isModelNotFound
+              ? 'model_not_found'
+              : isAnthropicAuth
+                ? 'anthropic_auth'
+                : isAnthropicRate
+                  ? 'anthropic_rate'
+                  : isAnthropicOverloaded
+                    ? 'anthropic_overloaded'
+                    : isAnthropicServer
+                      ? 'anthropic_server'
+                      : isNetworkFailure
+                        ? 'network_failure'
+                        : 'unknown',
         },
         'AI sheet analyze threw',
       )
@@ -376,6 +392,14 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
           res,
           503,
           'AI is not configured in this environment. Reach out to the StudyHub team if you see this in production.',
+          ERROR_CODES.INTERNAL,
+        )
+      }
+      if (isModelNotFound) {
+        return sendError(
+          res,
+          503,
+          'AI model is temporarily unavailable. The StudyHub team has been alerted — please try again shortly.',
           ERROR_CODES.INTERNAL,
         )
       }

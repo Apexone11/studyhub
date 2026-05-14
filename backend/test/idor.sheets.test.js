@@ -194,24 +194,20 @@ describe('PATCH /api/sheets/:id — ownership enforcement', () => {
     expect(mocks.prisma.studySheet.update).toHaveBeenCalled()
   })
 
-  it('passes auth gate when admin updates (update called)', async () => {
+  // Founder directive 2026-05-13 — admin is moderator-only on content
+  // routes. PATCH /api/sheets/:id rejects admin edits of other users'
+  // sheets so attribution and audit trails stay clean. Moderation
+  // actions live on /api/admin/* and audit-log every change.
+  it('returns 403 when admin tries to PATCH another users sheet (moderator, not creator)', async () => {
     mocks.state.userId = ADMIN_ID
     mocks.state.role = 'admin'
-    const sheet = sheetFixture()
+    const sheet = sheetFixture({ allowEditing: false })
     mocks.prisma.studySheet.findUnique.mockResolvedValue(sheet)
-    mocks.prisma.studySheet.update.mockResolvedValue({
-      ...sheet,
-      title: 'Admin Edit',
-      author: { id: ADMIN_ID, username: 'admin' },
-      course: null,
-      htmlVersions: [],
-      forkSource: null,
-    })
 
     const res = await request(app).patch('/api/sheets/1').send({ title: 'Admin Edit' })
 
-    expect(res.status).not.toBe(403)
-    expect(mocks.prisma.studySheet.update).toHaveBeenCalled()
+    expect(res.status).toBe(403)
+    expect(mocks.prisma.studySheet.update).not.toHaveBeenCalled()
   })
 })
 

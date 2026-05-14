@@ -99,7 +99,18 @@ export default function SheetLabEditorSurface({
   )
 
   const previewSlot = isHtml ? (
-    <iframe title="html-preview" sandbox="" srcDoc={content} style={previewFrameStyle} />
+    // sandbox=""	disabled scripts/forms/popups entirely, which made
+    // every interactive practice-test or quiz sheet render as a dead
+    // static page in the editor preview. The frontend reproduces what
+    // the published runtime allows: scripts + forms + popups, but no
+    // `allow-same-origin` (CLAUDE.md A14 — `allow-scripts allow-same-origin`
+    // is a documented sandbox-escape vector).
+    <iframe
+      title="html-preview"
+      sandbox="allow-scripts allow-popups allow-forms"
+      srcDoc={content}
+      style={previewFrameStyle}
+    />
   ) : (
     <div
       style={{

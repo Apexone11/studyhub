@@ -198,7 +198,10 @@ function SheetPreviewModal({ html, onClose }) {
         </div>
         <iframe
           src={iframeSrc}
-          sandbox=""
+          // Match the published-runtime sandbox so interactive sheets
+          // preview the same way they'll run after publish. CLAUDE.md
+          // A14 — never combine `allow-scripts` with `allow-same-origin`.
+          sandbox="allow-scripts allow-popups allow-forms"
           title="Sheet Preview"
           style={{ flex: 1, border: 'none', width: '100%' }}
         />

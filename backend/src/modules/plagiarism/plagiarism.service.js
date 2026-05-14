@@ -73,7 +73,9 @@ async function analyzeWithAi(contentA, contentB, titleA, titleB) {
     const previewB = normalizeText(contentB).slice(0, AI_CONTENT_PREVIEW_CHARS)
 
     const response = await client.messages.create({
-      model: 'claude-sonnet-4-20250514',
+      // Pinned to the canonical DEFAULT_MODEL constant so plagiarism
+      // analysis tracks Hub AI's model upgrades automatically.
+      model: require('../ai/ai.constants').DEFAULT_MODEL,
       max_tokens: 512,
       system: `You are a plagiarism analysis assistant for an academic study platform. Compare two pieces of content and determine if one is likely copied from the other. Respond with ONLY a JSON object: {"verdict":"original"|"likely_copy"|"paraphrase"|"coincidental","confidence":0.0-1.0,"reasoning":"one sentence"}`,
       messages: [

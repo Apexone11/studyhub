@@ -12,6 +12,7 @@ const { getUserTier } = require('../../lib/getUserPlan')
 const { PLANS } = require('../payments/payments.constants')
 const { withPreviewText } = require('../../lib/sheets/applyContentUpdate')
 const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
+const { isAdmin } = require('../../lib/accessControl')
 
 const router = express.Router()
 
@@ -54,8 +55,26 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
     if (original.status !== SHEET_STATUS.PUBLISHED) {
       return res.status(403).json({ error: 'Only published sheets can be forked.' })
     }
+    // Admins are moderators, not content creators. Forking creates an
+    // editable copy under the admin's name, which would mix moderation
+    // and authorship in ways that distort attribution and audit trails.
+    // Self-fork is blocked below; combined, admins can't fork at all.
+    if (isAdmin(req.user)) {
+      return res.status(403).json({
+        error: 'Admin accounts cannot fork sheets. Forking is a creator action.',
+        code: 'ADMIN_CANNOT_FORK',
+      })
+    }
     if (original.userId === req.user.userId) {
-      return res.status(400).json({ error: 'You cannot fork your own sheet.' })
+      // Covers both originals and forks the requester already owns —
+      // re-forking your own fork has no purpose when SheetLab edit is
+      // available directly on the existing fork.
+      return res.status(400).json({
+        error: original.forkOf
+          ? 'You already own this fork. Edit it in SheetLab instead of re-forking.'
+          : 'You cannot fork your own sheet.',
+        code: original.forkOf ? 'ALREADY_OWNS_FORK' : 'SELF_FORK',
+      })
     }
     // Forking creates an editable copy of the content, which would defeat the
     // creator's intent if they've explicitly disabled edits. Gate Fork on the

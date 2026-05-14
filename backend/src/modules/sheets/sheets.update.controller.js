@@ -45,11 +45,17 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
-    const isOwnerOrAdmin = req.user.role === 'admin' || req.user.userId === sheet.userId
-    if (!isOwnerOrAdmin && !sheet.allowEditing) {
+    // Founder directive 2026-05-13: admin is a moderator role, not a
+    // creator role. Admins must not silently mutate other users' sheet
+    // content via this endpoint — moderation actions live on the
+    // dedicated /api/admin/* routes and audit-log every change. Here
+    // we treat admin like any other viewer (read-only unless they own
+    // the sheet or have non-owner edit access via allowEditing).
+    const isOwner = req.user.userId === sheet.userId
+    if (!isOwner && !sheet.allowEditing) {
       return res.status(403).json({ error: 'The owner has disabled editing on this sheet.' })
     }
-    if (!isOwnerOrAdmin) {
+    if (!isOwner) {
       // Non-owners with editing permission can only update content fields,
       // not metadata like allowDownloads, allowEditing, status, courseId, or removeAttachment.
       const restricted = [
