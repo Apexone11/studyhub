@@ -28,6 +28,18 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.1 — deferred work follow-on (F7 + UI/UX Bucket A6/A7/A9/A11) (2026-05-16)
+
+Follow-on to wave-12 closing out the deferred items.
+
+- **F7 pub/sub bridge for raw-fetch cache invalidation.** `lib/useFetch.js` now exports `onCacheInvalidate(fn)`. `clearFetchCache(key)` notifies subscribers with the cleared key (or `null` for a full clear). `useSheetViewer` subscribes to its own sheet's key and triggers `loadSheet()` on invalidation, closing the 45-second polling gap between a contribute-back submit and the parent sheet showing the new pending PR. 5 new unit tests cover notify / unsubscribe / multi-subscriber / listener-error swallow / idempotent re-add.
+- **A6 global prefers-reduced-motion safety net.** Added `@media (prefers-reduced-motion: reduce) { *:not([data-motion='keep']) { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }` to `index.css`. Catches all 33 CSS files in one rule. `SubmitSpinner.jsx` gets `data-motion="keep"` per WCAG 2.3.3 (essential motion is allowed).
+- **A7 skeleton loaders on AdminOverview.** Replaced "Loading admin stats…" + "Loading…" text with proper `<Skeleton />` placeholders + `aria-busy` + sr-only labels for screen readers.
+- **A9 ConfirmDialog on ScholarSavedPage bulk-remove.** Replaced raw `window.confirm` with the portaled, focus-trapped, danger-variant ConfirmDialog. Friendlier copy ("Remove N saved papers? You can re-save them anytime").
+- **A11 breadcrumbs on /sheets and /library.** Added `crumbs={[{ label: 'Study Sheets', to: '/sheets' }]}` / `crumbs={[{ label: 'Library', to: '/library' }]}` for navigation consistency.
+
+A12 (tab order audit) deferred — needs interactive verification I can't do solo.
+
 ### Wave-12 — contribute-back fix bundle, ecosystem doc + 12h follow-on (2026-05-15 → 2026-05-16)
 
 Founder bug repro on the fork-contribute-back flow exposed four related bugs plus a class of ecosystem-mapping debt. Shipped the four fixes uncommitted overnight, then ran a 12-hour follow-on session covering the bonus audit findings + UI/UX Bucket A items + 6 review loops. Plus added a new top-level `docs/internal/ecosystem.md` living document mapping the 13 sub-ecosystems + their cross-wiring, with the canonical contribute-back bug captured as the founding case in the Lessons-log.

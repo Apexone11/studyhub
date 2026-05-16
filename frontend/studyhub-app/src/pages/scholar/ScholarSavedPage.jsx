@@ -20,6 +20,7 @@ import useFetch from '../../lib/useFetch'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import ScholarShell from './ScholarShell'
 import './ScholarPage.css'
 import './ScholarLists.css'
@@ -203,6 +204,7 @@ export default function ScholarSavedPage() {
   const [filter, setFilter] = useState('all')
   const [selected, setSelected] = useState(() => new Set())
   const [creatingShelf, setCreatingShelf] = useState(false)
+  const [bulkRemoveOpen, setBulkRemoveOpen] = useState(false)
 
   // Build the query string for the preferred endpoint so SWR caches per
   // (shelf|sort|filter) tuple. Falls back gracefully on 404.
@@ -334,10 +336,17 @@ export default function ScholarSavedPage() {
     }
   }, [refetchShelves, refetchScholarSaved])
 
-  const handleBulkRemove = useCallback(async () => {
+  // Split open-confirm from really-do-it so the destructive action gets a
+  // portaled focus-trapped ConfirmDialog instead of the raw window.confirm
+  // (which can't be styled, traps focus poorly, and doesn't match the
+  // rest of the app's modals).
+  const handleBulkRemove = useCallback(() => {
     if (selected.size === 0) return
-    const confirmed = window.confirm(`Remove ${selected.size} saved paper(s)?`)
-    if (!confirmed) return
+    setBulkRemoveOpen(true)
+  }, [selected])
+
+  const confirmBulkRemove = useCallback(async () => {
+    setBulkRemoveOpen(false)
     const ids = [...selected]
     let okCount = 0
     for (const id of ids) {
@@ -762,6 +771,16 @@ export default function ScholarSavedPage() {
           ← Back to Scholar
         </Link>
       </div>
+      <ConfirmDialog
+        open={bulkRemoveOpen}
+        title="Remove saved papers?"
+        message={`Remove ${selected.size} saved paper${selected.size === 1 ? '' : 's'} from your shelf? You can re-save them anytime from the paper's page.`}
+        confirmLabel="Remove"
+        cancelLabel="Keep"
+        variant="danger"
+        onConfirm={confirmBulkRemove}
+        onCancel={() => setBulkRemoveOpen(false)}
+      />
     </ScholarShell>
   )
 }

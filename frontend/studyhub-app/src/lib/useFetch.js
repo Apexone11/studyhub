@@ -62,8 +62,30 @@ function ensureSweepRunning() {
   }
 }
 
+// Subscribers notified whenever `clearFetchCache(key)` runs. Used by
+// raw-fetch hooks (e.g. useSheetViewer) that don't go through useFetch
+// but still want the SWR cache invalidation signal so a writer like
+// SheetLabContribute can trigger their refetch. Receives the cleared
+// key (or null when the entire cache is cleared).
+const cacheInvalidationListeners = new Set()
+
 /**
- * Clear fetch cache entries.
+ * Subscribe to cache-invalidation events.
+ * Returns an unsubscribe fn. Listener fires with `(cacheKey | null)`
+ * where `null` means "all keys were cleared."
+ *
+ * @param {(key: string|null) => void} fn
+ * @returns {() => void} unsubscribe
+ */
+export function onCacheInvalidate(fn) {
+  cacheInvalidationListeners.add(fn)
+  return () => {
+    cacheInvalidationListeners.delete(fn)
+  }
+}
+
+/**
+ * Clear fetch cache entries + notify any raw-fetch subscribers.
  * @param {string|null} cacheKey - If provided, clear only this key. If null, clear all.
  */
 export function clearFetchCache(cacheKey = null) {
@@ -71,6 +93,15 @@ export function clearFetchCache(cacheKey = null) {
     cache.delete(cacheKey)
   } else {
     cache.clear()
+  }
+  // Notify subscribers — fire-and-forget. Errors in one listener must
+  // not break the others.
+  for (const fn of cacheInvalidationListeners) {
+    try {
+      fn(cacheKey)
+    } catch {
+      /* listener error is the listener's problem */
+    }
   }
 }
 
