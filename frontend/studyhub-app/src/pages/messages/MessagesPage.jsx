@@ -201,6 +201,11 @@ export default function MessagesPage() {
       nav={<Navbar crumbs={[{ label: 'Messages', to: '/messages' }]} hideTabs />}
       sidebar={<AppSidebar />}
     >
+      {/* Visually-hidden page heading for screen readers / WCAG 1.3.1.
+          The visual page chrome (split-panel layout) doesn't naturally
+          land an h1; this gives AT users an unambiguous page mark.
+          Wave-11 audit L4-5 fix. */}
+      <h1 className="sr-only">Messages</h1>
       {authError && (
         <div
           role="alert"

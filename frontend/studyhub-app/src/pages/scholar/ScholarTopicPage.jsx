@@ -151,8 +151,44 @@ export default function ScholarTopicPage() {
   // Follow state — read once on mount, optimistic toggle on click.
   // 404 on the GET means "not implemented yet" — the button still functions
   // and toggles purely client-side until the endpoint exists.
-  const [followed, setFollowed] = useState(false)
+  //
+  // Wave-8 fix (2026-05-13, founder): until the backend endpoint exists,
+  // the followed state was lost on page reload. Persist to localStorage
+  // key `studyhub.scholar.followedTopics` (Set of slug strings) so the
+  // user sees their "Following" pill stick across navigation.
+  const FOLLOW_KEY = 'studyhub.scholar.followedTopics'
+  const [followed, setFollowed] = useState(() => {
+    if (typeof window === 'undefined' || !safeSlug) return false
+    try {
+      const raw = window.localStorage.getItem(FOLLOW_KEY)
+      if (!raw) return false
+      const list = JSON.parse(raw)
+      return Array.isArray(list) && list.includes(safeSlug)
+    } catch {
+      return false
+    }
+  })
   const [followBusy, setFollowBusy] = useState(false)
+
+  // Write-through helper: mirror the followed-set to localStorage whenever
+  // we flip state. Safari private mode throws on setItem — swallow.
+  const persistFollowedToLocal = useCallback(
+    (slug, next) => {
+      if (typeof window === 'undefined' || !slug) return
+      try {
+        const raw = window.localStorage.getItem(FOLLOW_KEY)
+        const parsed = raw ? JSON.parse(raw) : []
+        const list = Array.isArray(parsed) ? parsed : []
+        const set = new Set(list)
+        if (next) set.add(slug)
+        else set.delete(slug)
+        window.localStorage.setItem(FOLLOW_KEY, JSON.stringify(Array.from(set)))
+      } catch {
+        // Safari private mode / corrupted value — non-fatal.
+      }
+    },
+    [FOLLOW_KEY],
+  )
 
   useEffect(() => {
     if (!safeSlug) return undefined
@@ -180,34 +216,43 @@ export default function ScholarTopicPage() {
     if (!safeSlug || followBusy) return
     setFollowBusy(true)
     const previous = followed
-    setFollowed(!previous) // optimistic; reverted on failure
+    const next = !previous
+    setFollowed(next) // optimistic; reverted on failure
+    // Persist locally up-front so a reload during the in-flight fetch
+    // keeps the user's choice visible. Backend success overrides later.
+    persistFollowedToLocal(safeSlug, next)
     try {
       const res = await fetch(`${API}/api/scholar/topics/${encodeURIComponent(safeSlug)}/follow`, {
         method: 'POST',
         credentials: 'include',
         headers: authHeaders(),
-        body: JSON.stringify({ follow: !previous }),
+        body: JSON.stringify({ follow: next }),
       })
       if (res.status === 404) {
-        // Endpoint not built — keep optimistic state, show one-time hint.
+        // Endpoint not built — keep optimistic state + the localStorage
+        // mirror is the only persistence path until the route lands.
         showToast(
-          previous ? 'Removed from followed topics.' : 'Following — saved locally for now.',
+          previous
+            ? `Removed ${topicLabel} from your followed topics.`
+            : `Following ${topicLabel} — your list is saved locally for now.`,
           'info',
         )
         return
       }
       if (!res.ok) throw new Error(`Follow failed (${res.status})`)
       const json = await res.json().catch(() => ({}))
-      const persisted = typeof json.following === 'boolean' ? json.following : !previous
+      const persisted = typeof json.following === 'boolean' ? json.following : next
       setFollowed(persisted)
+      persistFollowedToLocal(safeSlug, persisted)
       showToast(persisted ? `Following ${topicLabel}.` : `Unfollowed ${topicLabel}.`, 'success')
     } catch (err) {
       setFollowed(previous)
+      persistFollowedToLocal(safeSlug, previous)
       showToast(err.message || 'Could not update follow state.', 'error')
     } finally {
       setFollowBusy(false)
     }
-  }, [safeSlug, followBusy, followed, topicLabel])
+  }, [safeSlug, followBusy, followed, topicLabel, persistFollowedToLocal])
 
   return (
     <ScholarShell mainId="scholar-topic-main">

@@ -130,27 +130,30 @@ export default function FeedPage() {
   useEffect(() => {
     if (!targetPostId || feedState.loading) return
     const el = document.querySelector(`[data-post-id="${targetPostId}"]`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.style.transition = 'box-shadow 0.3s'
-      el.style.boxShadow = '0 0 0 3px var(--sh-info-border)'
-      setTimeout(() => {
-        el.style.boxShadow = ''
-      }, 2000)
-    }
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.style.transition = 'box-shadow 0.3s'
+    el.style.boxShadow = '0 0 0 3px var(--sh-info-border)'
+    // Track the timer ID so a fast nav (or a back-to-back targetPostId
+    // change) can clear the prior timer before it fires on an element
+    // that may no longer exist. Wave-11 frontend bug hunt P1-5 fix.
+    const t = setTimeout(() => {
+      el.style.boxShadow = ''
+    }, 2000)
+    return () => clearTimeout(t)
   }, [targetPostId, feedState.loading])
 
   useEffect(() => {
     if (!targetCommentId || feedState.loading) return
     const el = document.querySelector(`[data-comment-id="${targetCommentId}"]`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-      el.style.transition = 'box-shadow 0.3s'
-      el.style.boxShadow = '0 0 0 3px var(--sh-info-border)'
-      setTimeout(() => {
-        el.style.boxShadow = ''
-      }, 2000)
-    }
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    el.style.transition = 'box-shadow 0.3s'
+    el.style.boxShadow = '0 0 0 3px var(--sh-info-border)'
+    const t = setTimeout(() => {
+      el.style.boxShadow = ''
+    }, 2000)
+    return () => clearTimeout(t)
   }, [targetCommentId, feedState.loading])
 
   const confirmDeletePost = useCallback(

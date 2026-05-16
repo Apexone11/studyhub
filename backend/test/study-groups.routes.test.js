@@ -147,7 +147,17 @@ const mockTargets = new Map([
   [require.resolve('../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../src/lib/socketio'), mocks.socketio],
   [require.resolve('../src/lib/notify'), mocks.notify],
+  [require.resolve('../src/middleware/originAllowlist'), fakeOriginAllowlistFactory],
 ])
+
+// originAllowlist factory mock — see ai.routes.test.js for context.
+function fakeOriginAllowlistFactory() {
+  return function fakeOriginAllowlist(_req, _res, next) {
+    next()
+  }
+}
+fakeOriginAllowlistFactory.normalizeOrigin = (v) => v
+fakeOriginAllowlistFactory.buildTrustedOrigins = () => new Set()
 
 const originalModuleLoad = Module._load
 

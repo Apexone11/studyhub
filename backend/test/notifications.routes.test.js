@@ -281,6 +281,56 @@ describe('notifications routes', () => {
         }),
       )
     })
+
+    // Research-loop-4 F12 — server-side filter so a 200-deep inbox can
+    // surface just the mentions without paging the whole list.
+    it('filters by type=mention (server-side where clause)', async () => {
+      mocks.prisma.notification.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+      const response = await request(app).get('/?type=mention')
+      expect(response.status).toBe(200)
+      expect(response.body.filter).toBe('mention')
+      expect(mocks.prisma.notification.findMany).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          where: expect.objectContaining({
+            userId: 42,
+            type: { in: expect.arrayContaining(['mention']) },
+          }),
+        }),
+      )
+    })
+
+    it('ignores unknown type values silently (filter=null, no 400)', async () => {
+      mocks.prisma.notification.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+      const response = await request(app).get('/?type=bogus')
+      expect(response.status).toBe(200)
+      expect(response.body.filter).toBe(null)
+    })
+
+    it('honours onlyUnread=true (where.read=false)', async () => {
+      mocks.prisma.notification.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+      const response = await request(app).get('/?onlyUnread=true')
+      expect(response.status).toBe(200)
+      expect(response.body.onlyUnread).toBe(true)
+      expect(mocks.prisma.notification.findMany).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          where: expect.objectContaining({ userId: 42, read: false }),
+        }),
+      )
+    })
+
+    it('sets private Cache-Control with 15s max-age + 30s SWR', async () => {
+      mocks.prisma.notification.findMany.mockResolvedValueOnce([]).mockResolvedValueOnce([])
+      const response = await request(app).get('/')
+      expect(response.status).toBe(200)
+      const cacheCtrl = response.headers['cache-control'] || ''
+      expect(cacheCtrl).toMatch(/private/)
+      expect(cacheCtrl).toMatch(/max-age=15/)
+      expect(cacheCtrl).toMatch(/stale-while-revalidate=30/)
+      const vary = response.headers.vary || ''
+      expect(vary).toMatch(/Cookie/)
+    })
   })
 
   describe('PATCH /:id/read', () => {

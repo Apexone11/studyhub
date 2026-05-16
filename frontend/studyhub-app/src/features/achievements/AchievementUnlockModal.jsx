@@ -83,7 +83,7 @@ export default function AchievementUnlockModal() {
 }
 
 function UnlockModalInner({ slug, onClose, onView }) {
-  const { data, loading } = useAchievementDetail(slug)
+  const { data, loading, error } = useAchievementDetail(slug)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -91,7 +91,39 @@ function UnlockModalInner({ slug, onClose, onView }) {
     return () => clearTimeout(t)
   }, [])
 
-  // Escape close + Tab focus-trap now provided by FocusTrappedDialog.
+  // Defensive auto-dismiss. Two failure modes the modal must not lock
+  // the page on:
+  //   1. detail resolved with error AND no data → silently dismiss, no
+  //      user-visible flash. The "first-star-received" badge URL hopped
+  //      via socket should never spawn an error popup if the API hiccups.
+  //   2. detail still loading after 6s → dismiss so a stuck request
+  //      can't hold a focus-trapped dialog over the page indefinitely.
+  // CLAUDE.md A20 — verify or fail-soft. We pick fail-soft here.
+  useEffect(() => {
+    if (!loading && error && !data) {
+      onClose()
+      return undefined
+    }
+    if (loading) {
+      const timeout = setTimeout(() => {
+        if (!data) onClose()
+      }, 6000)
+      return () => clearTimeout(timeout)
+    }
+    return undefined
+  }, [loading, error, data, onClose])
+
+  // While the detail is still loading, render NOTHING — no backdrop,
+  // no panel, no "Loading..." text. The unlock celebration is a
+  // best-effort enhancement; it must never block the underlying page.
+  // The original implementation paint an opaque overlay during the
+  // loading window, which presented as a white screen on the
+  // /sheets/:id/lab page if the detail fetch took longer than the
+  // animation duration. The data-ready branch below keeps the original
+  // motion design (scale-in panel) intact for the happy path.
+  if (loading || !data) return null
+
+  // Escape close + Tab focus-trap provided by FocusTrappedDialog.
   return (
     <FocusTrappedDialog
       open
@@ -129,11 +161,7 @@ function UnlockModalInner({ slug, onClose, onView }) {
         >
           Achievement Unlocked
         </div>
-        {loading || !data ? (
-          <div style={{ padding: 40, color: 'var(--sh-muted)', fontSize: 14 }}>Loading...</div>
-        ) : (
-          <UnlockModalBody data={data} onView={onView} onClose={onClose} />
-        )}
+        <UnlockModalBody data={data} onView={onView} onClose={onClose} />
       </div>
     </FocusTrappedDialog>
   )

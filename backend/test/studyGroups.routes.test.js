@@ -65,6 +65,15 @@ let app
 beforeAll(() => {
   const emptySubRouter = express.Router({ mergeParams: true })
 
+  // originAllowlist factory mock — see ai.routes.test.js for context.
+  function fakeOriginAllowlistFactory() {
+    return function fakeOriginAllowlist(_req, _res, next) {
+      next()
+    }
+  }
+  fakeOriginAllowlistFactory.normalizeOrigin = (v) => v
+  fakeOriginAllowlistFactory.buildTrustedOrigins = () => new Set()
+
   const mockTargets = new Map([
     [require.resolve('../src/lib/prisma'), mocks.prisma],
     [require.resolve('../src/middleware/auth'), mocks.auth],
@@ -78,6 +87,7 @@ beforeAll(() => {
     [require.resolve('../src/modules/studyGroups/studyGroups.discussions.routes'), emptySubRouter],
     [require.resolve('../src/modules/studyGroups/studyGroups.activity.routes'), emptySubRouter],
     [require.resolve('../src/modules/studyGroups/studyGroups.reports.routes'), emptySubRouter],
+    [require.resolve('../src/middleware/originAllowlist'), fakeOriginAllowlistFactory],
   ])
 
   Module._load = function patchedModuleLoad(requestId, parent, isMain) {

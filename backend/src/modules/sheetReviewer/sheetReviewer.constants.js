@@ -3,8 +3,21 @@
  * System prompt is HARDCODED here. Never store in DB or expose via API.
  */
 
-/** Model for sheet review -- Haiku is fast and cheap. */
-const REVIEWER_MODEL = 'claude-haiku-4-5-20251001'
+const { SHEET_REVIEW_MODEL, DEFAULT_MODEL } = require('../ai/ai.constants')
+
+/**
+ * Primary model for sheet review. Founder directive 2026-05-13: review
+ * decisions are policy-bearing, so they get the strongest model. Source
+ * of truth is `ai.constants.SHEET_REVIEW_MODEL`.
+ */
+const REVIEWER_MODEL = SHEET_REVIEW_MODEL
+
+/**
+ * Fallback model if Anthropic rejects the primary model ID (deprecation,
+ * temporary outage). Sonnet keeps approve/reject quality high while we
+ * roll a primary update — preferable to going dark on review.
+ */
+const REVIEWER_FALLBACK_MODEL = DEFAULT_MODEL
 
 /** Max tokens for the review response (JSON output). */
 const MAX_REVIEW_TOKENS = 1024
@@ -102,6 +115,7 @@ const REVIEW_DECISIONS = {
 
 module.exports = {
   REVIEWER_MODEL,
+  REVIEWER_FALLBACK_MODEL,
   MAX_REVIEW_TOKENS,
   REVIEW_TIMEOUT_MS,
   HOURLY_REVIEW_CAP,

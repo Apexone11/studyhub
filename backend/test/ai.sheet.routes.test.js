@@ -371,6 +371,21 @@ describe('POST /sheets/:sheetId/analyze', () => {
     expect(res.status).toBe(200)
   })
 
+  // ── Stale-model regression (2026-05-13) ─────────────────────────
+  // Anthropic 404 with type 'not_found_error' must surface as a 503
+  // with a model-specific message, not the generic "Failed to analyze
+  // sheet" toast that hid the deprecation for weeks.
+  it('returns 503 with model-unavailable copy when Anthropic 404s on the model id', async () => {
+    mocks.prisma.studySheet.findUnique.mockResolvedValueOnce(publishedSheetOwnedBy(1))
+    const err = new Error('model: claude-sonnet-foo not found')
+    err.status = 404
+    err.type = 'not_found_error'
+    mocks.messagesCreate.mockRejectedValueOnce(err)
+    const res = await request(app).post('/sheets/10/analyze').send({})
+    expect(res.status).toBe(503)
+    expect(res.body.error?.message || res.body.error || '').toMatch(/temporarily unavailable/i)
+  })
+
   it('clamps issues over the 30-row cap and unknown severities default to "low"', async () => {
     mocks.prisma.studySheet.findUnique.mockResolvedValueOnce(publishedSheetOwnedBy(1))
     const tooManyIssues = Array.from({ length: 40 }, (_, i) => ({
@@ -654,13 +669,17 @@ describe('POST /sheets/:sheetId/apply-edit', () => {
     expect(res.body.sheet.content).toBe(validBody.proposedContent)
   })
 
-  it('admin can apply edits to any sheet (defense in depth still allows admin)', async () => {
+  // Founder directive 2026-05-13 — admin is a moderator, not a content
+  // creator. apply-edit on someone else's sheet is a creator action and
+  // is therefore rejected for admin viewers exactly like any other
+  // non-owner. (Moderation actions live on /api/admin/* and audit-log
+  // every change.)
+  it('admin cannot apply edits to other users sheets (creator-only action)', async () => {
     authedUser = { userId: 99, username: 'admin', role: 'admin' }
     mocks.prisma.studySheet.findUnique.mockResolvedValueOnce(publishedSheetOwnedBy(1))
-    mockApplyEditDb()
     const res = await request(app).post('/sheets/10/apply-edit').send(validBody)
-    expect(res.status).toBe(200)
-    expect(mocks.prisma.sheetCommit.create).toHaveBeenCalledTimes(2)
+    expect(res.status).toBe(403)
+    expect(mocks.prisma.sheetCommit.create).not.toHaveBeenCalled()
   })
 
   it('handles "no prior commits" (parentId = null on the snapshot commit)', async () => {

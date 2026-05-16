@@ -1,7 +1,7 @@
 const express = require('express')
 const multer = require('multer')
 const path = require('node:path')
-const { readLimiter } = require('../../lib/rateLimiters')
+const { readLimiter, adminAnnouncementLimiter } = require('../../lib/rateLimiters')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
 const originAllowlist = require('../../middleware/originAllowlist')
@@ -91,69 +91,81 @@ router.get('/', async (req, res) => {
 // CLAUDE.md A1 — admin enforcement uses the centralized requireAdmin
 // middleware (DB re-check + securityEvents.access_denied log), not an
 // inline req.user.role check in the handler.
-router.post('/', requireAuth, requireAdmin, requireTrustedOrigin, async (req, res) => {
-  const title = typeof req.body.title === 'string' ? req.body.title.trim() : ''
-  const body = typeof req.body.body === 'string' ? req.body.body.trim() : ''
-  const pinned = !!req.body.pinned
-  const videoId = req.body.videoId ? Number.parseInt(req.body.videoId, 10) : null
+router.post(
+  '/',
+  requireAuth,
+  requireAdmin,
+  requireTrustedOrigin,
+  adminAnnouncementLimiter,
+  async (req, res) => {
+    const title = typeof req.body.title === 'string' ? req.body.title.trim() : ''
+    const body = typeof req.body.body === 'string' ? req.body.body.trim() : ''
+    const pinned = !!req.body.pinned
+    const videoId = req.body.videoId ? Number.parseInt(req.body.videoId, 10) : null
+    // CLAUDE.md A13 — enum-allowlist on body fields before they touch
+    // Prisma. urgency='urgent' bypasses mute filters at notify time;
+    // anything else is normalized to 'normal'.
+    const urgency = req.body.urgency === 'urgent' ? 'urgent' : 'normal'
 
-  if (!title) return sendError(res, 400, 'Title is required.', ERROR_CODES.BAD_REQUEST)
-  if (!body) return sendError(res, 400, 'Body is required.', ERROR_CODES.BAD_REQUEST)
-  if (title.length > MAX_TITLE_LENGTH) {
-    return sendError(
-      res,
-      400,
-      `Title must be ${MAX_TITLE_LENGTH} characters or fewer.`,
-      ERROR_CODES.BAD_REQUEST,
-    )
-  }
-  if (body.length > MAX_BODY_LENGTH) {
-    return res
-      .status(400)
-      .json({ error: `Body must be ${MAX_BODY_LENGTH.toLocaleString()} characters or fewer.` })
-  }
-
-  try {
-    // If attaching a video, verify it exists
-    if (videoId) {
-      const video = await prisma.video.findUnique({
-        where: { id: videoId },
-        select: { id: true, status: true },
-      })
-      if (!video) return sendError(res, 404, 'Video not found.', ERROR_CODES.NOT_FOUND)
+    if (!title) return sendError(res, 400, 'Title is required.', ERROR_CODES.BAD_REQUEST)
+    if (!body) return sendError(res, 400, 'Body is required.', ERROR_CODES.BAD_REQUEST)
+    if (title.length > MAX_TITLE_LENGTH) {
+      return sendError(
+        res,
+        400,
+        `Title must be ${MAX_TITLE_LENGTH} characters or fewer.`,
+        ERROR_CODES.BAD_REQUEST,
+      )
+    }
+    if (body.length > MAX_BODY_LENGTH) {
+      return res
+        .status(400)
+        .json({ error: `Body must be ${MAX_BODY_LENGTH.toLocaleString()} characters or fewer.` })
     }
 
-    const announcement = await prisma.announcement.create({
-      data: {
-        title,
-        body,
-        pinned,
-        authorId: req.user.userId,
-        // If a video is attached, create a media record for it
-        ...(videoId
-          ? {
-              media: {
-                create: {
-                  type: 'video',
-                  url: '',
-                  videoId,
-                  position: 0,
+    try {
+      // If attaching a video, verify it exists
+      if (videoId) {
+        const video = await prisma.video.findUnique({
+          where: { id: videoId },
+          select: { id: true, status: true },
+        })
+        if (!video) return sendError(res, 404, 'Video not found.', ERROR_CODES.NOT_FOUND)
+      }
+
+      const announcement = await prisma.announcement.create({
+        data: {
+          title,
+          body,
+          pinned,
+          urgency,
+          authorId: req.user.userId,
+          // If a video is attached, create a media record for it
+          ...(videoId
+            ? {
+                media: {
+                  create: {
+                    type: 'video',
+                    url: '',
+                    videoId,
+                    position: 0,
+                  },
                 },
-              },
-            }
-          : {}),
-      },
-      include: {
-        author: { select: { id: true, username: true, avatarUrl: true } },
-        ...mediaInclude,
-      },
-    })
-    res.status(201).json(announcement)
-  } catch (err) {
-    captureError(err, { route: req.originalUrl, method: req.method })
-    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
-  }
-})
+              }
+            : {}),
+        },
+        include: {
+          author: { select: { id: true, username: true, avatarUrl: true } },
+          ...mediaInclude,
+        },
+      })
+      res.status(201).json(announcement)
+    } catch (err) {
+      captureError(err, { route: req.originalUrl, method: req.method })
+      sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 // ── POST /api/announcements/:id/images — upload images (admin only) ───
 router.post(

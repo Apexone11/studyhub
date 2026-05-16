@@ -4,7 +4,7 @@
  *
  * Pins:
  *   - POST /:messageId/reactions creates upserted reaction
- *   - Emoji length cap (≤32 chars; schema is VarChar(16) but route's gate is 32)
+ *   - Emoji length cap (≤16 chars; schema is VarChar(16), route enforces same)
  *   - Whitespace-only emoji rejected
  *   - DELETE removes the reaction row
  *   - Dedup: posting the same emoji twice is idempotent (upsert)
@@ -172,6 +172,38 @@ describe('messaging.reactions.deep — POST /:messageId/reactions', () => {
       .send({ emoji: 'x'.repeat(33) })
     expect(res.status).toBe(400)
     expect(res.body.error).toMatch(/too long/i)
+  })
+
+  // Research-loop-4 F11: schema is VarChar(16); any 17–32-char input used
+  // to pass validation and get silently truncated by Postgres. Route now
+  // matches the column cap so the upsert key stays consistent.
+  it('rejects emoji exactly 17 chars (400) — matches VarChar(16) column', async () => {
+    const res = await request(app)
+      .post('/100/reactions')
+      .send({ emoji: 'x'.repeat(17) })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/too long/i)
+  })
+
+  it('accepts emoji exactly 16 chars (boundary case)', async () => {
+    mocks.prisma.messageReaction.upsert.mockResolvedValue({
+      id: 9,
+      messageId: 100,
+      userId: 42,
+      emoji: 'x'.repeat(16),
+      createdAt: new Date(),
+      user: { id: 42, username: 'test_user' },
+    })
+    const res = await request(app)
+      .post('/100/reactions')
+      .send({ emoji: 'x'.repeat(16) })
+    expect(res.status).toBe(201)
+  })
+
+  it('rejects emoji containing ASCII control characters (400)', async () => {
+    const res = await request(app).post('/100/reactions').send({ emoji: '' }) // BEL char
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/invalid characters/i)
   })
 
   it('A12: rejects non-numeric messageId (400)', async () => {

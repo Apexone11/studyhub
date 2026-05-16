@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * NotesList.jsx — Notes list/sidebar component
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PAGE_FONT, timeAgo } from '../shared/pageUtils'
 import { staggerEntrance } from '../../lib/animations'
 import { SkeletonList } from '../../components/Skeleton'
@@ -21,11 +21,53 @@ export default function NotesList({
   setActiveNote,
   selectNote,
   createNote,
+  importFileAsNote,
   creating,
   loadingNotes,
 }) {
   const notesListRef = useRef(null)
   const animatedRef = useRef(false)
+  const fileInputRef = useRef(null)
+  // dragOver counter rather than boolean — dragenter/dragleave fire on
+  // every child element as the cursor moves, so a boolean flips on and
+  // off rapidly and the dashed-outline flickers. A counter only goes to
+  // zero when the cursor genuinely leaves the list region.
+  const [dragDepth, setDragDepth] = useState(0)
+  const isDragging = dragDepth > 0
+
+  function handleFilePick(event) {
+    const file = event.target.files?.[0]
+    if (file && importFileAsNote) importFileAsNote(file)
+    // Reset so picking the same file twice still re-fires onChange.
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  function handleDragEnter(event) {
+    event.preventDefault()
+    if (event.dataTransfer?.types?.includes('Files')) {
+      setDragDepth((d) => d + 1)
+    }
+  }
+
+  function handleDragLeave(event) {
+    event.preventDefault()
+    setDragDepth((d) => Math.max(0, d - 1))
+  }
+
+  function handleDragOver(event) {
+    // Required for drop to fire.
+    if (event.dataTransfer?.types?.includes('Files')) {
+      event.preventDefault()
+      event.dataTransfer.dropEffect = 'copy'
+    }
+  }
+
+  function handleDrop(event) {
+    event.preventDefault()
+    setDragDepth(0)
+    const file = event.dataTransfer?.files?.[0]
+    if (file && importFileAsNote) importFileAsNote(file)
+  }
 
   /* Animate notes list on first load */
   useEffect(() => {
@@ -36,7 +78,54 @@ export default function NotesList({
   }, [loadingNotes, visibleNotes.length])
 
   return (
-    <div>
+    <div
+      onDragEnter={importFileAsNote ? handleDragEnter : undefined}
+      onDragLeave={importFileAsNote ? handleDragLeave : undefined}
+      onDragOver={importFileAsNote ? handleDragOver : undefined}
+      onDrop={importFileAsNote ? handleDrop : undefined}
+      style={{
+        position: 'relative',
+        // Subtle outline + brand wash while a file is being dragged
+        // over the list. Token-only colors per CLAUDE.md.
+        outline: isDragging ? '2px dashed var(--sh-brand)' : 'none',
+        outlineOffset: 4,
+        borderRadius: 16,
+        background: isDragging ? 'var(--sh-brand-bg, transparent)' : 'transparent',
+        transition: 'background 0.15s, outline-color 0.15s',
+      }}
+    >
+      {isDragging ? (
+        <div
+          aria-hidden="true"
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            pointerEvents: 'none',
+            zIndex: 2,
+            background: 'var(--sh-modal-overlay, rgba(15, 23, 42, 0.04))',
+            borderRadius: 16,
+          }}
+        >
+          <div
+            style={{
+              padding: '14px 20px',
+              borderRadius: 12,
+              background: 'var(--sh-surface)',
+              border: '1px solid var(--sh-brand)',
+              color: 'var(--sh-heading)',
+              fontFamily: PAGE_FONT,
+              fontSize: 13,
+              fontWeight: 700,
+              boxShadow: '0 6px 24px rgba(0,0,0,0.12)',
+            }}
+          >
+            Drop to import as a new note
+          </div>
+        </div>
+      ) : null}
       {/* Header with filter tabs and new note button */}
       <div
         style={{
@@ -178,29 +267,84 @@ export default function NotesList({
             </div>
           ) : null}
         </div>
-        <button
-          data-tutorial="notes-create"
-          onClick={createNote}
-          disabled={creating}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 16px',
-            background: 'var(--sh-brand)',
-            border: 'none',
-            borderRadius: 10,
-            fontSize: 13,
-            fontWeight: 600,
-            color: 'var(--sh-surface)',
-            cursor: 'pointer',
-            fontFamily: PAGE_FONT,
-            boxShadow: '0 2px 8px var(--sh-brand-shadow, rgba(59,130,246,0.25))',
-            transition: 'box-shadow .15s',
-          }}
-        >
-          {creating ? 'Creating…' : '+ New Note'}
-        </button>
+        <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+          {/* Hidden file input + Import button. v1 accepts .txt / .md;
+              backend rejects everything else with a clear message. The
+              full list / drag-drop hint lives in the empty-state. */}
+          {importFileAsNote ? (
+            <>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".txt,.md,.markdown,text/plain,text/markdown"
+                onChange={handleFilePick}
+                style={{ display: 'none' }}
+                aria-hidden="true"
+                tabIndex={-1}
+              />
+              <button
+                type="button"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={creating}
+                aria-label="Import a text or markdown file as a new note"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  padding: '8px 14px',
+                  background: 'var(--sh-surface, #fff)',
+                  border: '1px solid var(--sh-border)',
+                  borderRadius: 10,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: 'var(--sh-heading)',
+                  cursor: creating ? 'not-allowed' : 'pointer',
+                  fontFamily: PAGE_FONT,
+                }}
+              >
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Import
+              </button>
+            </>
+          ) : null}
+          <button
+            data-tutorial="notes-create"
+            onClick={createNote}
+            disabled={creating}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 16px',
+              background: 'var(--sh-brand)',
+              border: 'none',
+              borderRadius: 10,
+              fontSize: 13,
+              fontWeight: 600,
+              color: 'var(--sh-surface)',
+              cursor: 'pointer',
+              fontFamily: PAGE_FONT,
+              boxShadow: '0 2px 8px var(--sh-brand-shadow, rgba(59,130,246,0.25))',
+              transition: 'box-shadow .15s',
+            }}
+          >
+            {creating ? 'Creating…' : '+ New Note'}
+          </button>
+        </div>
       </div>
 
       {/* Notes list */}

@@ -20,7 +20,10 @@ function getClient() {
   return _client
 }
 
-const ANALYSIS_MODEL = 'claude-sonnet-4-20250514'
+// Track Hub AI's DEFAULT_MODEL so review reports follow model upgrades
+// automatically. The original hardcoded `claude-sonnet-4-20250514` was
+// deprecated and silently broke weekly reviews until 2026-05-13.
+const { DEFAULT_MODEL: ANALYSIS_MODEL } = require('../ai/ai.constants')
 
 /**
  * Generate a weekly review report.

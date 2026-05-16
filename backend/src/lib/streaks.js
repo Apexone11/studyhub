@@ -29,12 +29,57 @@ function getWeekStartDate() {
  * Calculate user's current study streak (consecutive days with any activity)
  * Returns current streak, longest streak, last active date, and whether today is active
  *
+ * Prefers the denormalized `UserStreak` row (O(1), maintained by the
+ * 2026-05-12 streak service + daily sweeper at 04:00 UTC). Falls back to
+ * scanning `UserDailyActivity` for the legacy path so users created
+ * before the streak table was seeded still see a number.
+ *
  * @param {PrismaClient} prisma
  * @param {number} userId
  * @returns {Promise<{currentStreak: number, longestStreak: number, lastActiveDate: Date|null, todayActive: boolean}>}
  */
 async function getUserStreak(prisma, userId) {
   try {
+    // Loop A2 follow-up — read the denormalized counter first so the
+    // dashboard / profile pages render in a single index hit instead of
+    // scanning up to 366 daily-activity rows. The legacy scan still runs
+    // when the row hasn't been bumped yet (e.g. a brand-new account that
+    // hasn't created anything since the streak feature shipped).
+    //
+    // Guarded against tests / older callers that mock prisma WITHOUT
+    // including the `userStreak` model — falling back to the scan path
+    // is correct behavior in both cases. The denormalized read failing
+    // (model missing, DB error) must never abort the request.
+    let denormalized = null
+    if (prisma.userStreak && typeof prisma.userStreak.findUnique === 'function') {
+      try {
+        denormalized = await prisma.userStreak.findUnique({ where: { userId } })
+      } catch (denormErr) {
+        captureError(denormErr, { source: 'getUserStreak.denormalized_read', userId })
+      }
+    }
+    if (denormalized && denormalized.currentStreak > 0) {
+      const today = getTodayDate()
+      const last = denormalized.lastActiveDate ? new Date(denormalized.lastActiveDate) : null
+      // Trust the denormalized counter only when `lastActiveDate` is today
+      // or yesterday. If it's older, the streak has lapsed but the daily
+      // 04:00 UTC sweeper hasn't reset the row yet (failed run, clock
+      // skew, brand-new deploy). Falling through to the legacy scan lets
+      // it compute the correct 0 instead of reporting a stale number.
+      const yesterday = new Date(today)
+      yesterday.setDate(yesterday.getDate() - 1)
+      const lastIsFresh =
+        last && (last.getTime() === today.getTime() || last.getTime() === yesterday.getTime())
+      if (lastIsFresh) {
+        return {
+          currentStreak: denormalized.currentStreak,
+          longestStreak: denormalized.longestStreak,
+          lastActiveDate: last,
+          todayActive: last.getTime() === today.getTime(),
+        }
+      }
+    }
+
     const activities = await prisma.userDailyActivity.findMany({
       where: { userId },
       select: { date: true, commits: true, sheets: true, reviews: true, comments: true },

@@ -128,6 +128,26 @@ function PrivateRoute({ children }) {
   return <RouteErrorBoundary>{children}</RouteErrorBoundary>
 }
 
+/**
+ * AdminRoute — like PrivateRoute but also checks `user.role === 'admin'`.
+ * Before this gate existed, `/admin` only required auth; non-admins
+ * who navigated there would download ~13 admin chunks before the page-
+ * level guard rendered "not authorized". The router-level check now
+ * avoids the wasted download and surfaces the same "forbidden" state
+ * to non-admins immediately. Backend still re-checks role on every
+ * admin endpoint (CLAUDE.md A6 — defense in depth). Added wave-11
+ * 2026-05-14 per frontend bug hunt P1-1.
+ */
+function AdminRoute({ children }) {
+  const { isBootstrapping, isAuthenticated, user } = useSession()
+
+  if (isBootstrapping) return <RouteFallback />
+  if (!isAuthenticated) return <Navigate to="/login" replace />
+  if (user?.role !== 'admin') return <Navigate to="/feed" replace />
+
+  return <RouteErrorBoundary>{children}</RouteErrorBoundary>
+}
+
 function EditRedirect() {
   const { id } = useParams()
   return <Navigate to={`/sheets/${id}/lab`} replace />
@@ -772,9 +792,9 @@ function AppRoutes() {
                     <Route
                       path="/admin"
                       element={
-                        <PrivateRoute>
+                        <AdminRoute>
                           <AdminPage />
-                        </PrivateRoute>
+                        </AdminRoute>
                       }
                     />
                     <Route

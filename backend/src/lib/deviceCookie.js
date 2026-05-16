@@ -1,12 +1,21 @@
 /**
  * sh_did — device-identity cookie.
  *
- * 128-bit random, httpOnly, SameSite=Lax, 10-year TTL, Secure in prod.
+ * 128-bit random, httpOnly, 10-year TTL, Secure in prod, SameSite=none in
+ * prod (matches the auth cookie so cross-site fetches between the SPA
+ * origin and the API origin always carry the device signal). In dev we
+ * fall back to SameSite=lax so cookies still attach without HTTPS.
+ *
  * Set on first successful login that didn't already have one. Not tied
  * to auth; survives logout so a returning device can still be recognized.
  *
  * Reads are cheap. Writes happen at most once per browser-lifetime unless
  * the user manually clears cookies or we explicitly rotate (panic mode).
+ *
+ * SameSite history (2026-05-14): was hard-coded to 'lax' which caused
+ * the device cookie to drop on cross-site fetches between SPA and API
+ * origins, degrading device-trust scoring and triggering extra 2FA
+ * prompts. Mirrors the proven `authTokens.js` pattern now.
  */
 
 const crypto = require('crypto')
@@ -24,7 +33,7 @@ function cookieOptions() {
   return {
     httpOnly: true,
     secure: isProd,
-    sameSite: 'lax',
+    sameSite: isProd ? 'none' : 'lax',
     path: '/',
     maxAge: TEN_YEARS_MS,
   }

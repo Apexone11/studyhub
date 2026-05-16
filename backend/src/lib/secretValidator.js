@@ -19,8 +19,17 @@ const RECOMMENDED = [
   { key: 'ANTHROPIC_API_KEY', description: 'Claude AI API key' },
   { key: 'STRIPE_SECRET_KEY', description: 'Stripe payment processing' },
   { key: 'STRIPE_WEBHOOK_SECRET', description: 'Stripe webhook signature verification' },
+  {
+    key: 'RESEND_WEBHOOK_SECRET',
+    description:
+      'Resend webhook signing key (svix). Without it the strict-mode handler 503s on every webhook; ' +
+      'with it the handler verifies signatures and stores delivery + suppression events. Added 2026-05-14.',
+  },
   { key: 'SENTRY_DSN', description: 'Error monitoring' },
-  { key: 'FRONTEND_URL', description: 'Frontend origin for CORS + redirects' },
+  // FRONTEND_URL was previously listed here as RECOMMENDED only — promoted
+  // to REQUIRED_IN_PRODUCTION (line ~87) wave-11 2026-05-14 so missing
+  // values fail at boot rather than at the first Stripe checkout. The
+  // RECOMMENDED entry is intentionally removed to avoid double-listing.
   {
     key: 'GIPHY_API_KEY',
     description:
@@ -78,6 +87,12 @@ const RECOMMENDED = [
  * missing FIELD_ENCRYPTION_KEY in prod would cause encrypted PII columns to
  * silently fall back to plaintext. */
 const REQUIRED_IN_PRODUCTION = [
+  {
+    key: 'FRONTEND_URL',
+    minLength: 8,
+    description:
+      'Frontend origin used for Stripe checkout success / cancel URLs, password-reset links, and email redirects. Promoted to REQUIRED_IN_PRODUCTION wave-11 2026-05-14 alongside the prod-throw in payments.service.getFrontendAppUrl().',
+  },
   {
     key: 'FIELD_ENCRYPTION_KEY',
     // 64 hex chars = 32 raw bytes for AES-256, matching the runtime check

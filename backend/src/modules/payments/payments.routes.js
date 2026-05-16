@@ -48,6 +48,28 @@ const router = express.Router()
 // it uses Stripe signature verification and is called server-to-server.
 const requireTrustedOrigin = originAllowlist()
 
+// Stripe webhook idempotency LRU. Holds the last 1000 event IDs we've
+// processed (Stripe never reuses event.id, so a re-arrival is always a
+// retry of the same delivery). 1000 entries is ~3 days of capacity at
+// our current ~1/min webhook rate; entries evict in insertion order so
+// memory stays bounded. Per-replica only — see route comment.
+const STRIPE_EVENT_LRU_MAX = 1000
+const _stripeEventLru = new Map()
+function stripeEventSeen(eventId) {
+  if (_stripeEventLru.has(eventId)) return true
+  _stripeEventLru.set(eventId, Date.now())
+  if (_stripeEventLru.size > STRIPE_EVENT_LRU_MAX) {
+    const oldestKey = _stripeEventLru.keys().next().value
+    _stripeEventLru.delete(oldestKey)
+  }
+  return false
+}
+// Exported for the regression test.
+module.exports._stripeEventLruForTests = {
+  has: (id) => _stripeEventLru.has(id),
+  clear: () => _stripeEventLru.clear(),
+}
+
 // ── Auth middleware ───────────────────────────────────────────────────────
 
 function requireAdmin(req, res, next) {
@@ -221,6 +243,19 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
 
   log.info({ type: event.type, id: event.id }, 'Stripe webhook received')
 
+  // Idempotency guard. Stripe retries delivery up to ~3 days on any
+  // non-2xx response, so a handler that's slow or fails partway through
+  // can re-fire the same event multiple times. Without dedup we double-
+  // insert Payment rows, double-fire achievement events, and double-
+  // increment Donation totals. Per-replica in-memory LRU is enough for
+  // the single-Railway-replica deploy; if we ever scale horizontally
+  // this needs to move to a DB-backed table (e.g. `StripeWebhookEvent`
+  // with a unique index on event.id). Fixed wave-11 2026-05-14.
+  if (event.id && stripeEventSeen(event.id)) {
+    log.info({ eventId: event.id, type: event.type }, 'Stripe webhook duplicate — skipping')
+    return res.json({ received: true, handled: false, duplicate: true })
+  }
+
   let handled = false
   try {
     switch (event.type) {
@@ -250,8 +285,10 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
     }
   } catch (error) {
     captureError(error, { context: 'stripe.webhook', eventType: event.type })
+    // CLAUDE.md A16 — pino-only. Duplicate `console.error` removed
+    // 2026-05-14; structured log + Sentry capture already carry the
+    // full context.
     log.error({ err: error, eventType: event.type }, 'Error processing Stripe webhook')
-    console.error('[stripe:webhook] Handler failed for', event.type, '-', error.message)
     // Return 500 so Stripe retries the webhook (up to ~3 days)
     return sendError(res, 500, 'Webhook handler failed', ERROR_CODES.INTERNAL, {
       eventType: event.type,
@@ -766,94 +803,106 @@ router.get('/usage', requireAuth, paymentReadLimiter, async (req, res) => {
 // ── Cancel Subscription ────────────────────────────────────────────────────
 // Sets cancel_at_period_end on Stripe so the user keeps access until the
 // billing period ends, then moves to free.
-router.post('/subscription/cancel', paymentPortalLimiter, requireAuth, async (req, res) => {
-  try {
-    const sub = await prisma.subscription.findUnique({
-      where: { userId: req.user.userId },
-      select: { stripeSubscriptionId: true, status: true, plan: true },
-    })
+router.post(
+  '/subscription/cancel',
+  paymentPortalLimiter,
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    try {
+      const sub = await prisma.subscription.findUnique({
+        where: { userId: req.user.userId },
+        select: { stripeSubscriptionId: true, status: true, plan: true },
+      })
 
-    if (!sub || sub.status === 'canceled' || sub.plan === 'free') {
-      return sendError(res, 400, 'No active subscription to cancel.', ERROR_CODES.BAD_REQUEST)
-    }
+      if (!sub || sub.status === 'canceled' || sub.plan === 'free') {
+        return sendError(res, 400, 'No active subscription to cancel.', ERROR_CODES.BAD_REQUEST)
+      }
 
-    if (!sub.stripeSubscriptionId) {
-      return sendError(res, 400, 'No Stripe subscription found.', ERROR_CODES.BAD_REQUEST)
-    }
+      if (!sub.stripeSubscriptionId) {
+        return sendError(res, 400, 'No Stripe subscription found.', ERROR_CODES.BAD_REQUEST)
+      }
 
-    const stripe = service.getStripe()
-    const updated = await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-      cancel_at_period_end: true,
-    })
+      const stripe = service.getStripe()
+      const updated = await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+        cancel_at_period_end: true,
+      })
 
-    await prisma.subscription.update({
-      where: { userId: req.user.userId },
-      data: {
+      await prisma.subscription.update({
+        where: { userId: req.user.userId },
+        data: {
+          cancelAtPeriodEnd: true,
+        },
+      })
+
+      log.info(
+        { event: 'payments.cancel_queued', userId: req.user.userId },
+        'Subscription set to cancel at period end',
+      )
+
+      // Persist a notification immediately so the user has a durable record of
+      // their cancel action even if they navigate away before the toast lands.
+      // Stripe only fires `customer.subscription.deleted` at period end (could
+      // be 30 days later), so without this the user has no inbox proof for that
+      // entire window — refund disputes follow.
+      const periodEnd = new Date(updated.current_period_end * 1000)
+      createNotification(prisma, {
+        userId: req.user.userId,
+        type: 'subscription_will_cancel',
+        message: `Your Pro subscription will end on ${periodEnd.toLocaleDateString()}. You can reactivate any time before then.`,
+        linkPath: '/settings?tab=subscription',
+        priority: 'high',
+      }).catch(() => {})
+
+      res.json({
+        message: 'Subscription will be canceled at the end of your billing period.',
         cancelAtPeriodEnd: true,
-      },
-    })
-
-    log.info(
-      { event: 'payments.cancel_queued', userId: req.user.userId },
-      'Subscription set to cancel at period end',
-    )
-
-    // Persist a notification immediately so the user has a durable record of
-    // their cancel action even if they navigate away before the toast lands.
-    // Stripe only fires `customer.subscription.deleted` at period end (could
-    // be 30 days later), so without this the user has no inbox proof for that
-    // entire window — refund disputes follow.
-    const periodEnd = new Date(updated.current_period_end * 1000)
-    createNotification(prisma, {
-      userId: req.user.userId,
-      type: 'subscription_will_cancel',
-      message: `Your Pro subscription will end on ${periodEnd.toLocaleDateString()}. You can reactivate any time before then.`,
-      linkPath: '/settings?tab=subscription',
-      priority: 'high',
-    }).catch(() => {})
-
-    res.json({
-      message: 'Subscription will be canceled at the end of your billing period.',
-      cancelAtPeriodEnd: true,
-      currentPeriodEnd: periodEnd,
-    })
-  } catch (err) {
-    captureError(err, { context: 'payments.cancel' })
-    log.error({ err }, 'Failed to cancel subscription')
-    sendError(res, 500, 'Failed to cancel subscription.', ERROR_CODES.INTERNAL)
-  }
-})
+        currentPeriodEnd: periodEnd,
+      })
+    } catch (err) {
+      captureError(err, { context: 'payments.cancel' })
+      log.error({ err }, 'Failed to cancel subscription')
+      sendError(res, 500, 'Failed to cancel subscription.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
 
 // ── Reactivate Subscription (undo cancel) ─────────────────────────────────
-router.post('/subscription/reactivate', paymentPortalLimiter, requireAuth, async (req, res) => {
-  try {
-    const sub = await prisma.subscription.findUnique({
-      where: { userId: req.user.userId },
-      select: { stripeSubscriptionId: true, cancelAtPeriodEnd: true },
-    })
+router.post(
+  '/subscription/reactivate',
+  paymentPortalLimiter,
+  requireAuth,
+  requireTrustedOrigin,
+  async (req, res) => {
+    try {
+      const sub = await prisma.subscription.findUnique({
+        where: { userId: req.user.userId },
+        select: { stripeSubscriptionId: true, cancelAtPeriodEnd: true },
+      })
 
-    if (!sub?.stripeSubscriptionId || !sub.cancelAtPeriodEnd) {
-      return sendError(res, 400, 'No pending cancellation to undo.', ERROR_CODES.BAD_REQUEST)
+      if (!sub?.stripeSubscriptionId || !sub.cancelAtPeriodEnd) {
+        return sendError(res, 400, 'No pending cancellation to undo.', ERROR_CODES.BAD_REQUEST)
+      }
+
+      const stripe = service.getStripe()
+      await stripe.subscriptions.update(sub.stripeSubscriptionId, {
+        cancel_at_period_end: false,
+      })
+
+      await prisma.subscription.update({
+        where: { userId: req.user.userId },
+        data: { cancelAtPeriodEnd: false },
+      })
+
+      log.info({ userId: req.user.userId }, 'Subscription reactivated')
+      res.json({ message: 'Subscription reactivated. You will continue to be billed.' })
+    } catch (err) {
+      captureError(err, { context: 'payments.reactivate' })
+      log.error({ err }, 'Failed to reactivate subscription')
+      sendError(res, 500, 'Failed to reactivate subscription.', ERROR_CODES.INTERNAL)
     }
-
-    const stripe = service.getStripe()
-    await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-      cancel_at_period_end: false,
-    })
-
-    await prisma.subscription.update({
-      where: { userId: req.user.userId },
-      data: { cancelAtPeriodEnd: false },
-    })
-
-    log.info({ userId: req.user.userId }, 'Subscription reactivated')
-    res.json({ message: 'Subscription reactivated. You will continue to be billed.' })
-  } catch (err) {
-    captureError(err, { context: 'payments.reactivate' })
-    log.error({ err }, 'Failed to reactivate subscription')
-    sendError(res, 500, 'Failed to reactivate subscription.', ERROR_CODES.INTERNAL)
-  }
-})
+  },
+)
 
 // ── Sprint E: Pro-level features (referral, gift, trial, pause, student) ──
 const sprintERoutes = require('./sprintE.routes')

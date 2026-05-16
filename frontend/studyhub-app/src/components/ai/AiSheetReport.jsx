@@ -72,10 +72,21 @@ function AiSheetReportInner({ sheetId, onClose }) {
 
   const [snapshotName, setSnapshotName] = useState('')
   const [applying, setApplying] = useState(false)
+  // v2 "Improve this sheet" — composes the analyze report into a single
+  // instruction string and pipes it through the existing
+  // propose-edit → permission-gate → apply-edit flow. No new endpoint,
+  // no new permission surface; defense-in-depth is reused as-is.
+  const [improving, setImproving] = useState(false)
 
-  // Detect ownership for the optional "Edit with AI" buttons.
+  // Detect ownership for the optional "Edit with AI" / "Improve" buttons.
   // The backend re-checks ownership before applying (CLAUDE.md A6) so
   // this is purely a UX nicety, not a security control.
+  //
+  // Founder directive 2026-05-13: admin is a moderator role, NOT a
+  // content creator role. Admins must not see the AI edit/improve
+  // affordances on other users' sheets — the backend would 403 them
+  // anyway after the canEdit override was removed in ai.sheet.routes,
+  // but hiding the button keeps the UI honest.
   useEffect(() => {
     const me = getStoredUser()
     if (!me) return
@@ -85,7 +96,7 @@ function AiSheetReportInner({ sheetId, onClose }) {
       .then((sheet) => {
         if (!sheet) return
         const ownerId = sheet?.sheet?.userId ?? sheet?.userId
-        if (me.role === 'admin' || ownerId === me.id) setCanEdit(true)
+        if (ownerId === me.id) setCanEdit(true)
       })
       .catch(() => {
         /* graceful — buttons stay hidden */
@@ -119,6 +130,116 @@ function AiSheetReportInner({ sheetId, onClose }) {
       return
     }
     setProposal(res.data)
+  }
+
+  /**
+   * v2 — "Improve this sheet" pipeline.
+   *
+   * 1. Synthesize an instruction string from the analyze report's
+   *    issues + suggestions (capped so the AI doesn't get a noisy
+   *    instruction that drowns out the source content).
+   * 2. Call propose-edit with the synthesized instruction.
+   * 3. Route the proposal through the same permission gate the manual
+   *    "Edit with AI" flow uses → user accepts → apply-edit creates a
+   *    snapshot and writes the new content. User can revert from
+   *    SheetLab History at any time.
+   *
+   * Only available to owners (the button is gated on canEdit). Non-owner
+   * forkers should fork first via the existing /api/sheets/:id/fork
+   * route — once they own the fork, this same button works on the fork.
+   * Backend `canEdit` re-checks ownership on apply-edit (CLAUDE.md A6).
+   */
+  const handleImprove = async () => {
+    if (!report || improving || !canEdit) return
+    const issueLines = (report.issues || [])
+      .slice(0, 20)
+      .map(
+        (i, idx) =>
+          `${idx + 1}. [${i.severity}|${i.layer || i.category}] ${i.title} — ${i.suggestion}`,
+      )
+      .join('\n')
+    const suggLines = (report.suggestions || [])
+      .slice(0, 10)
+      .map((s, idx) => `${idx + 1}. ${s.title} — ${s.why}`)
+      .join('\n')
+    if (!issueLines && !suggLines) {
+      showToast('Nothing concrete to improve from the current report.', 'info')
+      return
+    }
+    const composedInstruction =
+      `Apply all of the following improvements from the previous analysis pass. Preserve the author's voice and structure. Only change what each item explicitly asks for; do not invent facts.
+
+Issues to fix:
+${issueLines || '(none)'}
+
+Suggestions to apply:
+${suggLines || '(none)'}`.slice(0, 4000)
+
+    setImproving(true)
+    setError(null)
+    const proposeRes = await proposeSheetEdit(sheetContext.sheetId, composedInstruction)
+    if (!proposeRes.ok) {
+      setImproving(false)
+      setError(proposeRes.error)
+      return
+    }
+
+    const fallbackName = 'AI improvements from analysis'
+    const accepted = await requestPermission({
+      kind: 'sheet.edit',
+      title: 'Apply all AI improvements to this sheet?',
+      summary:
+        'Hub AI will replace the sheet content with a version that addresses every finding in the report. A snapshot of the current content is saved first so you can revert from History anytime.',
+      preview: (
+        <pre
+          style={{
+            margin: 0,
+            whiteSpace: 'pre-wrap',
+            wordBreak: 'break-word',
+            fontFamily: 'inherit',
+            fontSize: 11.5,
+            color: 'var(--sh-text)',
+            maxHeight: 200,
+            overflow: 'auto',
+          }}
+        >
+          {proposeRes.data.proposedContent.slice(0, 1200)}
+          {proposeRes.data.proposedContent.length > 1200 ? '\n…' : ''}
+        </pre>
+      ),
+      applyLabel: 'Apply improvements',
+      rejectLabel: 'Discard',
+      details: {
+        snapshotName: fallbackName,
+        issuesAddressed: report.issues?.length || 0,
+        suggestionsApplied: report.suggestions?.length || 0,
+        newLength: proposeRes.data.diffSummary?.newLength ?? proposeRes.data.proposedContent.length,
+        delta: proposeRes.data.diffSummary?.delta ?? 0,
+      },
+    })
+    if (!accepted) {
+      setImproving(false)
+      showToast('AI improvements discarded. No changes were made.', 'info')
+      return
+    }
+
+    const applyRes = await applySheetEdit(sheetContext.sheetId, {
+      proposedContent: proposeRes.data.proposedContent,
+      snapshotName: fallbackName,
+    })
+    setImproving(false)
+    if (!applyRes.ok) {
+      setError(applyRes.error)
+      return
+    }
+    const msg = applyRes.data?.quarantined
+      ? 'Improvements submitted for review (Tier-3 content). Snapshot saved.'
+      : 'Improvements applied. Snapshot saved in History.'
+    showToast(msg, applyRes.data?.quarantined ? 'warning' : 'success')
+    setReport(null)
+    window.dispatchEvent(
+      new CustomEvent('sh:sheet-updated', { detail: { sheetId: sheetContext.sheetId } }),
+    )
   }
 
   const handleApply = async () => {
@@ -249,6 +370,20 @@ function AiSheetReportInner({ sheetId, onClose }) {
         >
           {loading ? 'Analyzing…' : report ? 'Re-analyze' : 'Analyze sheet'}
         </button>
+        {/* v2 — one-click "apply everything from the report" pipeline.
+            Surfaces only after analyze has run AND the report has at
+            least one issue or suggestion, AND the viewer can edit the
+            sheet. Backend re-checks ownership on apply-edit. */}
+        {canEdit && report && (report.issues?.length || report.suggestions?.length) ? (
+          <button
+            type="button"
+            onClick={handleImprove}
+            disabled={improving}
+            style={secondaryActionStyle()}
+          >
+            {improving ? 'Improving…' : 'Improve this sheet'}
+          </button>
+        ) : null}
         {canEdit ? (
           <button
             type="button"

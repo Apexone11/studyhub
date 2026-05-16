@@ -285,11 +285,15 @@ export function ScholarShortcutsHint({ onOpen }) {
 
   return createPortal(
     <div
-      // Position fixed bottom-right but raised above the safe-area
-      // inset so it isn't clipped on iOS PWAs.
+      // Anchored to the BOTTOM-LEFT corner — the AI bubble owns the
+      // bottom-right, and stacking these on top of each other made the
+      // chrome feel cluttered (founder feedback 2026-05-13). Hidden
+      // entirely on phones (<640px) where vertical space is precious
+      // and keyboard shortcuts are touch-irrelevant anyway.
+      className="scholar-shortcuts-hint"
       style={{
         position: 'fixed',
-        right: 'max(16px, env(safe-area-inset-right))',
+        left: 'max(16px, env(safe-area-inset-left))',
         bottom: 'calc(16px + env(safe-area-inset-bottom))',
         zIndex: 900,
         display: 'inline-flex',

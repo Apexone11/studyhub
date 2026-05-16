@@ -65,8 +65,15 @@ const mocks = vi.hoisted(() => {
       captureError: vi.fn(),
     },
     accessControl: {
-      assertOwnerOrAdmin: vi.fn(({ user, ownerId }) => {
-        return user.role === 'admin' || Number(ownerId) === Number(user.userId)
+      assertOwnerOrAdmin: vi.fn(({ res, user, ownerId, message }) => {
+        if (user.role === 'admin' || Number(ownerId) === Number(user.userId)) return true
+        if (res) res.status(403).json({ error: message || 'Forbidden' })
+        return false
+      }),
+      assertOwner: vi.fn(({ res, user, ownerId, message }) => {
+        if (Number(ownerId) === Number(user?.userId)) return true
+        if (res) res.status(403).json({ error: message || 'Forbidden' })
+        return false
       }),
     },
     moderationEngine: {

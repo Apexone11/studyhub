@@ -828,9 +828,12 @@ export function EditorPanel({
       {isHtmlMode ? (
         <iframe
           title="html-inline-preview"
-          /* Strict sandbox for untrusted HTML — matches the Phase 3 plan. No
-             same-origin, no scripts, no forms. Preview still renders HTML/CSS. */
-          sandbox=""
+          /* Mirror the published runtime so the upload preview reflects
+             what users will actually see after publish (interactive
+             practice tests, quizzes, etc.). `allow-scripts` lives inside
+             the sandbox iframe; `allow-same-origin` is intentionally
+             omitted per CLAUDE.md A14 to prevent sandbox escape. */
+          sandbox="allow-scripts allow-popups allow-forms"
           srcDoc={content}
           style={{
             width: '100%',

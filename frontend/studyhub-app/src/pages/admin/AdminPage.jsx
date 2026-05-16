@@ -156,6 +156,11 @@ export default function AdminPage() {
 
   return (
     <>
+      {/* WCAG 1.3.1 — sr-only h1 anchors the page for screen readers.
+          AdminPage's visual chrome doesn't land an h1 naturally because
+          the page is a tab shell; this lives at the top of the document
+          flow so AT users hear "Admin" on entry. Wave-11 audit L4-5. */}
+      <h1 className="sr-only">Admin</h1>
       <div
         className="sh-app-page"
         style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}

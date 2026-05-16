@@ -359,6 +359,9 @@ export default function SettingsPage() {
       className="sh-app-page"
       style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: FONT }}
     >
+      {/* sr-only h1 for WCAG 1.3.1. The settings UI is a tab shell so
+          no visible h1 ever renders. Wave-11 audit L4-5. */}
+      <h1 className="sr-only">Settings</h1>
       <Navbar crumbs={[{ label: 'Settings', to: '/settings' }]} hideTabs />
 
       <div

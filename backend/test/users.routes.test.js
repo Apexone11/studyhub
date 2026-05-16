@@ -88,6 +88,15 @@ const mocks = vi.hoisted(() => {
   }
 })
 
+// originAllowlist factory mock — see ai.routes.test.js for context.
+function fakeOriginAllowlistFactory() {
+  return function fakeOriginAllowlist(_req, _res, next) {
+    next()
+  }
+}
+fakeOriginAllowlistFactory.normalizeOrigin = (v) => v
+fakeOriginAllowlistFactory.buildTrustedOrigins = () => new Set()
+
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/middleware/auth'), mocks.auth],
@@ -101,6 +110,7 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/badges'), mocks.badges],
   [require.resolve('../src/lib/streaks'), mocks.streaks],
   [require.resolve('../src/lib/rateLimiters'), mocks.rateLimiters],
+  [require.resolve('../src/middleware/originAllowlist'), fakeOriginAllowlistFactory],
 ])
 
 const originalModuleLoad = Module._load

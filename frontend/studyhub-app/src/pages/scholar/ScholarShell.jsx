@@ -103,28 +103,34 @@ function ChevronRight() {
 
 const FONT_STACK = '"Plus Jakarta Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif'
 
+// Tab styling aligned with the global Sheets-page tab pattern in
+// navbar/navbarConstants.js: bold active underline matching the brand
+// accent, restful text weight, hover state that previews the active
+// underline rather than a background swap.
 const TAB_LINK_STYLE = {
   display: 'inline-flex',
   alignItems: 'center',
   justifyContent: 'center',
-  height: 44,
-  minWidth: 44,
-  padding: '0 14px',
+  height: 48,
+  minWidth: 48,
+  padding: '0 18px',
   fontFamily: FONT_STACK,
   fontWeight: 600,
   fontSize: 14,
+  letterSpacing: '-0.005em',
   color: 'var(--sh-text-muted, var(--sh-slate-600))',
   textDecoration: 'none',
   borderBottom: '2px solid transparent',
   borderRadius: 0,
   background: 'transparent',
   whiteSpace: 'nowrap',
-  transition: 'color 160ms ease, border-color 160ms ease',
+  transition: 'color 160ms ease, border-color 160ms ease, background 160ms ease',
 }
 
 const TAB_LINK_ACTIVE_STYLE = {
   color: 'var(--sh-text, var(--sh-slate-900))',
   borderBottomColor: 'var(--sh-accent)',
+  fontWeight: 700,
 }
 
 function TopicsDropdown() {
@@ -460,6 +466,49 @@ function Breadcrumb({ items }) {
   )
 }
 
+function ScholarPageMark() {
+  // Inline section header that anchors the strip to Scholar so the
+  // sub-nav reads as "Scholar > Hub|Search|Saved" instead of a
+  // floating row of links. Hidden on phones where horizontal real
+  // estate matters more than wayfinding (the global Navbar crumb
+  // already says "Scholar" in that context).
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        gap: 8,
+        height: 48,
+        paddingRight: 14,
+        marginRight: 4,
+        borderRight: '1px solid var(--sh-border)',
+        fontFamily: FONT_STACK,
+        fontWeight: 800,
+        fontSize: 14,
+        letterSpacing: '-0.01em',
+        color: 'var(--sh-text, var(--sh-slate-900))',
+      }}
+    >
+      <svg
+        width="18"
+        height="18"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        focusable="false"
+      >
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20" />
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z" />
+      </svg>
+      Scholar
+    </span>
+  )
+}
+
 function ScholarSubNav({ isCompact, showBreadcrumb, breadcrumb }) {
   // Force re-renders of NavLink on every route change so the active
   // underline syncs even if a child page does a programmatic navigate.
@@ -476,14 +525,17 @@ function ScholarSubNav({ isCompact, showBreadcrumb, breadcrumb }) {
         background: 'var(--sh-surface)',
         borderBottom: '1px solid var(--sh-border)',
         backdropFilter: 'saturate(140%) blur(6px)',
+        // Subtle elevation when scrolled — mirrors the navbar pattern
+        // and gives the strip "weight" so it reads as primary chrome.
+        boxShadow: '0 1px 0 var(--sh-border), 0 4px 14px -10px rgba(15, 23, 42, 0.08)',
       }}
     >
       <div
         style={{
           width: '100%',
-          maxWidth: 1200,
+          maxWidth: 1320,
           margin: '0 auto',
-          padding: '0 clamp(16px, 2.5vw, 24px)',
+          padding: '0 clamp(16px, 2vw, 20px)',
         }}
       >
         <div
@@ -491,12 +543,13 @@ function ScholarSubNav({ isCompact, showBreadcrumb, breadcrumb }) {
             display: 'flex',
             alignItems: 'center',
             gap: 4,
-            minHeight: 52,
+            minHeight: 56,
             overflowX: 'auto',
             scrollbarWidth: 'none',
             fontFamily: FONT_STACK,
           }}
         >
+          {!isCompact ? <ScholarPageMark /> : null}
           <nav
             aria-label="Scholar sections"
             style={{ display: 'flex', alignItems: 'center', gap: 4, flex: '0 1 auto' }}
@@ -576,9 +629,9 @@ export default function ScholarShell({ children, mainId = 'scholar-main', mainSt
               <div
                 style={{
                   width: '100%',
-                  maxWidth: 1200,
+                  maxWidth: 1320,
                   margin: '0 auto',
-                  padding: '24px clamp(16px, 2.5vw, 24px)',
+                  padding: '24px clamp(16px, 2vw, 20px)',
                   fontFamily: FONT_STACK,
                 }}
               >

@@ -58,6 +58,11 @@ const mocks = vi.hoisted(() => {
         res.status(403).json({ error: message || 'Forbidden.' })
         return false
       }),
+      assertOwner: vi.fn(({ res, user, ownerId, message }) => {
+        if (Number(ownerId) === Number(user?.userId)) return true
+        res.status(403).json({ error: message || 'Forbidden.' })
+        return false
+      }),
     },
     moderation: {
       isModerationEnabled: vi.fn(() => false),

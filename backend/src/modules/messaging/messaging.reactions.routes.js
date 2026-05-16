@@ -20,6 +20,22 @@ const { verifyMessageParticipant } = require('./messaging.helpers')
 
 const router = express.Router({ mergeParams: true })
 
+// Hard cap aligned with `MessageReaction.emoji` VarChar(16) column in
+// schema.prisma. The previous 32-char gate let Postgres silently truncate
+// to 16 bytes, which (a) lost the trailing characters of any long emoji
+// sequence and (b) broke the upsert unique key because the truncated
+// value collided with shorter pre-existing entries. Research-loop-4 F11.
+const MAX_EMOJI_LENGTH = 16
+
+// Reject ASCII control characters (0x00–0x1F, 0x7F). Emoji codepoints
+// start at 0x1F300+, so this guard never rejects real emoji input — it
+// only filters invisible artefacts that render as nothing in the strip
+// and confuse screen readers. Written with `\xNN` escape sequences (not
+// literal control bytes) so the source file stays plain-text for diff /
+// blame / search tooling.
+// eslint-disable-next-line no-control-regex
+const REACTION_CONTROL_CHAR_RE = /[\x00-\x1F\x7F]/
+
 /**
  * POST /messages/:messageId/reactions
  * Add a reaction
@@ -36,9 +52,12 @@ router.post('/:messageId/reactions', requireAuth, messagingWriteLimiter, async (
       return sendError(res, 400, 'Reaction required.', ERROR_CODES.BAD_REQUEST)
     }
 
-    // Limit reaction length to prevent abuse
-    if (emoji.trim().length > 32) {
+    const trimmedEmoji = emoji.trim()
+    if (trimmedEmoji.length > MAX_EMOJI_LENGTH) {
       return sendError(res, 400, 'Reaction too long.', ERROR_CODES.BAD_REQUEST)
+    }
+    if (REACTION_CONTROL_CHAR_RE.test(trimmedEmoji)) {
+      return sendError(res, 400, 'Reaction contains invalid characters.', ERROR_CODES.BAD_REQUEST)
     }
 
     // Verify the user is a participant in the conversation
@@ -51,14 +70,14 @@ router.post('/:messageId/reactions', requireAuth, messagingWriteLimiter, async (
         messageId_userId_emoji: {
           messageId,
           userId: req.user.userId,
-          emoji: emoji.trim(),
+          emoji: trimmedEmoji,
         },
       },
       update: { createdAt: new Date() },
       create: {
         messageId,
         userId: req.user.userId,
-        emoji: emoji.trim(),
+        emoji: trimmedEmoji,
       },
       include: {
         user: {
@@ -362,3 +381,4 @@ router.post('/:messageId/poll/close', requireAuth, messagingWriteLimiter, async 
 })
 
 module.exports = router
+module.exports.__internal = { MAX_EMOJI_LENGTH, REACTION_CONTROL_CHAR_RE }

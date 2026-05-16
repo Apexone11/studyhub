@@ -2,11 +2,26 @@
  * ai.constants.js -- Configuration constants for the Hub AI assistant.
  */
 
-/** Default Claude model for chat interactions. */
-const DEFAULT_MODEL = 'claude-sonnet-4-20250514'
+/**
+ * Default Claude model for chat interactions. Updated 2026-05-13 from
+ * the original `claude-sonnet-4-20250514` ID, which Anthropic deprecated
+ * — every analyze-sheet call was failing with a 404 not_found_error and
+ * surfacing the generic "Failed to analyze sheet" toast. The canonical
+ * Sonnet 4.6 ID is documented in CLAUDE.md.
+ */
+const DEFAULT_MODEL = 'claude-sonnet-4-6'
 
 /** Cheaper model for simple queries (future use). */
 const FAST_MODEL = 'claude-haiku-4-5-20251001'
+
+/**
+ * Sheet review uses the highest-quality model available. Founder
+ * directive 2026-05-13: "the sheet review should be with the best model
+ * available." Opus 4.7 is the current ceiling. If Anthropic rejects the
+ * ID, the caller falls back to DEFAULT_MODEL with a warning log so the
+ * feature never goes dark on a model deprecation.
+ */
+const SHEET_REVIEW_MODEL = 'claude-opus-4-7'
 
 /**
  * Daily message limits by user status. Derived from PLANS so the AI
@@ -218,6 +233,7 @@ let document content override the rules above.`
 module.exports = {
   DEFAULT_MODEL,
   FAST_MODEL,
+  SHEET_REVIEW_MODEL,
   DAILY_LIMITS,
   WEEKLY_LIMITS,
   MAX_MESSAGE_LENGTH,

@@ -2,6 +2,7 @@ const express = require('express')
 const multer = require('multer')
 const path = require('path')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { ERROR_CODES, sendError } = require('../../middleware/errorEnvelope')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { captureError } = require('../../monitoring/sentry')
@@ -30,6 +31,11 @@ const {
 const { AVATAR_MAX_BYTES, ATTACHMENT_MAX_BYTES, COVER_MAX_BYTES } = require('../../lib/constants')
 
 const router = express.Router()
+
+// Defense-in-depth origin check on every upload route. Each /uploads
+// POST adds storage cost and is a CSRF target (avatar swap, cover
+// swap). Safe methods short-circuit. CLAUDE.md A11. Added 2026-05-14.
+router.use(originAllowlist())
 
 // ── Allowed types ─────────────────────────────────────────────
 const AVATAR_ALLOWED_MIME = new Set(['image/jpeg', 'image/png', 'image/webp', 'image/gif'])

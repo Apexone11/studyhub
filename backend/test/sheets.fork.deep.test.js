@@ -380,4 +380,39 @@ describe('POST /api/sheets/:id/fork', () => {
     await request(app).post('/api/sheets/10/fork').send({ title: 'My Custom Fork' })
     expect(createCallArgs.data.title).toBe('My Custom Fork')
   })
+
+  // ── Founder directive 2026-05-13 ───────────────────────────────────
+  // Admins are moderators, not creators. Forking would mix the two
+  // and pollute attribution / audit trails. The frontend already hides
+  // the Fork button for admins; the backend enforces the same boundary
+  // so a curl request can't bypass it.
+  it('403 ADMIN_CANNOT_FORK when an admin tries to fork', async () => {
+    mocks.state.user = { userId: 5, username: 'studyhub_owner', role: 'admin' }
+    mocks.prisma.studySheet.findUnique.mockResolvedValueOnce(origSheet())
+    const res = await request(app).post('/api/sheets/10/fork').send({})
+    expect(res.status).toBe(403)
+    expect(res.body.code).toBe('ADMIN_CANNOT_FORK')
+    expect(mocks.prisma.studySheet.findFirst).not.toHaveBeenCalled()
+    expect(mocks.prisma.$transaction).not.toHaveBeenCalled()
+  })
+
+  // Re-forking your own fork is meaningless because SheetLab edit is
+  // available directly. We surface a distinct error code so the
+  // frontend can route the user back to the editor instead of showing
+  // a generic "you cannot fork your own sheet" toast.
+  it('400 ALREADY_OWNS_FORK when forking a fork you already own', async () => {
+    mocks.prisma.studySheet.findUnique.mockResolvedValueOnce(
+      origSheet({ userId: 2, forkOf: 7 }), // self-owned fork
+    )
+    const res = await request(app).post('/api/sheets/10/fork').send({})
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('ALREADY_OWNS_FORK')
+  })
+
+  it('400 SELF_FORK code on a non-fork original you own', async () => {
+    mocks.prisma.studySheet.findUnique.mockResolvedValueOnce(origSheet({ userId: 2, forkOf: null }))
+    const res = await request(app).post('/api/sheets/10/fork').send({})
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('SELF_FORK')
+  })
 })

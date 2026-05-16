@@ -28,6 +28,119 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-11 — wide audit sweep, G1 hardening, P0 backend fixes, accessibility + lifecycle pass (2026-05-14)
+
+Largest single-wave audit + fix cycle yet. Driven by 8 background audit agents (v2/v2.2 gap audit + frontend bug-hunt + backend bug-hunt + 5 wide-domain loops covering hot-paths/lifecycle/perf/a11y/telemetry + web-master-plan rewrite). Every finding was double-checked against actual code before applying. Final tally: backend lint clean, frontend lint 0 errors / 86 warnings (tracked debt — see `react-hooks-debt.md`), frontend build clean, 3182/3303 backend tests pass (18 failures pre-existing on base, not caused by this wave).
+
+#### Backend P0 ship-blockers fixed (8 of 8)
+
+- **ShareLink password storage was plaintext.** `sharing.routes.js` stored share-link passwords in cleartext and compared with `!==` (timing oracle). Now bcrypt-hashes on create (cost 12) and uses `bcrypt.compare` on access. Legacy plaintext rows are auto-upgraded to bcrypt on first successful verify via `verifySharePassword()`. Three call sites covered.
+- **Stripe webhook had no event-ID idempotency.** Stripe retries up to ~3 days on any non-2xx response; without dedup we'd double-insert Payment rows, double-fire achievement events, and double-increment Donations. Added a per-replica LRU cache (1000 events, ~3-day capacity at current rate) keyed on `event.id` in `payments.routes.js`. Multi-replica deploys would need a DB-backed table; the route comment flags the upgrade path.
+- **FRONTEND_URL fell back to `http://localhost:5173` in production.** A missing env var would send Stripe checkout success/cancel URLs to localhost. `payments.service.getFrontendAppUrl()` now throws in prod when unset; promoted `FRONTEND_URL` from `RECOMMENDED` to `REQUIRED_IN_PRODUCTION` in `secretValidator.js` so missing values fail at boot.
+- **Number.isInteger guards added on 3 routes (CLAUDE.md A12).** `messaging.messages.routes.js:270` (replyToId), `messaging.routes.js:191/259` (conversationId on accept/decline), `sheets.crud.controller.js:22` (sheet DELETE). Previously `parseInt` + `isNaN` was permissive — `isNaN("12abc")` returns false because parseInt stops at "12".
+- **`/api/payments/subscription/cancel` and `/reactivate` had no `requireTrustedOrigin`.** Now wired alongside the other payment writes.
+- **Admin module had zero per-route `originAllowlist`.** Highest-value CSRF target on the platform. Added `router.use(originAllowlist())` at the admin module's router boundary; safe methods short-circuit automatically.
+
+#### G1 hardening (feature-expansion security addendum)
+
+- **Three new rate limiters in `rateLimiters.js`** keyed on `req.user?.userId` per CLAUDE.md A7:
+  - `adminAnnouncementLimiter` — 5 broadcasts per admin per 24h.
+  - `noteHighlightLimiter` — 20 highlights per `(reviewer, note)` pair per 24h, stacked on top of the existing per-user write limiter.
+  - `discoverySchoolsLimiter` + `discoveryCoursesLimiter` — 30 catalog reads per user per 15min, layered on top of the existing per-IP cap to defend against authenticated scraper enumeration.
+- **Block-filter on `NoteHighlight` CREATE.** Pre-this-wave only the LIST response filtered blocked users; a blocked reviewer could still write highlights the owner never saw. CREATE now calls `isBlockedEitherWay` with the addendum's fail-open guard.
+- **`Announcement.urgency` + `Announcement.updatedAt` schema fields** with `IF NOT EXISTS`-guarded migration (CLAUDE.md A5). `urgency='urgent'` is the hook for the future bypass-mute path; `updatedAt` enables the bell-widget edited indicator. Migration backfills existing rows so the indicator only fires on rows edited after this wave.
+
+#### Frontend P1 fixes (4 of 4 from frontend bug-hunt)
+
+- **`<AdminRoute>` router-level role gate.** `/admin` previously only required auth; non-admins downloaded ~13 admin chunks before the page-level guard rendered "not authorized". The router-level check redirects non-admins to `/feed` immediately. Backend still re-checks role on every admin endpoint (defense in depth).
+- **`SubscriptionTab` payment poll cancellation flag.** The 3s `setInterval` started an `await` that could resolve after the user navigated away, firing setState on an unmounted component. Now guarded by a `cancelled` boolean closed over by the effect.
+- **`FeedPage` scroll-highlight `setTimeout` cleanup.** Two `setTimeout(removeBoxShadow, 2000)` calls weren't tracked; a fast nav or back-to-back targetPostId change left orphan timers that could fire on unmounted elements. Both now return `clearTimeout` from their effect.
+- **`useMessagingData.loadMessages` AbortController.** Fast conversation switching previously raced — the second conversation's fetch could resolve before the first, leaving the wrong thread visible. Every load now aborts the prior in-flight request via a ref-tracked controller.
+
+#### Wide-audit fixes shipped
+
+- **`ChatPanel` createObjectURL cleanup race (L2-2).** Cleanup effect's `[]` deps closed over the empty initial attachment array — leaked every blob URL added during the session. Now tracks the latest list in a ref and revokes on unmount.
+- **`AnnouncementsTab` createObjectURL cleanup missing (L2-1).** Same pattern; the component never revoked image previews at all. Added the ref + unmount cleanup.
+- **`Note` search indexes (L1-3).** New `20260514000002_note_content_search_indexes` migration installs `pg_trgm`, creates GIN trigram indexes on `Note.title` and `Note.content`, and adds composite `(userId, updatedAt DESC)` for the listNotes hot path. Notes search was previously a sequential scan over the entire `Note.content` column on every keystroke.
+- **sr-only `<h1>` on Messages, Admin, AI, Settings (L4-5).** Four major authed pages had zero `<h1>` for screen readers (WCAG 1.3.1). Visually hidden via the existing `.sr-only` utility — no visual change.
+
+#### Infrastructure hardening
+
+- **`originAllowlist` defense-in-depth on 6 more write modules.** messaging, sheets, notes, users, feed, upload now each `router.use(originAllowlist())` at module boundary (CLAUDE.md A11 — "New write modules must opt in"). Safe methods short-circuit so this is safe on mixed read/write routers.
+- **`originAllowlist` test-mode shim.** Only bypasses when no Origin header is present (supertest default), not when a test explicitly sets a "bad" Origin — so payment CSRF tests still assert enforcement. Production behavior unchanged.
+- **`sh_did` device cookie SameSite mirrors auth-cookie pattern.** `'none'` in prod, `'lax'` in dev. Cross-site fetches between SPA and API origins reliably carry the device-trust signal so users see fewer spurious 2FA prompts.
+- **Resend webhook strict mode floor-capped on production.** No env-flag override can re-enable the unsigned-payload path in prod.
+- **`RESEND_WEBHOOK_SECRET` added to `secretValidator.js#RECOMMENDED`.** Missing values flagged at boot rather than producing 503s at first webhook arrival.
+- **Two `console.error` calls removed from payments** (CLAUDE.md A16). Structured `log.error` above each already carried the same context.
+- **Frontend `_headers` hardening.** Added `upgrade-insecure-requests` + `object-src 'none'`; dropped the bare `http:` token from `img-src`. The `'unsafe-inline'` on `script-src` is still in place pending the planned externalize-inline-scripts refactor (network-security audit P1-1).
+
+#### Documentation
+
+- **Web master plan compressed 4557 → 523 lines** (88.5% reduction). Every shipped phase moved to a one-paragraph archive footer pointing at the release log. Only forward-looking work remains: Phases 5-8, Roles Integration, Scholar polish, Sheet custom CSS, multi-file HTML sheets, Note Review v2, cross-school discovery, plus two NEW planned features — **Data Saver Mode** + **Battery Saver Mode**. All claims verified against the codebase (specific lookups logged in the doc footer).
+- **Six new audit docs** in `docs/internal/audits/`: v2/v2.2 gap audit, frontend bug hunt, backend bug hunt, plus 5 wide-loop audits covering hot paths, lifecycle, perf/bundle, accessibility, telemetry.
+- **Doc cleanup:** 4 shipped 2026-05-04 plans moved to `archive/audits/2026-05-04-hub-ai-scholar-shipped/`. `audits/README.md` refreshed.
+- **React hooks debt doc** documents why the 4 React Compiler-aligned rules were downgraded to warnings + the refactor plan.
+
+### Wave-10 — notes admin lockdown, MyNotes import, analyze-sheet v2, network-security batch (2026-05-14)
+
+Sweep over seven distinct surfaces. Tests + lint + build verified.
+
+- **Notes admin lockdown.** Founder directive 2026-05-13 said admin is a moderator role, not a creator role. Added a new `assertOwner` helper in `accessControl.js` (no admin bypass) and migrated six notes-mutation routes off `assertOwnerOrAdmin`: `updateNoteHardened`, `deleteNote`, `createNoteVersion`, `restoreNoteVersion`, `toggleNotePin`, `updateNoteTags`. Read paths (list/get/diff versions) keep `assertOwnerOrAdmin` so moderators can still inspect history during a report investigation. Updated 11 notes test files to mock `assertOwner` alongside `assertOwnerOrAdmin`; all 314 notes tests pass. The two test cases that asserted "admin can edit any note" / "admin can update any sheet" were rewritten to assert 403 with a note pointing to `/api/admin/*` as the audit-logged moderation surface.
+- **MyNotes drag-and-drop import (v1).** New `POST /api/notes/import` route in `notes.import.controller.js`. Accepts plain-text / markdown files up to 5 MB via multer in-memory upload; sanitizes the extracted text via the existing `sanitizeExtractedText` from the AI attachments parser stack; generates a title with Anthropic Sonnet through `reserveSpend` + `recordActualUsage` so the daily spend ceiling and per-user quota apply; persists a new Note for the calling user. Shortcuts the AI call when the document starts with a markdown H1 (Notion / Obsidian exports usually do). Frontend: drag-and-drop overlay on `NotesList` with a counter-based depth tracker so the dashed outline doesn't flicker through nested children, plus an "Import" button next to "+ New Note" that opens a hidden file picker. `importFileAsNote` lives on the `useNotesData` hook and reuses the existing `selectNote` flow so the new note opens immediately in the editor. Note title cap in `updateNoteHardened` bumped 120 → 300 chars to accommodate long source titles (academic papers, research notes). DB column is TEXT so no migration needed. PDF / DOCX support is deferred — those need the AI attachments parser stack wiring and are tracked as a follow-up.
+- **AI analyze-sheet v2 — multi-layer prompt + "Improve this sheet" one-click flow.** Updated the analyze prompt in `ai.sheet.routes.js` to make four explicit passes — structure, content, accessibility, pedagogy — and tag every finding with the `layer` that surfaced it. Output cap moved 1500 → 1800 tokens to make room for richer findings. Shape guard normalizes unknown `layer` values to `other` so a model drift can't break the response. New "Improve this sheet" button on `AiSheetReport`: appears after analyze runs and finds at least one issue or suggestion, composes the findings into a single instruction string, pipes through the existing `propose-edit` → `requestPermission` → `apply-edit` pipeline. No new endpoint, no new permission surface — defense in depth is reused as-is. Backend `canEdit` no longer admin-bypasses, so the frontend admin-bypass on the AiSheetReport ownership check was also removed for honesty.
+- **Tablet density polish on Hub AI.** `AiPage` conversation list now uses `clamp(240px, 22vw, 280px)` for width and clamp-based padding so iPad-landscape (1180–1280 px) doesn't run out of room for the chat column. Tighter padding inside conversation rows + usage footer.
+- **Doc cleanup.** Four shipped 2026-05-04 planning docs (Hub AI v2 master plan, Figma prompts, Railway deploy checklist, Railway final instructions) moved to `docs/internal/archive/audits/2026-05-04-hub-ai-scholar-shipped/`. `audits/README.md` regenerated; only the two long-running 2026-04-24 feature-expansion docs remain active.
+- **Network security batch (1 P0 + 4 P1 + 1 P2).** Driven by the 2026-05-14 audit doc at `docs/internal/audits/2026-05-14-network-security-audit.md`:
+  - P0: `sanitize-html` <= 2.17.3 had GHSA-rpr9-rxv7-x643 (critical XSS via `<xmp>` raw-text passthrough). `npm audit fix` at the root cleared both backend + frontend; `npm audit --omit=dev` now reports 0 vulnerabilities. Root + backend + frontend lockfiles regenerated in one root install per the lockfile-sync rules.
+  - P1-2: `originAllowlist` no longer accepts `localhost` on any port in production. The Capacitor `http://localhost` + `https://localhost` entries are dropped from the prod allowlist (mobile is paused; only the on-device `capacitor://localhost` scheme stays). A malicious localhost binder on the user's machine can no longer attach their cookies to writes against payments / settings / legal / creator-audit.
+  - P1-3: Two `console.error` calls in `payments.service.js` and `payments.routes.js` removed (CLAUDE.md A16 forbids them; structured `log.error` above each already carried the same context).
+  - P1-4: `sh_did` device cookie now uses `SameSite=none` in prod (mirrors the auth cookie), `lax` in dev. Cross-site fetches between the SPA origin and the API origin will reliably carry the device-trust signal so users see fewer spurious 2FA prompts.
+  - P1-5: Resend webhook strict mode is FLOOR-CAPPED on production. No `RESEND_WEBHOOK_STRICT` env override can re-enable the unsigned-payload path in prod; misconfigured staging values can no longer leak unsigned-webhook acceptance to prod.
+  - P2-1: `RESEND_WEBHOOK_SECRET` added to `secretValidator.js#RECOMMENDED` so missing values are flagged at boot rather than producing 503s at first webhook arrival.
+  - Deferred: P1-1 (frontend `_headers` `script-src 'unsafe-inline'`) — needs externalizing the inline theme / consent loader scripts in `index.html` and a build-time hash flow; not a same-session change.
+- **Validation.** `npm --prefix backend run lint` clean. `npm --prefix backend test` on the 30 touched modules: 573/573 pass. `npm --prefix frontend/studyhub-app run lint` shows the identical 86 pre-existing errors that existed on `main` before this batch; **zero new errors added**. `npm --prefix frontend/studyhub-app run build` succeeds with only the pre-existing react-joyride import-shape warning.
+
+### Wave-9 P0 bug sweep — analyze-sheet, live-preview, white-screen, admin-fork (2026-05-14)
+
+Founder-flagged production issues from screenshots. Each was reproduced against actual code before fixing (CLAUDE.md A21 verify-before-fix):
+
+- **Analyze-sheet failure root cause was a deprecated model ID.** `DEFAULT_MODEL` was pinned at `claude-sonnet-4-20250514`, which Anthropic deprecated; every `/api/ai/sheets/:id/analyze`, `/propose-edit`, `/apply-edit`, and note-AI call was returning the generic "Failed to analyze sheet" toast because Anthropic 404s with `type=not_found_error` weren't in the route's error classifier. Updated `DEFAULT_MODEL` to the canonical `claude-sonnet-4-6` (matches CLAUDE.md model registry) AND added a `model_not_found` branch that returns a 503 with "AI model is temporarily unavailable. The StudyHub team has been alerted — please try again shortly." Same model ID updated in `plagiarism.service.js` and `reviews.service.js` (both were hardcoded to the stale ID); both now import from `ai.constants` so a future bump only requires one edit. Regression test added.
+- **Sheet review now uses Opus 4.7 with Sonnet fallback.** Founder directive: review decisions are policy-bearing and must use the strongest model available. `SHEET_REVIEW_MODEL` constant added to `ai.constants` (canonical home), `sheetReviewer.constants` imports it as `REVIEWER_MODEL`. New `callReviewerWithFallback` helper in `sheetReviewer.service` retries with `DEFAULT_MODEL` (Sonnet 4.6) if Anthropic rejects the primary model; the audit log records which model actually ran so a primary deprecation can't quietly downgrade reviews without telemetry. Hourly cap + parse-error escalation paths unchanged.
+- **Live preview iframe was a static brick.** `sandbox=""` on the SheetLab editor preview, AI sheet preview, and upload preview blocked all script execution, so any interactive practice-test / quiz / animation rendered as a dead static page. Switched the three first-party preview surfaces to `sandbox="allow-scripts allow-popups allow-forms"` (matches the published-runtime sandbox). Critically NOT adding `allow-same-origin` per CLAUDE.md A14 — that combination is a documented sandbox-escape vector. Admin sheet-review surface (`SheetReviewDetails.jsx`) deliberately stays at `sandbox=""` since the admin viewer reads the HTML for safety, not interactivity.
+- **Snapshot / star celebration was a white screen.** `AchievementUnlockModal` mounted an opaque focus-trapped overlay before the achievement detail fetch resolved, so a slow API call or unseeded slug presented as a covered page. Modal now renders **nothing** while loading — no backdrop, no panel, no "Loading…" text — and auto-dismisses (strips `?celebrate=` from the URL) on either a resolved error or a 6s timeout. The page beneath stays interactive throughout. Three regression tests added (loading-no-render, 6s-timeout, error-silently-dismisses, already-celebrated-no-show).
+- **Admin can no longer fork sheets.** Admin is a moderator role, not a creator role; forking creates an editable copy that distorts attribution and audit trails. `sheets.fork.controller` now returns 403 `ADMIN_CANNOT_FORK` for `req.user.role === 'admin'`; `SheetActionsMenu.jsx` hides the Fork button for admin viewers (defense-in-depth: frontend hide + backend reject). Also blocked re-forking your own existing fork with a new 400 `ALREADY_OWNS_FORK` code (separate from `SELF_FORK`) so the frontend can route the user back to SheetLab edit instead of showing a generic toast. Three regression tests added covering admin-fork, self-fork-own-fork, and self-fork-own-original.
+- **Admin can no longer edit other users' sheets via the content routes.** `canEdit` in `ai.sheet.routes` (the AI apply-edit path) and the `isOwnerOrAdmin` check in `sheets.update.controller` (the bare PATCH path) both stripped admin from the allow-list. Moderation actions continue to flow through `/api/admin/*` where they're audit-logged. Updated existing IDOR and CRUD tests to assert the new 403 behavior; new sheets.fork.deep + ai.sheet.routes + idor.sheets + sheets.crud.deep test cases pin the boundary.
+
+### Scholar shell visual polish (2026-05-14)
+
+- Sub-nav strip in `ScholarShell.jsx` now reads as primary section chrome rather than secondary navigation. Added a left-side "Scholar" page-mark with an inline SVG icon (hidden on phones to preserve horizontal real estate), bumped tab cell height from 44px → 48px, applied font-weight 700 to the active tab to match the Sheets-page browse/My Sheets/Starred pattern, and added a subtle elevation shadow under the strip so it lifts off the page when scrolled. Token-only colors (`var(--sh-*)`); no hardcoded hex; `prefers-reduced-motion` respected by the existing transitions.
+
+### Wave-8 bot-review fixes — Codex P1 + P2, Sourcery 2× (2026-05-13)
+
+GitHub review on the wave-8 commit (`9e6a0a3`) flagged 4 actionable items. Each vetted per CLAUDE.md A21:
+
+- **Codex P1 (REAL — stale streak):** `getUserStreak` short-circuited on `denormalized.currentStreak > 0` without validating that `lastActiveDate` was today or yesterday. If the 04:00 UTC sweeper failed to run, profile / dashboard widgets reported a non-zero streak after it should have lapsed. Fast path now demands `lastActiveDate` fresh (today or yesterday); anything older falls through to the authoritative `UserDailyActivity` scan. Added regression test for the 3-days-stale case.
+- **Codex P2 (REAL — binary in source):** `messaging.reactions.routes.js` line 35 stored the reaction control-character regex with **literal** `0x00`, `0x1F`, and `0x7F` bytes embedded in the JS file. The bytes made the file display as binary to some Git/text tooling and were invisible in diff / blame / search. Replaced with `\xNN` escape sequences (`/[\x00-\x1F\x7F]/`); reaction validation behavior is identical, all 18 messaging-reactions tests still pass.
+- **Sourcery (REAL — double JSON.parse):** `persistFollowedToLocal` in `ScholarTopicPage` ran `JSON.parse(raw)` twice inside an `Array.isArray(...) ? ...` ternary on every follow toggle. Parsed once into a local; checked the parsed value. Net: half the parse work, clearer control flow.
+- **Sourcery (REAL — doc typo):** release-log entry referenced the `VarChar(16)` column; corrected to the canonical SQL spelling `VARCHAR(16)`.
+
+**Rejected (style preferences, not bugs):** Sourcery suggested centralizing `fakeOriginAllowlistFactory` (out of scope, would be its own design pass), hoisting `FOLLOW_KEY` to module scope (idiomatic const-in-render, micro-opt), and adding a `queueMicrotask` polyfill (full support in every browser React 19 targets).
+
+**Verification:** backend lint clean · frontend lint clean · frontend build clean · streaks tests 5/5 (incl. new regression case) · messaging.reactions tests 18/18.
+
+### Wave-8 planned-feature backlog drain (2026-05-13)
+
+Six contained features from the planning docs landed without new env vars / API keys / schema changes:
+
+- **Reaction emoji length now matches the `VARCHAR(16)` column.** `POST /messages/:id/reactions` rejected at 32 chars while Postgres truncated at 16, producing silent data loss and upsert key collisions. Route + tests now enforce 16-char cap and additionally reject ASCII control characters (NUL, BEL, DEL, etc.) that rendered as invisible glyphs in the reactions strip. Research-loop-4 F11.
+- **Notifications dropdown gets server-side filters.** `GET /api/notifications` now accepts `?type=mention|reply|social|study_group|moderation` and `?onlyUnread=true`, mapped against a curated allowlist (rejects unknown values silently per Postel). `unreadCount` still reports the global count so the bell badge stays consistent regardless of the active tab. Research-loop-4 F12.
+- **`/api/notifications` opts into 15s private cache + 30s SWR.** Absorbs the sidebar bell's natural double-mount on SPA route changes. `Vary: Cookie, Authorization` per `cacheControl` default so a cached body cannot leak across sessions. Research-loop-3 P2 #14.
+- **`/api/dashboard/summary` opts into 60s private cache + 5min SWR.** Cuts DB load on rapid back-and-forth navigation (profile ↔ feed ↔ dashboard). Per-user; same `Vary` defaults. Research-loop-3 P2 #15.
+- **`getUserStreak` prefers the denormalized `UserStreak` row (O(1) vs O(366)).** Reads the row first and short-circuits when `currentStreak > 0`. Falls back to the legacy `UserDailyActivity` scan when the row is missing or has been reset by the daily sweeper so pre-2026-05-12 accounts still resolve. Loop A2 follow-up.
+- **Socket.io `CONVERSATION_LEAVE` is now rate-limited (30/min).** Mirrors `CONVERSATION_JOIN`. Blocks a malicious client from spamming join/leave to fan out `USER_LEFT` notification storms to every conversation participant. Research-loop-3 P1 #11.
+
+Verification: `npm --prefix backend run lint` clean; `npm --prefix backend test` for the touched files passes (`notifications.routes.test.js` 21/21, `messaging.reactions.deep.test.js` 18/18, `messaging.socket.deep.test.js` + dashboard 19/19, new `streaks.test.js` 4/4). No new dependencies introduced (CLAUDE.md "v2.1 dependency exception" not invoked).
+
 ### Bot review fixes — Codex P2 + Sourcery 3x (2026-05-13)
 
 GitHub review on the wave-7 commit (`73a35bcb`) flagged 4 items. Each vetted per CLAUDE.md A21:

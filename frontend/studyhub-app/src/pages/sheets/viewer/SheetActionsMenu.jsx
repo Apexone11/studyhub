@@ -181,11 +181,12 @@ export default function SheetActionsMenu({
         </Link>
       ) : null}
 
-      {/* Fork is gated on the creator's allowEditing toggle. When edits are
-          disabled, forking is also disabled — a fork is just a writable copy
-          of the content, which would defeat the creator's no-edit intent.
+      {/* Fork visibility rules:
+          - logged-in non-owner
+          - creator has allowEditing=true (a fork is a writable copy)
+          - viewer is NOT admin — admins are moderators, not creators
           Backend POST /api/sheets/:id/fork enforces the same rule (403). */}
-      {user && sheet.userId !== user.id && sheet.allowEditing === true ? (
+      {user && sheet.userId !== user.id && sheet.allowEditing === true && user.role !== 'admin' ? (
         <button
           type="button"
           onClick={handleFork}

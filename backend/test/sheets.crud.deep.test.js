@@ -499,12 +499,19 @@ describe('PATCH /api/sheets/:id', () => {
     expect(res.status).toBe(404)
   })
 
-  it('admin can patch any sheet', async () => {
+  // Founder directive 2026-05-13 — admin is a moderator role, not a
+  // creator role. PATCH /api/sheets/:id is a content edit; admin must
+  // not silently edit other users' sheets here. Moderation routes on
+  // /api/admin/* are the audit-logged path for any admin-driven
+  // change to user content.
+  it('admin CANNOT patch other users sheets (moderation goes through /api/admin/*)', async () => {
     mocks.state.user = { userId: 999, username: 'admin', role: 'admin' }
-    mocks.prisma.studySheet.findUnique.mockResolvedValue(published({ userId: 1 }))
-    mocks.prisma.studySheet.update.mockResolvedValue(published())
+    mocks.prisma.studySheet.findUnique.mockResolvedValue(
+      published({ userId: 1, allowEditing: false }),
+    )
     const res = await request(app).patch('/api/sheets/10').send({ title: 'Admin edit' })
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(403)
+    expect(mocks.prisma.studySheet.update).not.toHaveBeenCalled()
   })
 
   it('re-extracts previewText on content update', async () => {

@@ -595,3 +595,186 @@
     animation: none;
   }
 }
+
+/* ── In-app PDF reader ─────────────────────────────────────────────────────
+ * Loop S11 fix #1: in-app reader so users can read OA papers without
+ * leaving StudyHub. Sandbox enforced in JSX (allow-scripts allow-popups
+ * allow-forms — NEVER allow-same-origin per CLAUDE.md A14). The wrapper
+ * here owns the dimensions, the toolbar, and the loading skeleton.
+ * ─────────────────────────────────────────────────────────────────────── */
+.scholar-paper__pdf-reader {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100%;
+  max-width: 900px;
+  margin: 12px auto 0;
+}
+
+.scholar-paper__pdf-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 8px 12px;
+  background: var(--sh-surface);
+  border: 1px solid var(--sh-border);
+  border-radius: 10px;
+}
+
+.scholar-paper__pdf-toolbar-label {
+  font-size: 13px;
+  color: var(--sh-subtext);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+.scholar-paper__pdf-toolbar-actions {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.scholar-paper__pdf-toolbar-btn {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background 120ms ease,
+    border-color 120ms ease,
+    color 120ms ease;
+}
+
+.scholar-paper__pdf-toolbar-btn:hover,
+.scholar-paper__pdf-toolbar-btn:focus-visible {
+  background: var(--sh-brand-soft, var(--sh-soft));
+  border-color: var(--sh-brand);
+  color: var(--sh-brand);
+  outline: none;
+}
+
+.scholar-paper__pdf-toolbar-btn:focus-visible {
+  outline: 2px solid var(--sh-brand);
+  outline-offset: 2px;
+}
+
+.scholar-paper__pdf-frame-wrap {
+  position: relative;
+  width: 100%;
+  min-height: 80dvh;
+  border: 1px solid var(--sh-border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--sh-surface);
+}
+
+/* Older browsers without `dvh` support — fall back to a tall vh.
+   The `@supports` block lets newer browsers use the dynamic-viewport unit
+   so the reader fills the screen without being shoved under the mobile
+   browser chrome. */
+@supports not (min-height: 80dvh) {
+  .scholar-paper__pdf-frame-wrap {
+    min-height: 80vh;
+  }
+}
+
+.scholar-paper__pdf-frame {
+  display: block;
+  width: 100%;
+  height: 80dvh;
+  border: 0;
+  background: var(--sh-surface);
+}
+
+@supports not (height: 80dvh) {
+  .scholar-paper__pdf-frame {
+    height: 80vh;
+  }
+}
+
+.scholar-paper__pdf-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--sh-subtext);
+  background: var(--sh-surface);
+  z-index: 1;
+  padding: 24px;
+  text-align: center;
+}
+
+.scholar-paper__pdf-loading-spinner {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid var(--sh-border);
+  border-top-color: var(--sh-brand);
+  animation: scholarPdfSpin 0.8s linear infinite;
+}
+
+@keyframes scholarPdfSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Mobile: full-width, no centering margin. Min-height stays 80dvh so the
+   reader fills the viewport without forcing the user to resize. */
+@media (max-width: 767px) {
+  .scholar-paper__pdf-reader {
+    max-width: 100%;
+    margin: 8px 0 0;
+  }
+  .scholar-paper__pdf-toolbar {
+    padding: 8px 10px;
+  }
+  .scholar-paper__pdf-toolbar-btn {
+    flex: 1 1 auto;
+  }
+}
+
+/* Reveal transition — only when the user hasn't asked us to stop moving. */
+@media (prefers-reduced-motion: no-preference) {
+  .scholar-paper__pdf-reader {
+    animation: scholarPdfReveal 220ms ease-out;
+  }
+  @keyframes scholarPdfReveal {
+    from {
+      opacity: 0;
+      transform: translateY(4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scholar-paper__pdf-loading-spinner {
+    animation: none;
+    border-top-color: var(--sh-brand);
+  }
+  .scholar-paper__pdf-toolbar-btn {
+    transition: none;
+  }
+}

@@ -5,6 +5,11 @@ const { cacheControl } = require('../../lib/cacheControl')
 const prisma = require('../../lib/prisma')
 const log = require('../../lib/logger')
 const { schoolsLimiter, POPULAR_COURSES_LIMIT } = require('./courses.constants')
+// Stricter per-USER cap (30/15min) layered on top of the existing
+// per-IP cap (120/15min). Wave-11 G1-6 — defends against authenticated
+// scraper enumeration of the school + course taxonomy.
+// Feature-expansion security addendum §1 HIGH requirement.
+const { discoverySchoolsLimiter, discoveryCoursesLimiter } = require('../../lib/rateLimiters')
 
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
@@ -23,6 +28,7 @@ router.get(
   '/schools',
   cacheControl(600, { staleWhileRevalidate: 1800 }),
   schoolsLimiter,
+  discoverySchoolsLimiter,
   async (req, res) => {
     try {
       const schools = await prisma.school.findMany({
@@ -69,6 +75,7 @@ router.get(
   '/popular',
   cacheControl(300, { staleWhileRevalidate: 600 }),
   schoolsLimiter,
+  discoveryCoursesLimiter,
   async (req, res) => {
     try {
       // StudySheet.courseId is a non-nullable Int in the schema, so no

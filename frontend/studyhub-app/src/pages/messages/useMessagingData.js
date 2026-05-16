@@ -35,6 +35,10 @@ export function useMessagingData(socket, currentUserId) {
   const [hasMoreMessages, setHasMoreMessages] = useState(true)
   const [typingUsers, setTypingUsers] = useState(new Map())
   const typingTimerRef = useRef(null)
+  // Holds the AbortController for the in-flight loadMessages() call so
+  // a fast conversation switch can cancel the prior fetch and avoid
+  // applying stale messages to the wrong thread. Wave-11 P1-2.
+  const loadMessagesAbortRef = useRef(null)
   // Ref tracks activeConversation.id so socket handlers always see the latest value
   // (avoids stale closure bug where incoming messages increment unread on the active conversation)
   const activeConversationIdRef = useRef(null)
@@ -202,8 +206,24 @@ export function useMessagingData(socket, currentUserId) {
     }
   }, [])
 
-  /* ── Load messages for active conversation ────────────────────────────– */
+  /* ── Load messages for active conversation ────────────────────────────–
+   * Fast conversation switching previously caused a race: the second
+   * conversation's fetch could resolve before the first, leaving the
+   * wrong thread visible. Now every load aborts the prior in-flight
+   * request before issuing a new one — the AbortController ref lives
+   * outside the callback so successive calls cancel each other.
+   * Wave-11 frontend bug hunt P1-2 fix.
+   */
   const loadMessages = useCallback(async (conversationId, beforeMessageId = null) => {
+    if (loadMessagesAbortRef.current) {
+      try {
+        loadMessagesAbortRef.current.abort()
+      } catch {
+        /* ignore — controller might already be aborted */
+      }
+    }
+    const controller = new AbortController()
+    loadMessagesAbortRef.current = controller
     setLoadingMessages(true)
     try {
       const params = new URLSearchParams()
@@ -214,13 +234,16 @@ export function useMessagingData(socket, currentUserId) {
         {
           headers: authHeaders(),
           credentials: 'include',
+          signal: controller.signal,
         },
       )
+      if (controller.signal.aborted) return
       if (!response.ok) {
         showToast('Failed to load messages', 'error')
         return
       }
       const data = await response.json()
+      if (controller.signal.aborted) return
       const newMessages = Array.isArray(data) ? data : data?.messages || []
 
       if (beforeMessageId) {
@@ -232,9 +255,14 @@ export function useMessagingData(socket, currentUserId) {
       if (newMessages.length === 0 || data?.hasMore === false) {
         setHasMoreMessages(false)
       }
-    } catch {
+    } catch (err) {
+      // Aborted fetches surface as AbortError — treat as silent.
+      if (err?.name === 'AbortError') return
       showToast('Failed to load messages', 'error')
     } finally {
+      if (loadMessagesAbortRef.current === controller) {
+        loadMessagesAbortRef.current = null
+      }
       setLoadingMessages(false)
     }
   }, [])

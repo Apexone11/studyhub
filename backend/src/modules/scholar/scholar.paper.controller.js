@@ -43,6 +43,25 @@ async function getPaper(req, res) {
     }
     const paper = await service.getPaperDetail(id)
     if (!paper) return sendError(res, 404, 'Paper not found.', ERROR_CODES.NOT_FOUND)
+    // Loop S11 fix #1: lazily attach a signed PDF URL so the frontend's
+    // in-app reader (sandboxed iframe at ScholarPaperPage.jsx) can mount
+    // without a second round-trip. Only fired when the paper is OA AND
+    // we have a cached R2 key — otherwise the field stays null and the
+    // "Open PDF" button hides. Wrapped in try/catch so a transient R2
+    // signature failure never breaks the main paper fetch (CLAUDE.md A4).
+    if (paper.openAccess && paper.pdfCachedKey) {
+      try {
+        const signed = await service.getSignedPdfUrl(id)
+        if (signed && signed.url) {
+          paper.pdfUrl = signed.url
+        }
+      } catch (pdfErr) {
+        log.warn(
+          { event: 'scholar.paper.pdf_sign_failed', err: pdfErr.message, paperId: id },
+          'PDF sign failed during paper fetch — falling back to null pdfUrl',
+        )
+      }
+    }
     res.json({ paper })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })

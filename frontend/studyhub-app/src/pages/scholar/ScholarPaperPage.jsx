@@ -386,14 +386,18 @@ export default function ScholarPaperPage() {
   const [isGenerating, setIsGenerating] = useState(false)
   const [citeOpen, setCiteOpen] = useState(false)
   const [showPdfViewer, setShowPdfViewer] = useState(false)
+  // `pdfLoading` tracks the iframe's network fetch so we can show a
+  // skeleton overlay while the PDF byte-streams from R2. Driven by
+  // onLoad / onError on the iframe.
+  const [pdfLoading, setPdfLoading] = useState(false)
   const [titleBarVisible, setTitleBarVisible] = useState(false)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
 
   // Reset the local override whenever the paper changes, so navigating
   // between papers doesn't leak the previous paper's "Saved" toggle.
+  // Deferred via queueMicrotask to satisfy React Compiler.
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    setSavedOverride(null)
+    queueMicrotask(() => setSavedOverride(null))
   }, [validId])
 
   // `recentlyViewedTick` bumps every time we write to localStorage so
@@ -506,7 +510,13 @@ export default function ScholarPaperPage() {
   }, [])
 
   const handleOpenPdf = useCallback(() => {
-    setShowPdfViewer((v) => !v)
+    setShowPdfViewer((v) => {
+      const next = !v
+      // Show the skeleton again on every re-open so the user gets a
+      // visible "we're fetching" state. Cleared by the iframe's onLoad.
+      if (next) setPdfLoading(true)
+      return next
+    })
   }, [])
 
   const handleGenerateSheet = useCallback(async () => {
@@ -778,20 +788,71 @@ export default function ScholarPaperPage() {
                     }`}
                   >
                     {showPdfViewer && showPdfButton ? (
-                      <iframe
-                        title={`PDF viewer for ${paper.title || 'paper'}`}
-                        src={paper.pdfUrl}
-                        /* allow-scripts allow-popups allow-forms only — NEVER
-                           allow-same-origin (CLAUDE.md A14). */
-                        sandbox="allow-scripts allow-popups allow-forms"
-                        style={{
-                          width: '100%',
-                          minHeight: '70vh',
-                          border: '1px solid var(--sh-border)',
-                          borderRadius: 10,
-                          background: 'var(--sh-surface)',
-                        }}
-                      />
+                      <div
+                        className="scholar-paper__pdf-reader"
+                        role="region"
+                        aria-label="PDF reader"
+                      >
+                        <div className="scholar-paper__pdf-toolbar">
+                          <span className="scholar-paper__pdf-toolbar-label">
+                            {pdfLoading ? 'Loading PDF…' : 'Reading inline'}
+                          </span>
+                          <div className="scholar-paper__pdf-toolbar-actions">
+                            <a
+                              className="scholar-paper__pdf-toolbar-btn"
+                              href={paper.pdfUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              aria-label="Open PDF in a new browser tab"
+                            >
+                              Open in new tab
+                            </a>
+                            <button
+                              type="button"
+                              className="scholar-paper__pdf-toolbar-btn"
+                              onClick={handleOpenPdf}
+                              aria-label="Close PDF reader"
+                            >
+                              Close reader
+                            </button>
+                          </div>
+                        </div>
+                        <div className="scholar-paper__pdf-frame-wrap">
+                          {pdfLoading && (
+                            <div
+                              className="scholar-paper__pdf-loading"
+                              role="status"
+                              aria-live="polite"
+                            >
+                              <span
+                                className="scholar-paper__pdf-loading-spinner"
+                                aria-hidden="true"
+                              />
+                              <span>Loading PDF — large papers may take a few seconds.</span>
+                            </div>
+                          )}
+                          <iframe
+                            title={`PDF viewer for ${paper.title || 'paper'}`}
+                            src={paper.pdfUrl}
+                            className="scholar-paper__pdf-frame"
+                            /* allow-scripts allow-popups allow-forms only — NEVER
+                               allow-same-origin (CLAUDE.md A14). The signed R2
+                               URL embeds the document; `allow-same-origin` would
+                               grant it parent-cookie access. */
+                            sandbox="allow-scripts allow-popups allow-forms"
+                            onLoad={() => {
+                              // Defer the setState until after the iframe load
+                              // event finishes propagating — keeps React Compiler
+                              // happy (no set-state-in-effect) and avoids racing
+                              // an in-flight render.
+                              queueMicrotask(() => setPdfLoading(false))
+                            }}
+                            onError={() => {
+                              queueMicrotask(() => setPdfLoading(false))
+                            }}
+                          />
+                        </div>
+                      </div>
                     ) : (
                       <p>
                         {paper.abstract ||

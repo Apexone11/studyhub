@@ -1,5 +1,5 @@
 const crypto = require('crypto')
-const { assertOwnerOrAdmin } = require('../../lib/accessControl')
+const { assertOwnerOrAdmin, assertOwner } = require('../../lib/accessControl')
 const { createNotification } = require('../../lib/notify')
 const { notifyMentionedUsers } = require('../../lib/mentions')
 const { trackActivity } = require('../../lib/activityTracker')
@@ -355,20 +355,27 @@ async function updateNoteHardened(req, res, noteId, body) {
     )
   }
 
-  // Title validation (hardened path is now the only path)
+  // Title validation. Cap bumped 120 → 300 on 2026-05-14 to
+  // accommodate document imports whose source title is naturally long
+  // (papers, research notes). DB column is TEXT so there's no schema
+  // floor; this is the UX cap.
   if (title !== undefined) {
     const trimmedTitle = typeof title === 'string' ? title.trim() : ''
     if (!trimmedTitle) return sendError(res, 400, 'Title cannot be empty.', ERROR_CODES.BAD_REQUEST)
-    if (trimmedTitle.length > 120)
-      return sendError(res, 400, 'Title must be 120 characters or fewer.', ERROR_CODES.BAD_REQUEST)
+    if (trimmedTitle.length > 300)
+      return sendError(res, 400, 'Title must be 300 characters or fewer.', ERROR_CODES.BAD_REQUEST)
     title = trimmedTitle
   }
 
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
     if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    // Note content mutation is owner-only per founder directive
+    // 2026-05-13. Admin moderation actions live on /api/admin/* and
+    // audit-log every change. assertOwner (no admin bypass) replaces
+    // assertOwnerOrAdmin on every note mutation route in this file.
     if (
-      !assertOwnerOrAdmin({
+      !assertOwner({
         res,
         user: req.user,
         ownerId: note.userId,
@@ -514,8 +521,9 @@ async function deleteNote(req, res) {
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
     if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    // Owner-only delete. Admin moderation deletes go through /api/admin/*.
     if (
-      !assertOwnerOrAdmin({
+      !assertOwner({
         res,
         user: req.user,
         ownerId: note.userId,
@@ -966,8 +974,10 @@ async function createNoteVersion(req, res) {
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
     if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    // Owner-only version snapshot. Reading version history (listNoteVersions,
+    // getNoteVersion, getVersionDiff) keeps admin-bypass for moderation.
     if (
-      !assertOwnerOrAdmin({
+      !assertOwner({
         res,
         user: req.user,
         ownerId: note.userId,
@@ -1165,8 +1175,11 @@ async function restoreNoteVersion(req, res) {
   try {
     const note = await prisma.note.findUnique({ where: { id: noteId } })
     if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    // Restore is a content mutation — owner-only. The pure-read
+    // version endpoints above keep admin-bypass so moderators can
+    // inspect history during a report investigation.
     if (
-      !assertOwnerOrAdmin({
+      !assertOwner({
         res,
         user: req.user,
         ownerId: note.userId,
@@ -1281,8 +1294,10 @@ async function toggleNotePin(req, res) {
       select: { id: true, userId: true, pinned: true },
     })
     if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    // Pin is a personal organization action for the note's owner.
+    // Admin pinning someone else's note has no meaning — owner-only.
     if (
-      !assertOwnerOrAdmin({
+      !assertOwner({
         res,
         user: req.user,
         ownerId: note.userId,
@@ -1316,8 +1331,10 @@ async function updateNoteTags(req, res) {
       select: { id: true, userId: true },
     })
     if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
+    // Tags are creator-owned metadata — admin shouldn't curate other
+    // users' tags via this route. Owner-only.
     if (
-      !assertOwnerOrAdmin({
+      !assertOwner({
         res,
         user: req.user,
         ownerId: note.userId,

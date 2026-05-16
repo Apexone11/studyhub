@@ -2,6 +2,7 @@ const express = require('express')
 const { adminLimiter } = require('../../lib/rateLimiters')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
+const originAllowlist = require('../../middleware/originAllowlist')
 const usersController = require('./admin.users.controller')
 const emailController = require('./admin.email.controller')
 const sheetsController = require('./admin.sheets.controller')
@@ -23,6 +24,13 @@ const router = express.Router()
 router.use(requireAuth)
 router.use(requireAdmin)
 router.use(adminLimiter)
+// Defense-in-depth origin check on every admin write. The global
+// Origin check in index.js is the floor; admin actions are the
+// highest-value CSRF target on the platform so the module re-runs
+// the allowlist at its router boundary. Safe methods short-circuit
+// per the originAllowlist middleware. CLAUDE.md A11. Added wave-11
+// 2026-05-14.
+router.use(originAllowlist())
 
 router.use(usersController)
 router.use(emailController)

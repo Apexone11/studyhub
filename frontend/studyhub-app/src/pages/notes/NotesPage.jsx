@@ -115,6 +115,7 @@ export default function NotesPage() {
               setActiveNote={data.setActiveNote}
               selectNote={data.selectNote}
               createNote={data.createNote}
+              importFileAsNote={data.importFileAsNote}
               creating={data.creating}
               loadingNotes={data.loadingNotes}
             />

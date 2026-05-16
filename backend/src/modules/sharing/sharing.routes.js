@@ -1,5 +1,6 @@
 const express = require('express')
 const crypto = require('crypto')
+const bcrypt = require('bcryptjs')
 const requireAuth = require('../../middleware/auth')
 const optionalAuth = require('../../core/auth/optionalAuth')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
@@ -8,6 +9,37 @@ const { isBlockedEitherWay } = require('../../lib/social/blockFilter')
 const { watermarkHtml, watermarkText } = require('../../lib/watermark')
 const prisma = require('../../lib/prisma')
 const { sharingMutateLimiter, sharingReadLimiter } = require('../../lib/rateLimiters')
+
+// Wave-11 (2026-05-14) — share-link password storage hardening.
+// Pre-this-wave, `ShareLink.password` was stored in plaintext and compared
+// with `!==`, which is both a credential-storage incident and a timing
+// oracle. We now bcrypt-hash the password on create and use
+// `bcrypt.compare` on access. Backwards compat: rows created before this
+// wave have a plaintext value that doesn't start with `$2`; for those we
+// fall back to a constant-time string compare and silently re-hash on the
+// next successful access so the row converts in place.
+const SHARE_LINK_BCRYPT_COST = 12
+function looksLikeBcryptHash(value) {
+  return typeof value === 'string' && /^\$2[aby]\$\d{2}\$/.test(value)
+}
+function constantTimeEquals(a, b) {
+  if (typeof a !== 'string' || typeof b !== 'string') return false
+  const aBuf = Buffer.from(a)
+  const bBuf = Buffer.from(b)
+  if (aBuf.length !== bBuf.length) return false
+  return crypto.timingSafeEqual(aBuf, bBuf)
+}
+async function verifySharePassword(rawInput, storedHashOrPlain) {
+  if (!storedHashOrPlain) return true
+  if (typeof rawInput !== 'string') return false
+  if (looksLikeBcryptHash(storedHashOrPlain)) {
+    return bcrypt.compare(rawInput, storedHashOrPlain)
+  }
+  // Legacy plaintext row — constant-time compare. The caller is
+  // responsible for re-hashing on a successful verify so the row
+  // upgrades to bcrypt on next use.
+  return constantTimeEquals(rawInput, storedHashOrPlain)
+}
 
 const router = express.Router()
 
@@ -42,11 +74,9 @@ router.post('/links', requireAuth, mutateLimiter, async (req, res) => {
       password !== null &&
       (typeof password !== 'string' || password.length > SHARE_LINK_PASSWORD_MAX)
     ) {
-      return res
-        .status(400)
-        .json({
-          error: `password must be a string of ${SHARE_LINK_PASSWORD_MAX} characters or fewer.`,
-        })
+      return res.status(400).json({
+        error: `password must be a string of ${SHARE_LINK_PASSWORD_MAX} characters or fewer.`,
+      })
     }
 
     const contentIdInt = parseInt(contentId, 10)
@@ -114,7 +144,9 @@ router.post('/links', requireAuth, mutateLimiter, async (req, res) => {
         permission,
         expiresAt: expiresAtParsed,
         maxViews: maxViewsInt,
-        password: password || null,
+        // bcrypt-hash on store. Plain `password ?? null` was a
+        // credential-storage incident — fixed wave-11 2026-05-14.
+        password: password ? await bcrypt.hash(String(password), SHARE_LINK_BCRYPT_COST) : null,
         active: true,
       },
     })
@@ -262,13 +294,26 @@ router.get('/access/:token', optionalAuth, readLimiter, async (req, res) => {
       return res.status(410).json({ error: 'Share link view limit reached.' })
     }
 
-    // Check password protection
+    // Check password protection — bcrypt-aware with legacy plaintext
+    // fallback so existing rows keep working. On successful verify of a
+    // plaintext row we re-hash so the row converts in place.
     if (shareLink.password) {
       if (!password) {
         return res.status(403).json({ error: 'Password required.' })
       }
-      if (password !== shareLink.password) {
+      const ok = await verifySharePassword(password, shareLink.password)
+      if (!ok) {
         return res.status(403).json({ error: 'Invalid password.' })
+      }
+      if (!looksLikeBcryptHash(shareLink.password)) {
+        prisma.shareLink
+          .update({
+            where: { id: shareLink.id },
+            data: { password: await bcrypt.hash(String(password), SHARE_LINK_BCRYPT_COST) },
+          })
+          .catch(() => {
+            /* best-effort upgrade — next access will retry */
+          })
       }
     }
 
@@ -378,13 +423,24 @@ router.get('/access/:token/watermarked', optionalAuth, readLimiter, async (req, 
       return res.status(410).json({ error: 'Share link view limit reached.' })
     }
 
-    // Check password protection
+    // Check password protection — bcrypt-aware, see verifySharePassword().
     if (shareLink.password) {
       if (!password) {
         return res.status(403).json({ error: 'Password required.' })
       }
-      if (password !== shareLink.password) {
+      const ok = await verifySharePassword(password, shareLink.password)
+      if (!ok) {
         return res.status(403).json({ error: 'Invalid password.' })
+      }
+      if (!looksLikeBcryptHash(shareLink.password)) {
+        prisma.shareLink
+          .update({
+            where: { id: shareLink.id },
+            data: { password: await bcrypt.hash(String(password), SHARE_LINK_BCRYPT_COST) },
+          })
+          .catch(() => {
+            /* best-effort upgrade — next access will retry */
+          })
       }
     }
 

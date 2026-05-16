@@ -52,9 +52,16 @@ const mocks = vi.hoisted(() => {
     prisma,
     sentry: { captureError: vi.fn() },
     accessControl: {
-      assertOwnerOrAdmin: vi.fn(
-        ({ user, ownerId }) => user.role === 'admin' || Number(ownerId) === Number(user.userId),
-      ),
+      assertOwnerOrAdmin: vi.fn(({ res, user, ownerId, message }) => {
+        if (user?.role === 'admin' || Number(ownerId) === Number(user?.userId)) return true
+        if (res) res.status(403).json({ error: message || 'Forbidden' })
+        return false
+      }),
+      assertOwner: vi.fn(({ res, user, ownerId, message }) => {
+        if (Number(ownerId) === Number(user?.userId)) return true
+        if (res) res.status(403).json({ error: message || 'Forbidden' })
+        return false
+      }),
     },
     moderationEngine: { isModerationEnabled: vi.fn(() => false), scanContent: vi.fn() },
     notify: { createNotification: vi.fn() },
@@ -101,6 +108,7 @@ const fakeLimiterBag = {
   notesRestoreLimiter: fakeRateLimiter,
   notesDiffLimiter: fakeRateLimiter,
   noteHighlightWriteLimiter: fakeRateLimiter,
+  noteHighlightLimiter: fakeRateLimiter,
 }
 
 const mockTargets = new Map([
@@ -211,7 +219,9 @@ describe('POST /:id/versions', () => {
       title: 't',
       content: 'c',
     })
-    mocks.accessControl.assertOwnerOrAdmin.mockImplementationOnce(({ res }) => {
+    // createNoteVersion was tightened to assertOwner (no admin bypass)
+    // 2026-05-14 per founder directive. Override the right helper.
+    mocks.accessControl.assertOwner.mockImplementationOnce(({ res }) => {
       res.status(403).json({ error: 'Not your note.', code: 'FORBIDDEN' })
       return false
     })

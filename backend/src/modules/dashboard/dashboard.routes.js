@@ -2,6 +2,7 @@ const express = require('express')
 const { readLimiter } = require('../../lib/rateLimiters')
 const requireAuth = require('../../middleware/auth')
 const { captureError } = require('../../monitoring/sentry')
+const { cacheControl } = require('../../lib/cacheControl')
 const prisma = require('../../lib/prisma')
 
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
@@ -10,7 +11,13 @@ const router = express.Router()
 router.use(requireAuth)
 router.use(readLimiter)
 
-router.get('/summary', async (req, res) => {
+// 60s private cache + 5min SWR keeps the dashboard responsive on rapid
+// back-and-forth navigation (profile ↔ feed ↔ dashboard) without making
+// recently-added enrollments invisible for too long. Per-user response
+// — `cacheControl` defaults to `Vary: Cookie, Authorization` for
+// private scope so a cached body can never leak to a different session.
+// Research-loop-3 P2 #15.
+router.get('/summary', cacheControl(60, { staleWhileRevalidate: 300 }), async (req, res) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.user.userId },

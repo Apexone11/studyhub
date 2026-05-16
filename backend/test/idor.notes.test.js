@@ -130,15 +130,19 @@ describe('PATCH /api/notes/:id — ownership enforcement', () => {
     expect(mocks.prisma.note.update).toHaveBeenCalled()
   })
 
-  it('returns 200 when admin updates any note', async () => {
+  // Founder directive 2026-05-13 — admin is a moderator role, not a
+  // creator role. PATCH /api/notes/:id rejects admin edits of other
+  // users' notes. Moderation actions live on /api/admin/* and
+  // audit-log every change.
+  it('returns 403 when admin tries to PATCH another users note (moderator, not creator)', async () => {
     mocks.state.userId = 99
     mocks.state.role = 'admin'
     mocks.prisma.note.findUnique.mockResolvedValue(noteFixture())
-    mocks.prisma.note.update.mockResolvedValue({ ...noteFixture(), title: 'Admin Edit' })
 
     const res = await request(app).patch('/api/notes/1').send({ title: 'Admin Edit' })
 
-    expect(res.status).toBe(200)
+    expect(res.status).toBe(403)
+    expect(mocks.prisma.note.update).not.toHaveBeenCalled()
   })
 })
 

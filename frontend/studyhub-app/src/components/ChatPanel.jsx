@@ -65,14 +65,20 @@ export default function ChatPanel({ open, onClose }) {
     activeIdRef.current = activeId
   }, [activeId])
 
-  // Clean up object URLs on unmount
+  // Track the latest attachment list in a ref so the unmount cleanup
+  // sees the full list, not the empty initial value. The original
+  // `[]` deps closed over the empty array → leaks every blob URL the
+  // user added during the session. Wave-11 audit L2-2 fix.
+  const attachmentPreviewsRef = useRef(attachmentPreviews)
+  useEffect(() => {
+    attachmentPreviewsRef.current = attachmentPreviews
+  }, [attachmentPreviews])
   useEffect(() => {
     return () => {
-      attachmentPreviews.forEach((a) => {
+      attachmentPreviewsRef.current.forEach((a) => {
         if (a.previewUrl) URL.revokeObjectURL(a.previewUrl)
       })
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   /* -- Socket.io: real-time messages + typing ----------------------------- */

@@ -73,16 +73,20 @@ function clampSheetContent(content) {
  * Check whether `viewer` may write a new revision to `sheet`.
  *
  * Allowed:
- *   - Owner
- *   - Admin
+ *   - Owner only.
  *
- * (Forkers editing their own forks already have ownership of the fork
- * sheet, so they hit the "owner" branch — no fork-source mutation
- * needed. CLAUDE.md A6 — defense in depth.)
+ * Admins are explicitly NOT allowed (founder directive 2026-05-13:
+ * admin is a moderator role, not a creator role; admins must not
+ * mutate other users' content via AI apply-edit). Moderation actions
+ * — unpublish, reject, delete — live on the dedicated admin routes
+ * and continue to require admin role there. CLAUDE.md A6 — defense
+ * in depth.
+ *
+ * Forkers editing their own forks already own the fork sheet, so
+ * they hit this branch — no fork-source mutation needed.
  */
 function canEdit(sheet, viewer) {
   if (!sheet || !viewer) return false
-  if (viewer.role === 'admin') return true
   return sheet.userId === viewer.userId
 }
 
@@ -149,7 +153,19 @@ router.post(
       }
 
       const sheetContent = clampSheetContent(sheet.content || '')
-      const instruction = `You are reviewing a student's study sheet. Identify clear, concrete issues a reader would actually hit: typos, broken HTML/markdown, missing context, factual mistakes, structural problems, accessibility issues (alt text, heading order). Suggest improvements that respect the author's voice. Be specific.
+      // v2 multi-layer prompt (2026-05-14). The reviewer is asked to
+      // make four explicit passes — structure, content, a11y, pedagogy
+      // — so the resulting findings are richer than the v1 single-pass
+      // output. Each finding carries a \`layer\` tag (matching the
+      // category enum) so the UI can group them. Existing \`severity\`
+      // and \`suggestion\` fields are preserved for backwards
+      // compatibility with the V1 UI.
+      const instruction = `You are reviewing a student's study sheet. Make FOUR explicit passes and combine the findings:
+
+PASS 1 — STRUCTURE: heading order (h1 → h2 → h3, no skipping), section completeness (intro / body / summary), unused/empty sections, broken markdown or HTML.
+PASS 2 — CONTENT: typos, factual mistakes, unclear sentences, missing context a peer reader would actually hit.
+PASS 3 — ACCESSIBILITY: alt text on images, heading levels, link text ("click here" → meaningful), color-only emphasis, table headers.
+PASS 4 — PEDAGOGY: clarity for a student reader, examples that illustrate concepts, definitions before use, summaries / takeaways.
 
 Sheet metadata:
   Title: ${sheet.title}
@@ -166,18 +182,20 @@ Respond ONLY with a JSON object matching this shape (no prose, no markdown fence
 {
   "summary": "1–2 sentence overall verdict",
   "issues": [
-    { "severity": "low|medium|high", "category": "typo|html|content|structure|a11y|fact|other", "title": "short label", "suggestion": "what to change" }
+    { "severity": "low|medium|high", "category": "typo|html|content|structure|a11y|fact|other", "layer": "structure|content|a11y|pedagogy", "title": "short label", "suggestion": "what to change" }
   ],
   "suggestions": [
     { "title": "short label", "why": "1 sentence reason", "example": "optional improved snippet" }
   ]
 }
 
-If there are no issues, return { "summary": "...", "issues": [], "suggestions": [...] } with at least 1–2 enhancement suggestions. Keep total output under 1500 tokens.`
+Keep \`layer\` matching the pass that surfaced the issue. If there are no issues, return { "summary": "...", "issues": [], "suggestions": [...] } with at least 1–2 enhancement suggestions. Keep total output under 1800 tokens.`
 
-      // Spend ceiling guard
+      // Spend ceiling guard. v2 prompt is multi-layer so the output
+      // budget moves from 1500 → 1800 tokens to make room for richer
+      // findings without truncating the JSON.
       const inputTokensEst = estimateTokens(SYSTEM_PROMPT) + estimateTokens(instruction)
-      const maxOutputTokens = 1500
+      const maxOutputTokens = 1800
       reservation = await reserveSpend({
         user: req.user,
         inputTokensEst,
@@ -267,13 +285,19 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
         })
       }
 
-      // Shape guard so the frontend never blows up on a partial response
+      // Shape guard so the frontend never blows up on a partial response.
+      // v2 adds the optional \`layer\` field (structure | content | a11y |
+      // pedagogy) so the UI can group findings by analyzer pass. Unknown
+      // layer values normalize to "other" so a model drift doesn't break
+      // the response.
+      const ALLOWED_LAYERS = ['structure', 'content', 'a11y', 'pedagogy']
       const safe = {
         summary: typeof report.summary === 'string' ? report.summary : '',
         issues: Array.isArray(report.issues)
           ? report.issues.slice(0, 30).map((i) => ({
               severity: ['low', 'medium', 'high'].includes(i.severity) ? i.severity : 'low',
               category: typeof i.category === 'string' ? i.category.slice(0, 40) : 'other',
+              layer: ALLOWED_LAYERS.includes(i.layer) ? i.layer : 'other',
               title: typeof i.title === 'string' ? i.title.slice(0, 200) : '',
               suggestion: typeof i.suggestion === 'string' ? i.suggestion.slice(0, 1000) : '',
             }))
@@ -306,15 +330,39 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
       // Categorize the error. Anthropic SDK errors carry a `.status`
       // and `.type` we trust; plain `Error` thrown from getClient when
       // ANTHROPIC_API_KEY is missing carries a recognisable message;
-      // anything else falls through to "internal".
+      // node fetch network errors carry a `.code` like ECONNRESET /
+      // ENOTFOUND / ECONNREFUSED / ETIMEDOUT, or a `.cause.code`. We
+      // surface those as 503 rather than 500 so the user sees a
+      // useful retry message. Founder feedback 2026-05-13: every
+      // analyze attempt was returning the generic "Failed to analyze
+      // sheet" toast and we couldn't tell why.
       const errMsg = err?.message || String(err)
       const errStatus = Number.isInteger(err?.status) ? err.status : null
       const errType = typeof err?.type === 'string' ? err.type : null
+      const errCode = err?.code || err?.cause?.code || null
       const isMissingApiKey = /ANTHROPIC_API_KEY is not set/i.test(errMsg)
       const isAnthropicAuth = errStatus === 401 || errStatus === 403
       const isAnthropicRate = errStatus === 429
       const isAnthropicServer = errStatus && errStatus >= 500 && errStatus < 600
       const isAnthropicOverloaded = errType === 'overloaded_error' || errStatus === 529
+      // 404 not_found_error means we asked Anthropic for a model it
+      // doesn't know about (deprecation, typo, regional). Surface a
+      // distinct alert tag so on-call can fix the constant fast — this
+      // was the silent cause of every "Failed to analyze sheet" toast
+      // during the 2026-05-13 stale-model-id incident.
+      const isModelNotFound =
+        (errStatus === 404 || errStatus === 400) &&
+        (errType === 'not_found_error' ||
+          /model[^.]*not (?:found|available)/i.test(errMsg) ||
+          /unknown model/i.test(errMsg))
+      const isNetworkFailure =
+        errCode === 'ECONNRESET' ||
+        errCode === 'ENOTFOUND' ||
+        errCode === 'ECONNREFUSED' ||
+        errCode === 'ETIMEDOUT' ||
+        errCode === 'EAI_AGAIN' ||
+        err?.name === 'AbortError' ||
+        /fetch failed/i.test(errMsg)
 
       // Structured log + Sentry capture with enough context to triage
       // the next 500 in production. err.stack is critical when the
@@ -327,19 +375,24 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
           err: errMsg,
           status: errStatus,
           type: errType,
+          code: errCode,
           stack: err?.stack ? String(err.stack).slice(0, 2000) : null,
           // Best-effort cause classifier so we can grep alerts by class.
           cause: isMissingApiKey
             ? 'missing_api_key'
-            : isAnthropicAuth
-              ? 'anthropic_auth'
-              : isAnthropicRate
-                ? 'anthropic_rate'
-                : isAnthropicOverloaded
-                  ? 'anthropic_overloaded'
-                  : isAnthropicServer
-                    ? 'anthropic_server'
-                    : 'unknown',
+            : isModelNotFound
+              ? 'model_not_found'
+              : isAnthropicAuth
+                ? 'anthropic_auth'
+                : isAnthropicRate
+                  ? 'anthropic_rate'
+                  : isAnthropicOverloaded
+                    ? 'anthropic_overloaded'
+                    : isAnthropicServer
+                      ? 'anthropic_server'
+                      : isNetworkFailure
+                        ? 'network_failure'
+                        : 'unknown',
         },
         'AI sheet analyze threw',
       )
@@ -359,6 +412,14 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
           res,
           503,
           'AI is not configured in this environment. Reach out to the StudyHub team if you see this in production.',
+          ERROR_CODES.INTERNAL,
+        )
+      }
+      if (isModelNotFound) {
+        return sendError(
+          res,
+          503,
+          'AI model is temporarily unavailable. The StudyHub team has been alerted — please try again shortly.',
           ERROR_CODES.INTERNAL,
         )
       }
@@ -383,6 +444,14 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
           res,
           503,
           'AI service is overloaded right now. Please try again in a minute.',
+          ERROR_CODES.INTERNAL,
+        )
+      }
+      if (isNetworkFailure) {
+        return sendError(
+          res,
+          503,
+          'Could not reach the AI service. Check your connection and try again.',
           ERROR_CODES.INTERNAL,
         )
       }

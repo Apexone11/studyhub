@@ -6,11 +6,13 @@
 const Anthropic = require('@anthropic-ai/sdk')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
+const log = require('../../lib/logger')
 const { sendHighRiskSheetAlert } = require('../../lib/email/email')
 const { createNotification } = require('../../lib/notify')
 const { RISK_TIER } = require('../../lib/html/htmlSecurity')
 const {
   REVIEWER_MODEL,
+  REVIEWER_FALLBACK_MODEL,
   MAX_REVIEW_TOKENS,
   HOURLY_REVIEW_CAP,
   MIN_APPROVE_CONFIDENCE,
@@ -34,6 +36,60 @@ function getClient() {
 
 function isAiReviewEnabled() {
   return process.env.AI_REVIEW_ENABLED !== 'false'
+}
+
+// ── Model call with fallback ─────────────────────────────────────────
+
+/**
+ * Anthropic rejects an unknown model id with a 404 carrying
+ * `error.type === 'not_found_error'`. When that happens for the primary
+ * model (Opus 4.7 today) we fall back to the AI module's DEFAULT_MODEL
+ * (Sonnet) so the review pipeline keeps running. Any other failure
+ * propagates — those are real outages or auth bugs, not deprecations.
+ */
+function isModelDeprecationError(err) {
+  if (!err) return false
+  const status = err.status || err.response?.status
+  if (status !== 404 && status !== 400) return false
+  const message = (err.message || '').toLowerCase()
+  return (
+    message.includes('model') ||
+    err.error?.error?.type === 'not_found_error' ||
+    err.error?.type === 'not_found_error'
+  )
+}
+
+async function callReviewerWithFallback({ system, messages }) {
+  const client = getClient()
+  try {
+    const response = await client.messages.create({
+      model: REVIEWER_MODEL,
+      max_tokens: MAX_REVIEW_TOKENS,
+      system,
+      messages,
+    })
+    return { response, modelUsed: REVIEWER_MODEL }
+  } catch (err) {
+    if (!isModelDeprecationError(err) || REVIEWER_MODEL === REVIEWER_FALLBACK_MODEL) {
+      throw err
+    }
+    log.warn(
+      {
+        event: 'sheetReviewer.model_fallback',
+        primaryModel: REVIEWER_MODEL,
+        fallbackModel: REVIEWER_FALLBACK_MODEL,
+        status: err.status || err.response?.status,
+      },
+      'Sheet reviewer primary model rejected; falling back',
+    )
+    const response = await client.messages.create({
+      model: REVIEWER_FALLBACK_MODEL,
+      max_tokens: MAX_REVIEW_TOKENS,
+      system,
+      messages,
+    })
+    return { response, modelUsed: REVIEWER_FALLBACK_MODEL }
+  }
 }
 
 // ── Hourly cost cap ──────────────────────────────────────────────────
@@ -76,9 +132,7 @@ async function reviewSheet({ htmlContent, scanFindings, riskTier, sheetTitle, sh
     sheetDescription,
   })
 
-  const response = await getClient().messages.create({
-    model: REVIEWER_MODEL,
-    max_tokens: MAX_REVIEW_TOKENS,
+  const { response, modelUsed } = await callReviewerWithFallback({
     system: SHEET_REVIEWER_SYSTEM_PROMPT,
     messages: [{ role: 'user', content: userMessage }],
   })
@@ -107,8 +161,10 @@ async function reviewSheet({ htmlContent, scanFindings, riskTier, sheetTitle, sh
         },
       ],
       reasoning: 'Auto-escalated: AI response could not be parsed as JSON.',
+      modelUsed,
     }
   }
+  result.modelUsed = modelUsed
 
   // Validate the decision field
   if (!Object.values(REVIEW_DECISIONS).includes(result.decision)) {
@@ -221,7 +277,7 @@ async function reviewSheetAndUpdateStatus(
         riskScore: result.risk_score || 0,
         findings: JSON.stringify(result.findings || []),
         reasoning: result.reasoning || '',
-        model: REVIEWER_MODEL,
+        model: result.modelUsed || REVIEWER_MODEL,
         inputTier: tier,
       },
     })
@@ -327,7 +383,7 @@ async function reReviewSheet(sheetId) {
       riskScore: result.risk_score || 0,
       findings: JSON.stringify(result.findings || []),
       reasoning: result.reasoning || '',
-      model: REVIEWER_MODEL,
+      model: result.modelUsed || REVIEWER_MODEL,
       inputTier: sheet.htmlRiskTier,
     },
   })

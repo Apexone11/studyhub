@@ -234,8 +234,8 @@ function AiBubbleInner() {
             position: 'fixed',
             bottom: 88,
             right: 24,
-            width: 'min(380px, calc(100vw - 48px))',
-            height: 560,
+            width: 'min(420px, calc(100vw - 48px))',
+            height: 600,
             maxHeight: 'calc(100vh - 120px)',
             background: 'var(--sh-surface)',
             borderRadius: 16,
@@ -322,14 +322,15 @@ function AiBubbleInner() {
             <AiSheetReport />
 
             {!chat.activeConversationId && chat.messages.length === 0 && (
-              <div style={{ textAlign: 'center', padding: '30px 10px' }}>
-                <IconSpark size={32} style={{ color: 'var(--sh-brand)', marginBottom: 12 }} />
+              <div style={{ textAlign: 'center', padding: '16px 8px 12px' }}>
+                <IconSpark size={36} style={{ color: 'var(--sh-brand)', marginBottom: 10 }} />
                 <div
                   style={{
-                    fontSize: 14,
-                    fontWeight: 600,
+                    fontSize: 15,
+                    fontWeight: 700,
                     color: 'var(--sh-heading)',
-                    marginBottom: 6,
+                    marginBottom: 4,
+                    letterSpacing: '-0.01em',
                   }}
                 >
                   How can I help?
@@ -339,7 +340,7 @@ function AiBubbleInner() {
                     fontSize: 12,
                     color: 'var(--sh-subtext)',
                     lineHeight: 1.5,
-                    marginBottom: 14,
+                    marginBottom: 12,
                   }}
                 >
                   Ask me anything about your studies. I can create sheets, explain concepts, and
