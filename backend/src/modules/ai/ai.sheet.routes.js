@@ -153,7 +153,19 @@ router.post(
       }
 
       const sheetContent = clampSheetContent(sheet.content || '')
-      const instruction = `You are reviewing a student's study sheet. Identify clear, concrete issues a reader would actually hit: typos, broken HTML/markdown, missing context, factual mistakes, structural problems, accessibility issues (alt text, heading order). Suggest improvements that respect the author's voice. Be specific.
+      // v2 multi-layer prompt (2026-05-14). The reviewer is asked to
+      // make four explicit passes — structure, content, a11y, pedagogy
+      // — so the resulting findings are richer than the v1 single-pass
+      // output. Each finding carries a \`layer\` tag (matching the
+      // category enum) so the UI can group them. Existing \`severity\`
+      // and \`suggestion\` fields are preserved for backwards
+      // compatibility with the V1 UI.
+      const instruction = `You are reviewing a student's study sheet. Make FOUR explicit passes and combine the findings:
+
+PASS 1 — STRUCTURE: heading order (h1 → h2 → h3, no skipping), section completeness (intro / body / summary), unused/empty sections, broken markdown or HTML.
+PASS 2 — CONTENT: typos, factual mistakes, unclear sentences, missing context a peer reader would actually hit.
+PASS 3 — ACCESSIBILITY: alt text on images, heading levels, link text ("click here" → meaningful), color-only emphasis, table headers.
+PASS 4 — PEDAGOGY: clarity for a student reader, examples that illustrate concepts, definitions before use, summaries / takeaways.
 
 Sheet metadata:
   Title: ${sheet.title}
@@ -170,18 +182,20 @@ Respond ONLY with a JSON object matching this shape (no prose, no markdown fence
 {
   "summary": "1–2 sentence overall verdict",
   "issues": [
-    { "severity": "low|medium|high", "category": "typo|html|content|structure|a11y|fact|other", "title": "short label", "suggestion": "what to change" }
+    { "severity": "low|medium|high", "category": "typo|html|content|structure|a11y|fact|other", "layer": "structure|content|a11y|pedagogy", "title": "short label", "suggestion": "what to change" }
   ],
   "suggestions": [
     { "title": "short label", "why": "1 sentence reason", "example": "optional improved snippet" }
   ]
 }
 
-If there are no issues, return { "summary": "...", "issues": [], "suggestions": [...] } with at least 1–2 enhancement suggestions. Keep total output under 1500 tokens.`
+Keep \`layer\` matching the pass that surfaced the issue. If there are no issues, return { "summary": "...", "issues": [], "suggestions": [...] } with at least 1–2 enhancement suggestions. Keep total output under 1800 tokens.`
 
-      // Spend ceiling guard
+      // Spend ceiling guard. v2 prompt is multi-layer so the output
+      // budget moves from 1500 → 1800 tokens to make room for richer
+      // findings without truncating the JSON.
       const inputTokensEst = estimateTokens(SYSTEM_PROMPT) + estimateTokens(instruction)
-      const maxOutputTokens = 1500
+      const maxOutputTokens = 1800
       reservation = await reserveSpend({
         user: req.user,
         inputTokensEst,
@@ -271,13 +285,19 @@ If there are no issues, return { "summary": "...", "issues": [], "suggestions": 
         })
       }
 
-      // Shape guard so the frontend never blows up on a partial response
+      // Shape guard so the frontend never blows up on a partial response.
+      // v2 adds the optional \`layer\` field (structure | content | a11y |
+      // pedagogy) so the UI can group findings by analyzer pass. Unknown
+      // layer values normalize to "other" so a model drift doesn't break
+      // the response.
+      const ALLOWED_LAYERS = ['structure', 'content', 'a11y', 'pedagogy']
       const safe = {
         summary: typeof report.summary === 'string' ? report.summary : '',
         issues: Array.isArray(report.issues)
           ? report.issues.slice(0, 30).map((i) => ({
               severity: ['low', 'medium', 'high'].includes(i.severity) ? i.severity : 'low',
               category: typeof i.category === 'string' ? i.category.slice(0, 40) : 'other',
+              layer: ALLOWED_LAYERS.includes(i.layer) ? i.layer : 'other',
               title: typeof i.title === 'string' ? i.title.slice(0, 200) : '',
               suggestion: typeof i.suggestion === 'string' ? i.suggestion.slice(0, 1000) : '',
             }))

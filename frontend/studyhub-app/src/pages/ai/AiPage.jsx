@@ -312,6 +312,10 @@ export default function AiPage() {
         overflowX: 'hidden',
       }}
     >
+      {/* sr-only h1 for WCAG 1.3.1 — visual chrome opens straight into
+          the conversation list / chat split and never lands an h1.
+          Wave-11 audit L4-5. */}
+      <h1 className="sr-only">Hub AI</h1>
       <AiStreamAnnouncer streaming={chat.streaming} error={chat.error} stopped={stopped} />
       <Navbar />
       <div style={pageShell('app')}>
@@ -496,8 +500,11 @@ function ConversationSidebar({
   return (
     <div
       style={{
-        width: isCompact ? '100%' : 280,
-        minWidth: isCompact ? undefined : 280,
+        // Conversation list fluidly shrinks 240px → 280px so iPad
+        // landscape (1180–1280px) doesn't run out of room for the chat
+        // column. On compact (drawer-mode) it goes full width.
+        width: isCompact ? '100%' : 'clamp(240px, 22vw, 280px)',
+        minWidth: isCompact ? undefined : 240,
         borderRight: isCompact ? 'none' : '1px solid var(--sh-border)',
         display: 'flex',
         flexDirection: 'column',
@@ -507,7 +514,7 @@ function ConversationSidebar({
       {/* Header */}
       <div
         style={{
-          padding: '16px 16px 12px',
+          padding: '14px 14px 10px',
           borderBottom: '1px solid var(--sh-border)',
           display: 'flex',
           alignItems: 'center',
@@ -635,7 +642,10 @@ function ConversationSidebar({
                     gridTemplateColumns: '1fr auto',
                     alignItems: 'center',
                     columnGap: 6,
-                    padding: '10px 16px',
+                    // Tighter padding at narrow desktop widths so the
+                    // list reads denser on iPad landscape without
+                    // losing the desktop comfort at wide displays.
+                    padding: 'clamp(8px, 1.2vw, 10px) clamp(12px, 1.4vw, 16px)',
                   }}
                 >
                   <button
@@ -777,7 +787,7 @@ function ConversationSidebar({
       {usage && (
         <div
           style={{
-            padding: '10px 16px',
+            padding: 'clamp(8px, 1.2vw, 10px) clamp(12px, 1.4vw, 16px)',
             borderTop: '1px solid var(--sh-border)',
             fontSize: 11,
             color: 'var(--sh-subtext)',

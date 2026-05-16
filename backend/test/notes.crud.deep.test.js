@@ -60,9 +60,16 @@ const mocks = vi.hoisted(() => {
     prisma,
     sentry: { captureError: vi.fn() },
     accessControl: {
-      assertOwnerOrAdmin: vi.fn(
-        ({ user, ownerId }) => user.role === 'admin' || Number(ownerId) === Number(user.userId),
-      ),
+      assertOwnerOrAdmin: vi.fn(({ res, user, ownerId, message }) => {
+        if (user?.role === 'admin' || Number(ownerId) === Number(user?.userId)) return true
+        if (res) res.status(403).json({ error: message || 'Forbidden' })
+        return false
+      }),
+      assertOwner: vi.fn(({ res, user, ownerId, message }) => {
+        if (Number(ownerId) === Number(user?.userId)) return true
+        if (res) res.status(403).json({ error: message || 'Forbidden' })
+        return false
+      }),
     },
     moderationEngine: { isModerationEnabled: vi.fn(() => false), scanContent: vi.fn() },
     notify: { createNotification: vi.fn() },
@@ -126,6 +133,7 @@ const fakeLimiterBag = {
   notesRestoreLimiter: fakeRateLimiter,
   notesDiffLimiter: fakeRateLimiter,
   noteHighlightWriteLimiter: fakeRateLimiter,
+  noteHighlightLimiter: fakeRateLimiter,
 }
 
 const mockTargets = new Map([
@@ -468,7 +476,8 @@ describe('PATCH /:id', () => {
       content: 'x',
       revision: 0,
     })
-    mocks.accessControl.assertOwnerOrAdmin.mockImplementationOnce(({ res }) => {
+    // updateNote was tightened to assertOwner (no admin bypass) 2026-05-14.
+    mocks.accessControl.assertOwner.mockImplementationOnce(({ res }) => {
       res.status(403).json({ error: 'Not your note.', code: 'FORBIDDEN' })
       return false
     })
@@ -510,7 +519,8 @@ describe('DELETE /:id', () => {
 
   it('non-owner gets 403', async () => {
     mocks.prisma.note.findUnique.mockResolvedValueOnce({ id: 1, userId: 99 })
-    mocks.accessControl.assertOwnerOrAdmin.mockImplementationOnce(({ res }) => {
+    // deleteNote was tightened to assertOwner (no admin bypass) 2026-05-14.
+    mocks.accessControl.assertOwner.mockImplementationOnce(({ res }) => {
       res.status(403).json({ error: 'Not your note.', code: 'FORBIDDEN' })
       return false
     })
@@ -607,7 +617,9 @@ describe('PATCH /:id/pin', () => {
 
   it('non-owner gets 403', async () => {
     mocks.prisma.note.findUnique.mockResolvedValueOnce({ id: 1, userId: 99, pinned: false })
-    mocks.accessControl.assertOwnerOrAdmin.mockImplementationOnce(({ res }) => {
+    // toggleNotePin was tightened to assertOwner (no admin bypass)
+    // 2026-05-14 per founder directive. Override the right helper.
+    mocks.accessControl.assertOwner.mockImplementationOnce(({ res }) => {
       res.status(403).json({ error: 'Not your note.', code: 'FORBIDDEN' })
       return false
     })

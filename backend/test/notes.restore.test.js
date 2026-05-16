@@ -63,6 +63,11 @@ const mocks = vi.hoisted(() => {
         if (res) res.status(403).json({ error: 'Not your note.' })
         return false
       }),
+      assertOwner: vi.fn(({ res, user, ownerId }) => {
+        if (Number(ownerId) === Number(user?.userId)) return true
+        if (res) res.status(403).json({ error: 'Not your note.' })
+        return false
+      }),
     },
     moderationEngine: {
       isModerationEnabled: vi.fn(() => true),

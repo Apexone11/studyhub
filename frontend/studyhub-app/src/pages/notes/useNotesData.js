@@ -411,6 +411,47 @@ export function useNotesData() {
     }
   }
 
+  /**
+   * Drag-and-drop / picker import flow (2026-05-14). Sends the file to
+   * `POST /api/notes/import`; backend handles parsing, AI title gen,
+   * and persistence. Returns true on success so the caller can clear
+   * its file input state. v1 accepts plain-text + markdown; PDF/DOCX
+   * land in a follow-up that wires the AI attachments parser stack.
+   */
+  async function importFileAsNote(file) {
+    if (!file) return false
+    setCreating(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      // Don't set Content-Type — let the browser write the multipart
+      // boundary. We still need credentials so the auth cookie travels.
+      const headers = { ...authHeaders() }
+      delete headers['Content-Type']
+      const response = await fetch(`${API}/api/notes/import`, {
+        method: 'POST',
+        headers,
+        credentials: 'include',
+        body: fd,
+      })
+      const raw = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        showToast(raw?.error?.message || raw?.error || 'Failed to import file', 'error')
+        return false
+      }
+      const note = normalizeNote(raw)
+      setNotes((prev) => [note, ...prev])
+      selectNote(note)
+      showToast(`Imported "${note.title}"`, 'success')
+      return true
+    } catch (err) {
+      showToast(err?.message || 'Failed to import file', 'error')
+      return false
+    } finally {
+      setCreating(false)
+    }
+  }
+
   async function deleteNote() {
     if (!activeNote) return
     try {
@@ -607,6 +648,7 @@ export function useNotesData() {
     handleAllowDownloadsChange,
     handleCourseChange,
     createNote,
+    importFileAsNote,
     deleteNote,
     toggleStar,
     togglePin,

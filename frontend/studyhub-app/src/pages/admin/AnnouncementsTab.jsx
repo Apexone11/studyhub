@@ -7,7 +7,7 @@
  *   - Pin/unpin and delete controls
  *   - Pagination
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { API } from '../../config'
 import { Pager } from './AdminWidgets'
 import { inputStyle, primaryButton, pillButton } from './adminConstants'
@@ -33,6 +33,20 @@ export default function AnnouncementsTab({
   const [imageError, setImageError] = useState('')
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
+  // Mirror state into a ref so the unmount cleanup below revokes the
+  // CURRENT image previews, not the initial empty array. Wave-11
+  // audit L2-1 fix (createObjectURL leak on unmount).
+  const imagesRef = useRef(images)
+  useEffect(() => {
+    imagesRef.current = images
+  }, [images])
+  useEffect(() => {
+    return () => {
+      imagesRef.current.forEach((img) => {
+        if (img?.preview) URL.revokeObjectURL(img.preview)
+      })
+    }
+  }, [])
 
   const bodyLen = (announceForm.body || '').length
   const bodyPct = bodyLen / MAX_BODY

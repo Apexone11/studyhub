@@ -19,13 +19,23 @@ const {
   notesRestoreLimiter,
   notesDiffLimiter,
   noteHighlightWriteLimiter,
+  noteHighlightLimiter,
 } = require('../../lib/rateLimiters')
 const notesController = require('./notes.controller')
 const noteHighlightsController = require('./note.highlights.controller')
+const { importNoteHandler, importUploadMiddleware } = require('./notes.import.controller')
 
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
 const requireTrustedOrigin = originAllowlist()
+
+// Defense-in-depth origin check on every write under /api/notes. Safe
+// methods (GET/HEAD/OPTIONS) short-circuit in originAllowlist so this
+// is safe at the router.use level. CLAUDE.md A11. The per-route
+// `requireTrustedOrigin` references below are now redundant but kept
+// for grep visibility — removing them would make a future code-mover
+// think the route had no origin check.
+router.use(requireTrustedOrigin)
 
 const mutateLimiter = notesMutateLimiter
 const readLimiter = notesReadLimiter
@@ -45,6 +55,19 @@ router.get('/', requireAuth, readLimiter, notesController.listNotes)
 
 // ── POST /api/notes ─────────────────────────────────────────────
 router.post('/', requireAuth, mutateLimiter, requireVerifiedEmail, notesController.createNote)
+
+// ── POST /api/notes/import ─ Drag-and-drop file → AI-titled Note ─
+// 2026-05-14 — v1 supports plain-text + markdown. PDF/DOCX gated on
+// the AI attachments parser stack (planned follow-up).
+router.post(
+  '/import',
+  requireAuth,
+  requireVerifiedEmail,
+  requireTrustedOrigin,
+  mutateLimiter,
+  importUploadMiddleware,
+  importNoteHandler,
+)
 
 // ── PATCH /api/notes/:id ────────────────────────────────────────────��──────────────────────────────��
 router.patch(
@@ -193,11 +216,16 @@ router.get(
 )
 
 // ── POST /api/notes/:noteId/highlights ───────────────────────────────────
+// Per-pair daily cap (G1-3) stacked on top of the per-user write limiter.
+// noteHighlightLimiter is keyed on the (reviewerId, noteId) pair so a
+// single reviewer can't drown a single note in 20+ highlights/day, but
+// they can still review across multiple notes at a healthy cadence.
 router.post(
   '/:noteId/highlights',
   requireAuth,
   requireTrustedOrigin,
   noteHighlightWriteLimiter,
+  noteHighlightLimiter,
   noteHighlightsController.createHighlight,
 )
 

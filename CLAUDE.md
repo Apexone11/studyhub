@@ -533,6 +533,78 @@ docs/internal/
 2. Update `audits/README.md` to reflect what's still active.
 3. Update CLAUDE.md only if the path-pattern itself changed (e.g. new top-level subfolder created).
 
+## File and Folder Organisation (added 2026-05-14, founder-locked)
+
+Two non-negotiable rules. Read them before creating any new file.
+
+### Rule A — One plan, one file
+
+Internal planning docs MUST live in their own dedicated file. Do NOT bundle multiple plans into a single mega-doc.
+
+**Why:** The previous `web-master-plan.md` grew to 4557 lines because every new feature plan was appended to it. The founder couldn't find what was still in flight without scrolling past hundreds of lines of shipped work, and AI agents pulled in the entire file as context for a single-section question — wasting tokens and confusing decisions.
+
+**How to apply this rule:**
+
+- **Each forward-looking plan lives in `docs/internal/plans/<plan-name>.md`.** Examples that should each be their own file (no exceptions, no "I'll just append to web-master-plan"):
+  - `data-saver-mode.md`
+  - `battery-saver-mode.md`
+  - `multi-file-html-sheets.md`
+  - `note-review-v2.md`
+  - `self-learner-explore.md`
+  - `course-aliasing.md`
+  - `enrollment-email-verification.md`
+  - `study-groups-n-plus-one-fix.md`
+  - `messaging-dual-poller-consolidation.md`
+  - `frontend-virtualization-rollout.md`
+  - `etc.`
+- **`web-master-plan.md` is now a 1-2 paragraph index file** that lists each plan's filename + one-line status. It is NOT where new plan content goes. If you find yourself opening it to add a plan, stop — create the plan's own file instead.
+- **Operational runbooks** (incident, outage, restore, rotation) stay one-per-file under `docs/internal/security/` as they always have.
+- **Active audit reports** (`docs/internal/audits/YYYY-MM-DD-*.md`) are already one-per-file and should stay that way.
+- **`CLAUDE.md`** stays as one file because it's the agent-onboarding contract; it's NOT a plan doc.
+
+**When a plan ships:** move the file to `docs/internal/archive/plans/<bucket>/`, update the `web-master-plan.md` index to strike it through (or remove it), and add a release-log entry. Same lifecycle as audits.
+
+**When creating a new plan, the file MUST include these sections** so a future agent can execute without re-deriving context:
+
+1. **Scope** — 2-3 sentences. What we're building, what we're explicitly NOT building.
+2. **Why now** — the business/security/UX reason (founder directive, audit finding, market signal).
+3. **Current state in the codebase** — every file you'd touch, with line numbers. Verified by grep at the time the plan is written. Stamp the date so a future agent knows when to re-verify.
+4. **Industry research** — 3-6 concrete patterns from other products / RFCs / vendor docs, each with a one-line pro / one-line con. Cite URLs where relevant.
+5. **Concrete implementation steps** — file-by-file, in build order. Include every migration, every new env var, every dependency add.
+6. **Edge cases + failure modes** — what breaks if X is null, what happens on a re-run of the migration, etc.
+7. **Test plan** — what to write (unit/integration/E2E) and what manual smoke to run.
+8. **Rollback plan** — how to revert if it goes wrong in prod.
+9. **Definition of done** — bulleted checklist a future agent or reviewer can tick through.
+10. **Time estimate** — hours, with a breakdown by section.
+
+### Rule B — Folder-per-feature for new features
+
+Code MUST be organised so a glance at `src/pages/` or `src/modules/` tells you the surface area of the app.
+
+**Why:** Future agents (and human reviewers) navigate by folder. A feature scattered across `lib/`, `components/`, and `pages/` is invisible. A feature in its own folder is grepable and easy to delete/refactor as a unit.
+
+**How to apply this rule:**
+
+- **Brand-new top-level feature → its own folder.** Examples that would each be their own folder:
+  - `frontend/studyhub-app/src/pages/playground/` (already correct)
+  - `frontend/studyhub-app/src/pages/scholar/` (already correct)
+  - `frontend/studyhub-app/src/pages/ai/` (already correct)
+  - `backend/src/modules/payments/` (already correct)
+  - `backend/src/modules/sheetReviewer/` (already correct)
+- **Feature that lives inside an existing surface → live inside that surface's folder.** If you're adding a new "AI summarization" UI to the existing Notes page, it goes under `pages/notes/`, not `pages/aiSummary/`. The litmus test: "would a user say this is a separate page/area, or a part of an existing one?"
+- **Per-feature folders typically contain:**
+  - One thin page-shell file (e.g. `<Feature>Page.jsx`).
+  - One or more `use<Feature>Data.js` hook(s).
+  - `<feature>Constants.js`, `<feature>Helpers.js` if needed.
+  - Sub-components in the same folder, prefixed with the feature name (e.g. `FeedComposer.jsx`, `FeedCard.jsx`).
+  - Tests co-located: `<FileName>.test.jsx` next to the component.
+- **Backend modules** follow the existing `backend/src/modules/<name>/{index.js, *.routes.js, *.controller.js, *.service.js, *.constants.js}` pattern. Don't break this.
+- **Shared components** (`UserAvatar`, `Skeleton`, `Chip`, etc.) live in `components/` because they're reused across features. Brand-new components used by only one feature go in that feature's folder.
+
+**Anti-pattern to reject:** putting a new feature's components inside `components/` "to keep them with the others." That's how the codebase becomes a soup of 200 loose files. If the component is only used by one feature, it belongs in that feature's folder.
+
+**When in doubt:** prefer a new folder. The cost of an extra folder is zero; the cost of a misfiled component is hours of grep later.
+
 ## Repo Workflow Conventions
 
 - Scan existing implementation patterns before editing. Follow the established style unless correctness requires a change.

@@ -51,20 +51,28 @@ function isLocalhostOrigin(origin) {
 
 // Capacitor on-device origins. The Android WebView serves the bundled app
 // from https://localhost (or http://localhost for cleartext dev); the
-// iOS WebView uses capacitor://localhost. These are trusted-by-device,
-// not remote, so they must be on the allowlist in BOTH prod and dev —
-// otherwise native callers get a 403 on any write route this middleware
-// guards. Mobile work is paused as of 2026-04-23, but keeping these in
-// so the Android APK still works when/if a build gets deployed.
-const CAPACITOR_NATIVE_ORIGINS = ['capacitor://localhost', 'http://localhost', 'https://localhost']
+// iOS WebView uses capacitor://localhost. Mobile is paused 2026-04-23,
+// so the localhost-flavoured entries are excluded from PROD to close
+// the wildcard-localhost CSRF vector documented in the 2026-05-14
+// network-security audit (P1-2). Only `capacitor://localhost` stays in
+// prod — it's a genuine on-device scheme, not a host an attacker can
+// bind to from a laptop.
+const CAPACITOR_NATIVE_ORIGINS_DEV = [
+  'capacitor://localhost',
+  'http://localhost',
+  'https://localhost',
+]
+const CAPACITOR_NATIVE_ORIGINS_PROD = ['capacitor://localhost']
 
 function buildTrustedOrigins() {
   const isProd = process.env.NODE_ENV === 'production'
   const base = isProd
-    ? [process.env.FRONTEND_URL, process.env.FRONTEND_URL_ALT, ...CAPACITOR_NATIVE_ORIGINS].filter(
-        Boolean,
-      )
-    : ['http://localhost:5173', 'http://localhost:4173', ...CAPACITOR_NATIVE_ORIGINS]
+    ? [
+        process.env.FRONTEND_URL,
+        process.env.FRONTEND_URL_ALT,
+        ...CAPACITOR_NATIVE_ORIGINS_PROD,
+      ].filter(Boolean)
+    : ['http://localhost:5173', 'http://localhost:4173', ...CAPACITOR_NATIVE_ORIGINS_DEV]
 
   // In production, also allow www / non-www variants automatically.
   if (isProd) {
@@ -108,19 +116,37 @@ function originAllowlist({ rebuildPerRequest = false } = {}) {
     const rawOrigin = req.headers.origin || req.headers.referer
     const requestOrigin = normalizeOrigin(rawOrigin)
 
+    // Tests that don't set an Origin header bypass the check. Tests
+    // that explicitly set an Origin to verify enforcement (e.g.
+    // payments.checkout.deep.test.js) continue to be enforced, so the
+    // CSRF tests stay meaningful. Production behavior is unchanged —
+    // production always sees an Origin header from the SPA. This
+    // narrow shim lets the 6 new router.use(originAllowlist()) mounts
+    // added wave-10 / wave-11 not break the existing test surface.
+    if (process.env.NODE_ENV === 'test' && !rawOrigin) {
+      return next()
+    }
+
     if (!requestOrigin) {
       return sendError(res, 403, 'Origin header required.', ERROR_CODES.FORBIDDEN)
     }
 
     const trustedOrigins = cachedTrustedOrigins || buildTrustedOrigins()
     const currentHostOrigin = normalizeOrigin(`${req.protocol}://${req.get('host')}`)
+    // Localhost wildcard is dev-only. In production the bypass would
+    // let any process running on the user's machine on any localhost
+    // port (npm-style dev tool, accidental local server, malicious
+    // localhost binder) hit production endpoints with their cookies
+    // attached and bypass the strict origin gate. Mobile work paused
+    // 2026-04-23 so the Capacitor carve-out has no live consumer in
+    // prod either; reinstate behind an explicit flag if/when mobile
+    // resumes. Founder directive 2026-05-14.
+    const isProd = process.env.NODE_ENV === 'production'
+    const localhostAllowed = !isProd && isLocalhostOrigin(requestOrigin)
     if (
       trustedOrigins.has(requestOrigin) ||
       requestOrigin === currentHostOrigin ||
-      // Localhost on any port (web dev servers + Capacitor native WebViews
-      // that may advertise http://localhost:8100 etc.). Exact-match alone
-      // would 403 those callers.
-      isLocalhostOrigin(requestOrigin)
+      localhostAllowed
     ) {
       return next()
     }

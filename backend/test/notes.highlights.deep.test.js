@@ -57,9 +57,16 @@ const mocks = vi.hoisted(() => {
     },
     sentry: { captureError: vi.fn() },
     accessControl: {
-      assertOwnerOrAdmin: vi.fn(
-        ({ user, ownerId }) => user.role === 'admin' || Number(ownerId) === Number(user.userId),
-      ),
+      assertOwnerOrAdmin: vi.fn(({ res, user, ownerId, message }) => {
+        if (user.role === 'admin' || Number(ownerId) === Number(user.userId)) return true
+        if (res) res.status(403).json({ error: message || 'Forbidden' })
+        return false
+      }),
+      assertOwner: vi.fn(({ res, user, ownerId, message }) => {
+        if (Number(ownerId) === Number(user?.userId)) return true
+        if (res) res.status(403).json({ error: message || 'Forbidden' })
+        return false
+      }),
     },
     moderationEngine: { isModerationEnabled: vi.fn(() => false), scanContent: vi.fn() },
     notify: { createNotification: vi.fn() },
@@ -113,6 +120,10 @@ const fakeLimiterBag = {
   notesRestoreLimiter: fakeRateLimiter,
   notesDiffLimiter: fakeRateLimiter,
   noteHighlightWriteLimiter: fakeRateLimiter,
+  // G1-3 added a stricter per-(reviewer, note) cap on top of the
+  // existing per-user write limiter. The test stubs it as a pass-through
+  // so the route mount resolves without enforcing limits.
+  noteHighlightLimiter: fakeRateLimiter,
 }
 
 const mockTargets = new Map([

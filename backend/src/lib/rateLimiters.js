@@ -83,6 +83,66 @@ const adminLimiter = rateLimit({
 })
 
 /**
+ * Admin announcement create + edit — 5 broadcasts per admin per 24h.
+ * Wave-11 (2026-05-14) G1-1. Required by feature-expansion security
+ * addendum §2 HIGH. Prevents a compromised admin account from spamming
+ * the entire platform's notification bell. Keyed on `req.user.userId`
+ * per CLAUDE.md A7; the 'anon' fallback never fires because the routes
+ * sit behind requireAuth + requireAdmin.
+ */
+const adminAnnouncementLimiter = rateLimit({
+  windowMs: WINDOW_1_DAY,
+  max: 5,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `admin-ann-${req.user?.userId || 'anon'}`,
+  message: { error: 'Daily announcement quota reached (5 per 24 hours).' },
+})
+
+/**
+ * Note highlight create — 20 highlights per reviewer per note per 24h.
+ * Wave-11 (2026-05-14) G1-3. Required by feature-expansion security
+ * addendum §4 HIGH. Keyed on the reviewer+note pair so a heavy reviewer
+ * on one note can't quench review activity on another. The `noteId`
+ * comes from the URL params; falls back to 'unknown-note' if missing
+ * which is impossibly tight (you can't hit the limiter without a note)
+ * but matches the safe-by-default pattern.
+ */
+const noteHighlightLimiter = rateLimit({
+  windowMs: WINDOW_1_DAY,
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) =>
+    `note-hl-${req.user?.userId || 'anon'}-${req.params?.noteId || req.params?.id || 'unknown-note'}`,
+  message: { error: 'Highlight quota reached for this note (20 per 24 hours).' },
+})
+
+/**
+ * Discovery enumeration limiters — 30 reads per user per 15min on the
+ * school catalog + course catalog endpoints. Wave-11 (2026-05-14) G1-6.
+ * Required by feature-expansion security addendum §1 HIGH. Defends
+ * against scraper enumeration of the school+course taxonomy.
+ */
+const discoverySchoolsLimiter = rateLimit({
+  windowMs: WINDOW_15_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `disc-schools-${req.user?.userId || req.ip}`,
+  message: { error: 'Too many catalog requests. Please slow down.' },
+})
+
+const discoveryCoursesLimiter = rateLimit({
+  windowMs: WINDOW_15_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `disc-courses-${req.user?.userId || req.ip}`,
+  message: { error: 'Too many catalog requests. Please slow down.' },
+})
+
+/**
  * Preview / resource-intensive endpoints.
  * 60 requests per minute per IP.
  */
@@ -1362,6 +1422,10 @@ module.exports = {
   writeLimiter,
   readLimiter,
   adminLimiter,
+  adminAnnouncementLimiter,
+  noteHighlightLimiter,
+  discoverySchoolsLimiter,
+  discoveryCoursesLimiter,
   previewLimiter,
   publicLimiter,
 

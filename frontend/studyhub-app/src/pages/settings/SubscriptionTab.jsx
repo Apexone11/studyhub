@@ -260,12 +260,19 @@ export default function SubscriptionTab() {
     window.history.replaceState({}, '', window.location.pathname + '?tab=subscription')
     refreshSession()
 
+    // Cancellation flag prevents post-unmount setState. The poll's
+    // 3s interval starts an `await fetchSubscriptionData()` that can
+    // resolve after the user has navigated away — without this guard
+    // setSub / setHistory fire on an unmounted component and React
+    // logs a memory-leak warning. Wave-11 frontend bug hunt P1-6 fix.
+    let cancelled = false
     let attempts = 0
     const MAX_ATTEMPTS = 10
     pollRef.current = setInterval(async () => {
       attempts++
       try {
         const { subData, histData } = await fetchSubscriptionData()
+        if (cancelled) return
         if (subData) setSub(subData)
         if (histData) setHistory(histData)
         if ((subData && subData.plan !== 'free') || attempts >= MAX_ATTEMPTS) {
@@ -277,7 +284,10 @@ export default function SubscriptionTab() {
       }
     }, 3000)
 
-    return () => clearInterval(pollRef.current)
+    return () => {
+      cancelled = true
+      clearInterval(pollRef.current)
+    }
   }, [refreshSession, fetchSubscriptionData])
 
   // Initial load

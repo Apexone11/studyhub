@@ -15,7 +15,15 @@ function envFlag(name, fallback = false) {
 }
 
 function isStrictWebhookMode() {
-  return envFlag('RESEND_WEBHOOK_STRICT', process.env.NODE_ENV === 'production')
+  // Strict mode is FLOOR-CAPPED on production: no env-flag override can
+  // re-enable the unsigned-payload path in prod. Without this hard
+  // ceiling a misconfigured `RESEND_WEBHOOK_STRICT=false` in prod would
+  // let any caller knowing the URL write EmailDeliveryEvent rows + add
+  // EmailSuppression entries (P1-5 of the 2026-05-14 network-security
+  // audit). Outside prod the env flag still wins so local dev tests
+  // can exercise both branches.
+  if (process.env.NODE_ENV === 'production') return true
+  return envFlag('RESEND_WEBHOOK_STRICT', false)
 }
 
 function normalizeString(value) {

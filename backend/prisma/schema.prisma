@@ -534,7 +534,16 @@ model Announcement {
   body      String
   authorId  Int
   pinned    Boolean             @default(false)
+  // 'normal' | 'urgent'. Urgent announcements bypass per-user mutes
+  // (mute is for noisy admins, not safety-critical broadcasts).
+  // Feature-expansion roadmap decision #16 + addendum §6 MEDIUM.
+  // Added wave-11 2026-05-14.
+  urgency   String              @default("normal")
   createdAt DateTime            @default(now())
+  // Edited-indicator on the bell widget needs updatedAt. Migration
+  // backfills existing rows from createdAt and Prisma populates on
+  // every subsequent update via @updatedAt. Wave-11 easy-win #1.
+  updatedAt DateTime            @updatedAt
   author    User                @relation(fields: [authorId], references: [id])
   media     AnnouncementMedia[]
 

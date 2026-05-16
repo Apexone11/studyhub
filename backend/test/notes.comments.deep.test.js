@@ -53,7 +53,7 @@ const mocks = vi.hoisted(() => {
   return {
     prisma,
     sentry: { captureError: vi.fn() },
-    accessControl: { assertOwnerOrAdmin: vi.fn(() => true) },
+    accessControl: { assertOwnerOrAdmin: vi.fn(() => true), assertOwner: vi.fn(() => true) },
     moderationEngine: { isModerationEnabled: vi.fn(() => false), scanContent: vi.fn() },
     notify: { createNotification: vi.fn().mockResolvedValue(undefined) },
     mentions: { notifyMentionedUsers: vi.fn().mockResolvedValue(undefined) },
@@ -106,6 +106,7 @@ const fakeLimiterBag = {
   notesRestoreLimiter: fakeRateLimiter,
   notesDiffLimiter: fakeRateLimiter,
   noteHighlightWriteLimiter: fakeRateLimiter,
+  noteHighlightLimiter: fakeRateLimiter,
 }
 
 const mockTargets = new Map([

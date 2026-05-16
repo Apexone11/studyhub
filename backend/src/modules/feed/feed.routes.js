@@ -1,5 +1,6 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { authLimiter, feedReadLimiter } = require('./feed.constants')
 const { feedMobileLimiter } = require('../../lib/rateLimiters')
 const listController = require('./feed.list.controller')
@@ -23,6 +24,11 @@ router.get('/mobile', requireAuth, feedMobileLimiter, mobileController.getMobile
 router.use(authLimiter)
 router.use(requireAuth)
 router.use(feedReadLimiter)
+// Defense-in-depth origin check on every authed feed write (posts,
+// comments, reactions). Safe methods short-circuit so the public
+// leaderboard / trending mounts above are unaffected. CLAUDE.md A11.
+// Added 2026-05-14.
+router.use(originAllowlist())
 
 router.use(listController)
 router.use(postsController)

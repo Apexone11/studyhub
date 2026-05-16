@@ -30,8 +30,33 @@ function assertOwnerOrAdmin({ res, user, ownerId, message, targetType, targetId 
   return false
 }
 
+/**
+ * Owner-only gate. Use on content-mutation routes where the founder
+ * directive 2026-05-13 applies: admin is a moderator role, not a
+ * creator role. Admin moderation actions live on dedicated /api/admin/*
+ * routes that audit-log every change. Same shape as assertOwnerOrAdmin
+ * so swapping is a one-line edit.
+ */
+function assertOwner({ res, user, ownerId, message, targetType, targetId }) {
+  if (isOwner(user, ownerId)) {
+    return true
+  }
+
+  logSecurityEvent('access.denied', {
+    actorId: user?.userId || null,
+    actorRole: user?.role || 'anonymous',
+    targetType: targetType || null,
+    targetId: targetId ?? null,
+    reason: ERROR_CODES.FORBIDDEN,
+  })
+
+  sendForbidden(res, message)
+  return false
+}
+
 module.exports = {
   assertOwnerOrAdmin,
+  assertOwner,
   isAdmin,
   isOwner,
   sendForbidden,

@@ -1,6 +1,7 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const optionalAuth = require('../../core/auth/optionalAuth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const {
   readLimiter,
   writeLimiter,
@@ -16,6 +17,11 @@ router.use((req, res, next) => {
   if (req.method === 'GET' || req.method === 'HEAD') return readLimiter(req, res, next)
   next()
 })
+// Defense-in-depth origin check on every write under /api/users. The
+// global Origin check is the floor; this re-runs at the module
+// boundary per CLAUDE.md A11. Safe methods short-circuit so this is
+// safe at router.use. Added 2026-05-14.
+router.use(originAllowlist())
 
 const followLimiter = usersFollowLimiter
 

@@ -59,6 +59,14 @@ const mocks = vi.hoisted(() => {
         }
         return true
       }),
+      // Owner-only (no admin bypass). Founder directive 2026-05-13.
+      assertOwner: vi.fn(({ res, user, ownerId }) => {
+        if (Number(user?.userId) !== Number(ownerId)) {
+          res.status(403).json({ error: 'Not your note.' })
+          return false
+        }
+        return true
+      }),
     },
     moderation: {
       isModerationEnabled: vi.fn(() => false),

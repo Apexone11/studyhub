@@ -261,13 +261,25 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
       captureError(blockErr, { route: req.originalUrl, context: 'block-check-send' })
     }
 
+    // CLAUDE.md A12 — never trust untyped numeric input. A non-integer
+    // `replyToId` here was coerced to NaN by parseInt and silently sent
+    // to Prisma, which could match unintended rows on PG int casting.
+    // Fixed wave-11 2026-05-14.
+    let safeReplyToId = null
+    if (replyToId !== undefined && replyToId !== null && replyToId !== '') {
+      const parsed = Number.parseInt(replyToId, 10)
+      if (!Number.isInteger(parsed) || parsed < 1) {
+        return sendError(res, 400, 'Invalid replyToId.', ERROR_CODES.BAD_REQUEST)
+      }
+      safeReplyToId = parsed
+    }
     const message = await prisma.message.create({
       data: {
         conversationId,
         senderId: req.user.userId,
         content: cleanContent,
         type,
-        replyToId: replyToId ? parseInt(replyToId, 10) : null,
+        replyToId: safeReplyToId,
         // Create attachments if provided
         ...(attachments.length > 0 && {
           attachments: {

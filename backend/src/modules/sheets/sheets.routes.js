@@ -1,4 +1,5 @@
 const express = require('express')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const listController = require('./sheets.list.controller')
 const crudController = require('./sheets.crud.controller')
@@ -19,6 +20,12 @@ router.use((req, res, next) => {
   if (req.method === 'GET' || req.method === 'HEAD') return readLimiter(req, res, next)
   return writeLimiter(req, res, next)
 })
+
+// Defense-in-depth origin check on every write under /api/sheets. The
+// global Origin check is the floor; this re-runs the allowlist at the
+// module boundary per CLAUDE.md A11. originAllowlist short-circuits
+// safe methods so it's safe at router.use level. Added 2026-05-14.
+router.use(originAllowlist())
 
 // Static / prefix routes must come before parameterised /:id routes so Express
 // does not treat "leaderboard", "drafts", or "contributions" as an :id value.
