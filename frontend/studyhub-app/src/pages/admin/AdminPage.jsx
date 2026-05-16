@@ -20,6 +20,7 @@ import EmailSuppressionsTab from './EmailSuppressionsTab'
 import AdminSettingsTab from './AdminSettingsTab'
 import SchoolsTab from './SchoolsTab'
 import ReviewsTab from './ReviewsTab'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 const AnalyticsTab = lazy(() => import('./AnalyticsTab'))
 const RevenueTab = lazy(() => import('./RevenueTab'))
@@ -32,6 +33,7 @@ const ObservabilityTab = lazy(() => import('./ObservabilityTab'))
 const ConsentLogTab = lazy(() => import('./ConsentLogTab'))
 
 export default function AdminPage() {
+  usePageTitle('Admin')
   const layout = useResponsiveAppLayout()
   const [activeTab, setActiveTab] = useState('overview')
   const d = useAdminData()

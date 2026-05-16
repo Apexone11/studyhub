@@ -1,8 +1,14 @@
 import { useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useFocusTrap } from '../lib/useFocusTrap'
 
 /**
  * Reusable confirmation dialog that replaces window.confirm().
+ *
+ * Portaled to document.body so the position:fixed overlay isn't
+ * trapped by an animated ancestor's transform (which creates a new
+ * containing block and breaks viewport centering — CLAUDE.md
+ * "Common Bugs and Pitfalls" #8). Returns null when SSR'ed.
  *
  * Props:
  *  open          — boolean, whether to show the dialog
@@ -28,10 +34,11 @@ export default function ConfirmDialog({
   const trapRef = useFocusTrap({ active: open, onClose: onCancel, initialFocusRef: confirmRef })
 
   if (!open) return null
+  if (typeof document === 'undefined') return null
 
   const isDanger = variant === 'danger'
 
-  return (
+  return createPortal(
     <div style={styles.overlay} onClick={onCancel} role="presentation">
       <div
         ref={trapRef}
@@ -61,7 +68,8 @@ export default function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

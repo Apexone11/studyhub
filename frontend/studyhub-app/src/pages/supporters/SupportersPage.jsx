@@ -4,6 +4,7 @@ import Navbar from '../../components/navbar/Navbar'
 import UserAvatar from '../../components/UserAvatar'
 import { Skeleton, SkeletonCard } from '../../components/Skeleton'
 import { API } from '../../config'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 // ── Inject premium keyframe animations ──────────────────────────────────
 
@@ -72,6 +73,7 @@ const PARTICLES = [
 // ── Main Component ───────────────────────────────────────────────────────
 
 export default function SupportersPage() {
+  usePageTitle('Supporters')
   useInjectedStyles()
 
   const [searchParams, setSearchParams] = useSearchParams()

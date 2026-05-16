@@ -120,3 +120,29 @@ export function partitionCoursesBySchool(courses, enrolledSchoolIds) {
   other.sort(byCode)
   return { primary, other }
 }
+
+/**
+ * Derive the /my-courses hero copy. Returning users (any enrollments)
+ * get a possessive "Your Courses" header; first-time users get the
+ * imperative "Personalize Your Feed" onboarding header.
+ *
+ * Pure function — accepts the session user shape + the in-flight
+ * selectedCourseIds (so the count chip reflects pending edits, not
+ * just the persisted server state). Returns
+ *   { title, subtitle, isReturning }.
+ *
+ * Used by `pages/courses/MyCoursesPage.jsx`. Kept here so the
+ * branching is unit-tested without mounting the page.
+ */
+export function deriveMyCoursesHero(user, selectedCourseIds) {
+  const enrollmentCount = Array.isArray(user?.enrollments) ? user.enrollments.length : 0
+  const isReturning = enrollmentCount > 0
+  const selectedCount = Array.isArray(selectedCourseIds) ? selectedCourseIds.length : 0
+  const title = isReturning
+    ? `Your Courses${selectedCount > 0 ? ` (${selectedCount})` : ''}`
+    : 'Personalize Your Feed'
+  const subtitle = isReturning
+    ? 'Edit your school, add or remove courses, and your feed updates immediately.'
+    : 'Choose your school and courses to see relevant study sheets, connect with classmates, and get personalized recommendations. You can change these anytime.'
+  return { title, subtitle, isReturning }
+}

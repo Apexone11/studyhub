@@ -78,7 +78,9 @@
   background: rgba(255, 255, 255, 0.95);
   border-bottom: 1px solid var(--sh-border);
   backdrop-filter: blur(10px);
-  transition: opacity 0.3s ease, visibility 0.3s ease;
+  transition:
+    opacity 0.3s ease,
+    visibility 0.3s ease;
 }
 
 [data-theme='dark'] .reader-toolbar {
@@ -97,7 +99,9 @@
   color: var(--sh-text);
   cursor: pointer;
   border-radius: var(--radius-control);
-  transition: background-color 0.2s ease, color 0.2s ease;
+  transition:
+    background-color 0.2s ease,
+    color 0.2s ease;
   flex-shrink: 0;
 }
 
@@ -234,8 +238,12 @@
 }
 
 @keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+  from {
+    transform: translateX(100%);
+  }
+  to {
+    transform: translateX(0);
+  }
 }
 
 .reader-bookmark-panel__header {
@@ -255,8 +263,12 @@
 }
 
 .reader-bookmark-panel__close {
-  width: 28px;
-  height: 28px;
+  /* 44×44 minimum hit area satisfies WCAG 2.5.5 (target size) — the
+   * visible chip stays small via the inner content scale. */
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -386,8 +398,12 @@
 }
 
 .reader-bookmark-panel__delete-btn {
-  width: 24px;
-  height: 24px;
+  /* 44×44 invisible hit area around the visible glyph — WCAG 2.5.5.
+   * The glyph itself stays small via font-size; flexbox centers it. */
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -398,7 +414,9 @@
   cursor: pointer;
   font-size: 12px;
   flex-shrink: 0;
-  transition: background 0.2s, color 0.2s;
+  transition:
+    background 0.2s,
+    color 0.2s;
 }
 
 .reader-bookmark-panel__delete-btn:hover {

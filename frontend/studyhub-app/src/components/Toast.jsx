@@ -72,6 +72,12 @@ export default function ToastContainer() {
     function handleToast(toast) {
       setToasts((prev) => [...prev.slice(-4), toast])
 
+      // durationMs === 0 means "manual dismiss only" (default for errors —
+      // see lib/toast.js DEFAULT_DURATIONS). Skip the auto-dismiss timer
+      // entirely. The user-facing dismiss path (click or Escape on the
+      // role=alert below) still works.
+      if (toast.durationMs === 0) return
+
       const timer = setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== toast.id))
         timers.delete(toast.id)

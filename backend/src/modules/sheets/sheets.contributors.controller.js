@@ -3,6 +3,7 @@ const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const optionalAuth = require('../../core/auth/optionalAuth')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
+const { forkTreeLimiter } = require('../../lib/rateLimiters')
 const { AUTHOR_SELECT, SHEET_STATUS } = require('./sheets.constants')
 const { canReadSheet } = require('./sheets.service')
 
@@ -107,7 +108,7 @@ router.get('/:id/contributors', optionalAuth, async (req, res) => {
  * the node matching the requested id is flagged with `isCurrent: true`.
  * Unreadable sheets return 404 (matches the sheets.read pattern).
  */
-router.get('/:id/fork-tree', optionalAuth, async (req, res) => {
+router.get('/:id/fork-tree', forkTreeLimiter, optionalAuth, async (req, res) => {
   const sheetId = parseSheetId(req.params.id)
   if (!sheetId) {
     return sendError(res, 400, 'Invalid sheet id.', ERROR_CODES.BAD_REQUEST)

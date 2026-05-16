@@ -807,6 +807,11 @@ model SheetContribution {
 
   @@index([targetSheetId, status])
   @@index([proposerId, status])
+  // Added 2026-05-15: outgoing-summary groupBy in
+  // sheets.serializer.fetchContributionCollections filters by
+  // forkSheetId on every sheet read. Without this index the query
+  // would seq-scan as the table grows.
+  @@index([forkSheetId, status])
 }
 
 model ContributionComment {

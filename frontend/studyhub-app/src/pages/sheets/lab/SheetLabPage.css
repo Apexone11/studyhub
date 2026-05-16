@@ -66,7 +66,9 @@
   cursor: pointer;
   border-bottom: 2px solid transparent;
   margin-bottom: -2px;
-  transition: color 0.15s, border-color 0.15s;
+  transition:
+    color 0.15s,
+    border-color 0.15s;
   white-space: nowrap;
 }
 
@@ -301,7 +303,9 @@
   border: 1px solid var(--sh-border, #e2e8f0);
   padding: 14px 16px;
   cursor: pointer;
-  transition: box-shadow 0.15s, border-color 0.15s;
+  transition:
+    box-shadow 0.15s,
+    border-color 0.15s;
 }
 
 .sheet-lab__commit-card:hover {
@@ -516,7 +520,9 @@
   background: var(--sh-surface, #fff);
   color: var(--sh-muted, #64748b);
   cursor: pointer;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
 }
 
 .sheet-lab__diff-mode-btn:first-child {
@@ -1015,7 +1021,9 @@
   border: 1px solid var(--sh-border, #e2e8f0);
   border-radius: 10px;
   padding: 10px 14px;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
 }
 
 .lineage-node__card:hover {
@@ -1128,6 +1136,141 @@
 .lineage-node__title:focus-visible {
   outline: 2px solid var(--sh-brand, #6366f1);
   outline-offset: 2px;
+}
+
+/* ── Fork-tree single-line refresh (2026-05-15) ───────────────
+ * Tightens the recursive tree to one row per node so the panel
+ * stays compact even on deeply-forked sheets. The depth-shift
+ * plus the curved branch SVG carry the tree structure visually
+ * without needing a full card per node.
+ */
+.lineage-node--single-line {
+  align-items: center;
+  gap: 6px;
+  padding: 2px 6px;
+  min-height: 32px;
+}
+
+.lineage-node--single-line .lineage-node__row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.lineage-node--single-line .lineage-node__row:hover {
+  background: var(--sh-soft, #f8fafc);
+  border-color: var(--sh-border, #e2e8f0);
+}
+
+.lineage-node--single-line.lineage-node--current .lineage-node__row {
+  background: var(--sh-brand-soft-bg, var(--sh-brand-soft, #eef2ff));
+  border-color: var(--sh-brand, #818cf8);
+}
+
+.lineage-node--single-line .lineage-node__title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--sh-heading, #0f172a);
+  text-decoration: none;
+  flex-shrink: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 60%;
+}
+
+.lineage-node--single-line .lineage-node__meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--sh-muted, #64748b);
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.lineage-node--single-line .lineage-node__author-name {
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: inline-block;
+  vertical-align: bottom;
+}
+
+.lineage-node__status {
+  display: inline-flex;
+  align-items: center;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 1px 7px;
+  border-radius: 4px;
+  background: var(--sh-soft, #f1f5f9);
+  color: var(--sh-muted, #64748b);
+  text-transform: capitalize;
+  letter-spacing: 0.2px;
+  flex-shrink: 0;
+}
+
+.lineage-node__status--draft {
+  background: var(--sh-warning-bg, #fffbeb);
+  color: var(--sh-warning-text, #92400e);
+}
+
+.lineage-node__status--pending_review {
+  background: var(--sh-info-bg, #eff6ff);
+  color: var(--sh-brand, #6366f1);
+}
+
+.lineage-node__status--quarantined {
+  background: var(--sh-danger-bg, #fef2f2);
+  color: var(--sh-danger-text, #991b1b);
+}
+
+.lineage-node__show-more {
+  display: block;
+  width: calc(100% - 16px);
+  margin: 4px 8px 2px;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px dashed var(--sh-border, #e2e8f0);
+  border-radius: 8px;
+  color: var(--sh-muted, #64748b);
+  font-size: 11px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  text-align: center;
+  transition:
+    background 0.15s,
+    color 0.15s,
+    border-color 0.15s;
+}
+
+.lineage-node__show-more:hover {
+  background: var(--sh-soft, #f8fafc);
+  color: var(--sh-brand, #6366f1);
+  border-color: var(--sh-brand-soft, #c7d2fe);
+}
+
+.lineage-node__show-more:focus-visible {
+  outline: 2px solid var(--sh-brand, #6366f1);
+  outline-offset: 2px;
+}
+
+.lineage-node--single-line .lineage-node__branch {
+  margin-top: 0;
+  align-self: center;
 }
 
 /* ── Responsive ────────────────────────────────────────────── */

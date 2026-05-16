@@ -17,9 +17,13 @@
 import { useParams } from 'react-router-dom'
 import GroupListView from './GroupListView'
 import GroupDetailView from './GroupDetailView'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 export default function StudyGroupsPage() {
   const { id: groupId } = useParams()
+  // Detail view sets its own per-group title; list view gets the
+  // generic "Study Groups" label.
+  usePageTitle(groupId ? null : 'Study Groups')
 
   if (groupId) {
     return <GroupDetailView groupId={groupId} />

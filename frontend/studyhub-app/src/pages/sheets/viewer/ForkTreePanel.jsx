@@ -57,15 +57,15 @@ export default function ForkTreePanel({ sheetId }) {
           color: 'var(--sh-heading)',
           display: 'flex',
           alignItems: 'center',
-          gap: 8,
+          gap: 6,
         }}
       >
         <IconFork size={14} />
-        Fork tree
-        <span
-          style={{ marginLeft: 'auto', fontSize: 11, color: 'var(--sh-muted)', fontWeight: 600 }}
-        >
-          {state.count} {state.count === 1 ? 'sheet' : 'sheets'}
+        <span>
+          Fork tree
+          <span style={{ marginLeft: 6, color: 'var(--sh-muted)', fontWeight: 600 }}>
+            ({state.count})
+          </span>
         </span>
       </h2>
       <div className="lineage-panel__tree" style={{ margin: 0 }}>

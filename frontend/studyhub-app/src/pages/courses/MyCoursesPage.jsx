@@ -22,6 +22,7 @@ import { useTutorial } from '../../lib/useTutorial'
 import { MY_COURSES_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { resolveImageUrl } from '../../lib/imageUrls'
+import { deriveMyCoursesHero } from '../../lib/courses'
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 const authHeaders = () => ({ 'Content-Type': 'application/json' })
@@ -288,12 +289,16 @@ export default function MyCoursesPage() {
   }, [catalogReloadKey])
 
   /* ── Seed from current user enrollments ─────────────────────────────── */
+  // Some session payloads carry `course.schoolId` directly; others carry
+  // the nested `course.school.id` relation. Prefer the scalar, fall back
+  // to the relation — matches the dual-shape handling in lib/courses.js.
   useEffect(() => {
     if (!user?.enrollments?.length) return
     queueMicrotask(() => {
-      const currentSchoolId = user.enrollments[0]?.course?.schoolId
+      const first = user.enrollments[0]?.course
+      const currentSchoolId = first?.schoolId ?? first?.school?.id ?? null
       if (currentSchoolId) setSelectedSchoolId(String(currentSchoolId))
-      setSelectedCourseIds(user.enrollments.map((e) => e.courseId))
+      setSelectedCourseIds(user.enrollments.map((e) => e.courseId).filter(Boolean))
     })
   }, [user?.enrollments])
 
@@ -387,13 +392,18 @@ export default function MyCoursesPage() {
 
   function toggleCourse(courseId) {
     setSelectedCourseIds((prev) => {
-      const next = prev.includes(courseId)
-        ? prev.filter((id) => id !== courseId)
-        : prev.length < 10
-          ? [...prev, courseId]
-          : prev
+      const isRemoving = prev.includes(courseId)
+      if (isRemoving) {
+        setDirty(true)
+        return prev.filter((id) => id !== courseId)
+      }
+      if (prev.length >= 10) {
+        // Surface the cap explicitly — the silent no-op was confusing.
+        showToast('10 courses max. Remove one to add a different course.', 'info')
+        return prev
+      }
       setDirty(true)
-      return next
+      return [...prev, courseId]
     })
   }
 
@@ -428,6 +438,17 @@ export default function MyCoursesPage() {
   /* ── Render ──────────────────────────────────────────────────────────── */
   const allDepartmentsActive = deptFilter === ''
 
+  // Returning user vs first-time picker. We key off session enrollments
+  // (the durable source of truth) rather than `selectedSchoolId` so the
+  // hero doesn't briefly flip to "Personalize" between user reload and
+  // the seed effect firing. Helper lives in lib/courses.js so the
+  // branching is unit-tested without mounting the page.
+  const {
+    title: heroTitle,
+    subtitle: heroSubtitle,
+    isReturning,
+  } = deriveMyCoursesHero(user, selectedCourseIds)
+
   return (
     <div className="sh-app-page" style={{ minHeight: '100vh', background: 'var(--sh-bg)' }}>
       <Navbar crumbs={[{ label: 'My Courses', to: '/my-courses' }]} hideTabs />
@@ -455,7 +476,7 @@ export default function MyCoursesPage() {
           }}
         >
           <h1 style={{ margin: '0 0 8px', fontSize: 'clamp(22px, 3vw, 28px)', fontWeight: 800 }}>
-            Personalize Your Feed
+            {heroTitle}
           </h1>
           <p
             style={{
@@ -466,9 +487,35 @@ export default function MyCoursesPage() {
               lineHeight: 1.6,
             }}
           >
-            Choose your school and courses to see relevant study sheets, connect with classmates,
-            and get personalized recommendations. You can change these anytime.
+            {heroSubtitle}
           </p>
+          {isReturning && !dirty ? (
+            <div
+              style={{
+                marginTop: 14,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 12px',
+                borderRadius: 999,
+                background: 'rgba(255,255,255,0.15)',
+                fontSize: 12,
+                fontWeight: 600,
+              }}
+            >
+              <span
+                aria-hidden="true"
+                style={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  background: 'var(--sh-success, #16a34a)',
+                  display: 'inline-block',
+                }}
+              />
+              <span>All changes saved</span>
+            </div>
+          ) : null}
         </div>
 
         {catalogLoading && (
@@ -575,6 +622,7 @@ export default function MyCoursesPage() {
                     <button
                       type="button"
                       onClick={clearSchool}
+                      aria-label="Switch to a different school"
                       style={{
                         background: 'none',
                         border: '1px solid var(--sh-border)',
@@ -587,7 +635,7 @@ export default function MyCoursesPage() {
                         fontFamily: 'inherit',
                       }}
                     >
-                      Clear
+                      Switch school
                     </button>
                   )}
                 </div>

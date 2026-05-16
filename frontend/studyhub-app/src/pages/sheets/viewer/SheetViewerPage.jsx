@@ -11,6 +11,7 @@ import { SkeletonCard } from '../../../components/Skeleton'
 import { IconGitPullRequest } from '../../../components/Icons'
 import { useResponsiveAppLayout, pageShell } from '../../../lib/ui'
 import { useTutorial } from '../../../lib/useTutorial'
+import { usePageTitle } from '../../../lib/usePageTitle'
 import { VIEWER_STEPS, TUTORIAL_VERSIONS } from '../../../lib/tutorialSteps'
 import useSheetViewer from './useSheetViewer'
 import SheetViewerSidebar from './SheetViewerSidebar'
@@ -80,6 +81,10 @@ export default function SheetViewerPage() {
 
   const [reportOpen, setReportOpen] = useState(false)
   const [activeTab, setActiveTab] = useState('content')
+
+  // Set browser tab title to the sheet's actual title once loaded.
+  // Falls back to a generic label while loading or on error.
+  usePageTitle(sheet?.title || 'Sheet')
 
   /* Refs for scroll-to-section navigation */
   const contentRef = useRef(null)

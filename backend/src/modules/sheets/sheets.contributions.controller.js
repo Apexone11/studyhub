@@ -25,6 +25,7 @@ const {
   EVENT_KINDS,
 } = require('../achievements')
 const { withPreviewText } = require('../../lib/sheets/applyContentUpdate')
+const { isBlockedEitherWay } = require('../../lib/social/blockFilter')
 
 const router = express.Router()
 
@@ -49,10 +50,10 @@ router.patch(
     )
 
     if (!Number.isInteger(contributionId)) {
-      return res.status(400).json({ error: 'Contribution id must be an integer.' })
+      return sendError(res, 400, 'Contribution id must be an integer.', ERROR_CODES.BAD_REQUEST)
     }
     if (!['accept', 'reject'].includes(action)) {
-      return res.status(400).json({ error: 'Action must be "accept" or "reject".' })
+      return sendError(res, 400, 'Action must be "accept" or "reject".', ERROR_CODES.VALIDATION)
     }
 
     try {
@@ -80,13 +81,32 @@ router.patch(
       })
 
       if (!contribution) {
-        return res.status(404).json({ error: 'Contribution not found.' })
+        return sendError(res, 404, 'Contribution not found.', ERROR_CODES.NOT_FOUND)
       }
       if (contribution.status !== 'pending') {
-        return res.status(409).json({ error: 'This contribution has already been reviewed.' })
+        return sendError(
+          res,
+          409,
+          'This contribution has already been reviewed.',
+          ERROR_CODES.CONFLICT,
+        )
       }
       if (req.user.role !== 'admin' && req.user.userId !== contribution.targetSheet.userId) {
         return sendForbidden(res, 'Only the original author can review this contribution.')
+      }
+
+      // Block-filter on the review path too — if the proposer blocked the
+      // reviewer (or vice versa) between submit and review, the maintainer
+      // should not be able to act on it. Admins bypass for moderation
+      // purposes. Wrapped per the same fail-open pattern as the submit path.
+      if (req.user.role !== 'admin') {
+        try {
+          if (await isBlockedEitherWay(prisma, req.user.userId, contribution.proposerId)) {
+            return sendError(res, 404, 'Contribution not found.', ERROR_CODES.NOT_FOUND)
+          }
+        } catch {
+          /* graceful degrade */
+        }
       }
 
       // Conflict detection: check if target sheet has diverged since contribution was created
@@ -100,7 +120,9 @@ router.patch(
         if (contribution.forkSheet.contentFormat === 'html') {
           const validation = validateHtmlForSubmission(contribution.forkSheet.content)
           if (!validation.ok) {
-            return res.status(400).json({ error: validation.issues[0], issues: validation.issues })
+            return sendError(res, 400, validation.issues[0], ERROR_CODES.VALIDATION, {
+              issues: validation.issues,
+            })
           }
         }
 
@@ -222,6 +244,23 @@ router.patch(
             },
           )
         }
+      } else {
+        // Rejection isn't a dead end — it's a checkpoint in an iterative
+        // workflow. The proposer should be tracked for "iterate-and-improve"
+        // badges (re-submit after revision, recovery PR streaks, etc).
+        // Powers the future "Iterator" badge family without changing
+        // existing behaviour today (criteria is opt-in per badge).
+        void emitAchievementEvent(
+          prisma,
+          contribution.proposer.id,
+          EVENT_KINDS.CONTRIBUTION_REVISION_REQUESTED,
+          {
+            contributionId: contribution.id,
+            sheetId: contribution.targetSheet.id,
+            reviewerId: req.user.userId,
+            hasFeedback: Boolean(reviewComment),
+          },
+        )
       }
 
       await createNotification(prisma, {
@@ -247,7 +286,7 @@ router.patch(
       res.json(responseData)
     } catch (error) {
       captureError(error, { route: req.originalUrl, method: req.method })
-      res.status(500).json({ error: 'Server error.' })
+      sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
     }
   },
 )
@@ -275,9 +314,14 @@ router.post(
         },
       })
 
-      if (!forkSheet) return res.status(404).json({ error: 'Sheet not found.' })
+      if (!forkSheet) return sendError(res, 404, 'Sheet not found.', ERROR_CODES.NOT_FOUND)
       if (!forkSheet.forkOf) {
-        return res.status(400).json({ error: 'Only forked sheets can be contributed back.' })
+        return sendError(
+          res,
+          400,
+          'Only forked sheets can be contributed back.',
+          ERROR_CODES.BAD_REQUEST,
+        )
       }
       if (forkSheet.userId !== req.user.userId && req.user.role !== 'admin') {
         return sendForbidden(res, 'Only the fork owner can contribute changes.')
@@ -287,9 +331,33 @@ router.post(
         where: { id: forkSheet.forkOf },
         select: { id: true, title: true, userId: true, content: true },
       })
-      if (!targetSheet) return res.status(404).json({ error: 'Original sheet not found.' })
+      if (!targetSheet) {
+        return sendError(res, 404, 'Original sheet not found.', ERROR_CODES.NOT_FOUND)
+      }
       if (targetSheet.userId === req.user.userId) {
-        return res.status(400).json({ error: 'You cannot contribute back to your own sheet.' })
+        return sendError(
+          res,
+          400,
+          'You cannot contribute back to your own sheet.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
+
+      // Block-filter: if either party blocked the other, the contribute-back
+      // path is closed. Bidirectional per CLAUDE.md "Block/Mute System."
+      // Wrapped in try-catch so a transient block-table outage doesn't
+      // close every contribution path — fail-open here is the right call
+      // (other read paths use the same try-catch graceful-degradation
+      // pattern with `getBlockedUserIds`).
+      try {
+        if (await isBlockedEitherWay(prisma, req.user.userId, targetSheet.userId)) {
+          // 404 (not 403) so the existence of the target is not confirmed
+          // to a blocked user — matches the "blocked users see nothing"
+          // bidirectional rule.
+          return sendError(res, 404, 'Original sheet not found.', ERROR_CODES.NOT_FOUND)
+        }
+      } catch {
+        /* graceful degrade — block check failure must not break the workflow */
       }
 
       const pending = await prisma.sheetContribution.findFirst({
@@ -301,7 +369,12 @@ router.post(
         select: { id: true },
       })
       if (pending) {
-        return res.status(409).json({ error: 'This fork already has a pending contribution.' })
+        return sendError(
+          res,
+          409,
+          'This fork already has a pending contribution.',
+          ERROR_CODES.CONFLICT,
+        )
       }
 
       const contribution = await prisma.sheetContribution.create({
@@ -358,7 +431,7 @@ router.post(
       res.status(201).json({ contribution: serializeContribution(contribution) })
     } catch (error) {
       captureError(error, { route: req.originalUrl, method: req.method })
-      res.status(500).json({ error: 'Server error.' })
+      sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
     }
   },
 )
@@ -366,7 +439,7 @@ router.post(
 router.get('/contributions/:contributionId/diff', requireAuth, diffLimiter, async (req, res) => {
   const contributionId = Number.parseInt(req.params.contributionId, 10)
   if (!Number.isInteger(contributionId)) {
-    return res.status(400).json({ error: 'Invalid contribution ID.' })
+    return sendError(res, 400, 'Invalid contribution ID.', ERROR_CODES.BAD_REQUEST)
   }
 
   try {
@@ -378,13 +451,20 @@ router.get('/contributions/:contributionId/diff', requireAuth, diffLimiter, asyn
       },
     })
 
-    if (!contribution) return res.status(404).json({ error: 'Contribution not found.' })
+    if (!contribution) {
+      return sendError(res, 404, 'Contribution not found.', ERROR_CODES.NOT_FOUND)
+    }
 
     const isTargetOwner = req.user.userId === contribution.targetSheet.userId
     const isProposer = req.user.userId === contribution.proposerId
     const isAdmin = req.user.role === 'admin'
     if (!isTargetOwner && !isProposer && !isAdmin) {
-      return res.status(403).json({ error: 'You do not have access to this contribution diff.' })
+      return sendError(
+        res,
+        403,
+        'You do not have access to this contribution diff.',
+        ERROR_CODES.FORBIDDEN,
+      )
     }
 
     const diff = computeLineDiff(
@@ -403,7 +483,7 @@ router.get('/contributions/:contributionId/diff', requireAuth, diffLimiter, asyn
     res.json({ diff, hasConflict })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })
-    res.status(500).json({ error: 'Server error.' })
+    sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
   }
 })
 

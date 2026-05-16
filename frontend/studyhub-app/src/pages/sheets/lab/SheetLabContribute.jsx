@@ -9,6 +9,8 @@ import { API } from '../../../config'
 import { authHeaders } from './sheetLabConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'
 import { showToast } from '../../../lib/toast'
+import { clearFetchCache } from '../../../lib/useFetch'
+import PendingButton from '../../../components/buttons/PendingButton'
 import { DiffViewer } from './SheetLabPanels'
 
 export default function SheetLabContribute({ sheet, onContributed }) {
@@ -127,6 +129,17 @@ export default function SheetLabContribute({ sheet, onContributed }) {
       setSubmitStep('compose')
       setPreviewDiff(null)
       setChecklist({ reviewed: false, guidelines: false, original: false })
+      // Invalidate any SWR cache entries for the fork and the parent —
+      // mostly a forward-compat / defense-in-depth measure (current
+      // useSheetViewer uses raw fetch + re-mount so it already re-reads
+      // on navigation back). When useSheetViewer migrates to useFetch
+      // these clears will become load-bearing. Cost: a Map.delete miss.
+      // Founder repro 2026-05-16 traced the visible bug to the serializer
+      // gating (fixed in sheets.serializer.js) rather than caching.
+      clearFetchCache(`/api/sheets/${sheet.id}`)
+      if (sheet.forkOf) {
+        clearFetchCache(`/api/sheets/${sheet.forkOf}`)
+      }
       if (onContributed) onContributed()
     } catch (err) {
       showToast(err.message, 'error')
@@ -283,14 +296,14 @@ export default function SheetLabContribute({ sheet, onContributed }) {
               rows={3}
               style={textareaStyle}
             />
-            <button
-              type="button"
+            <PendingButton
+              pending={loadingPreview}
+              pendingLabel="Loading preview…"
               onClick={handleReviewChanges}
-              disabled={loadingPreview}
               style={submitButtonStyle}
             >
-              {loadingPreview ? 'Loading preview...' : 'Review changes'}
-            </button>
+              Review changes
+            </PendingButton>
           </div>
         ) : (
           /* Step 2: Review changes summary + confirm submission */
@@ -409,18 +422,19 @@ export default function SheetLabContribute({ sheet, onContributed }) {
             </fieldset>
 
             <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                type="button"
+              <PendingButton
+                pending={submitting}
+                pendingLabel="Submitting…"
+                disabled={!checklistReady}
                 onClick={handleSubmit}
-                disabled={submitting || !checklistReady}
                 style={{
                   ...submitButtonStyle,
                   opacity: submitting || !checklistReady ? 0.5 : 1,
                   cursor: submitting || !checklistReady ? 'not-allowed' : 'pointer',
                 }}
               >
-                {submitting ? 'Submitting...' : 'Confirm & submit contribution'}
-              </button>
+                Confirm &amp; submit contribution
+              </PendingButton>
             </div>
           </div>
         )
@@ -497,7 +511,15 @@ export default function SheetLabContribute({ sheet, onContributed }) {
                   ) : null}
                 </div>
               ) : null}
-              <div style={{ marginTop: 8 }}>
+              <div
+                style={{
+                  marginTop: 8,
+                  display: 'flex',
+                  gap: 8,
+                  flexWrap: 'wrap',
+                  alignItems: 'center',
+                }}
+              >
                 <button
                   type="button"
                   onClick={() => toggleDiff(c.id)}
@@ -506,6 +528,25 @@ export default function SheetLabContribute({ sheet, onContributed }) {
                 >
                   {loadingDiff === c.id ? 'Loading...' : diffData[c.id] ? 'Hide diff' : 'View diff'}
                 </button>
+                {originalId ? (
+                  <Link
+                    to={`/sheets/${originalId}?tab=reviews`}
+                    style={{
+                      ...diffToggleStyle,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                      textDecoration: 'none',
+                      color: 'var(--sh-brand)',
+                      borderColor: 'var(--sh-info-border)',
+                      background: 'var(--sh-info-bg)',
+                    }}
+                    aria-label="View this contribution from the maintainer's perspective on the original sheet"
+                  >
+                    View on original sheet
+                    <span aria-hidden="true">↗</span>
+                  </Link>
+                ) : null}
               </div>
               {diffData[c.id] ? (
                 <div style={{ marginTop: 10 }}>

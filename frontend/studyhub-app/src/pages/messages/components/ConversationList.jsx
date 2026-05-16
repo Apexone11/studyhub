@@ -857,10 +857,28 @@ export function ConversationList({
           Loading conversations...
         </div>
       ) : filtered.length === 0 ? (
-        <div style={{ padding: 24, textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
-          {conversations.length === 0
-            ? 'No conversations yet. Start a chat!'
-            : 'No conversations match your search.'}
+        <div
+          style={{
+            padding: '32px 24px',
+            textAlign: 'center',
+            color: 'var(--sh-muted)',
+            fontSize: 13,
+            lineHeight: 1.6,
+          }}
+        >
+          {conversations.length === 0 ? (
+            <>
+              <div style={{ fontWeight: 700, color: 'var(--sh-heading)', marginBottom: 6 }}>
+                Start your first conversation
+              </div>
+              <div>
+                Find a classmate on the feed or in a course, open their profile, and tap
+                <strong> Message</strong>.
+              </div>
+            </>
+          ) : (
+            'No conversations match your search.'
+          )}
         </div>
       ) : (
         <div style={{ flex: 1, overflowY: 'auto', paddingTop: 12 }} role="list">

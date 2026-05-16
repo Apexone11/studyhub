@@ -18,6 +18,7 @@ import NoteCommentSection from './NoteCommentSection'
 import NoteHighlightLayer from './NoteHighlightLayer'
 import AiNoteAssistant from '../../components/ai/AiNoteAssistant'
 import { useNoteViewer } from './useNoteViewer'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 // Reading speed used for the "X min read" estimate. 220 wpm is the median
 // silent-reading rate cited by Brysbaert (2019) — same baseline Bear and
@@ -145,6 +146,7 @@ export default function NoteViewerPage() {
   const { user } = useSession()
   const { note, loading, error } = useNoteViewer()
   const [reportOpen, setReportOpen] = useState(false)
+  usePageTitle(note?.title || 'Note')
 
   // Local social state
   const [starred, setStarred] = useState(null)

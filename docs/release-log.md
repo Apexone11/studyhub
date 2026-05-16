@@ -28,6 +28,68 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12 — contribute-back fix bundle, ecosystem doc + 12h follow-on (2026-05-15 → 2026-05-16)
+
+Founder bug repro on the fork-contribute-back flow exposed four related bugs plus a class of ecosystem-mapping debt. Shipped the four fixes uncommitted overnight, then ran a 12-hour follow-on session covering the bonus audit findings + UI/UX Bucket A items + 6 review loops. Plus added a new top-level `docs/internal/ecosystem.md` living document mapping the 13 sub-ecosystems + their cross-wiring, with the canonical contribute-back bug captured as the founding case in the Lessons-log.
+
+#### `/my-courses` hero copy adapts to returning users
+
+- Extracted pure `deriveMyCoursesHero(user, selectedCourseIds)` helper in `lib/courses.js`. Returning users see "Your Courses (N)" + edit-tone subtitle; first-time users still get the onboarding "Personalize Your Feed" copy.
+- "All changes saved" chip surfaces in the hero when not dirty.
+- Seed effect hardened to fall back to `course.school.id` when `course.schoolId` is absent.
+- "Clear" button renamed to "Switch school" (less destructive-sounding) + aria-label.
+- 10-course cap toast instead of silent no-op.
+- 6 new unit tests covering returning / first-time / corrupt session / mid-clear / null user edge cases.
+
+#### Contribute-back end-to-end fix (4 bugs)
+
+- **Button gated on ownership.** `SheetHeader.jsx` now hides the `Contribute back` button for non-owners. Previously visible to everyone, producing silent 403s.
+- **Public summary chips for everyone.** `sheets.serializer.js` now returns `incomingContributionsSummary` + `outgoingContributionsSummary` (total/pending/accepted/rejected) on every sheet read. Detailed row arrays remain permission-gated. Backed by `safeGroupBy` graceful degradation for older / mocked Prisma clients. Migration `20260515000001_contribution_forksheet_status_index` adds `@@index([forkSheetId, status])` so the outgoing-summary groupBy stays index-backed at scale.
+- **Cache invalidated on submit.** `SheetLabContribute.jsx` clears the SWR cache for both the fork and parent sheet IDs after a successful submit.
+- **"View on original sheet ↗" link** added to the contribution history card so the proposer can see their submission from the maintainer's view.
+- 8 new serializer tests covering all 4 viewer scenarios (owner / non-owner / admin / anonymous) + degraded `groupBy`.
+
+#### Fork-tree UI polish
+
+- `ForkTree.jsx` rewritten to render each node on ONE line — title · status pill · meta. Replaces the prior 2-row stack that ran "Exampublished" together.
+- Status pill hidden for `published` (default — too noisy on every row); styled per-status for `draft` / `pending_review` / `quarantined`.
+- Curved branch SVG replaces the angular tree connector.
+- Truncates after 6 nodes with "Show N more forks ↓" + "Show less ↑" toggles.
+- Current sheet row highlighted with `--sh-brand-soft-bg`.
+- `ForkTreePanel.jsx` header tightened from `Fork tree    2 sheets` (two columns) to `Fork tree (2)` (single line).
+- 10 new RTL tests covering null root, single node, current-flag, status pill, truncation, expand/collapse, singular vs plural wording, link mode.
+
+#### Bonus audit findings — 6 of 7 shipped
+
+- **F1 block-filter on contribute-back.** Submit AND review handlers now call `isBlockedEitherWay(prisma, userA, userB)`. Bidirectional, 404 to avoid existence-leak, admin bypass on review (moderation), try-catch fail-open per the established `getBlockedUserIds` graceful-degradation pattern.
+- **F2 forkTreeLimiter.** New 60/min/IP rate limiter on `GET /api/sheets/:id/fork-tree`. Public endpoint with no per-route limiter previously.
+- **F3 A12 sweep on feed.posts.** Extracted `parseOptionalFk(raw, fieldName)` helper that throws a tagged 400 on garbage input. Replaces the silent `Number.parseInt(x) || null` anti-pattern for `courseId` and `videoId` in `POST /api/feed/posts`.
+- **F4 sendError sweep on contributions controller.** 12 raw `res.status().json({error})` sites replaced with the standard envelope and ERROR_CODES enum.
+- **F5 CONTRIBUTION_REVISION_REQUESTED achievement event.** Fires on the proposer when their PR is rejected. Backward-compatible (no current badge consumes it) — future "iterate-and-improve" badge family can opt in.
+- **F6 fork-tree panel header tighten.** See above.
+- **F7 deferred:** `useSheetViewer` raw `fetch` → `useFetch` migration. Larger refactor; punted to a future PR.
+
+#### UI/UX Bucket A — 7 of 12 items
+
+- **A1 PendingButton component.** New `components/buttons/PendingButton.jsx` with built-in spinner, `aria-busy`, disabled state, and proper `type="button"` default. 10 unit tests. Wired into 3 high-traffic call sites (SheetLabContribute Review + Submit, BookReader Add-Bookmark).
+- **A2 Toast cadence.** Per-type defaults: success 2.5s (was 3.5s), info 3.5s, error 6s (was 3.5s — Nielsen "5s+ for novel error copy"). Callers can pass `0` to disable auto-dismiss for critical errors; `Toast.jsx` updated to honor `0`. 9 unit tests.
+- **A3 Modal portal audit.** `ConfirmDialog.jsx` and `ReportModal.jsx` now portal to `document.body` per CLAUDE.md "Common Bugs" #8.
+- **A4 focus-visible ring.** Verified already shipped at `index.css:4001` with a more sophisticated opt-out toggle (`html[data-focus-ring="off"]`) than the plan called for.
+- **A5 touch targets ≥ 44×44 px.** `BookReaderPage.css` close + delete buttons (were 28px / 24px) now WCAG 2.5.5 compliant via invisible hit area.
+- **A8 empty state copy upgrades.** Notes ("Start your first note. Hub AI can help draft the outline."), Messages ("Start your first conversation. Find a classmate..."), AI ("Ask anything, anytime. Try 'explain forking like I'm new'...").
+- **A10 usePageTitle sweep.** Added to 14 high-traffic pages: LoginPage, ForgotPasswordPage, ResetPasswordPage, RolePickerPage, LoginChallengePage, NotFoundPage, AdminPage, PricingPage, SupportersPage, StudyGroupsPage, SheetViewerPage, NoteViewerPage, UploadSheetPage, Setup2FAPage, AttachmentPreviewPage, SheetHtmlPreviewPage. Plus all 7 legal pages covered via one edit to the shared `LegalDocumentPage.jsx` shell.
+
+#### Hotfix shipped
+
+- **Discovery limiters IPv6 crash.** `discoverySchoolsLimiter` + `discoveryCoursesLimiter` had custom keyGenerators using `req.ip` fallback that crashed `express-rate-limit` v7+ at boot with `ERR_ERL_KEY_GEN_IPV6`. Dropped the custom keyGenerators entirely (default IP keying handles IPv6 correctly). Production deploy was crash-looping on this; now boots cleanly.
+
+#### Process / docs
+
+- New `docs/internal/ecosystem.md` living document — 13 sub-ecosystem reference + cross-cutting primitives + interconnection map + pre-flight checklist + post-change checklist + Lessons-log. Required reading per new CLAUDE.md "ECOSYSTEM AWARENESS" section.
+- CLAUDE.md gained "ECOSYSTEM AWARENESS" section with 12-item pre-flight checklist and 7-item post-change checklist.
+- Comment cleanup sweep: removed scattered "Copilot review 2026-XX-XX" / "wave-N" date stamps from `AiPage.jsx`, `SheetHtmlPreviewPage.jsx`, `GroupDetailView.jsx` (kept load-bearing wave references in tests/seeds per CLAUDE.md "Load-bearing exceptions").
+- 5 plan docs archived to `docs/internal/archive/plans/2026-05/`: hotfix-discovery-limiter-ipv6, bug-my-courses-misleading-copy, bug-contribute-back-and-sheet-page-audit, bonus-audit-findings-2026-05-15.
+
 ### Wave-11 — wide audit sweep, G1 hardening, P0 backend fixes, accessibility + lifecycle pass (2026-05-14)
 
 Largest single-wave audit + fix cycle yet. Driven by 8 background audit agents (v2/v2.2 gap audit + frontend bug-hunt + backend bug-hunt + 5 wide-domain loops covering hot-paths/lifecycle/perf/a11y/telemetry + web-master-plan rewrite). Every finding was double-checked against actual code before applying. Final tally: backend lint clean, frontend lint 0 errors / 86 warnings (tracked debt — see `react-hooks-debt.md`), frontend build clean, 3182/3303 backend tests pass (18 failures pre-existing on base, not caused by this wave).

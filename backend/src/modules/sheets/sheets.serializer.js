@@ -171,28 +171,69 @@ async function fetchContributionCollections(sheet, currentUser) {
     },
   }
 
-  const [incomingContributions, outgoingContributions] = await Promise.all([
-    canReviewIncoming
-      ? prisma.sheetContribution.findMany({
-          where: { targetSheetId: sheet.id },
-          include: contributionInclude,
-          orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
-          take: 20,
-        })
-      : [],
-    canSeeOutgoing
-      ? prisma.sheetContribution.findMany({
-          where: { forkSheetId: sheet.id },
-          include: contributionInclude,
-          orderBy: { createdAt: 'desc' },
-          take: 20,
-        })
-      : [],
-  ])
+  // Public summary counts — visible to EVERY viewer (incl. anonymous /
+  // logged-in non-owner). GitHub-grade UX: anyone can see "3 open
+  // contributions" on a repo without needing to be a maintainer. The
+  // detailed row arrays remain permission-gated below. Bug repro 2026-05-16:
+  // non-owner viewers saw "No contributions yet" panels that couldn't
+  // distinguish "actually empty" from "you can't see them." See
+  // docs/internal/plans/bug-contribute-back-and-sheet-page-audit.md.
+  // groupBy may be absent in older / mocked Prisma clients (some tests
+  // assemble a partial mock without it). Fall back to a zeroed summary
+  // rather than blowing up the read path — the summary is a UX-nicety,
+  // not a security gate, so degrading gracefully is the right call.
+  const safeGroupBy = async (where) => {
+    if (typeof prisma.sheetContribution.groupBy !== 'function') return []
+    try {
+      return await prisma.sheetContribution.groupBy({
+        by: ['status'],
+        where,
+        _count: { _all: true },
+      })
+    } catch {
+      return []
+    }
+  }
+
+  const [incomingContributions, outgoingContributions, incomingByStatus, outgoingByStatus] =
+    await Promise.all([
+      canReviewIncoming
+        ? prisma.sheetContribution.findMany({
+            where: { targetSheetId: sheet.id },
+            include: contributionInclude,
+            orderBy: [{ status: 'asc' }, { createdAt: 'desc' }],
+            take: 20,
+          })
+        : [],
+      canSeeOutgoing
+        ? prisma.sheetContribution.findMany({
+            where: { forkSheetId: sheet.id },
+            include: contributionInclude,
+            orderBy: { createdAt: 'desc' },
+            take: 20,
+          })
+        : [],
+      safeGroupBy({ targetSheetId: sheet.id }),
+      safeGroupBy({ forkSheetId: sheet.id }),
+    ])
+
+  const summarize = (rows) => {
+    const out = { total: 0, pending: 0, accepted: 0, rejected: 0 }
+    for (const row of rows) {
+      const n = row?._count?._all || 0
+      out.total += n
+      if (row.status === 'pending') out.pending += n
+      else if (row.status === 'accepted') out.accepted += n
+      else if (row.status === 'rejected') out.rejected += n
+    }
+    return out
+  }
 
   return {
     incomingContributions: incomingContributions.map(serializeContribution),
     outgoingContributions: outgoingContributions.map(serializeContribution),
+    incomingContributionsSummary: summarize(incomingByStatus),
+    outgoingContributionsSummary: summarize(outgoingByStatus),
   }
 }
 

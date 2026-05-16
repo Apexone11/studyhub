@@ -13,6 +13,7 @@ import { Skeleton } from '../../components/Skeleton'
 import { usePageTitle } from '../../lib/usePageTitle'
 import useBookReader from './useBookReader'
 import { hasPreview, getPreviewLink } from './libraryHelpers'
+import PendingButton from '../../components/buttons/PendingButton'
 import './BookReaderPage.css'
 
 /**
@@ -234,13 +235,15 @@ export default function BookReaderPage() {
                       rows={2}
                       maxLength={500}
                     />
-                    <button
+                    <PendingButton
                       className="reader-bookmark-panel__add-btn"
+                      pending={saving}
+                      pendingLabel="Saving…"
+                      disabled={!bookmarkLabel.trim()}
                       onClick={handleAddBookmark}
-                      disabled={saving || !bookmarkLabel.trim()}
                     >
-                      {saving ? 'Saving...' : 'Add Bookmark'}
-                    </button>
+                      Add Bookmark
+                    </PendingButton>
                     {bookmarkError && (
                       <div className="reader-bookmark-panel__error">{bookmarkError}</div>
                     )}

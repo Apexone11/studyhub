@@ -9,6 +9,7 @@
  *  onReported    — optional callback after successful submission
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { API } from '../config'
 import { useFocusTrap } from '../lib/useFocusTrap'
 
@@ -97,7 +98,11 @@ export default function ReportModal({ open, targetType, targetId, onClose, onRep
 
   const label = TARGET_LABELS[targetType] || 'content'
 
-  return (
+  // Portal to body so the fixed-position overlay isn't constrained by
+  // any animated ancestor's transform (CLAUDE.md "Common Bugs" #8).
+  if (typeof document === 'undefined') return null
+
+  return createPortal(
     <div style={styles.overlay} onClick={onClose} role="presentation">
       <div
         ref={trapRef}
@@ -178,7 +183,8 @@ export default function ReportModal({ open, targetType, targetId, onClose, onRep
           </form>
         )}
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }
 

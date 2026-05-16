@@ -4,9 +4,11 @@ import { useState } from 'react'
 import { API } from '../../config'
 import SubmitSpinner from '../../components/SubmitSpinner'
 import { useFormValidation } from '../../lib/useFormValidation'
+import { usePageTitle } from '../../lib/usePageTitle'
 import './ForgotPasswordPage.css'
 
 function ForgotPasswordPage() {
+  usePageTitle('Forgot password')
   const [identifier, setIdentifier] = useState('')
   const [submitted, setSubmitted] = useState(false)
   const [loading, setLoading] = useState(false)

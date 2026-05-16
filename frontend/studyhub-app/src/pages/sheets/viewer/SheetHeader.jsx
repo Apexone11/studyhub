@@ -231,23 +231,31 @@ export default function SheetHeader({
               </>
             )}
           </span>
-          <Link
-            to={`/sheets/${sheet.id}/lab?tab=contribute`}
-            style={{
-              marginLeft: 'auto',
-              padding: '6px 12px',
-              borderRadius: 6,
-              minHeight: 28,
-              background: 'var(--sh-brand)',
-              color: 'var(--sh-btn-primary-text)',
-              fontSize: 11,
-              fontWeight: 700,
-              textDecoration: 'none',
-              flexShrink: 0,
-            }}
-          >
-            Contribute back
-          </Link>
+          {/* The Contribute back button is only useful to the fork owner —
+              the backend rejects POSTs from anyone else with 403 (see
+              sheets.contributions.controller.js#L282). Showing the button
+              to non-owners produced silent failures (founder repro
+              2026-05-16). Admins can also use it as a moderation
+              affordance. */}
+          {user && (user.id === sheet.userId || user.role === 'admin') ? (
+            <Link
+              to={`/sheets/${sheet.id}/lab?tab=contribute`}
+              style={{
+                marginLeft: 'auto',
+                padding: '6px 12px',
+                borderRadius: 6,
+                minHeight: 28,
+                background: 'var(--sh-brand)',
+                color: 'var(--sh-btn-primary-text)',
+                fontSize: 11,
+                fontWeight: 700,
+                textDecoration: 'none',
+                flexShrink: 0,
+              }}
+            >
+              Contribute back
+            </Link>
+          ) : null}
         </div>
       )}
 

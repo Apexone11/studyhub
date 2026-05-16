@@ -270,87 +270,128 @@ export default function SheetViewerSidebar({
         ) : null}
       </section>
       {/* ── Collaboration context ────────────────────────────────── */}
-      {sheet.forkSource ||
-      sheet.forks > 0 ||
-      sheet.incomingContributions?.length > 0 ||
-      sheet.outgoingContributions?.length > 0 ? (
-        <section style={panelStyle()}>
-          <h2 style={{ margin: '0 0 10px', fontSize: 15, color: 'var(--sh-heading)' }}>
-            Collaboration
-          </h2>
-          <div
-            style={{
-              display: 'grid',
-              gap: 8,
-              fontSize: 12,
-              color: 'var(--sh-subtext)',
-              lineHeight: 1.6,
-            }}
-          >
-            {sheet.forkSource ? (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <IconFork size={12} />
-                <span>
-                  Forked from{' '}
-                  <Link
-                    to={`/sheets/${sheet.forkSource.id}`}
-                    style={{ color: 'var(--sh-brand)', fontWeight: 600, textDecoration: 'none' }}
-                  >
-                    {sheet.forkSource.title}
-                  </Link>
-                  {sheet.forkSource.author ? (
-                    <>
-                      {' '}
-                      by{' '}
-                      <Link
-                        to={`/users/${sheet.forkSource.author.username}`}
-                        style={{
-                          color: 'var(--sh-brand)',
-                          fontWeight: 600,
-                          textDecoration: 'none',
-                        }}
-                      >
-                        {sheet.forkSource.author.username}
-                      </Link>
-                      <VerificationBadge user={sheet.forkSource.author} size={11} />
-                    </>
-                  ) : null}
-                </span>
-              </div>
-            ) : null}
-            {sheet.forks > 0 ? (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <IconFork size={12} />
-                <span>
-                  {sheet.forks} {sheet.forks === 1 ? 'fork' : 'forks'}
-                </span>
-              </div>
-            ) : null}
-            {sheet.incomingContributions?.filter((c) => c.status === 'pending').length > 0 ? (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <IconGitPullRequest size={12} />
-                <span style={{ color: 'var(--sh-warning)', fontWeight: 600 }}>
-                  {sheet.incomingContributions.filter((c) => c.status === 'pending').length} pending{' '}
-                  {sheet.incomingContributions.filter((c) => c.status === 'pending').length === 1
-                    ? 'contribution'
-                    : 'contributions'}
-                </span>
-              </div>
-            ) : null}
-            {sheet.incomingContributions?.filter((c) => c.status === 'accepted').length > 0 ? (
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-                <IconCheck size={12} />
-                <span>
-                  {sheet.incomingContributions.filter((c) => c.status === 'accepted').length}{' '}
-                  accepted
-                </span>
-              </div>
-            ) : null}
-          </div>
-        </section>
-      ) : null}
+      {/*
+        PUBLIC summary chips render to every viewer using the new
+        incomingContributionsSummary / outgoingContributionsSummary fields
+        the serializer always returns (GitHub-grade UX: anyone can see
+        open-PR counts on a public repo without being a maintainer).
+        DETAILED row arrays remain permission-gated by the backend
+        (canModerateOrOwnSheet) — when arrays are absent we hide the
+        list panels entirely instead of showing a misleading "No
+        contributions yet" empty state (founder repro 2026-05-16).
+      */}
+      {(() => {
+        const incomingSummary = sheet.incomingContributionsSummary || {
+          total: 0,
+          pending: 0,
+          accepted: 0,
+        }
+        const outgoingSummary = sheet.outgoingContributionsSummary || {
+          total: 0,
+          pending: 0,
+          accepted: 0,
+        }
+        const showPanel =
+          sheet.forkSource ||
+          sheet.forks > 0 ||
+          incomingSummary.total > 0 ||
+          outgoingSummary.total > 0
+        if (!showPanel) return null
+        return (
+          <section style={panelStyle()}>
+            <h2 style={{ margin: '0 0 10px', fontSize: 15, color: 'var(--sh-heading)' }}>
+              Collaboration
+            </h2>
+            <div
+              style={{
+                display: 'grid',
+                gap: 8,
+                fontSize: 12,
+                color: 'var(--sh-subtext)',
+                lineHeight: 1.6,
+              }}
+            >
+              {sheet.forkSource ? (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <IconFork size={12} />
+                  <span>
+                    Forked from{' '}
+                    <Link
+                      to={`/sheets/${sheet.forkSource.id}`}
+                      style={{
+                        color: 'var(--sh-brand)',
+                        fontWeight: 600,
+                        textDecoration: 'none',
+                      }}
+                    >
+                      {sheet.forkSource.title}
+                    </Link>
+                    {sheet.forkSource.author ? (
+                      <>
+                        {' '}
+                        by{' '}
+                        <Link
+                          to={`/users/${sheet.forkSource.author.username}`}
+                          style={{
+                            color: 'var(--sh-brand)',
+                            fontWeight: 600,
+                            textDecoration: 'none',
+                          }}
+                        >
+                          {sheet.forkSource.author.username}
+                        </Link>
+                        <VerificationBadge user={sheet.forkSource.author} size={11} />
+                      </>
+                    ) : null}
+                  </span>
+                </div>
+              ) : null}
+              {sheet.forks > 0 ? (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <IconFork size={12} />
+                  <span>
+                    {sheet.forks} {sheet.forks === 1 ? 'fork' : 'forks'}
+                  </span>
+                </div>
+              ) : null}
+              {incomingSummary.pending > 0 ? (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <IconGitPullRequest size={12} />
+                  <span style={{ color: 'var(--sh-warning)', fontWeight: 600 }}>
+                    {incomingSummary.pending} pending{' '}
+                    {incomingSummary.pending === 1 ? 'contribution' : 'contributions'}
+                  </span>
+                </div>
+              ) : null}
+              {incomingSummary.accepted > 0 ? (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <IconCheck size={12} />
+                  <span>{incomingSummary.accepted} accepted</span>
+                </div>
+              ) : null}
+              {outgoingSummary.pending > 0 ? (
+                <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                  <IconGitPullRequest size={12} />
+                  <span style={{ color: 'var(--sh-subtext)' }}>
+                    {outgoingSummary.pending} pending{' '}
+                    {outgoingSummary.pending === 1 ? 'contribution' : 'contributions'} to upstream
+                  </span>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        )
+      })()}
 
-      {sheet.incomingContributions ? (
+      {/*
+        Detailed list panels — render ONLY when the array is present
+        AND non-empty. Empty `[]` from a permission-gated query and
+        absent property both result in no panel. We never show a
+        misleading "No contributions yet" empty state to a viewer
+        who simply lacks the permission to see them — the public
+        count chips above tell the real story.
+      */}
+      {Array.isArray(sheet.incomingContributions) && sheet.incomingContributions.length > 0 ? (
         <ContributionList
           title="Incoming contributions"
           items={sheet.incomingContributions}
@@ -359,7 +400,7 @@ export default function SheetViewerSidebar({
           reviewingId={reviewingId}
         />
       ) : null}
-      {sheet.outgoingContributions ? (
+      {Array.isArray(sheet.outgoingContributions) && sheet.outgoingContributions.length > 0 ? (
         <ContributionList title="Outgoing contributions" items={sheet.outgoingContributions} />
       ) : null}
       <TopContributorsPanel sheetId={sheet.id} />

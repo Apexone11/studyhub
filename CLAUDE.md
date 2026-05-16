@@ -175,6 +175,69 @@ The goal: bot review is an _input_ to the developer's judgment, not a directive.
 
 ---
 
+## ⛔ ECOSYSTEM AWARENESS (READ BEFORE WRITING ANY CODE)
+
+StudyHub is **one ecosystem of thirteen sub-ecosystems** sitting on **ten cross-cutting primitives**. Every feature lives inside at least one sub-ecosystem, and most live inside three or four at once. Touching one wire without understanding the others is how silent regressions ship.
+
+**The canonical example:** on 2026-05-16 the founder reported that the **Contribute back** button on a fork was broken. Investigation found four real bugs: the button was rendered to non-owners (no ownership gate), the empty-state panels showed "No contributions yet" without distinguishing "none exist" from "you can't see them," the SheetLab submit didn't invalidate the parent sheet's SWR cache, and there was no link from the contributor's view to the maintainer's view. **None of these were caught at ship time because there was no single document mapping which surfaces a feature affects.** We could not see, at a glance, that the Contribute back button was wired to one surface (the lab) but invisible to four others (the parent sheet's Incoming panel, the fork's Outgoing panel, the maintainer's review queue, the contributor's profile activity).
+
+We now have that document. It is **`docs/internal/ecosystem.md`**.
+
+### Required reading
+
+Before writing ANY new feature or modifying ANY existing one, read [`docs/internal/ecosystem.md`](docs/internal/ecosystem.md). At minimum:
+
+- The **big-picture diagram** (Mermaid or ASCII fallback).
+- The **sub-ecosystem** for the area you're touching.
+- The **"Interconnection map"** rows that reference your area as source OR destination.
+- The **Pre-flight checklist** (12 items).
+
+A skim is not enough. The Interconnection map is the part that prevents this class of bug.
+
+### Pre-flight checklist (before writing code)
+
+Run this checklist in your head — or write it into the PR description / your reply to the founder — BEFORE making changes:
+
+1. **Identify the sub-ecosystem(s) your change lives in.** Almost every feature touches 2-4.
+2. **Find your change in the Interconnection map.** Note every "To" cell. Those are your blast-radius targets.
+3. **Open each "To" surface.** Confirm whether your change requires a corresponding update there. Plan that update in the same PR.
+4. **Check the sub-ecosystem's "Depended on by" list.** Every dependent surface needs review.
+5. **Re-read the relevant CLAUDE.md A-rules.** Auth / payment / rate-limit / secret / SQL / iframe — re-read verbatim.
+6. **Permissions audit (CLAUDE.md A6).** If the feature has a visibility/privacy toggle, plan enforcement in three places (frontend, route handler, serializer).
+7. **Notification fan-out audit.** If your change writes data that another user cares about, plan a notification.
+8. **Achievements fan-out audit.** If your change is a meaningful user action, identify the `EVENT_KIND` that fires.
+9. **Telemetry audit.** Plan the structured `event:` name you'll log + the PostHog event you'll fire.
+10. **Cross-surface link audit.** If your change creates a new entity, identify what other entities should link to/from it.
+11. **Cache invalidation audit.** If your change mutates content already served by `useFetch`, identify every cacheKey that needs `clearFetchCache()`.
+12. **Migration audit.** Every new Prisma model needs an `IF NOT EXISTS`-guarded migration (A5).
+
+### Post-change checklist (before saying "done")
+
+1. Lint, build, test — per A2. **Actually run them.**
+2. Sweep dependents — grep callers of every function you changed.
+3. **Update `ecosystem.md`** — if your change adds a new module, sub-ecosystem, or interconnection, the map must reflect it BEFORE you say done.
+4. Update CLAUDE.md if your change touches a founder-locked rule or introduces a new standard pattern.
+5. Update `docs/release-log.md` (one-line entry, required by CI).
+6. Update the private cycle log if applicable.
+7. For changes touching >5 files, dispatch the `code-reviewer` subagent on the diff (A1).
+
+### Maintaining the ecosystem map
+
+`docs/internal/ecosystem.md` is a **living document.** A stale ecosystem map is worse than no map at all because it teaches lies. Update it whenever:
+
+- A new sub-ecosystem is added (rare).
+- A new feature is added to an existing sub-ecosystem (common — update the Surface + Core code lists).
+- A new interconnection is introduced (common — add a row to the Interconnection map).
+- A new primitive is added or removed.
+- A founder-locked rule changes.
+- A bug ships that "we wouldn't have hit if the ecosystem had been on the map" (add a Lessons-log entry).
+
+If you find yourself thinking "this is too small to bother updating the map" — that thought is wrong. **Small accumulations are how the map rots.** The contribute-back bug existed because every contributor of that feature thought their slice was too small to map.
+
+**The map update is part of "done."** A PR that ships code without the corresponding map update is incomplete. AI agents reading this: do not say "I've completed the feature" without confirming the ecosystem map reflects what you built.
+
+---
+
 ## Project Overview
 
 StudyHub is a GitHub-style collaborative study platform for college students. Core product ideas:
