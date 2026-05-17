@@ -280,6 +280,10 @@ export default function MyCoursesPage() {
   // Location-aware school sort. The hook itself is idle until the user
   // grants permission via the "Use my location" button — never auto-prompts.
   const geolocation = useGeolocation()
+  // /my-courses is the page where users PICK their school, not a course
+  // picker that consumes the scope toggle. The scope preference is
+  // surfaced in Settings → Privacy → Personalization and consumed by
+  // the actual course pickers (Notes / Sheets / AI Sheet Setup).
   // Recommendations come from the existing /api/courses/recommendations endpoint
   // (collaborative filter on overlapping enrollments, popular fallback for
   // brand-new users). We cache them in state so toggling chips doesn't refetch.

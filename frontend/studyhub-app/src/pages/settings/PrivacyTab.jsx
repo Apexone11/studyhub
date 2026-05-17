@@ -7,6 +7,7 @@ import { useSession } from '../../lib/session-context'
 import { showToast } from '../../lib/toast'
 import UserAvatar from '../../components/UserAvatar'
 import { Skeleton } from '../../components/Skeleton'
+import SchoolScopeToggle from '../../components/SchoolScopeToggle'
 
 function authHeaders() {
   return { 'Content-Type': 'application/json' }
@@ -296,6 +297,15 @@ export default function PrivacyTab() {
             <option value="private">Private (only you)</option>
           </Select>
         </FormField>
+      </SectionCard>
+
+      <SectionCard
+        title="Personalization"
+        subtitle="Scope what surfaces in course pickers and the feed to your primary school."
+      >
+        <div style={{ marginTop: 4 }}>
+          <SchoolScopeToggle mode="setting" />
+        </div>
       </SectionCard>
 
       <SectionCard

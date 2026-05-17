@@ -5,6 +5,7 @@ import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../
 import { useSession } from '../../../lib/session-context'
 import { useLivePolling } from '../../../lib/useLivePolling'
 import { onCacheInvalidate } from '../../../lib/useFetch'
+import { useRecentlyVisited } from '../../../lib/useRecentlyVisited'
 import { fadeInUp } from '../../../lib/animations'
 import { showToast } from '../../../lib/toast'
 import { usePageTitle } from '../../../lib/usePageTitle'
@@ -55,9 +56,19 @@ export default function useSheetViewer() {
   }, [sheetState.loading, sheetState.sheet])
 
   /* Record sheet view for recently-viewed tracking */
+  const { record: recordRecentlyVisited } = useRecentlyVisited()
   useEffect(() => {
-    if (sheetState.sheet) recordSheetView(sheetState.sheet)
-  }, [sheetState.sheet])
+    if (!sheetState.sheet) return
+    recordSheetView(sheetState.sheet)
+    // Mirror into the cross-surface recently-visited list (Bucket C1)
+    // so the /feed strip can surface it next to notes/papers/books.
+    recordRecentlyVisited({
+      type: 'sheet',
+      id: sheetState.sheet.id,
+      title: sheetState.sheet.title,
+      href: `/sheets/${sheetState.sheet.id}`,
+    })
+  }, [sheetState.sheet, recordRecentlyVisited])
 
   const sheetId = Number.parseInt(id, 10)
   const { studyStatus, setStudyStatus, STUDY_STATUSES } = useStudyStatus(sheetId)

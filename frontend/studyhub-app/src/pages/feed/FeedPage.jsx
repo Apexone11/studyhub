@@ -20,6 +20,7 @@ import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { SkeletonFeed } from '../../components/Skeleton'
 import SafeJoyride from '../../components/SafeJoyride'
+import RecentlyVisitedStrip from '../../components/RecentlyVisitedStrip'
 import { useTutorial } from '../../lib/useTutorial'
 import { FEED_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { useOnboardingRedirect } from '../../lib/useOnboardingRedirect'
@@ -343,6 +344,12 @@ export default function FeedPage() {
                   </Panel>
                 </div>
               )}
+
+              {/* Recently viewed strip — surfaces the user's last 5
+               * visited sheets/notes/papers/books across the app for
+               * one-click return. Renders nothing when the list is
+               * empty (new users) so it doesn't take up space. */}
+              <RecentlyVisitedStrip />
 
               <div className="feed-page__toolbar">
                 <div className="feed-page__filters" data-tutorial="feed-filters">

@@ -28,6 +28,47 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.3 — School-scope toggle infra + cross-surface links + RelatedWorkStrip + global keyboard shortcuts + RecentlyVisited (2026-05-16)
+
+Three founder asks plus several long-deferred ecosystem pieces. None are full rollouts — they're foundations + first-site wiring so the next sessions can finish without re-laying the plumbing.
+
+**School-scope toggle infrastructure (founder ask):**
+
+- `UserPreferences.scopeBySchool` had its migration in wave-12.2. This wave wires it through the existing settings endpoints: added to `PREF_BOOLEAN_KEYS` in `settings.constants.js` so the existing `PATCH /api/settings/preferences` handler accepts it.
+- New `lib/useScopeBySchool.js` hook with synchronous localStorage first-paint + server reconciliation on mount + fire-and-forget PATCH on flip. Exports `primarySchoolIdFromUser()` helper that handles both `course.schoolId` and `course.school.id` shapes.
+- New `components/SchoolScopeToggle.jsx` — two display modes: `inline` (compact pill for course pickers) and `setting` (full row with `role="switch"`, `aria-checked`, animated knob).
+- New "Personalization" section in `PrivacyTab.jsx` mounts the master toggle.
+- Deferred: wiring the inline pill into the 4 course pickers (Notes/Sheets/AI Sheet Setup) + the feed algorithm v2 — foundation in place, plan in `school-scoped-search-and-feed-algorithm.md`.
+
+**Ecosystem Track 2 — Cross-surface link fields:**
+
+- Migration `20260516000003_cross_surface_link_fields` adds `StudySheet.libraryVolumeId`, `StudySheet.derivedFromPaperId`, `Note.relatedSheetId`, `Note.relatedPaperId`. All nullable + indexed for reverse lookup. `IF NOT EXISTS`-guarded.
+- Schema updates in `schema.prisma` with explanatory comments.
+
+**Ecosystem Track 5 — RelatedWorkStrip:**
+
+- New `backend/src/modules/related/` module with 4 routes: `/sheet/:id`, `/note/:id`, `/paper/:paperId`, `/book/:volumeId`. Block-filtered (try-catch wrapped). Hard cap of 8 items total. Mounted at `/api/related`.
+- New `components/RelatedWorkStrip.jsx` — reusable component with grid layout, type badges, hover states. Returns null when empty.
+
+**Bucket B2 — Global keyboard shortcuts (built earlier but never wired):**
+
+- `lib/useGlobalShortcuts.js` was already full-featured (`?` help, `/` search, `g h/s/n/m/a` navigation, sequence handling, editable-context guard) but never invoked. Wired into `Navbar.jsx` so it loads on every authenticated page.
+
+**Bucket C1 — Recently-visited cross-surface strip:**
+
+- New `lib/useRecentlyVisited.js` — localStorage-backed (cap 20, dedup by (type, id), cross-tab + in-page sync, validates entry shape).
+- New `components/RecentlyVisitedStrip.jsx` — horizontal strip on `/feed`, hides on empty list, type-accent border.
+- Recording wired in `useSheetViewer.js` and `NoteViewerPage.jsx` so every sheet/note view populates the strip automatically.
+
+**Bucket C7:** verified that reading-time chips already ship via `SheetGridCard.jsx` and `NoteViewerPage.jsx`. The unified `lib/readingTime.js` helper from wave-12.2 is available for future sites.
+
+**Loop findings fixed in-session:**
+
+- Bug: `related.routes.js` note handler treated the blocked-userId list as a sheet-id list. Refactored to check `blocked.includes(sheet.userId)` after fetching the sheet.
+- Security: `cacheControl(60)` on `/api/related/*` could serve a blocked user's content to someone who blocked them on shared-browser profiles. Removed cache headers entirely from these routes.
+
+**Tests:** 33 new (8 useScopeBySchool + 7 useRecentlyVisited + 10 related.routes + others). 164 tests across all touched suites pass. Frontend lint 0 errors / 89 pre-existing react-hooks debt warnings. Backend lint clean. Build clean in 1.33s.
+
 ### Wave-12.2 — MD+VA catalog + location sort + course-detail drawer + Library Phase A + primitives (2026-05-16)
 
 Major wave covering the founder's MD+VA schools/courses ask, location-based sort, course detail drawer on `/my-courses`, plus several long-deferred infrastructure pieces (useAsyncAction hook, streak chip, reading-time helper, Library Phase A badges, UserPreferences.scopeBySchool foundation for the upcoming school-scoped search rollout).

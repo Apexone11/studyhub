@@ -423,6 +423,12 @@ model StudySheet {
   lastAuditGrade         String?      @db.VarChar(1)
   lastAuditReport        Json?
   lastAuditedAt          DateTime?
+  // Cross-surface link fields (wave-12.3, ecosystem Track 2). When a
+  // sheet is written about a Library book or generated from a Scholar
+  // paper, these point back so the Library/Scholar detail pages can
+  // show "Related sheets" via reverse lookup (indexed below).
+  libraryVolumeId        String?      @db.VarChar(64)
+  derivedFromPaperId     String?      @db.VarChar(128)
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
   course                 Course       @relation(fields: [courseId], references: [id])
@@ -455,6 +461,8 @@ model StudySheet {
   @@index([contentHash])
   @@index([contentSimhash])
   @@index([aiReviewDecision])
+  @@index([libraryVolumeId])
+  @@index([derivedFromPaperId])
 }
 
 model SheetHtmlVersion {
@@ -591,6 +599,14 @@ model Note {
   materials        Material[]     @relation("MaterialNote")
   revision         Int            @default(0)
   lastSaveId       String?        @db.Uuid
+  // Cross-surface link fields (wave-12.3, ecosystem Track 2).
+  // Notes can be linked to the sheet or paper they're "about." Powers
+  // the backlinks footer + Related-work strip on the linked entity.
+  relatedSheetId   Int?
+  relatedPaperId   String?        @db.VarChar(128)
+
+  @@index([relatedSheetId])
+  @@index([relatedPaperId])
 }
 
 // Range-anchored highlights for notes (Phase 9 — Note Review v1).

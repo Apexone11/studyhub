@@ -25,6 +25,10 @@ const PREF_BOOLEAN_KEYS = [
   'alertOnNewCountry',
   'alertOnNewCity',
   'blockAnonymousIp',
+  // School-scoped search (wave-12.3, 2026-05-16). Default true at the
+  // schema level — when on, course pickers in Notes/Sheets/AI Sheet
+  // Setup default to showing only the user's primary school's courses.
+  'scopeBySchool',
 ]
 const PREF_ENUM_KEYS = {
   profileVisibility: ['public', 'enrolled', 'private'],
