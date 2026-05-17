@@ -21,6 +21,7 @@ import { useSession } from '../../lib/session-context'
 import EmailVerificationBanner from '../EmailVerificationBanner'
 import NavbarUserMenu from './NavbarUserMenu'
 import NavbarNotifications from './NavbarNotifications'
+import StreakChip from './StreakChip'
 /* ChatPanel lazy-loaded above */
 import { IconMessages } from '../Icons'
 import { S, getConfig, handleIconHover } from './navbarConstants'
@@ -358,6 +359,9 @@ export default function Navbar({
               )}
             </button>
           )}
+
+          {/* streak chip — only shown when the user has an active streak */}
+          {user && <StreakChip />}
 
           {/* notification bell */}
           <NavbarNotifications />

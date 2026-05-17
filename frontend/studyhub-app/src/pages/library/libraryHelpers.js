@@ -67,6 +67,31 @@ export function hasPreview(book) {
 }
 
 /**
+ * Does Google Books report a PDF for this volume?
+ * For copyrighted works this is preview-PDF-only. Use isPublicDomainFull()
+ * to distinguish from full downloadable PDF.
+ */
+export function hasPdf(book) {
+  return Boolean(book?.pdfAvailable)
+}
+
+/** Does Google Books report an EPUB for this volume? */
+export function hasEpub(book) {
+  return Boolean(book?.epubAvailable)
+}
+
+/**
+ * Is this book full-text public domain — i.e., legally readable AND
+ * downloadable end-to-end? This is the "holy grail" case for the
+ * Library: the user can read the entire book inside StudyHub without
+ * licensing concerns.
+ */
+export function isPublicDomainFull(book) {
+  if (!book) return false
+  return Boolean(book.publicDomain) || book.accessViewStatus === 'FULL_PUBLIC_DOMAIN'
+}
+
+/**
  * Truncate text at word boundary.
  * @param {string} text - Text to truncate
  * @param {number} maxLen - Maximum length

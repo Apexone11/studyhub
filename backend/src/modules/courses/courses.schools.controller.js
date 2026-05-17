@@ -4,6 +4,7 @@ const { captureError } = require('../../monitoring/sentry')
 const { cacheControl } = require('../../lib/cacheControl')
 const prisma = require('../../lib/prisma')
 const log = require('../../lib/logger')
+const { distanceKm } = require('../../lib/geo/haversine')
 const { schoolsLimiter, POPULAR_COURSES_LIMIT } = require('./courses.constants')
 // Stricter per-USER cap (30/15min) layered on top of the existing
 // per-IP cap (120/15min). Wave-11 G1-6 — defends against authenticated
@@ -13,6 +14,18 @@ const { discoverySchoolsLimiter, discoveryCoursesLimiter } = require('../../lib/
 
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const router = express.Router()
+
+// Parse a lat or lng from a query string. Returns the number if it's
+// inside the valid range, otherwise null. We never persist the coords —
+// they're per-request only and used to sort the response.
+function parseCoord(raw, kind) {
+  if (raw == null || raw === '') return null
+  const parsed = Number.parseFloat(raw)
+  if (!Number.isFinite(parsed)) return null
+  if (kind === 'lat' && (parsed < -90 || parsed > 90)) return null
+  if (kind === 'lng' && (parsed < -180 || parsed > 180)) return null
+  return parsed
+}
 
 // Public endpoint for school + course dropdowns.
 //
@@ -127,6 +140,146 @@ router.get(
       log.error(
         { event: 'courses.popular_list_failed', err: error?.message || String(error) },
         'Failed to load popular courses list',
+      )
+      return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
+
+/**
+ * GET /api/courses/schools-nearby?lat=X&lng=Y&limit=N
+ *
+ * Returns schools sorted by haversine distance from the given lat/lng.
+ * If lat/lng are missing or invalid, falls back to alphabetical (same
+ * response shape as /schools). Each row includes `distanceKm` so the
+ * client can render "12 km from you" labels and skip coords-less rows
+ * to the bottom of the list.
+ *
+ * Privacy note: lat/lng come from `navigator.geolocation` in the client
+ * and are sent per-request as query params. We never persist them.
+ * That's why the endpoint is GET-without-body — easy to verify in
+ * server logs that no coords ever land in the DB.
+ */
+router.get(
+  '/schools-nearby',
+  cacheControl(60),
+  schoolsLimiter,
+  discoverySchoolsLimiter,
+  async (req, res) => {
+    const userLat = parseCoord(req.query.lat, 'lat')
+    const userLng = parseCoord(req.query.lng, 'lng')
+    const limitRaw = Number.parseInt(req.query.limit, 10)
+    const limit = Number.isInteger(limitRaw) && limitRaw > 0 && limitRaw <= 100 ? limitRaw : 50
+
+    try {
+      const schools = await prisma.school.findMany({
+        select: {
+          id: true,
+          name: true,
+          short: true,
+          city: true,
+          state: true,
+          schoolType: true,
+          logoUrl: true,
+          latitude: true,
+          longitude: true,
+        },
+        orderBy: { name: 'asc' },
+      })
+
+      if (userLat == null || userLng == null) {
+        // No coords provided — fall back to alphabetical with null
+        // distance. Same response shape so the client can render either
+        // mode without branching.
+        return res.json(schools.slice(0, limit).map((s) => ({ ...s, distanceKm: null })))
+      }
+
+      const scored = schools.map((school) => ({
+        ...school,
+        distanceKm: distanceKm(userLat, userLng, school.latitude, school.longitude),
+      }))
+
+      // Sort: rows with a distance first (ascending), then rows without
+      // coords alphabetically at the bottom. Stable order across reqs.
+      scored.sort((a, b) => {
+        if (a.distanceKm == null && b.distanceKm == null) return a.name.localeCompare(b.name)
+        if (a.distanceKm == null) return 1
+        if (b.distanceKm == null) return -1
+        return a.distanceKm - b.distanceKm
+      })
+
+      return res.json(scored.slice(0, limit))
+    } catch (error) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+      log.error(
+        { event: 'courses.schools_nearby_failed', err: error?.message || String(error) },
+        'Failed to load nearby schools list',
+      )
+      return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+    }
+  },
+)
+
+/**
+ * GET /api/courses/schools/:id
+ *
+ * Returns the full detail for a single school — used by the
+ * SchoolCourseDetailDrawer on /my-courses. Includes description,
+ * stats, website. Does NOT include courses (the caller already has
+ * those from /schools).
+ */
+router.get(
+  '/schools/:id',
+  cacheControl(300),
+  schoolsLimiter,
+  discoverySchoolsLimiter,
+  async (req, res) => {
+    const id = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(id) || id < 1) {
+      return sendError(res, 400, 'Invalid school id.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    try {
+      const school = await prisma.school.findUnique({
+        where: { id },
+        select: {
+          id: true,
+          name: true,
+          short: true,
+          city: true,
+          state: true,
+          schoolType: true,
+          logoUrl: true,
+          description: true,
+          websiteUrl: true,
+          enrollmentSize: true,
+          foundedYear: true,
+          mascot: true,
+          // Counts surfaced for the drawer's "X courses on StudyHub" badge.
+          _count: {
+            select: {
+              courses: true,
+              enrollments: true,
+            },
+          },
+        },
+      })
+
+      if (!school) {
+        return sendError(res, 404, 'School not found.', ERROR_CODES.NOT_FOUND)
+      }
+
+      return res.json({
+        ...school,
+        courseCount: school._count.courses,
+        memberCount: school._count.enrollments,
+        _count: undefined,
+      })
+    } catch (error) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+      log.error(
+        { event: 'courses.school_detail_failed', err: error?.message || String(error) },
+        'Failed to load school detail',
       )
       return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
     }

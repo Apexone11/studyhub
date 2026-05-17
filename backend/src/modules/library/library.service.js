@@ -85,6 +85,8 @@ function normalizeVolume(item) {
   if (!item) return null
   const info = item.volumeInfo || {}
   const accessInfo = item.accessInfo || {}
+  const pdf = accessInfo.pdf || {}
+  const epub = accessInfo.epub || {}
   return {
     volumeId: item.id,
     title: info.title || 'Untitled',
@@ -105,6 +107,21 @@ function normalizeVolume(item) {
     viewability: accessInfo.viewability || 'NO_PAGES',
     embeddable: accessInfo.embeddable || false,
     webReaderLink: accessInfo.webReaderLink || null,
+    // Library Phase A (wave-12.2 2026-05-16) — surface the format
+    // availability signals Google Books returns so card badges can
+    // tell users at a glance which books actually have a PDF / EPUB /
+    // full public-domain text. Only the `downloadLink` is present for
+    // public-domain works; for copyrighted works `pdfAvailable: true`
+    // means a preview-only PDF (not a download).
+    pdfAvailable: Boolean(pdf.isAvailable),
+    pdfDownloadLink: pdf.downloadLink || null,
+    epubAvailable: Boolean(epub.isAvailable),
+    epubDownloadLink: epub.downloadLink || null,
+    publicDomain: Boolean(accessInfo.publicDomain),
+    // accessViewStatus: 'NONE' | 'SAMPLE' | 'FULL_PUBLIC_DOMAIN'.
+    // The 'FULL_PUBLIC_DOMAIN' badge is the holy grail — free, complete,
+    // legally distributable text the user can read end-to-end.
+    accessViewStatus: accessInfo.accessViewStatus || null,
   }
 }
 

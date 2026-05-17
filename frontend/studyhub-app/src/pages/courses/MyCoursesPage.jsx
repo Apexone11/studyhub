@@ -23,6 +23,9 @@ import { MY_COURSES_STEPS, TUTORIAL_VERSIONS } from '../../lib/tutorialSteps'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { resolveImageUrl } from '../../lib/imageUrls'
 import { deriveMyCoursesHero } from '../../lib/courses'
+import { useGeolocation } from '../../lib/useGeolocation'
+import { distanceKm } from '../../lib/geo/haversineClient'
+import SchoolCourseDetailDrawer from './components/SchoolCourseDetailDrawer'
 
 /* ── Helpers ────────────────────────────────────────────────────────────── */
 const authHeaders = () => ({ 'Content-Type': 'application/json' })
@@ -155,45 +158,89 @@ function SchoolLogoCard({ school, selected, onClick, size = 'md' }) {
   )
 }
 
-function CourseChip({ course, selected, onToggle }) {
+// CourseChip — toggles enrollment on main click, opens the school
+// detail drawer on the small info button (so the toggle gesture is
+// not overloaded with two meanings). The info button is keyboard
+// reachable as its own focus stop.
+function CourseChip({ course, selected, onToggle, onInfo }) {
   return (
-    <button
-      type="button"
-      onClick={() => onToggle(course.id)}
-      aria-pressed={selected ? 'true' : 'false'}
-      aria-label={`${selected ? 'Selected:' : 'Toggle'} ${course.code} ${course.name}`}
+    <span
       style={{
-        padding: '8px 14px',
+        display: 'inline-flex',
+        alignItems: 'stretch',
         borderRadius: 10,
-        cursor: 'pointer',
         border: selected ? '2px solid var(--sh-brand)' : '1px solid var(--sh-border)',
         background: selected ? 'var(--sh-info-bg, #eff6ff)' : 'var(--sh-surface)',
-        color: selected ? 'var(--sh-brand)' : 'var(--sh-heading)',
-        fontWeight: selected ? 700 : 600,
-        fontSize: 13,
-        fontFamily: 'inherit',
+        overflow: 'hidden',
         transition: 'all 0.12s',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: 6,
       }}
     >
-      {selected && (
-        <svg
-          width="12"
-          height="12"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="3"
-          strokeLinecap="round"
+      <button
+        type="button"
+        onClick={() => onToggle(course.id)}
+        aria-pressed={selected ? 'true' : 'false'}
+        aria-label={`${selected ? 'Selected:' : 'Toggle'} ${course.code} ${course.name}`}
+        style={{
+          padding: '8px 12px',
+          cursor: 'pointer',
+          border: 'none',
+          background: 'transparent',
+          color: selected ? 'var(--sh-brand)' : 'var(--sh-heading)',
+          fontWeight: selected ? 700 : 600,
+          fontSize: 13,
+          fontFamily: 'inherit',
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 6,
+        }}
+      >
+        {selected && (
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+          >
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
+        )}
+        <span>{course.code}</span>
+        <span style={{ fontWeight: 400, color: 'var(--sh-muted)', fontSize: 12 }}>
+          {course.name}
+        </span>
+      </button>
+      {onInfo ? (
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation()
+            onInfo(course)
+          }}
+          aria-label={`See school info for ${course.code}`}
+          style={{
+            padding: '0 10px',
+            cursor: 'pointer',
+            border: 'none',
+            borderLeft: selected ? '1px solid var(--sh-brand)' : '1px solid var(--sh-border)',
+            background: 'transparent',
+            color: 'var(--sh-muted)',
+            fontSize: 14,
+            fontWeight: 800,
+            fontFamily: 'inherit',
+            minWidth: 36,
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
+          title="View school details"
         >
-          <polyline points="20 6 9 17 4 12" />
-        </svg>
-      )}
-      <span>{course.code}</span>
-      <span style={{ fontWeight: 400, color: 'var(--sh-muted)', fontSize: 12 }}>{course.name}</span>
-    </button>
+          i
+        </button>
+      ) : null}
+    </span>
   )
 }
 
@@ -221,6 +268,18 @@ export default function MyCoursesPage() {
   const [courseSearch, setCourseSearch] = useState('')
   const [saving, setSaving] = useState(false)
   const [dirty, setDirty] = useState(false)
+
+  // Drawer state — opens with a course payload when a user clicks a chip;
+  // the drawer fetches the school detail lazily via /api/courses/schools/:id.
+  // Per founder rule "if the user click on a new course after the first
+  // course it will show that course information" — we always overwrite
+  // drawerCourse, never append.
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [drawerCourse, setDrawerCourse] = useState(null)
+
+  // Location-aware school sort. The hook itself is idle until the user
+  // grants permission via the "Use my location" button — never auto-prompts.
+  const geolocation = useGeolocation()
   // Recommendations come from the existing /api/courses/recommendations endpoint
   // (collaborative filter on overlapping enrollments, popular fallback for
   // brand-new users). We cache them in state so toggling chips doesn't refetch.
@@ -330,16 +389,38 @@ export default function MyCoursesPage() {
     [catalog, selectedSchoolId],
   )
 
+  // Filter by search query (name/short/city match) AND apply the
+  // location sort when geolocation is granted. The sort happens in JS
+  // (small N — usually ~70 schools) so the user sees instant feedback
+  // the moment they grant permission. Schools without lat/lng fall to
+  // the bottom alphabetically.
   const filteredSchools = useMemo(() => {
-    if (!schoolSearch.trim()) return catalog
-    const q = schoolSearch.toLowerCase()
-    return catalog.filter(
-      (s) =>
-        s.name.toLowerCase().includes(q) ||
-        s.short.toLowerCase().includes(q) ||
-        (s.city && s.city.toLowerCase().includes(q)),
-    )
-  }, [catalog, schoolSearch])
+    const q = schoolSearch.trim().toLowerCase()
+    const filtered = q
+      ? catalog.filter(
+          (s) =>
+            s.name.toLowerCase().includes(q) ||
+            s.short.toLowerCase().includes(q) ||
+            (s.city && s.city.toLowerCase().includes(q)),
+        )
+      : catalog
+
+    if (geolocation.status !== 'granted' || !geolocation.coords) {
+      return filtered
+    }
+    const { lat, lng } = geolocation.coords
+    const scored = filtered.map((s) => ({
+      ...s,
+      _distanceKm: distanceKm(lat, lng, s.latitude, s.longitude),
+    }))
+    scored.sort((a, b) => {
+      if (a._distanceKm == null && b._distanceKm == null) return a.name.localeCompare(b.name)
+      if (a._distanceKm == null) return 1
+      if (b._distanceKm == null) return -1
+      return a._distanceKm - b._distanceKm
+    })
+    return scored
+  }, [catalog, schoolSearch, geolocation.status, geolocation.coords])
 
   const departments = useMemo(() => {
     if (!selectedSchool?.courses?.length) return []
@@ -380,6 +461,21 @@ export default function MyCoursesPage() {
     setDeptFilter('')
     setCourseSearch('')
     setDirty(true)
+  }
+
+  // Open the drawer with the clicked course; per founder rule the
+  // drawer ALWAYS overwrites the previous course so two clicks on
+  // different chips never leave stale content on screen.
+  function openCourseDetail(course) {
+    setDrawerCourse(course)
+    setDrawerOpen(true)
+  }
+
+  function closeCourseDetail() {
+    setDrawerOpen(false)
+    // We intentionally keep drawerCourse around for one render cycle so
+    // the drawer's exit animation (when we add one) has the data; the
+    // next open() overwrites it before anything is visible.
   }
 
   function clearSchool() {
@@ -662,6 +758,82 @@ export default function MyCoursesPage() {
                   }}
                 />
 
+                {/* "Use my location" prompt — only renders when the user
+                 * hasn't already granted permission this session. Once
+                 * granted, the school list silently sorts by distance and
+                 * we replace the prompt with a small status chip. */}
+                {geolocation.status === 'idle' && (
+                  <button
+                    type="button"
+                    onClick={geolocation.request}
+                    style={{
+                      width: '100%',
+                      padding: '8px 12px',
+                      borderRadius: 10,
+                      border: '1px dashed var(--sh-brand)',
+                      background: 'var(--sh-info-bg)',
+                      color: 'var(--sh-brand)',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      cursor: 'pointer',
+                      fontFamily: 'inherit',
+                      marginBottom: 12,
+                    }}
+                  >
+                    Sort by distance — use my location
+                  </button>
+                )}
+                {geolocation.status === 'requesting' && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--sh-muted)',
+                      marginBottom: 12,
+                      textAlign: 'center',
+                    }}
+                    aria-live="polite"
+                  >
+                    Finding your location…
+                  </div>
+                )}
+                {geolocation.status === 'granted' && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--sh-muted)',
+                      marginBottom: 12,
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 4,
+                    }}
+                  >
+                    <span
+                      aria-hidden="true"
+                      style={{
+                        width: 6,
+                        height: 6,
+                        borderRadius: '50%',
+                        background: 'var(--sh-success)',
+                        display: 'inline-block',
+                      }}
+                    />
+                    Sorted by distance from you
+                  </div>
+                )}
+                {(geolocation.status === 'denied' ||
+                  geolocation.status === 'error' ||
+                  geolocation.status === 'timeout') && (
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: 'var(--sh-muted)',
+                      marginBottom: 12,
+                    }}
+                  >
+                    Location unavailable — showing schools alphabetically.
+                  </div>
+                )}
+
                 {/* School list */}
                 <div
                   style={{
@@ -852,6 +1024,7 @@ export default function MyCoursesPage() {
                               course={course}
                               selected={false}
                               onToggle={toggleCourse}
+                              onInfo={openCourseDetail}
                             />
                           ))}
                         </div>
@@ -897,6 +1070,7 @@ export default function MyCoursesPage() {
                         course={course}
                         selected={selectedCourseIds.includes(course.id)}
                         onToggle={toggleCourse}
+                        onInfo={openCourseDetail}
                       />
                     ))}
                   </div>
@@ -1090,6 +1264,13 @@ export default function MyCoursesPage() {
       </div>
 
       <SafeJoyride {...tutorial.joyrideProps} />
+
+      <SchoolCourseDetailDrawer
+        open={drawerOpen}
+        course={drawerCourse}
+        schoolId={selectedSchool?.id || null}
+        onClose={closeCourseDetail}
+      />
     </div>
   )
 }

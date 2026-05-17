@@ -28,6 +28,49 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.2 — MD+VA catalog + location sort + course-detail drawer + Library Phase A + primitives (2026-05-16)
+
+Major wave covering the founder's MD+VA schools/courses ask, location-based sort, course detail drawer on `/my-courses`, plus several long-deferred infrastructure pieces (useAsyncAction hook, streak chip, reading-time helper, Library Phase A badges, UserPreferences.scopeBySchool foundation for the upcoming school-scoped search rollout).
+
+**School catalog expansion:**
+
+- `School` model gains `description`, `websiteUrl`, `latitude`, `longitude`, `enrollmentSize`, `foundedYear`, `mascot` columns (migration `20260516000001_school_detail_columns`). All nullable + `IF NOT EXISTS`.
+- Catalog expanded from 30 MD-only to ~70 schools covering all major MD + VA institutions (public 4-year, private 4-year, USM + VCCS community colleges).
+- `bootstrapSchools` writes new fields on insert + backfills nulls on update without overwriting admin-edited values.
+
+**Location-based school sort:**
+
+- New `backend/src/lib/geo/haversine.js` + frontend mirror `geo/haversineClient.js` (8 unit tests each side).
+- `GET /api/courses/schools-nearby?lat=&lng=` returns schools sorted by great-circle distance; falls back to alphabetical when coords are missing. Lat/lng are per-request only — never persisted to the database.
+- `GET /api/courses/schools/:id` returns full school detail (rate-limited via existing `discoverySchoolsLimiter`).
+- New `useGeolocation` hook — permission-aware, never auto-prompts, sessionStorage-cached, 10s timeout, low-accuracy mode (city-level is enough for school sort). 8 unit tests.
+- `/my-courses` school list now sorts by distance when geolocation is granted; shows a "Sort by distance — use my location" button in idle state and a discrete "Sorted by distance from you" chip when granted.
+
+**SchoolCourseDetailDrawer:**
+
+- New slide-in drawer (right side, portaled to body, focus-trapped, Esc-closable) that opens when a user clicks the new `i` button on any course chip.
+- Shows the school's neutral description, location, type, founded year, enrollment size, mascot, course count, member count, and a website link. No tuition, no rankings, no admissions stats per founder direction.
+- Switches content (does NOT stack) when the user clicks a different course chip while the drawer is open.
+- Course chips now split into two buttons: main toggle + small info button so the two gestures don't overlap.
+
+**`UserPreferences.scopeBySchool` foundation:**
+
+- Migration `20260516000002_user_preferences_scope_by_school` adds the boolean (default `true`). Foundation for the upcoming school-scoped search rollout (course pickers + feed algorithm v2 — full rollout pending; plan in `school-scoped-search-and-feed-algorithm.md`).
+
+**Library Phase A:**
+
+- `library.service.normalizeVolume` now passes through `accessInfo.pdf.isAvailable`, `accessInfo.epub.isAvailable`, `accessInfo.publicDomain`, `accessInfo.accessViewStatus` to the frontend.
+- New helpers `hasPdf`, `hasEpub`, `isPublicDomainFull` in `libraryHelpers.js` + 19 new unit tests.
+- `BookCard` now renders up to 3 stacked badges (Free + PDF + EPUB) in the bottom-right of the cover image. Color-coded via CSS tokens. WCAG-labeled.
+
+**Cross-cutting primitives:**
+
+- `useAsyncAction` hook (`lib/useAsyncAction.js`) — wraps any async fn with pending/error/data state + concurrent-call dedup + stale-set guard + latest-fn ref. Replaces 30+ ad-hoc patterns. 8 unit tests.
+- `StreakChip` (`components/navbar/StreakChip.jsx`) — small flame + day count in the navbar when the user has a non-zero streak. Reads `GET /api/users/me/streak` via useFetch SWR 5min. Silently returns null on failure or zero streak.
+- `readingTime` helper (`lib/readingTime.js`) — `estimateReadingMinutes(text)` and `formatReadingTime(text)`. 220 wpm baseline (Brysbaert 2019), HTML-tag-stripping, 1-min floor. 8 unit tests. Helper ready; per-card wiring is follow-on.
+
+**Test totals this wave:** 99 new frontend tests (8 useGeolocation + 19 library helpers + 8 useAsyncAction + 8 reading time + others) + 8 new backend tests (haversine). All pass. Frontend lint 0 errors, 88 warnings (pre-existing react-hooks debt). Backend lint clean. Build clean.
+
 ### Wave-12.1 — deferred work follow-on (F7 + UI/UX Bucket A6/A7/A9/A11) (2026-05-16)
 
 Follow-on to wave-12 closing out the deferred items.

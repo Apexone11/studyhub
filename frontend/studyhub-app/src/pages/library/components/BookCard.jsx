@@ -1,5 +1,13 @@
 import { Link } from 'react-router-dom'
-import { getBookCover, getAuthorNames, formatPageCount, truncateText } from '../libraryHelpers'
+import {
+  getBookCover,
+  getAuthorNames,
+  formatPageCount,
+  truncateText,
+  hasPdf,
+  hasEpub,
+  isPublicDomainFull,
+} from '../libraryHelpers'
 import './BookCard.css'
 
 /**
@@ -42,6 +50,33 @@ export default function BookCard({ book, progress }) {
               className="book-card__progress-fill"
               style={{ width: `${Math.min(progress, 100)}%` }}
             />
+          </div>
+        )}
+
+        {/* Format-availability badges (Library Phase A, wave-12.2).
+            Up to 3 stacked badges at the bottom-right of the cover so
+            users can see at a glance which books are PDF / EPUB / fully
+            public-domain. No emoji per CLAUDE.md UI-chrome rule. */}
+        {(hasPdf(book) || hasEpub(book) || isPublicDomainFull(book)) && (
+          <div className="book-card__badges" aria-hidden="false">
+            {isPublicDomainFull(book) && (
+              <span
+                className="book-card__badge book-card__badge--free"
+                aria-label="Free full-text public domain book"
+              >
+                Free
+              </span>
+            )}
+            {hasPdf(book) && (
+              <span className="book-card__badge book-card__badge--pdf" aria-label="PDF available">
+                PDF
+              </span>
+            )}
+            {hasEpub(book) && (
+              <span className="book-card__badge book-card__badge--epub" aria-label="EPUB available">
+                EPUB
+              </span>
+            )}
           </div>
         )}
       </div>

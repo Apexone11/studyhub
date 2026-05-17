@@ -311,8 +311,20 @@ model School {
   schoolType  String                 @default("public")
   logoUrl     String?
   emailDomain String?
-  courses     Course[]
-  enrollments UserSchoolEnrollment[]
+  // Detail fields added 2026-05-16 (wave-12.2). All nullable so the
+  // catalog can populate them progressively without breaking older rows.
+  // See backend/src/lib/catalog/catalogSchools.js for the curated data.
+  description    String?    @db.Text
+  websiteUrl     String?    @db.VarChar(255)
+  latitude       Float?
+  longitude      Float?
+  enrollmentSize Int?
+  foundedYear    Int?
+  mascot         String?    @db.VarChar(80)
+  courses        Course[]
+  enrollments    UserSchoolEnrollment[]
+
+  @@index([latitude, longitude])
 }
 
 model Course {
@@ -933,6 +945,12 @@ model UserPreferences {
   alertOnNewCountry      Boolean @default(true)
   alertOnNewCity         Boolean @default(false)
   blockAnonymousIp       Boolean @default(false)
+  // Added 2026-05-16 (wave-12.2 school-scoped-search): when true,
+  // course pickers in Notes/Sheets/AI Sheet Setup default to showing
+  // ONLY the user's primary school's courses. The user can flip to
+  // "All schools" inline per-picker. Default true matches the founder's
+  // intent that most users see their own school first.
+  scopeBySchool          Boolean @default(true)
   user                   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
