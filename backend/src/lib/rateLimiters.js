@@ -71,6 +71,21 @@ const readLimiter = rateLimit({
 })
 
 /**
+ * Related-work strip reads — 60 per minute per IP. /api/related/{sheet,
+ * note,paper,book}/:id is enumerable and reveals course-graph + backlink
+ * metadata. Stricter than the general read budget so scrapers can't map
+ * the published-content graph cheaply. Default IP keying (no custom
+ * keyGenerator) — CLAUDE.md A7.
+ */
+const relatedReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many related-work requests. Please slow down.' },
+})
+
+/**
  * Admin endpoints — moderate limits.
  * 120 requests per minute per IP.
  */
@@ -1444,6 +1459,7 @@ module.exports = {
   authLimiter,
   writeLimiter,
   readLimiter,
+  relatedReadLimiter,
   adminLimiter,
   adminAnnouncementLimiter,
   noteHighlightLimiter,

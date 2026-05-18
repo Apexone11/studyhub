@@ -9,8 +9,8 @@ const sanitizeHtml = require('../../lib/html/safeSanitize')
  * Parse an ID param with radix 10 and return null on NaN
  */
 function parseId(val) {
-  const parsed = parseInt(val, 10)
-  return Number.isNaN(parsed) ? null : parsed
+  const parsed = Number.parseInt(val, 10)
+  return Number.isInteger(parsed) ? parsed : null
 }
 
 /**

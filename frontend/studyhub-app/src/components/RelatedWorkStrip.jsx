@@ -16,15 +16,17 @@ import useFetch from '../lib/useFetch'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
+const TYPE_LABELS = { sheet: 'Sheet', note: 'Note', paper: 'Paper', book: 'Book' }
+const TYPE_COLORS = {
+  sheet: 'var(--sh-brand)',
+  note: 'var(--sh-success)',
+  paper: 'var(--sh-warning)',
+  book: 'var(--sh-info-text, var(--sh-brand))',
+}
+
 function TypeBadge({ type }) {
-  const label =
-    type === 'sheet' ? 'Sheet' : type === 'note' ? 'Note' : type === 'paper' ? 'Paper' : 'Item'
-  const color =
-    type === 'sheet'
-      ? 'var(--sh-brand)'
-      : type === 'note'
-        ? 'var(--sh-success)'
-        : 'var(--sh-warning)'
+  const label = TYPE_LABELS[type] || 'Item'
+  const color = TYPE_COLORS[type] || 'var(--sh-muted)'
   return (
     <span
       style={{
@@ -106,6 +108,18 @@ export default function RelatedWorkStrip({ type, id, title = 'Related work' }) {
             }}
             onMouseLeave={(e) => {
               e.currentTarget.style.borderColor = 'var(--sh-border)'
+            }}
+            onFocus={(e) => {
+              // Keyboard parity with the hover affordance. Without this,
+              // Tab-navigating through the strip leaves no visible
+              // indicator of which card has focus.
+              e.currentTarget.style.borderColor = 'var(--sh-brand)'
+              e.currentTarget.style.outline = '2px solid var(--sh-brand)'
+              e.currentTarget.style.outlineOffset = '2px'
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.borderColor = 'var(--sh-border)'
+              e.currentTarget.style.outline = 'none'
             }}
           >
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 6 }}>

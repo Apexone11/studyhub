@@ -18,11 +18,30 @@ const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { getBlockedUserIds } = require('../../lib/social/blockFilter')
+const { relatedReadLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
 
 const MAX_ITEMS_PER_BUCKET = 4
 const MAX_TOTAL_ITEMS = 8
+
+// paperId / volumeId come from external sources (Scholar API / Google
+// Books). They're opaque strings but we still validate the charset to
+// keep log lines + cache keys clean and reject obvious shell/SQL probes.
+// Real values are URL-safe; permissive enough not to break legit IDs.
+const OPAQUE_ID_REGEX = /^[A-Za-z0-9._:-]+$/
+
+// Defense-in-depth: every response from this router depends on the
+// viewer's block list (via getBlockedUserIds). Browser cache could
+// serve a blocked-user row to whoever uses the browser next on a
+// shared device. Explicit no-store cuts that off even though we don't
+// emit cacheControl headers — some proxies still apply heuristics.
+function noStore(_req, res, next) {
+  res.set('Cache-Control', 'no-store')
+  next()
+}
+
+router.use(relatedReadLimiter, noStore)
 
 async function getBlockedSafe(userId) {
   if (!userId) return []
@@ -252,7 +271,7 @@ router.get(
   optionalAuth,
   async (req, res) => {
     const paperId = String(req.params.paperId || '').slice(0, 128)
-    if (!paperId) {
+    if (!paperId || !OPAQUE_ID_REGEX.test(paperId)) {
       return sendError(res, 400, 'Invalid paper id.', ERROR_CODES.BAD_REQUEST)
     }
     try {
@@ -329,7 +348,7 @@ router.get(
   optionalAuth,
   async (req, res) => {
     const volumeId = String(req.params.volumeId || '').slice(0, 64)
-    if (!volumeId) {
+    if (!volumeId || !OPAQUE_ID_REGEX.test(volumeId)) {
       return sendError(res, 400, 'Invalid volume id.', ERROR_CODES.BAD_REQUEST)
     }
     try {

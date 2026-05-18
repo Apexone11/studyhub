@@ -69,6 +69,15 @@ export default function RecentlyVisitedStrip({ limit = 5 }) {
             key={`${entry.type}-${entry.id}`}
             to={entry.href}
             title={entry.title}
+            onFocus={(e) => {
+              // Keyboard parity — without an explicit focus outline,
+              // Tab-navigating the horizontal strip leaves no indicator.
+              e.currentTarget.style.outline = '2px solid var(--sh-brand)'
+              e.currentTarget.style.outlineOffset = '2px'
+            }}
+            onBlur={(e) => {
+              e.currentTarget.style.outline = 'none'
+            }}
             style={{
               display: 'inline-flex',
               flexDirection: 'column',

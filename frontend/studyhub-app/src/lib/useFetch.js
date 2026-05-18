@@ -130,6 +130,12 @@ export default function useFetch(path, options = {}) {
   // a background revalidate is in flight, so consumers never see a
   // skeleton flash on refetch.
   const hasFetchedRef = useRef(false)
+  // Per-fetch monotonic id. When `path` changes rapidly (user navigates
+  // detail page A → B), the old fetch can resolve AFTER the new fetch
+  // and overwrite B's data with A's response. Each fetchData increments
+  // this id and captures its own snapshot; on resolve we discard the
+  // result if a newer fetch has started.
+  const fetchIdRef = useRef(0)
 
   // Use a ref for the transform function so it never triggers re-fetches.
   // Inline arrow functions create a new reference every render; putting
@@ -145,6 +151,7 @@ export default function useFetch(path, options = {}) {
     if (!hasFetchedRef.current) setLoading(true)
     setIsValidating(true)
     setError(null)
+    const myFetchId = ++fetchIdRef.current
     try {
       const res = await fetch(`${API}${path}`, { credentials: 'include' })
       if (!res.ok) {
@@ -153,6 +160,8 @@ export default function useFetch(path, options = {}) {
       }
       let result = await res.json()
       if (transformRef.current) result = transformRef.current(result)
+      // Discard if a newer fetch has started (path changed mid-flight).
+      if (myFetchId !== fetchIdRef.current) return
       if (mountedRef.current) {
         setData(result)
         hasFetchedRef.current = true
@@ -163,11 +172,12 @@ export default function useFetch(path, options = {}) {
         }
       }
     } catch (err) {
+      if (myFetchId !== fetchIdRef.current) return
       if (mountedRef.current) {
         setError(err.message || 'Request failed')
       }
     } finally {
-      if (mountedRef.current) {
+      if (mountedRef.current && myFetchId === fetchIdRef.current) {
         setLoading(false)
         setIsValidating(false)
       }

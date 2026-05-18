@@ -25,6 +25,7 @@ import { useCallback, useEffect, useState } from 'react'
 
 const STORAGE_KEY = 'studyhub.recentlyVisited'
 const MAX_ITEMS = 20
+const MAX_TITLE_LEN = 120
 const SYNC_EVENT = 'studyhub:recentlyVisited:change'
 
 function readList() {
@@ -73,12 +74,19 @@ export function useRecentlyVisited() {
   // (`SYNC_EVENT` we dispatch ourselves on every write).
   useEffect(() => {
     if (typeof window === 'undefined') return undefined
-    const onChange = () => setItems(readList())
-    window.addEventListener('storage', onChange)
-    window.addEventListener(SYNC_EVENT, onChange)
+    const onStorage = (e) => {
+      // `storage` fires for every key in the origin (auth, toast queues,
+      // anything). Only re-read when our key changed (or when `null` —
+      // which signals a full localStorage.clear()).
+      if (e && e.key !== null && e.key !== STORAGE_KEY) return
+      setItems(readList())
+    }
+    const onSync = () => setItems(readList())
+    window.addEventListener('storage', onStorage)
+    window.addEventListener(SYNC_EVENT, onSync)
     return () => {
-      window.removeEventListener('storage', onChange)
-      window.removeEventListener(SYNC_EVENT, onChange)
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener(SYNC_EVENT, onSync)
     }
   }, [])
 
@@ -87,7 +95,9 @@ export function useRecentlyVisited() {
     const normalized = {
       type: entry.type,
       id: String(entry.id),
-      title: entry.title || 'Untitled',
+      // Cap title length so a malformed / runaway title can't bloat
+      // localStorage and crowd out other entries.
+      title: String(entry.title || 'Untitled').slice(0, MAX_TITLE_LEN),
       href: entry.href,
       visitedAt: Date.now(),
     }

@@ -26,7 +26,7 @@
  * loads at app boot and we don't want to block initial render on a
  * preferences read. This hook is opt-in per page that cares about scope.
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { API } from '../config'
 import { useSession } from './session-context'
 
@@ -73,6 +73,13 @@ export function useScopeBySchool() {
     return local == null ? true : local
   })
   const [isHydrating, setIsHydrating] = useState(true)
+  // Tracks whether the user flipped the toggle locally before the
+  // initial reconcile fetch resolved. Without this, a slow GET
+  // /api/settings/preferences race-overwrites the user's fresh flip
+  // with the stale server value (the PATCH they fired is also in
+  // flight — server wins eventually but during the current page session
+  // the toggle visibly reverts). Local-flip-during-hydration wins.
+  const userFlippedDuringHydrationRef = useRef(false)
 
   // Reconcile with server on mount.
   useEffect(() => {
@@ -80,11 +87,13 @@ export function useScopeBySchool() {
       setIsHydrating(false)
       return undefined
     }
+    userFlippedDuringHydrationRef.current = false
     let cancelled = false
     fetch(`${API}/api/settings/preferences`, { credentials: 'include' })
       .then((r) => (r.ok ? r.json() : null))
       .then((data) => {
         if (cancelled) return
+        if (userFlippedDuringHydrationRef.current) return
         if (data && typeof data.scopeBySchool === 'boolean') {
           // Server wins — flip local if they differ.
           if (data.scopeBySchool !== scoped) {
@@ -112,6 +121,9 @@ export function useScopeBySchool() {
       const boolNext = Boolean(next)
       setScopedState(boolNext)
       writeLocal(boolNext)
+      // Tell the in-flight reconcile to skip — user's local flip wins
+      // over whatever the server returns mid-hydration.
+      userFlippedDuringHydrationRef.current = true
       if (!user) return
       // Fire-and-forget persistence. The local + state update is
       // optimistic; a failed PATCH leaves local right and re-syncs from

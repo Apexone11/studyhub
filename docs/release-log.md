@@ -28,6 +28,29 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.5 — 20-loop audit fixes (2026-05-17)
+
+13 verified findings from a 20-loop narrow-to-wide audit (own files → wave-12.3 surface → cross-cutting infra → security sweep → UX/a11y/perf → 2 parallel subagents for breadth). False positives from the code-reviewer subagent (textarea/option claim) + Explore subagent (heuristic-only block-filter list, string-literal "console.log") rejected after empirical verification.
+
+**Security:**
+
+- **HIGH** — DM conversation creation failed OPEN on block-check error in `messaging.conversations.routes.js`. A thrown query in the block-check let the conversation continue with a blocked user. Changed to fail CLOSED with 503 + retry copy.
+- **HIGH** — `/api/related/*` had no rate limiter — scraper could enumerate the published-content graph at the global 1000/15min cap. Added `relatedReadLimiter` (60/min IP, default keying — A7 compliant).
+- **MED** — `/api/related/paper/:paperId` + `/book/:volumeId` validated length but not charset. Added `OPAQUE_ID_REGEX = /^[A-Za-z0-9._:-]+$/` reject.
+- **MED** — `/api/courses/schools/suggest` was the only schools route without `schoolsLimiter + discoverySchoolsLimiter`. Both added.
+- **MED** — `PATCH /api/settings/preferences` crashed on JSON literal `null` body (`Object.hasOwn(null, key)` throws). Added req.body shape guard up front.
+- **LOW** — `Cache-Control: no-store` on `/api/related/*` (responses depend on viewer's block list — defense-in-depth for shared-browser cache).
+
+**Correctness / UX:**
+
+- **MED** — `useFetch` could clobber B's data with A's slow response on rapid path-change navigation. Added `fetchIdRef` monotonic counter; stale completions discarded.
+- **MED** — `useScopeBySchool` reconcile race: user-flip during the initial preferences fetch was overwritten by the stale server value on resolve. Added `userFlippedDuringHydrationRef` flag — local-flip-during-hydration wins.
+- **MED** — `studyGroups.helpers.js#parseId` used bare `parseInt + Number.isNaN` instead of CLAUDE.md A12's `Number.parseInt(...,10) + Number.isInteger`. Fixed (pre-existing, file was open from wave-12.4 sanitizer swap).
+- **LOW** — `RelatedWorkStrip` TypeBadge had no `book` branch — fell through to "Item" label + warning color. Added `TYPE_LABELS`/`TYPE_COLORS` maps.
+- **LOW** — `RelatedWorkStrip` + `RecentlyVisitedStrip` Link cards had no `:focus-visible` style. Added `onFocus/onBlur` outline handlers (2px brand outline + 2px offset).
+- **LOW** — `useRecentlyVisited` storage handler re-rendered on every same-origin localStorage write (auth toasts, etc.). Filter to `e.key === STORAGE_KEY || e.key === null`.
+- **LOW** — `useRecentlyVisited.record` didn't truncate title. Added `MAX_TITLE_LEN = 120` cap.
+
 ### Wave-12.4 — Codex review + Dependabot sweep (2026-05-17)
 
 Bug-hunt cleanup: 3 Codex review findings on the wave-12.3 commit + 3 Dependabot advisories. All real, all fixed.
