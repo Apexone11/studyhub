@@ -243,9 +243,95 @@ describe('GET /api/related/sheet/:id', () => {
     const res = await request(app).get('/api/related/sheet/1')
     expect(res.body.items.length).toBeLessThanOrEqual(8)
   })
+
+  it('returns empty for an unpublished sheet to an anonymous viewer', async () => {
+    // Codex review finding 2026-05-17 — draft / unpublished sheets must
+    // not leak their course linkage or backlink list to enumerators.
+    fakeData.sheetById.set(77, { id: 77, courseId: 10, status: 'draft', userId: 999 })
+    fakeData.sheets.push({
+      id: 78,
+      courseId: 10,
+      status: 'published',
+      stars: 0,
+      userId: 100,
+      author: { username: 'sibling' },
+      title: 'sibling-of-draft',
+    })
+    const res = await request(app).get('/api/related/sheet/77')
+    expect(res.status).toBe(200)
+    expect(res.body.items).toEqual([])
+  })
+
+  it('returns related items for an unpublished sheet to its owner', async () => {
+    fakeData.sheetById.set(88, { id: 88, courseId: 10, status: 'draft', userId: 42 })
+    fakeData.sheets.push({
+      id: 89,
+      courseId: 10,
+      status: 'published',
+      stars: 0,
+      userId: 100,
+      author: { username: 'sibling' },
+      title: 'sibling-visible-to-owner',
+    })
+    const res = await request(app).get('/api/related/sheet/88').set('x-test-user-id', '42')
+    expect(res.status).toBe(200)
+    expect(res.body.items).toHaveLength(1)
+    expect(res.body.items[0].title).toBe('sibling-visible-to-owner')
+  })
 })
 
 describe('GET /api/related/note/:id', () => {
+  it('returns empty for a private note to an anonymous viewer', async () => {
+    // Codex review finding 2026-05-17 — private notes must not leak
+    // their linked sheet or same-author sibling list to enumerators.
+    fakeData.noteById.set(50, {
+      id: 50,
+      userId: 200,
+      courseId: 99,
+      relatedSheetId: 11,
+      relatedPaperId: null,
+      private: true,
+    })
+    fakeData.sheetById.set(11, {
+      id: 11,
+      title: 'Linked sheet',
+      status: 'published',
+      userId: 300,
+      author: { username: 'linker' },
+    })
+    fakeData.notes.push({
+      id: 51,
+      userId: 200,
+      courseId: 99,
+      private: false,
+      title: 'Public sibling',
+    })
+    const res = await request(app).get('/api/related/note/50')
+    expect(res.status).toBe(200)
+    expect(res.body.items).toEqual([])
+  })
+
+  it('returns related items for a private note to its owner', async () => {
+    fakeData.noteById.set(60, {
+      id: 60,
+      userId: 200,
+      courseId: 99,
+      relatedSheetId: null,
+      relatedPaperId: null,
+      private: true,
+    })
+    fakeData.notes.push({
+      id: 61,
+      userId: 200,
+      courseId: 99,
+      private: false,
+      title: 'Public sibling owner sees',
+    })
+    const res = await request(app).get('/api/related/note/60').set('x-test-user-id', '200')
+    expect(res.status).toBe(200)
+    expect(res.body.items.find((i) => i.type === 'note')?.title).toBe('Public sibling owner sees')
+  })
+
   it('returns the linked sheet + sibling notes', async () => {
     fakeData.noteById.set(7, {
       id: 7,

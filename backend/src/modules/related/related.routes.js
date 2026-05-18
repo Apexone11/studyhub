@@ -55,11 +55,26 @@ router.get(
     try {
       const sheet = await prisma.studySheet.findUnique({
         where: { id: sheetId },
-        select: { id: true, courseId: true, libraryVolumeId: true, derivedFromPaperId: true },
+        select: {
+          id: true,
+          courseId: true,
+          libraryVolumeId: true,
+          derivedFromPaperId: true,
+          status: true,
+          userId: true,
+        },
       })
       if (!sheet) return res.json({ items: [] })
 
-      const blocked = await getBlockedSafe(req.user?.userId)
+      // Visibility gate: unpublished sheets only expose related work to
+      // their owner. Returning empty to anyone else avoids leaking the
+      // sheet's course linkage + backlink list via ID enumeration.
+      // Codex review finding 2026-05-17.
+      const viewerId = req.user?.userId
+      const sheetVisible = sheet.status === 'published' || sheet.userId === viewerId
+      if (!sheetVisible) return res.json({ items: [] })
+
+      const blocked = await getBlockedSafe(viewerId)
       const notIn = notInClause(blocked)
 
       const [siblings, backlinkNotes] = await Promise.all([
@@ -148,11 +163,21 @@ router.get(
           courseId: true,
           relatedSheetId: true,
           relatedPaperId: true,
+          private: true,
         },
       })
       if (!note) return res.json({ items: [] })
 
-      const blocked = await getBlockedSafe(req.user?.userId)
+      // Visibility gate: private notes only expose related work to their
+      // owner. Without this, an enumerator could probe note IDs and learn
+      // linked-sheet + same-course/same-author public-note metadata that
+      // hints at the private note's contents.
+      // Codex review finding 2026-05-17.
+      const viewerId = req.user?.userId
+      const noteVisible = !note.private || note.userId === viewerId
+      if (!noteVisible) return res.json({ items: [] })
+
+      const blocked = await getBlockedSafe(viewerId)
       const items = []
 
       if (note.relatedSheetId) {
@@ -162,13 +187,17 @@ router.get(
             id: true,
             title: true,
             userId: true,
+            status: true,
             author: { select: { username: true } },
           },
         })
         // Block-filter against the SHEET's author id, not the sheet id.
         // `blocked` is a list of userIds — an earlier draft confused
-        // the two (Loop 1 finding 2026-05-16).
-        if (sheet && !blocked.includes(sheet.userId)) {
+        // the two (Loop 1 finding 2026-05-16). Also gate by sheet status
+        // so a private note's link to a draft sheet doesn't leak draft
+        // metadata (Codex finding 2026-05-17).
+        const sheetVisible = sheet && (sheet.status === 'published' || sheet.userId === viewerId)
+        if (sheetVisible && !blocked.includes(sheet.userId)) {
           items.push({
             type: 'sheet',
             id: sheet.id,

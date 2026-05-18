@@ -3,7 +3,7 @@
  */
 
 const prisma = require('../../lib/prisma')
-const sanitizeHtml = require('sanitize-html')
+const sanitizeHtml = require('../../lib/html/safeSanitize')
 
 /**
  * Parse an ID param with radix 10 and return null on NaN

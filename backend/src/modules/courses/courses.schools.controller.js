@@ -221,6 +221,40 @@ router.get(
 )
 
 /**
+ * GET /api/courses/schools/suggest
+ * Returns school matching the authenticated user's email domain (if .edu).
+ *
+ * MUST stay above /schools/:id — Express matches in registration order
+ * and 'suggest' would otherwise be parsed as the :id param and 400.
+ */
+router.get('/schools/suggest', requireAuth, async (req, res) => {
+  try {
+    const email = req.user?.email
+    if (!email) return res.json({ school: null })
+
+    const domain = email.split('@')[1]?.toLowerCase()
+    if (!domain || !domain.endsWith('.edu')) return res.json({ school: null })
+
+    const school = await prisma.school.findFirst({
+      where: { emailDomain: domain },
+      select: {
+        id: true,
+        name: true,
+        short: true,
+        city: true,
+        state: true,
+        logoUrl: true,
+      },
+    })
+
+    return res.json({ school: school || null })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
+  }
+})
+
+/**
  * GET /api/courses/schools/:id
  *
  * Returns the full detail for a single school — used by the
@@ -285,36 +319,5 @@ router.get(
     }
   },
 )
-
-/**
- * GET /api/courses/schools/suggest
- * Returns school matching the authenticated user's email domain (if .edu).
- */
-router.get('/schools/suggest', requireAuth, async (req, res) => {
-  try {
-    const email = req.user?.email
-    if (!email) return res.json({ school: null })
-
-    const domain = email.split('@')[1]?.toLowerCase()
-    if (!domain || !domain.endsWith('.edu')) return res.json({ school: null })
-
-    const school = await prisma.school.findFirst({
-      where: { emailDomain: domain },
-      select: {
-        id: true,
-        name: true,
-        short: true,
-        city: true,
-        state: true,
-        logoUrl: true,
-      },
-    })
-
-    return res.json({ school: school || null })
-  } catch (error) {
-    captureError(error, { route: req.originalUrl, method: req.method })
-    return sendError(res, 500, 'Server error.', ERROR_CODES.INTERNAL)
-  }
-})
 
 module.exports = router

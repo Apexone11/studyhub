@@ -28,6 +28,38 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.4 — Codex review + Dependabot sweep (2026-05-17)
+
+Bug-hunt cleanup: 3 Codex review findings on the wave-12.3 commit + 3 Dependabot advisories. All real, all fixed.
+
+**Codex P1 — Route ordering in `courses.schools.controller.js`:**
+
+- `GET /api/courses/schools/suggest` was registered AFTER `GET /api/courses/schools/:id`, so Express matched it as `:id="suggest"` and returned 400. Moved `/schools/suggest` above the dynamic route with an explanatory comment so future edits don't regress it.
+
+**Codex P1 — Private notes leaked metadata via `/api/related/note/:id`:**
+
+- Endpoint didn't check `note.private`. An anonymous caller could enumerate IDs and learn a private note's linked-sheet title + same-author public-note titles. Added owner-only visibility gate (`!note.private || note.userId === viewerId`). When the linked sheet itself is unpublished, gate that too so the link doesn't leak draft-sheet metadata.
+
+**Codex P2 — Unpublished sheets leaked metadata via `/api/related/sheet/:id`:**
+
+- Endpoint didn't check `sheet.status`. An anonymous caller could enumerate IDs of draft sheets and learn their course linkage + backlink-note list (both filtered to public rows, but the original sheet's existence + course was disclosed). Added owner-only visibility gate (`sheet.status === 'published' || sheet.userId === viewerId`).
+
+**Dependabot GHSA-rpr9-rxv7-x643 — `sanitize-html` ≤ 2.17.3 `<xmp>` XSS bypass:**
+
+- The default `nonTextTags` list omits `xmp`, so disallowed `<xmp>` tags hit a path that appends their inner text to the sanitized output unescaped — letting attackers smuggle `<script>` through `sanitizeHtml('<xmp><script>alert(1)</script></xmp>')`. No upstream patch exists yet (advisory says "Patched version: None").
+- Mitigation: new `backend/src/lib/html/safeSanitize.js` wrapper (and frontend mirror at `frontend/studyhub-app/src/lib/safeSanitize.js`) that adds every spec-defined raw-text element (`script style textarea option noscript noframes iframe noembed plaintext xmp`) to `nonTextTags` on every call. nonTextTags entries are dropped along with their content, so the unescaped-text path never fires.
+- All 6 call sites (5 backend, 1 frontend: `htmlPreviewDocument.js`, `library.service.js`, `messaging.helpers.js`, `studyGroups.helpers.js`, `notePaste.js`, and `safeSanitize.js`-internal) now import through the wrapper.
+- Regression test `backend/test/safeSanitize.test.js` runs the advisory's three PoC payloads through the wrapper and asserts no live markup makes it out (8 tests, all passing).
+
+**Dependabot GHSA — `fast-uri` ≤ 3.1.1 authority delimiter normalization:**
+
+- Transitive via `serve → ajv → fast-uri`. Workspace lockfile was pinned at `3.1.0` (vulnerable); patched at `3.1.2`. Added `overrides.fast-uri >= 3.1.2` at both root and `frontend/studyhub-app/package.json`, then re-synced the workspace lockfile.
+
+**Dependabot GHSA — `fast-xml-builder` ≤ 1.1.6 comment-value regex bypass:**
+
+- Transitive via `aws-sdk → xml-builder → fast-xml-parser → fast-xml-builder`. Backend workspace lockfile was pinned at `1.1.5` (vulnerable); patched at `1.1.7`. Added `overrides.fast-xml-builder >= 1.1.7` at both root and `backend/package.json`, then re-synced the workspace lockfile.
+- Root lockfile + workspace lockfiles now report `0 vulnerabilities` for both `fast-uri` and `fast-xml-builder`. Only the (mitigated) `sanitize-html` advisory remains in the audit output, expected until upstream ships a patch.
+
 ### Wave-12.3 — School-scope toggle infra + cross-surface links + RelatedWorkStrip + global keyboard shortcuts + RecentlyVisited (2026-05-16)
 
 Three founder asks plus several long-deferred ecosystem pieces. None are full rollouts — they're foundations + first-site wiring so the next sessions can finish without re-laying the plumbing.

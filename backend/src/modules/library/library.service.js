@@ -11,7 +11,7 @@ const {
 const cache = require('./library.cache')
 const { captureError } = require('../../monitoring/sentry')
 const log = require('../../lib/logger')
-const sanitizeHtml = require('sanitize-html')
+const sanitizeHtml = require('../../lib/html/safeSanitize')
 
 const BOOK_DESCRIPTION_TRANSFORM = sanitizeHtml.simpleTransform(
   'a',
