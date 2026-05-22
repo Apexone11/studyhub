@@ -1,4 +1,7 @@
-import sanitizeHtml from 'sanitize-html'
+// sanitize-html ≤ 2.17.3 has an unpatched <xmp> bypass; route every call
+// through safeSanitize which closes it by adding raw-text elements to
+// nonTextTags. See lib/safeSanitize.js for the full advisory write-up.
+import sanitizeHtml from '../../lib/safeSanitize'
 
 const allowedTags = [
   'p',

@@ -89,7 +89,7 @@ export default function SheetsPage() {
 
   return (
     <>
-      <Navbar />
+      <Navbar crumbs={[{ label: 'Study Sheets', to: '/sheets' }]} />
       <div className="sheets-page sh-app-page">
         <div className="sh-ambient-shell" style={pageShell('app', 26, 48)}>
           <div className="app-three-col-grid sh-ambient-grid">

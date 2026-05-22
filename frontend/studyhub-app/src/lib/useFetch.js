@@ -62,8 +62,30 @@ function ensureSweepRunning() {
   }
 }
 
+// Subscribers notified whenever `clearFetchCache(key)` runs. Used by
+// raw-fetch hooks (e.g. useSheetViewer) that don't go through useFetch
+// but still want the SWR cache invalidation signal so a writer like
+// SheetLabContribute can trigger their refetch. Receives the cleared
+// key (or null when the entire cache is cleared).
+const cacheInvalidationListeners = new Set()
+
 /**
- * Clear fetch cache entries.
+ * Subscribe to cache-invalidation events.
+ * Returns an unsubscribe fn. Listener fires with `(cacheKey | null)`
+ * where `null` means "all keys were cleared."
+ *
+ * @param {(key: string|null) => void} fn
+ * @returns {() => void} unsubscribe
+ */
+export function onCacheInvalidate(fn) {
+  cacheInvalidationListeners.add(fn)
+  return () => {
+    cacheInvalidationListeners.delete(fn)
+  }
+}
+
+/**
+ * Clear fetch cache entries + notify any raw-fetch subscribers.
  * @param {string|null} cacheKey - If provided, clear only this key. If null, clear all.
  */
 export function clearFetchCache(cacheKey = null) {
@@ -71,6 +93,15 @@ export function clearFetchCache(cacheKey = null) {
     cache.delete(cacheKey)
   } else {
     cache.clear()
+  }
+  // Notify subscribers — fire-and-forget. Errors in one listener must
+  // not break the others.
+  for (const fn of cacheInvalidationListeners) {
+    try {
+      fn(cacheKey)
+    } catch {
+      /* listener error is the listener's problem */
+    }
   }
 }
 
@@ -99,6 +130,12 @@ export default function useFetch(path, options = {}) {
   // a background revalidate is in flight, so consumers never see a
   // skeleton flash on refetch.
   const hasFetchedRef = useRef(false)
+  // Per-fetch monotonic id. When `path` changes rapidly (user navigates
+  // detail page A → B), the old fetch can resolve AFTER the new fetch
+  // and overwrite B's data with A's response. Each fetchData increments
+  // this id and captures its own snapshot; on resolve we discard the
+  // result if a newer fetch has started.
+  const fetchIdRef = useRef(0)
 
   // Use a ref for the transform function so it never triggers re-fetches.
   // Inline arrow functions create a new reference every render; putting
@@ -114,6 +151,7 @@ export default function useFetch(path, options = {}) {
     if (!hasFetchedRef.current) setLoading(true)
     setIsValidating(true)
     setError(null)
+    const myFetchId = ++fetchIdRef.current
     try {
       const res = await fetch(`${API}${path}`, { credentials: 'include' })
       if (!res.ok) {
@@ -122,6 +160,8 @@ export default function useFetch(path, options = {}) {
       }
       let result = await res.json()
       if (transformRef.current) result = transformRef.current(result)
+      // Discard if a newer fetch has started (path changed mid-flight).
+      if (myFetchId !== fetchIdRef.current) return
       if (mountedRef.current) {
         setData(result)
         hasFetchedRef.current = true
@@ -132,11 +172,12 @@ export default function useFetch(path, options = {}) {
         }
       }
     } catch (err) {
+      if (myFetchId !== fetchIdRef.current) return
       if (mountedRef.current) {
         setError(err.message || 'Request failed')
       }
     } finally {
-      if (mountedRef.current) {
+      if (mountedRef.current && myFetchId === fetchIdRef.current) {
         setLoading(false)
         setIsValidating(false)
       }

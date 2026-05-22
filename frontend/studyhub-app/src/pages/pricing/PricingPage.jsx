@@ -8,6 +8,7 @@ import { fadeInUp, staggerEntrance, fadeInOnScroll } from '../../lib/animations'
 import { LogoMark } from '../../components/Icons'
 import SubmitSpinner from '../../components/SubmitSpinner'
 import { useFormValidation } from '../../lib/useFormValidation'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 const FONT = "'Plus Jakarta Sans', sans-serif"
 
@@ -72,6 +73,7 @@ const DONATION_PRESETS = [3, 5, 10, 25, 50, 100]
 // ── Main Page ────────────────────────────────────────────────────────────
 
 export default function PricingPage() {
+  usePageTitle('Pricing')
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user, refreshSession } = useSession()

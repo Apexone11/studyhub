@@ -71,6 +71,21 @@ const readLimiter = rateLimit({
 })
 
 /**
+ * Related-work strip reads — 60 per minute per IP. /api/related/{sheet,
+ * note,paper,book}/:id is enumerable and reveals course-graph + backlink
+ * metadata. Stricter than the general read budget so scrapers can't map
+ * the published-content graph cheaply. Default IP keying (no custom
+ * keyGenerator) — CLAUDE.md A7.
+ */
+const relatedReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many related-work requests. Please slow down.' },
+})
+
+/**
  * Admin endpoints — moderate limits.
  * 120 requests per minute per IP.
  */
@@ -119,17 +134,25 @@ const noteHighlightLimiter = rateLimit({
 })
 
 /**
- * Discovery enumeration limiters — 30 reads per user per 15min on the
+ * Discovery enumeration limiters — 30 reads per 15min on the
  * school catalog + course catalog endpoints. Wave-11 (2026-05-14) G1-6.
  * Required by feature-expansion security addendum §1 HIGH. Defends
  * against scraper enumeration of the school+course taxonomy.
+ *
+ * Routes are PUBLIC (no requireAuth) so we must NOT use a custom
+ * keyGenerator that falls back to `req.ip` — express-rate-limit v7+
+ * rejects raw `req.ip` at boot with ERR_ERL_KEY_GEN_IPV6 because it
+ * doesn't IPv6-normalize. CLAUDE.md A7 forbids this pattern.
+ *
+ * Hotfix 2026-05-15: drop the custom keyGenerator entirely. Default
+ * IP-based keying handles IPv6 normalization correctly. We lose the
+ * "disc-schools-" namespace prefix but the limit still works correctly.
  */
 const discoverySchoolsLimiter = rateLimit({
   windowMs: WINDOW_15_MIN,
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `disc-schools-${req.user?.userId || req.ip}`,
   message: { error: 'Too many catalog requests. Please slow down.' },
 })
 
@@ -138,8 +161,23 @@ const discoveryCoursesLimiter = rateLimit({
   max: 30,
   standardHeaders: true,
   legacyHeaders: false,
-  keyGenerator: (req) => `disc-courses-${req.user?.userId || req.ip}`,
   message: { error: 'Too many catalog requests. Please slow down.' },
+})
+
+/**
+ * Public fork-tree endpoint — `GET /api/sheets/:id/fork-tree` is open
+ * (optionalAuth) and runs a `findMany` across the lineage on each call.
+ * Tree size is bounded by the deepest fork chain (typically <20 nodes)
+ * but a scraper can still hit it 1000×/sec under the global floor.
+ * 60/min per IP keeps it sub-DOS while leaving the legitimate viewer
+ * flow (one read per page open) untouched.
+ */
+const forkTreeLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many fork-tree requests. Please slow down.' },
 })
 
 /**
@@ -1421,11 +1459,13 @@ module.exports = {
   authLimiter,
   writeLimiter,
   readLimiter,
+  relatedReadLimiter,
   adminLimiter,
   adminAnnouncementLimiter,
   noteHighlightLimiter,
   discoverySchoolsLimiter,
   discoveryCoursesLimiter,
+  forkTreeLimiter,
   previewLimiter,
   publicLimiter,
 

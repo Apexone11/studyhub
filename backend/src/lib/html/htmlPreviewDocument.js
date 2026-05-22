@@ -1,4 +1,7 @@
-const sanitizeHtml = require('sanitize-html')
+// sanitize-html ≤ 2.17.3 has an unpatched <xmp> bypass; route every call
+// through safeSanitize which closes it by adding raw-text elements to
+// nonTextTags. See safeSanitize.js for the full advisory write-up.
+const sanitizeHtml = require('./safeSanitize')
 
 const DEFAULT_ALLOWED_TAGS = [
   ...sanitizeHtml.defaults.allowedTags,

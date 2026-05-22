@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { StatsGrid, ModerationOverview, ModerationActivityLog } from './AdminWidgets'
+import { Skeleton } from '../../components/Skeleton'
 import { API } from '../../config'
 
 // AI prompt-cache telemetry card (Loop A7, 2026-05-12).
@@ -85,7 +86,7 @@ function AiCacheHitRateCard() {
         cheaper.
       </div>
       {loading ? (
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading…</div>
+        <Skeleton width="100%" height={32} borderRadius={8} aria-label="Loading cache hit rate" />
       ) : error ? (
         <div
           style={{
@@ -183,7 +184,12 @@ export default function OverviewTab({ overview, loadOverview }) {
       ) : null}
 
       {!overview.stats && overview.loading ? (
-        <div style={{ color: 'var(--sh-subtext)', fontSize: 13 }}>Loading admin stats…</div>
+        <div style={{ display: 'grid', gap: 12 }} aria-busy="true" aria-live="polite">
+          <span className="sr-only">Loading admin stats…</span>
+          <Skeleton width="100%" height={100} borderRadius={12} />
+          <Skeleton width="100%" height={80} borderRadius={12} />
+          <Skeleton width="100%" height={80} borderRadius={12} />
+        </div>
       ) : overview.stats ? (
         <>
           <StatsGrid stats={overview.stats} />

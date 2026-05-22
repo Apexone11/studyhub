@@ -4,6 +4,7 @@ import { API } from '../../config'
 import { CURRENT_LEGAL_VERSION } from '../../lib/legalVersions'
 import { useSession } from '../../lib/session-context'
 import { ACCOUNT_TYPE_OPTIONS } from '../../lib/roleLabel'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 const STORAGE_KEY = 'studyhub.google.pending'
 const USERNAME_REGEX = /^[a-zA-Z0-9_]{3,20}$/
@@ -40,6 +41,7 @@ function deriveDefaultUsername(email, name) {
 }
 
 export default function RolePickerPage() {
+  usePageTitle('Choose your role')
   const navigate = useNavigate()
   const { completeAuthentication } = useSession()
   const [pending] = useState(() => readPending())

@@ -28,6 +28,11 @@ const EVENT_KINDS = Object.freeze({
   CONTRIBUTION_ACCEPT: 'contribution.accept',
   CONTRIBUTION_QUICKDRAW: 'contribution.quickdraw',
   CONTRIBUTION_PERFECT: 'contribution.perfect',
+  // Fired on the PROPOSER when their contribution is rejected. Powers
+  // "Iterate-and-improve" style badges: rejection becomes a step in the
+  // workflow rather than a dead-end, and the proposer's iteration count
+  // is trackable for the recovery-badge family.
+  CONTRIBUTION_REVISION_REQUESTED: 'contribution.revision_requested',
   REVIEW_SUBMIT: 'review.submit',
   REVIEW_FAST: 'review.fast',
   COMMIT_CREATE: 'commit.create',

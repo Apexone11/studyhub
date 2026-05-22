@@ -13,6 +13,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import Navbar from '../../components/navbar/Navbar'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
+import { usePageTitle } from '../../lib/usePageTitle'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { fadeInUp } from '../../lib/animations'
 import './LoginPage.css'
@@ -20,6 +21,7 @@ import './LoginPage.css'
 const CODE_LENGTH = 6
 
 export default function LoginChallengePage() {
+  usePageTitle('Verify sign-in')
   const { id } = useParams()
   const navigate = useNavigate()
   const { completeAuthentication } = useSession()

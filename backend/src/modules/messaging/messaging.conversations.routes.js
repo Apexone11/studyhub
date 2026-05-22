@@ -152,7 +152,11 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
       return sendError(res, 400, 'Invalid conversation type.', ERROR_CODES.BAD_REQUEST)
     }
 
-    // Check for blocks with all participants (graceful if block table unavailable)
+    // Block check on conversation creation is an ENFORCEMENT path
+    // (not just a feed-filter). Failing open here would let a user
+    // start a DM with someone who blocked them. Fail closed: if the
+    // block-table query throws, surface 503 so the client retries
+    // rather than silently bypassing the block.
     try {
       const blockedIds = await getBlockedUserIds(prisma, req.user.userId)
       for (const participantId of participantIds) {
@@ -161,7 +165,13 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
         }
       }
     } catch (blockErr) {
-      captureError(blockErr, { route: req.originalUrl, context: 'block-filter' })
+      captureError(blockErr, { route: req.originalUrl, context: 'block-filter-enforcement' })
+      return sendError(
+        res,
+        503,
+        'Cannot verify block status right now. Please try again in a moment.',
+        ERROR_CODES.INTERNAL,
+      )
     }
 
     // For DMs, check if conversation already exists between both users.

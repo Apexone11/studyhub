@@ -64,7 +64,7 @@ export default function GroupDetailView({ groupId }) {
   // Tab + post-id deep-link via `?tab=discussions&post=<id>`. Notifications
   // emit this URL shape so a click on a "post approved" / "replied to your
   // post" / "pinned" notification lands the user directly on the affected
-  // thread instead of the Overview tab (Copilot finding 2026-05-03).
+  // thread instead of the Overview tab.
   const [searchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
   const postParam = Number.parseInt(searchParams.get('post') || '', 10)
@@ -77,7 +77,7 @@ export default function GroupDetailView({ groupId }) {
   // Re-sync state when the user navigates from one notification to another
   // on the SAME route (React Router updates search params without
   // remounting). Without this, a second notification click strands the
-  // user on the previous tab/post (Copilot review #1, 2026-05-03).
+  // user on the previous tab/post.
   useEffect(() => {
     queueMicrotask(() => {
       if (VALID_TABS.includes(tabParam) && tabParam !== activeTab) {

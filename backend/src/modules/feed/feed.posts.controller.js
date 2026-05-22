@@ -17,11 +17,32 @@ const { VIDEO_STATUS } = require('../video/video.constants')
 
 const router = express.Router()
 
+// Parse an optional FK from req.body, returning either a positive int or
+// null. Throws a tagged Error on garbage input so the route returns a
+// clean 400 instead of a 500 from a downstream FK violation (CLAUDE.md
+// A12 — Number.parseInt + Number.isInteger guard pattern).
+function parseOptionalFk(raw, fieldName) {
+  if (raw == null || raw === '') return null
+  const parsed = Number.parseInt(raw, 10)
+  if (!Number.isInteger(parsed) || parsed < 1) {
+    const err = new Error(`Invalid ${fieldName}.`)
+    err.statusCode = 400
+    throw err
+  }
+  return parsed
+}
+
 router.post('/posts', feedWriteLimiter, async (req, res) => {
   const content = typeof req.body.content === 'string' ? req.body.content.trim() : ''
-  const courseId = req.body.courseId ? Number.parseInt(req.body.courseId, 10) : null
   const allowDownloads = req.body.allowDownloads !== false
-  const videoId = req.body.videoId ? Number.parseInt(req.body.videoId, 10) : null
+  let courseId
+  let videoId
+  try {
+    courseId = parseOptionalFk(req.body.courseId, 'courseId')
+    videoId = parseOptionalFk(req.body.videoId, 'videoId')
+  } catch (err) {
+    return res.status(err.statusCode || 400).json({ error: err.message })
+  }
 
   // Content is required unless a video is attached
   if (!content && !videoId) return res.status(400).json({ error: 'Post content is required.' })

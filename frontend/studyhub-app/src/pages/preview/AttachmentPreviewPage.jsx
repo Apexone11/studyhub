@@ -6,6 +6,7 @@ import HtmlDownloadWarningModal from '../../components/HtmlDownloadWarningModal'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { pageShell } from '../../lib/ui'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 const HTML_EXTENSIONS = new Set(['html', 'htm', 'xhtml', 'svg'])
 
@@ -127,6 +128,7 @@ function primaryLinkButton() {
 }
 
 export default function AttachmentPreviewPage() {
+  usePageTitle('Attachment preview')
   const { scope, id } = useParams()
   const [state, setState] = useState({ loading: true, error: '', detail: null })
   const [downloadWarning, setDownloadWarning] = useState({ open: false, tier: 0, url: '' })

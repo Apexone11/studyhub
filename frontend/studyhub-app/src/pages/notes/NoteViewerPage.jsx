@@ -2,7 +2,7 @@
  * NoteViewerPage.jsx — Read-only view for shared notes at /notes/:id
  * Features: like/dislike, star, download tracking, comments
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
@@ -18,6 +18,8 @@ import NoteCommentSection from './NoteCommentSection'
 import NoteHighlightLayer from './NoteHighlightLayer'
 import AiNoteAssistant from '../../components/ai/AiNoteAssistant'
 import { useNoteViewer } from './useNoteViewer'
+import { usePageTitle } from '../../lib/usePageTitle'
+import { useRecentlyVisited } from '../../lib/useRecentlyVisited'
 
 // Reading speed used for the "X min read" estimate. 220 wpm is the median
 // silent-reading rate cited by Brysbaert (2019) — same baseline Bear and
@@ -145,6 +147,21 @@ export default function NoteViewerPage() {
   const { user } = useSession()
   const { note, loading, error } = useNoteViewer()
   const [reportOpen, setReportOpen] = useState(false)
+  usePageTitle(note?.title || 'Note')
+
+  // Cross-surface "recently visited" tracking (Bucket C1). Records into
+  // localStorage; the /feed strip reads back. Idempotent — same note
+  // viewed twice in a session bumps the entry to the top.
+  const { record: recordRecentlyVisited } = useRecentlyVisited()
+  useEffect(() => {
+    if (!note?.id) return
+    recordRecentlyVisited({
+      type: 'note',
+      id: note.id,
+      title: note.title,
+      href: `/notes/${note.id}`,
+    })
+  }, [note?.id, note?.title, recordRecentlyVisited])
 
   // Local social state
   const [starred, setStarred] = useState(null)

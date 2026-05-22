@@ -32,6 +32,12 @@ router.get('/preferences', cacheControl(60, { staleWhileRevalidate: 120 }), asyn
 router.patch('/preferences', async (req, res) => {
   try {
     const { userId } = req.user
+    // `Object.hasOwn(null, key)` throws TypeError, so a literal JSON
+    // `null` body would otherwise return 500. Reject obvious junk up
+    // front and let the no-fields-provided 400 below handle empty {}.
+    if (!req.body || typeof req.body !== 'object' || Array.isArray(req.body)) {
+      return res.status(400).json({ error: 'Request body must be a JSON object.' })
+    }
     const updates = Object.create(null)
 
     for (const key of PREF_BOOLEAN_KEYS) {

@@ -1,6 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest'
 import { renderHook, waitFor, act } from '@testing-library/react'
-import useFetch, { cache, clearFetchCache } from './useFetch'
+import useFetch, { cache, clearFetchCache, onCacheInvalidate } from './useFetch'
 
 describe('useFetch cache utilities', () => {
   beforeEach(() => {
@@ -252,5 +252,69 @@ describe('useFetch focus revalidation', () => {
     // Initial + one throttled refetch.
     expect(fetchSpy.mock.calls.length).toBeLessThanOrEqual(2)
     unmount()
+  })
+})
+
+// F7 bridge: cache-invalidation pub/sub lets raw-fetch hooks (the sheet
+// viewer in particular) listen for `clearFetchCache(key)` notifications.
+// Without this bridge, a write like SheetLabContribute calling
+// `clearFetchCache('/api/sheets/42')` was a no-op for the viewer, which
+// uses raw fetch — the user had to wait 45s for the next poll.
+describe('onCacheInvalidate / clearFetchCache pub-sub bridge', () => {
+  let cleanups = []
+  afterEach(() => {
+    for (const fn of cleanups) fn()
+    cleanups = []
+  })
+
+  function track(unsubscribe) {
+    cleanups.push(unsubscribe)
+    return unsubscribe
+  }
+
+  it('notifies subscribers with the cleared key', () => {
+    const listener = vi.fn()
+    track(onCacheInvalidate(listener))
+    clearFetchCache('/api/sheets/42')
+    expect(listener).toHaveBeenCalledTimes(1)
+    expect(listener).toHaveBeenCalledWith('/api/sheets/42')
+  })
+
+  it('notifies subscribers with null on a full clear', () => {
+    const listener = vi.fn()
+    track(onCacheInvalidate(listener))
+    clearFetchCache()
+    expect(listener).toHaveBeenCalledWith(null)
+  })
+
+  it('unsubscribe stops further notifications', () => {
+    const listener = vi.fn()
+    const unsubscribe = onCacheInvalidate(listener)
+    clearFetchCache('/api/sheets/1')
+    expect(listener).toHaveBeenCalledTimes(1)
+    unsubscribe()
+    clearFetchCache('/api/sheets/2')
+    expect(listener).toHaveBeenCalledTimes(1)
+  })
+
+  it('multiple subscribers all receive the notification', () => {
+    const a = vi.fn()
+    const b = vi.fn()
+    track(onCacheInvalidate(a))
+    track(onCacheInvalidate(b))
+    clearFetchCache('/api/sheets/7')
+    expect(a).toHaveBeenCalledWith('/api/sheets/7')
+    expect(b).toHaveBeenCalledWith('/api/sheets/7')
+  })
+
+  it('listener error does not break sibling listeners', () => {
+    const broken = vi.fn(() => {
+      throw new Error('boom')
+    })
+    const sibling = vi.fn()
+    track(onCacheInvalidate(broken))
+    track(onCacheInvalidate(sibling))
+    expect(() => clearFetchCache('/api/sheets/9')).not.toThrow()
+    expect(sibling).toHaveBeenCalledWith('/api/sheets/9')
   })
 })

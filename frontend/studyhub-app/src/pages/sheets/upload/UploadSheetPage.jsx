@@ -31,10 +31,12 @@ import UploadNavActions from './UploadNavActions'
 import DraftsPickerModal from './DraftsPickerModal'
 import useUploadSheet from './useUploadSheet'
 import { useCallback, useState } from 'react'
+import { usePageTitle } from '../../../lib/usePageTitle'
 
 export default function UploadSheetPage() {
   const hook = useUploadSheet()
   const [showDraftsPicker, setShowDraftsPicker] = useState(false)
+  usePageTitle(hook.isEditing ? 'Edit sheet' : 'Upload sheet')
 
   /* Creator Audit publish gate (flag-gated, fail-closed). When the flag is on
    * and the user has not yet acknowledged the responsibility doc, the modal

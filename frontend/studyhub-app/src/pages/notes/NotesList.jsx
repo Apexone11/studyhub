@@ -406,7 +406,7 @@ export default function NotesList({
                   ? 'No shared notes'
                   : filterTab === 'starred'
                     ? 'No starred notes'
-                    : 'No notes yet'}
+                    : 'Start your first note'}
           </div>
           <div
             style={{
@@ -424,7 +424,7 @@ export default function NotesList({
                   ? 'Uncheck "Private" on a note to share it with classmates.'
                   : filterTab === 'starred'
                     ? 'Click the Star control on any note to keep it in this quick-access view.'
-                    : 'Create your first note to get started.'}
+                    : 'Capture an idea, summarize a lecture, or turn a sheet or paper into your own notes. Hub AI can help draft the outline.'}
           </div>
           <button
             onClick={createNote}

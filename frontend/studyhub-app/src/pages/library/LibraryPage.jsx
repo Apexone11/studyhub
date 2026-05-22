@@ -252,7 +252,7 @@ export default function LibraryPage() {
 
   return (
     <>
-      <Navbar />
+      <Navbar crumbs={[{ label: 'Library', to: '/library' }]} />
       <div className="library-page">
         {/* Hero Section */}
         <section

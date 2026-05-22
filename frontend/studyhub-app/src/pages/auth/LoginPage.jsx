@@ -23,9 +23,11 @@ import { useSession, SESSION_EXPIRED_FLAG } from '../../lib/session-context'
 import { LOGGED_OUT_FLAG } from '../../lib/session'
 import { useRolesV2Flags, isRolesV2FlagEnabled } from '../../lib/rolesV2Flags'
 import { useFormValidation } from '../../lib/useFormValidation'
+import { usePageTitle } from '../../lib/usePageTitle'
 import './LoginPage.css'
 
 export default function LoginPage() {
+  usePageTitle('Sign in')
   const navigate = useNavigate()
   const { completeAuthentication } = useSession()
   const { oauthPicker: oauthPickerEnabled } = useRolesV2Flags()

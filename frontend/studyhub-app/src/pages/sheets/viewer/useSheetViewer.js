@@ -4,6 +4,8 @@ import { API } from '../../../config'
 import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../../lib/http'
 import { useSession } from '../../../lib/session-context'
 import { useLivePolling } from '../../../lib/useLivePolling'
+import { onCacheInvalidate } from '../../../lib/useFetch'
+import { useRecentlyVisited } from '../../../lib/useRecentlyVisited'
 import { fadeInUp } from '../../../lib/animations'
 import { showToast } from '../../../lib/toast'
 import { usePageTitle } from '../../../lib/usePageTitle'
@@ -54,9 +56,19 @@ export default function useSheetViewer() {
   }, [sheetState.loading, sheetState.sheet])
 
   /* Record sheet view for recently-viewed tracking */
+  const { record: recordRecentlyVisited } = useRecentlyVisited()
   useEffect(() => {
-    if (sheetState.sheet) recordSheetView(sheetState.sheet)
-  }, [sheetState.sheet])
+    if (!sheetState.sheet) return
+    recordSheetView(sheetState.sheet)
+    // Mirror into the cross-surface recently-visited list (Bucket C1)
+    // so the /feed strip can surface it next to notes/papers/books.
+    recordRecentlyVisited({
+      type: 'sheet',
+      id: sheetState.sheet.id,
+      title: sheetState.sheet.title,
+      href: `/sheets/${sheetState.sheet.id}`,
+    })
+  }, [sheetState.sheet, recordRecentlyVisited])
 
   const sheetId = Number.parseInt(id, 10)
   const { studyStatus, setStudyStatus, STUDY_STATUSES } = useStudyStatus(sheetId)
@@ -213,6 +225,27 @@ export default function useSheetViewer() {
     enabled: Number.isInteger(sheetId),
     intervalMs: 60000,
   })
+
+  // Subscribe to SWR cache invalidation. Writers like SheetLabContribute
+  // call `clearFetchCache('/api/sheets/<id>')` after a successful submit;
+  // before this subscription that was a no-op because useSheetViewer uses
+  // raw fetch. Now an invalidation for THIS sheet's key OR a full clear
+  // (key === null) triggers an immediate refetch — no more 45s polling
+  // gap for post-contribute / post-fork / post-merge refreshes.
+  useEffect(() => {
+    if (!Number.isInteger(sheetId)) return undefined
+    const targetKey = `/api/sheets/${sheetId}`
+    const unsubscribe = onCacheInvalidate((clearedKey) => {
+      if (clearedKey === null || clearedKey === targetKey) {
+        // Fire and forget — abort signal handling lives inside loadSheet
+        // via the polling system's own controller.
+        loadSheet().catch(() => {
+          /* loadSheet handles its own error state */
+        })
+      }
+    })
+    return unsubscribe
+  }, [sheetId, loadSheet])
 
   const { sheet } = sheetState
   const canEdit = useMemo(

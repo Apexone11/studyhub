@@ -4,10 +4,12 @@ import { useState, useEffect } from 'react'
 import { API } from '../../config'
 import SubmitSpinner from '../../components/SubmitSpinner'
 import { useFormValidation } from '../../lib/useFormValidation'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 const FONT = "'Plus Jakarta Sans', sans-serif"
 
 function ResetPasswordPage() {
+  usePageTitle('Reset password')
   const navigate = useNavigate()
   const [token, setToken] = useState('')
   const [newPassword, setNewPassword] = useState('')

@@ -16,11 +16,13 @@ import { LogoMark, AnimatedLogoMark, IconSearch } from '../Icons'
 const SearchModal = lazy(() => import('../search/SearchModal'))
 const ChatPanel = lazy(() => import('../ChatPanel'))
 import KeyboardShortcuts from '../KeyboardShortcuts'
+import useGlobalShortcuts from '../../lib/useGlobalShortcuts'
 import { pageWidths } from '../../lib/ui'
 import { useSession } from '../../lib/session-context'
 import EmailVerificationBanner from '../EmailVerificationBanner'
 import NavbarUserMenu from './NavbarUserMenu'
 import NavbarNotifications from './NavbarNotifications'
+import StreakChip from './StreakChip'
 /* ChatPanel lazy-loaded above */
 import { IconMessages } from '../Icons'
 import { S, getConfig, handleIconHover } from './navbarConstants'
@@ -60,6 +62,11 @@ export default function Navbar({
 
   // user info from localStorage (set on login)
   const { user } = useSession()
+
+  // App-wide navigation shortcuts: `?` opens help, `/` focuses search,
+  // `g h/s/n/m/a` jumps to Feed/Sheets/Notes/Messages/Hub-AI. Editable
+  // contexts are guarded inside the hook.
+  useGlobalShortcuts()
 
   // search modal state
   const [searchOpen, setSearchOpen] = useState(false)
@@ -358,6 +365,9 @@ export default function Navbar({
               )}
             </button>
           )}
+
+          {/* streak chip — only shown when the user has an active streak */}
+          {user && <StreakChip />}
 
           {/* notification bell */}
           <NavbarNotifications />

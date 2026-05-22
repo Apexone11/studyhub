@@ -74,6 +74,7 @@ const sharingRoutes = require('./modules/sharing')
 const aiRoutes = require('./modules/ai')
 const libraryRoutes = require('./modules/library')
 const scholarRoutes = require('./modules/scholar')
+const relatedRoutes = require('./modules/related')
 const videoRoutes = require('./modules/video')
 const paymentsRoutes = require('./modules/payments')
 const reviewsRoutes = require('./modules/reviews')
@@ -705,6 +706,11 @@ app.use('/api/library', libraryRoutes)
 
 // Scholar v1 endpoints under /api/scholar (master plan §18).
 app.use('/api/scholar', scholarRoutes)
+
+// Related-work strips on detail pages (wave-12.3 ecosystem Track 5).
+// Public read-only — surfaces sibling sheets / linked notes / cross-
+// surface references for sheets, notes, papers, and library books.
+app.use('/api/related', relatedRoutes)
 
 // Video module endpoints under /api/video.
 app.use('/api/video', videoRoutes)

@@ -876,6 +876,24 @@ body,
   }
 }
 
+/* Global reduced-motion safety net. Per-component @media rules already
+ * exist in many files but coverage was incomplete (33 CSS files use
+ * animations; only ~21 honor the user's reduced-motion preference).
+ * This rule zeros animations and transitions for any element that
+ * doesn't explicitly opt out via `data-motion="keep"` (loading
+ * spinners, progress indicators — the few cases where movement is
+ * the message). WCAG 2.3.3 + Apple/Material accessibility guidance. */
+@media (prefers-reduced-motion: reduce) {
+  *:not([data-motion='keep']),
+  *:not([data-motion='keep'])::before,
+  *:not([data-motion='keep'])::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 body {
   font-family: var(--font);
   background: var(--sh-bg);

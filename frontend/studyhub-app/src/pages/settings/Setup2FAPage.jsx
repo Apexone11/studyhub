@@ -19,8 +19,10 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { API } from '../../config'
 import { Button, Message, SectionCard } from './settingsShared'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 export default function Setup2FAPage() {
+  usePageTitle('Set up 2FA')
   const navigate = useNavigate()
   const [me, setMe] = useState(null)
   const [loaded, setLoaded] = useState(false)

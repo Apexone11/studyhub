@@ -17,6 +17,7 @@ import {
   flattenSchoolsToCourses,
   enrolledSchoolIdsFromUser,
   partitionCoursesBySchool,
+  deriveMyCoursesHero,
 } from './courses'
 
 describe('flattenSchoolsToCourses', () => {
@@ -204,5 +205,58 @@ describe('partitionCoursesBySchool', () => {
     )
     expect(primary).toEqual([])
     expect(other).toHaveLength(1)
+  })
+})
+
+describe('deriveMyCoursesHero', () => {
+  it('returns the imperative onboarding copy when the user has no enrollments', () => {
+    const out = deriveMyCoursesHero({ enrollments: [] }, [])
+    expect(out.isReturning).toBe(false)
+    expect(out.title).toBe('Personalize Your Feed')
+    expect(out.subtitle).toMatch(/Choose your school and courses/i)
+  })
+
+  it('returns possessive copy when the user has any enrollments', () => {
+    const out = deriveMyCoursesHero(
+      { enrollments: [{ courseId: 1, course: { schoolId: 5 } }] },
+      [1],
+    )
+    expect(out.isReturning).toBe(true)
+    expect(out.title).toBe('Your Courses (1)')
+    expect(out.subtitle).toMatch(/Edit your school/i)
+  })
+
+  it('omits the count chip when no courses are currently selected (mid-clear)', () => {
+    const out = deriveMyCoursesHero({ enrollments: [{ courseId: 1, course: { schoolId: 5 } }] }, [])
+    expect(out.isReturning).toBe(true)
+    expect(out.title).toBe('Your Courses')
+  })
+
+  it('reflects the IN-FLIGHT selectedCourseIds, not user.enrollments.length', () => {
+    // user has 3 saved enrollments, but they unticked 2 chips locally;
+    // count chip must show 1 (the working copy) to match what the
+    // user sees in the right-side preview panel.
+    const out = deriveMyCoursesHero(
+      {
+        enrollments: [
+          { courseId: 1, course: { schoolId: 5 } },
+          { courseId: 2, course: { schoolId: 5 } },
+          { courseId: 3, course: { schoolId: 5 } },
+        ],
+      },
+      [1],
+    )
+    expect(out.title).toBe('Your Courses (1)')
+  })
+
+  it('returns onboarding copy when user is null (unauthenticated edge)', () => {
+    const out = deriveMyCoursesHero(null, [])
+    expect(out.isReturning).toBe(false)
+    expect(out.title).toBe('Personalize Your Feed')
+  })
+
+  it('returns onboarding copy when enrollments is not an array (corrupt session)', () => {
+    const out = deriveMyCoursesHero({ enrollments: 'oops' }, [])
+    expect(out.isReturning).toBe(false)
   })
 })

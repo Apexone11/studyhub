@@ -28,6 +28,219 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.5 — 20-loop audit fixes (2026-05-17)
+
+13 verified findings from a 20-loop narrow-to-wide audit (own files → wave-12.3 surface → cross-cutting infra → security sweep → UX/a11y/perf → 2 parallel subagents for breadth). False positives from the code-reviewer subagent (textarea/option claim) + Explore subagent (heuristic-only block-filter list, string-literal "console.log") rejected after empirical verification.
+
+**Security:**
+
+- **HIGH** — DM conversation creation failed OPEN on block-check error in `messaging.conversations.routes.js`. A thrown query in the block-check let the conversation continue with a blocked user. Changed to fail CLOSED with 503 + retry copy.
+- **HIGH** — `/api/related/*` had no rate limiter — scraper could enumerate the published-content graph at the global 1000/15min cap. Added `relatedReadLimiter` (60/min IP, default keying — A7 compliant).
+- **MED** — `/api/related/paper/:paperId` + `/book/:volumeId` validated length but not charset. Added `OPAQUE_ID_REGEX = /^[A-Za-z0-9._:-]+$/` reject.
+- **MED** — `/api/courses/schools/suggest` was the only schools route without `schoolsLimiter + discoverySchoolsLimiter`. Both added.
+- **MED** — `PATCH /api/settings/preferences` crashed on JSON literal `null` body (`Object.hasOwn(null, key)` throws). Added req.body shape guard up front.
+- **LOW** — `Cache-Control: no-store` on `/api/related/*` (responses depend on viewer's block list — defense-in-depth for shared-browser cache).
+
+**Correctness / UX:**
+
+- **MED** — `useFetch` could clobber B's data with A's slow response on rapid path-change navigation. Added `fetchIdRef` monotonic counter; stale completions discarded.
+- **MED** — `useScopeBySchool` reconcile race: user-flip during the initial preferences fetch was overwritten by the stale server value on resolve. Added `userFlippedDuringHydrationRef` flag — local-flip-during-hydration wins.
+- **MED** — `studyGroups.helpers.js#parseId` used bare `parseInt + Number.isNaN` instead of CLAUDE.md A12's `Number.parseInt(...,10) + Number.isInteger`. Fixed (pre-existing, file was open from wave-12.4 sanitizer swap).
+- **LOW** — `RelatedWorkStrip` TypeBadge had no `book` branch — fell through to "Item" label + warning color. Added `TYPE_LABELS`/`TYPE_COLORS` maps.
+- **LOW** — `RelatedWorkStrip` + `RecentlyVisitedStrip` Link cards had no `:focus-visible` style. Added `onFocus/onBlur` outline handlers (2px brand outline + 2px offset).
+- **LOW** — `useRecentlyVisited` storage handler re-rendered on every same-origin localStorage write (auth toasts, etc.). Filter to `e.key === STORAGE_KEY || e.key === null`.
+- **LOW** — `useRecentlyVisited.record` didn't truncate title. Added `MAX_TITLE_LEN = 120` cap.
+
+### Wave-12.4 — Codex review + Dependabot sweep (2026-05-17)
+
+Bug-hunt cleanup: 3 Codex review findings on the wave-12.3 commit + 3 Dependabot advisories. All real, all fixed.
+
+**Codex P1 — Route ordering in `courses.schools.controller.js`:**
+
+- `GET /api/courses/schools/suggest` was registered AFTER `GET /api/courses/schools/:id`, so Express matched it as `:id="suggest"` and returned 400. Moved `/schools/suggest` above the dynamic route with an explanatory comment so future edits don't regress it.
+
+**Codex P1 — Private notes leaked metadata via `/api/related/note/:id`:**
+
+- Endpoint didn't check `note.private`. An anonymous caller could enumerate IDs and learn a private note's linked-sheet title + same-author public-note titles. Added owner-only visibility gate (`!note.private || note.userId === viewerId`). When the linked sheet itself is unpublished, gate that too so the link doesn't leak draft-sheet metadata.
+
+**Codex P2 — Unpublished sheets leaked metadata via `/api/related/sheet/:id`:**
+
+- Endpoint didn't check `sheet.status`. An anonymous caller could enumerate IDs of draft sheets and learn their course linkage + backlink-note list (both filtered to public rows, but the original sheet's existence + course was disclosed). Added owner-only visibility gate (`sheet.status === 'published' || sheet.userId === viewerId`).
+
+**Dependabot GHSA-rpr9-rxv7-x643 — `sanitize-html` ≤ 2.17.3 `<xmp>` XSS bypass:**
+
+- The default `nonTextTags` list omits `xmp`, so disallowed `<xmp>` tags hit a path that appends their inner text to the sanitized output unescaped — letting attackers smuggle `<script>` through `sanitizeHtml('<xmp><script>alert(1)</script></xmp>')`. No upstream patch exists yet (advisory says "Patched version: None").
+- Mitigation: new `backend/src/lib/html/safeSanitize.js` wrapper (and frontend mirror at `frontend/studyhub-app/src/lib/safeSanitize.js`) that adds every spec-defined raw-text element (`script style textarea option noscript noframes iframe noembed plaintext xmp`) to `nonTextTags` on every call. nonTextTags entries are dropped along with their content, so the unescaped-text path never fires.
+- All 6 call sites (5 backend, 1 frontend: `htmlPreviewDocument.js`, `library.service.js`, `messaging.helpers.js`, `studyGroups.helpers.js`, `notePaste.js`, and `safeSanitize.js`-internal) now import through the wrapper.
+- Regression test `backend/test/safeSanitize.test.js` runs the advisory's three PoC payloads through the wrapper and asserts no live markup makes it out (8 tests, all passing).
+
+**Dependabot GHSA — `fast-uri` ≤ 3.1.1 authority delimiter normalization:**
+
+- Transitive via `serve → ajv → fast-uri`. Workspace lockfile was pinned at `3.1.0` (vulnerable); patched at `3.1.2`. Added `overrides.fast-uri >= 3.1.2` at both root and `frontend/studyhub-app/package.json`, then re-synced the workspace lockfile.
+
+**Dependabot GHSA — `fast-xml-builder` ≤ 1.1.6 comment-value regex bypass:**
+
+- Transitive via `aws-sdk → xml-builder → fast-xml-parser → fast-xml-builder`. Backend workspace lockfile was pinned at `1.1.5` (vulnerable); patched at `1.1.7`. Added `overrides.fast-xml-builder >= 1.1.7` at both root and `backend/package.json`, then re-synced the workspace lockfile.
+- Root lockfile + workspace lockfiles now report `0 vulnerabilities` for both `fast-uri` and `fast-xml-builder`. Only the (mitigated) `sanitize-html` advisory remains in the audit output, expected until upstream ships a patch.
+
+### Wave-12.3 — School-scope toggle infra + cross-surface links + RelatedWorkStrip + global keyboard shortcuts + RecentlyVisited (2026-05-16)
+
+Three founder asks plus several long-deferred ecosystem pieces. None are full rollouts — they're foundations + first-site wiring so the next sessions can finish without re-laying the plumbing.
+
+**School-scope toggle infrastructure (founder ask):**
+
+- `UserPreferences.scopeBySchool` had its migration in wave-12.2. This wave wires it through the existing settings endpoints: added to `PREF_BOOLEAN_KEYS` in `settings.constants.js` so the existing `PATCH /api/settings/preferences` handler accepts it.
+- New `lib/useScopeBySchool.js` hook with synchronous localStorage first-paint + server reconciliation on mount + fire-and-forget PATCH on flip. Exports `primarySchoolIdFromUser()` helper that handles both `course.schoolId` and `course.school.id` shapes.
+- New `components/SchoolScopeToggle.jsx` — two display modes: `inline` (compact pill for course pickers) and `setting` (full row with `role="switch"`, `aria-checked`, animated knob).
+- New "Personalization" section in `PrivacyTab.jsx` mounts the master toggle.
+- Deferred: wiring the inline pill into the 4 course pickers (Notes/Sheets/AI Sheet Setup) + the feed algorithm v2 — foundation in place, plan in `school-scoped-search-and-feed-algorithm.md`.
+
+**Ecosystem Track 2 — Cross-surface link fields:**
+
+- Migration `20260516000003_cross_surface_link_fields` adds `StudySheet.libraryVolumeId`, `StudySheet.derivedFromPaperId`, `Note.relatedSheetId`, `Note.relatedPaperId`. All nullable + indexed for reverse lookup. `IF NOT EXISTS`-guarded.
+- Schema updates in `schema.prisma` with explanatory comments.
+
+**Ecosystem Track 5 — RelatedWorkStrip:**
+
+- New `backend/src/modules/related/` module with 4 routes: `/sheet/:id`, `/note/:id`, `/paper/:paperId`, `/book/:volumeId`. Block-filtered (try-catch wrapped). Hard cap of 8 items total. Mounted at `/api/related`.
+- New `components/RelatedWorkStrip.jsx` — reusable component with grid layout, type badges, hover states. Returns null when empty.
+
+**Bucket B2 — Global keyboard shortcuts (built earlier but never wired):**
+
+- `lib/useGlobalShortcuts.js` was already full-featured (`?` help, `/` search, `g h/s/n/m/a` navigation, sequence handling, editable-context guard) but never invoked. Wired into `Navbar.jsx` so it loads on every authenticated page.
+
+**Bucket C1 — Recently-visited cross-surface strip:**
+
+- New `lib/useRecentlyVisited.js` — localStorage-backed (cap 20, dedup by (type, id), cross-tab + in-page sync, validates entry shape).
+- New `components/RecentlyVisitedStrip.jsx` — horizontal strip on `/feed`, hides on empty list, type-accent border.
+- Recording wired in `useSheetViewer.js` and `NoteViewerPage.jsx` so every sheet/note view populates the strip automatically.
+
+**Bucket C7:** verified that reading-time chips already ship via `SheetGridCard.jsx` and `NoteViewerPage.jsx`. The unified `lib/readingTime.js` helper from wave-12.2 is available for future sites.
+
+**Loop findings fixed in-session:**
+
+- Bug: `related.routes.js` note handler treated the blocked-userId list as a sheet-id list. Refactored to check `blocked.includes(sheet.userId)` after fetching the sheet.
+- Security: `cacheControl(60)` on `/api/related/*` could serve a blocked user's content to someone who blocked them on shared-browser profiles. Removed cache headers entirely from these routes.
+
+**Tests:** 33 new (8 useScopeBySchool + 7 useRecentlyVisited + 10 related.routes + others). 164 tests across all touched suites pass. Frontend lint 0 errors / 89 pre-existing react-hooks debt warnings. Backend lint clean. Build clean in 1.33s.
+
+### Wave-12.2 — MD+VA catalog + location sort + course-detail drawer + Library Phase A + primitives (2026-05-16)
+
+Major wave covering the founder's MD+VA schools/courses ask, location-based sort, course detail drawer on `/my-courses`, plus several long-deferred infrastructure pieces (useAsyncAction hook, streak chip, reading-time helper, Library Phase A badges, UserPreferences.scopeBySchool foundation for the upcoming school-scoped search rollout).
+
+**School catalog expansion:**
+
+- `School` model gains `description`, `websiteUrl`, `latitude`, `longitude`, `enrollmentSize`, `foundedYear`, `mascot` columns (migration `20260516000001_school_detail_columns`). All nullable + `IF NOT EXISTS`.
+- Catalog expanded from 30 MD-only to ~70 schools covering all major MD + VA institutions (public 4-year, private 4-year, USM + VCCS community colleges).
+- `bootstrapSchools` writes new fields on insert + backfills nulls on update without overwriting admin-edited values.
+
+**Location-based school sort:**
+
+- New `backend/src/lib/geo/haversine.js` + frontend mirror `geo/haversineClient.js` (8 unit tests each side).
+- `GET /api/courses/schools-nearby?lat=&lng=` returns schools sorted by great-circle distance; falls back to alphabetical when coords are missing. Lat/lng are per-request only — never persisted to the database.
+- `GET /api/courses/schools/:id` returns full school detail (rate-limited via existing `discoverySchoolsLimiter`).
+- New `useGeolocation` hook — permission-aware, never auto-prompts, sessionStorage-cached, 10s timeout, low-accuracy mode (city-level is enough for school sort). 8 unit tests.
+- `/my-courses` school list now sorts by distance when geolocation is granted; shows a "Sort by distance — use my location" button in idle state and a discrete "Sorted by distance from you" chip when granted.
+
+**SchoolCourseDetailDrawer:**
+
+- New slide-in drawer (right side, portaled to body, focus-trapped, Esc-closable) that opens when a user clicks the new `i` button on any course chip.
+- Shows the school's neutral description, location, type, founded year, enrollment size, mascot, course count, member count, and a website link. No tuition, no rankings, no admissions stats per founder direction.
+- Switches content (does NOT stack) when the user clicks a different course chip while the drawer is open.
+- Course chips now split into two buttons: main toggle + small info button so the two gestures don't overlap.
+
+**`UserPreferences.scopeBySchool` foundation:**
+
+- Migration `20260516000002_user_preferences_scope_by_school` adds the boolean (default `true`). Foundation for the upcoming school-scoped search rollout (course pickers + feed algorithm v2 — full rollout pending; plan in `school-scoped-search-and-feed-algorithm.md`).
+
+**Library Phase A:**
+
+- `library.service.normalizeVolume` now passes through `accessInfo.pdf.isAvailable`, `accessInfo.epub.isAvailable`, `accessInfo.publicDomain`, `accessInfo.accessViewStatus` to the frontend.
+- New helpers `hasPdf`, `hasEpub`, `isPublicDomainFull` in `libraryHelpers.js` + 19 new unit tests.
+- `BookCard` now renders up to 3 stacked badges (Free + PDF + EPUB) in the bottom-right of the cover image. Color-coded via CSS tokens. WCAG-labeled.
+
+**Cross-cutting primitives:**
+
+- `useAsyncAction` hook (`lib/useAsyncAction.js`) — wraps any async fn with pending/error/data state + concurrent-call dedup + stale-set guard + latest-fn ref. Replaces 30+ ad-hoc patterns. 8 unit tests.
+- `StreakChip` (`components/navbar/StreakChip.jsx`) — small flame + day count in the navbar when the user has a non-zero streak. Reads `GET /api/users/me/streak` via useFetch SWR 5min. Silently returns null on failure or zero streak.
+- `readingTime` helper (`lib/readingTime.js`) — `estimateReadingMinutes(text)` and `formatReadingTime(text)`. 220 wpm baseline (Brysbaert 2019), HTML-tag-stripping, 1-min floor. 8 unit tests. Helper ready; per-card wiring is follow-on.
+
+**Test totals this wave:** 99 new frontend tests (8 useGeolocation + 19 library helpers + 8 useAsyncAction + 8 reading time + others) + 8 new backend tests (haversine). All pass. Frontend lint 0 errors, 88 warnings (pre-existing react-hooks debt). Backend lint clean. Build clean.
+
+### Wave-12.1 — deferred work follow-on (F7 + UI/UX Bucket A6/A7/A9/A11) (2026-05-16)
+
+Follow-on to wave-12 closing out the deferred items.
+
+- **F7 pub/sub bridge for raw-fetch cache invalidation.** `lib/useFetch.js` now exports `onCacheInvalidate(fn)`. `clearFetchCache(key)` notifies subscribers with the cleared key (or `null` for a full clear). `useSheetViewer` subscribes to its own sheet's key and triggers `loadSheet()` on invalidation, closing the 45-second polling gap between a contribute-back submit and the parent sheet showing the new pending PR. 5 new unit tests cover notify / unsubscribe / multi-subscriber / listener-error swallow / idempotent re-add.
+- **A6 global prefers-reduced-motion safety net.** Added `@media (prefers-reduced-motion: reduce) { *:not([data-motion='keep']) { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }` to `index.css`. Catches all 33 CSS files in one rule. `SubmitSpinner.jsx` gets `data-motion="keep"` per WCAG 2.3.3 (essential motion is allowed).
+- **A7 skeleton loaders on AdminOverview.** Replaced "Loading admin stats…" + "Loading…" text with proper `<Skeleton />` placeholders + `aria-busy` + sr-only labels for screen readers.
+- **A9 ConfirmDialog on ScholarSavedPage bulk-remove.** Replaced raw `window.confirm` with the portaled, focus-trapped, danger-variant ConfirmDialog. Friendlier copy ("Remove N saved papers? You can re-save them anytime").
+- **A11 breadcrumbs on /sheets and /library.** Added `crumbs={[{ label: 'Study Sheets', to: '/sheets' }]}` / `crumbs={[{ label: 'Library', to: '/library' }]}` for navigation consistency.
+
+A12 (tab order audit) deferred — needs interactive verification I can't do solo.
+
+### Wave-12 — contribute-back fix bundle, ecosystem doc + 12h follow-on (2026-05-15 → 2026-05-16)
+
+Founder bug repro on the fork-contribute-back flow exposed four related bugs plus a class of ecosystem-mapping debt. Shipped the four fixes uncommitted overnight, then ran a 12-hour follow-on session covering the bonus audit findings + UI/UX Bucket A items + 6 review loops. Plus added a new top-level `docs/internal/ecosystem.md` living document mapping the 13 sub-ecosystems + their cross-wiring, with the canonical contribute-back bug captured as the founding case in the Lessons-log.
+
+#### `/my-courses` hero copy adapts to returning users
+
+- Extracted pure `deriveMyCoursesHero(user, selectedCourseIds)` helper in `lib/courses.js`. Returning users see "Your Courses (N)" + edit-tone subtitle; first-time users still get the onboarding "Personalize Your Feed" copy.
+- "All changes saved" chip surfaces in the hero when not dirty.
+- Seed effect hardened to fall back to `course.school.id` when `course.schoolId` is absent.
+- "Clear" button renamed to "Switch school" (less destructive-sounding) + aria-label.
+- 10-course cap toast instead of silent no-op.
+- 6 new unit tests covering returning / first-time / corrupt session / mid-clear / null user edge cases.
+
+#### Contribute-back end-to-end fix (4 bugs)
+
+- **Button gated on ownership.** `SheetHeader.jsx` now hides the `Contribute back` button for non-owners. Previously visible to everyone, producing silent 403s.
+- **Public summary chips for everyone.** `sheets.serializer.js` now returns `incomingContributionsSummary` + `outgoingContributionsSummary` (total/pending/accepted/rejected) on every sheet read. Detailed row arrays remain permission-gated. Backed by `safeGroupBy` graceful degradation for older / mocked Prisma clients. Migration `20260515000001_contribution_forksheet_status_index` adds `@@index([forkSheetId, status])` so the outgoing-summary groupBy stays index-backed at scale.
+- **Cache invalidated on submit.** `SheetLabContribute.jsx` clears the SWR cache for both the fork and parent sheet IDs after a successful submit.
+- **"View on original sheet ↗" link** added to the contribution history card so the proposer can see their submission from the maintainer's view.
+- 8 new serializer tests covering all 4 viewer scenarios (owner / non-owner / admin / anonymous) + degraded `groupBy`.
+
+#### Fork-tree UI polish
+
+- `ForkTree.jsx` rewritten to render each node on ONE line — title · status pill · meta. Replaces the prior 2-row stack that ran "Exampublished" together.
+- Status pill hidden for `published` (default — too noisy on every row); styled per-status for `draft` / `pending_review` / `quarantined`.
+- Curved branch SVG replaces the angular tree connector.
+- Truncates after 6 nodes with "Show N more forks ↓" + "Show less ↑" toggles.
+- Current sheet row highlighted with `--sh-brand-soft-bg`.
+- `ForkTreePanel.jsx` header tightened from `Fork tree    2 sheets` (two columns) to `Fork tree (2)` (single line).
+- 10 new RTL tests covering null root, single node, current-flag, status pill, truncation, expand/collapse, singular vs plural wording, link mode.
+
+#### Bonus audit findings — 6 of 7 shipped
+
+- **F1 block-filter on contribute-back.** Submit AND review handlers now call `isBlockedEitherWay(prisma, userA, userB)`. Bidirectional, 404 to avoid existence-leak, admin bypass on review (moderation), try-catch fail-open per the established `getBlockedUserIds` graceful-degradation pattern.
+- **F2 forkTreeLimiter.** New 60/min/IP rate limiter on `GET /api/sheets/:id/fork-tree`. Public endpoint with no per-route limiter previously.
+- **F3 A12 sweep on feed.posts.** Extracted `parseOptionalFk(raw, fieldName)` helper that throws a tagged 400 on garbage input. Replaces the silent `Number.parseInt(x) || null` anti-pattern for `courseId` and `videoId` in `POST /api/feed/posts`.
+- **F4 sendError sweep on contributions controller.** 12 raw `res.status().json({error})` sites replaced with the standard envelope and ERROR_CODES enum.
+- **F5 CONTRIBUTION_REVISION_REQUESTED achievement event.** Fires on the proposer when their PR is rejected. Backward-compatible (no current badge consumes it) — future "iterate-and-improve" badge family can opt in.
+- **F6 fork-tree panel header tighten.** See above.
+- **F7 deferred:** `useSheetViewer` raw `fetch` → `useFetch` migration. Larger refactor; punted to a future PR.
+
+#### UI/UX Bucket A — 7 of 12 items
+
+- **A1 PendingButton component.** New `components/buttons/PendingButton.jsx` with built-in spinner, `aria-busy`, disabled state, and proper `type="button"` default. 10 unit tests. Wired into 3 high-traffic call sites (SheetLabContribute Review + Submit, BookReader Add-Bookmark).
+- **A2 Toast cadence.** Per-type defaults: success 2.5s (was 3.5s), info 3.5s, error 6s (was 3.5s — Nielsen "5s+ for novel error copy"). Callers can pass `0` to disable auto-dismiss for critical errors; `Toast.jsx` updated to honor `0`. 9 unit tests.
+- **A3 Modal portal audit.** `ConfirmDialog.jsx` and `ReportModal.jsx` now portal to `document.body` per CLAUDE.md "Common Bugs" #8.
+- **A4 focus-visible ring.** Verified already shipped at `index.css:4001` with a more sophisticated opt-out toggle (`html[data-focus-ring="off"]`) than the plan called for.
+- **A5 touch targets ≥ 44×44 px.** `BookReaderPage.css` close + delete buttons (were 28px / 24px) now WCAG 2.5.5 compliant via invisible hit area.
+- **A8 empty state copy upgrades.** Notes ("Start your first note. Hub AI can help draft the outline."), Messages ("Start your first conversation. Find a classmate..."), AI ("Ask anything, anytime. Try 'explain forking like I'm new'...").
+- **A10 usePageTitle sweep.** Added to 14 high-traffic pages: LoginPage, ForgotPasswordPage, ResetPasswordPage, RolePickerPage, LoginChallengePage, NotFoundPage, AdminPage, PricingPage, SupportersPage, StudyGroupsPage, SheetViewerPage, NoteViewerPage, UploadSheetPage, Setup2FAPage, AttachmentPreviewPage, SheetHtmlPreviewPage. Plus all 7 legal pages covered via one edit to the shared `LegalDocumentPage.jsx` shell.
+
+#### Hotfix shipped
+
+- **Discovery limiters IPv6 crash.** `discoverySchoolsLimiter` + `discoveryCoursesLimiter` had custom keyGenerators using `req.ip` fallback that crashed `express-rate-limit` v7+ at boot with `ERR_ERL_KEY_GEN_IPV6`. Dropped the custom keyGenerators entirely (default IP keying handles IPv6 correctly). Production deploy was crash-looping on this; now boots cleanly.
+
+#### Process / docs
+
+- New `docs/internal/ecosystem.md` living document — 13 sub-ecosystem reference + cross-cutting primitives + interconnection map + pre-flight checklist + post-change checklist + Lessons-log. Required reading per new CLAUDE.md "ECOSYSTEM AWARENESS" section.
+- CLAUDE.md gained "ECOSYSTEM AWARENESS" section with 12-item pre-flight checklist and 7-item post-change checklist.
+- Comment cleanup sweep: removed scattered "Copilot review 2026-XX-XX" / "wave-N" date stamps from `AiPage.jsx`, `SheetHtmlPreviewPage.jsx`, `GroupDetailView.jsx` (kept load-bearing wave references in tests/seeds per CLAUDE.md "Load-bearing exceptions").
+- 5 plan docs archived to `docs/internal/archive/plans/2026-05/`: hotfix-discovery-limiter-ipv6, bug-my-courses-misleading-copy, bug-contribute-back-and-sheet-page-audit, bonus-audit-findings-2026-05-15.
+
 ### Wave-11 — wide audit sweep, G1 hardening, P0 backend fixes, accessibility + lifecycle pass (2026-05-14)
 
 Largest single-wave audit + fix cycle yet. Driven by 8 background audit agents (v2/v2.2 gap audit + frontend bug-hunt + backend bug-hunt + 5 wide-domain loops covering hot-paths/lifecycle/perf/a11y/telemetry + web-master-plan rewrite). Every finding was double-checked against actual code before applying. Final tally: backend lint clean, frontend lint 0 errors / 86 warnings (tracked debt — see `react-hooks-debt.md`), frontend build clean, 3182/3303 backend tests pass (18 failures pre-existing on base, not caused by this wave).

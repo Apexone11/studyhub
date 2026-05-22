@@ -311,8 +311,20 @@ model School {
   schoolType  String                 @default("public")
   logoUrl     String?
   emailDomain String?
-  courses     Course[]
-  enrollments UserSchoolEnrollment[]
+  // Detail fields added 2026-05-16 (wave-12.2). All nullable so the
+  // catalog can populate them progressively without breaking older rows.
+  // See backend/src/lib/catalog/catalogSchools.js for the curated data.
+  description    String?    @db.Text
+  websiteUrl     String?    @db.VarChar(255)
+  latitude       Float?
+  longitude      Float?
+  enrollmentSize Int?
+  foundedYear    Int?
+  mascot         String?    @db.VarChar(80)
+  courses        Course[]
+  enrollments    UserSchoolEnrollment[]
+
+  @@index([latitude, longitude])
 }
 
 model Course {
@@ -411,6 +423,12 @@ model StudySheet {
   lastAuditGrade         String?      @db.VarChar(1)
   lastAuditReport        Json?
   lastAuditedAt          DateTime?
+  // Cross-surface link fields (wave-12.3, ecosystem Track 2). When a
+  // sheet is written about a Library book or generated from a Scholar
+  // paper, these point back so the Library/Scholar detail pages can
+  // show "Related sheets" via reverse lookup (indexed below).
+  libraryVolumeId        String?      @db.VarChar(64)
+  derivedFromPaperId     String?      @db.VarChar(128)
   createdAt              DateTime     @default(now())
   updatedAt              DateTime     @updatedAt
   course                 Course       @relation(fields: [courseId], references: [id])
@@ -443,6 +461,8 @@ model StudySheet {
   @@index([contentHash])
   @@index([contentSimhash])
   @@index([aiReviewDecision])
+  @@index([libraryVolumeId])
+  @@index([derivedFromPaperId])
 }
 
 model SheetHtmlVersion {
@@ -579,6 +599,14 @@ model Note {
   materials        Material[]     @relation("MaterialNote")
   revision         Int            @default(0)
   lastSaveId       String?        @db.Uuid
+  // Cross-surface link fields (wave-12.3, ecosystem Track 2).
+  // Notes can be linked to the sheet or paper they're "about." Powers
+  // the backlinks footer + Related-work strip on the linked entity.
+  relatedSheetId   Int?
+  relatedPaperId   String?        @db.VarChar(128)
+
+  @@index([relatedSheetId])
+  @@index([relatedPaperId])
 }
 
 // Range-anchored highlights for notes (Phase 9 — Note Review v1).
@@ -807,6 +835,11 @@ model SheetContribution {
 
   @@index([targetSheetId, status])
   @@index([proposerId, status])
+  // Added 2026-05-15: outgoing-summary groupBy in
+  // sheets.serializer.fetchContributionCollections filters by
+  // forkSheetId on every sheet read. Without this index the query
+  // would seq-scan as the table grows.
+  @@index([forkSheetId, status])
 }
 
 model ContributionComment {
@@ -928,6 +961,12 @@ model UserPreferences {
   alertOnNewCountry      Boolean @default(true)
   alertOnNewCity         Boolean @default(false)
   blockAnonymousIp       Boolean @default(false)
+  // Added 2026-05-16 (wave-12.2 school-scoped-search): when true,
+  // course pickers in Notes/Sheets/AI Sheet Setup default to showing
+  // ONLY the user's primary school's courses. The user can flip to
+  // "All schools" inline per-picker. Default true matches the founder's
+  // intent that most users see their own school first.
+  scopeBySchool          Boolean @default(true)
   user                   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 

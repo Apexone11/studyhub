@@ -1,6 +1,7 @@
 import LegalPageLayout, { LegalSection } from '../../components/LegalPageLayout'
 import LegalDocumentText from '../../components/LegalDocumentText'
 import { useCurrentLegalDocument } from '../../lib/legalService'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 const styles = {
   viewer: {
@@ -65,6 +66,11 @@ export default function LegalDocumentPage({
   const summary = legalDocument?.summary || fallbackSummary
   const intro = legalDocument?.intro || fallbackIntro
   const updated = legalDocument?.updatedLabel || fallbackUpdated
+
+  // One usePageTitle here covers all 7 legal pages (Terms, Privacy,
+  // Cookies, Disclaimer, Guidelines, About, DataRequest) since each
+  // is just a thin wrapper that passes a fallbackTitle into this shell.
+  usePageTitle(title || 'Legal')
 
   let content = null
 

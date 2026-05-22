@@ -4,7 +4,7 @@
  * These functions are used by multiple messaging route modules.
  */
 
-const sanitizeHtml = require('sanitize-html')
+const sanitizeHtml = require('../../lib/html/safeSanitize')
 const prisma = require('../../lib/prisma')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 

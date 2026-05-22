@@ -2,10 +2,12 @@
  * NotFoundPage.jsx — Styled 404 page for unmatched routes
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { Link } from 'react-router-dom'
+import { usePageTitle } from '../lib/usePageTitle'
 
 const FONT = "'Plus Jakarta Sans', sans-serif"
 
 export default function NotFoundPage() {
+  usePageTitle('Page not found')
   return (
     <main
       id="main-content"

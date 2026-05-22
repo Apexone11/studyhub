@@ -4,6 +4,7 @@ import Navbar from '../../components/navbar/Navbar'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { pageShell } from '../../lib/ui'
+import { usePageTitle } from '../../lib/usePageTitle'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
@@ -21,6 +22,7 @@ function panelStyle() {
 }
 
 export default function SheetHtmlPreviewPage() {
+  usePageTitle('HTML sheet preview')
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const wantsInteractiveOnLoad = searchParams.get('interactive') === '1'
@@ -105,7 +107,6 @@ export default function SheetHtmlPreviewPage() {
     // (e.g. /sheets/preview/html/42 → /sheets/preview/html/43?interactive=1)
     // honors the new ?interactive=1 param. Without this reset, only the
     // FIRST sheet visited per session ever auto-opens interactive mode.
-    // (Copilot review 2026-05-03.)
     setInteractiveAutoTried(false)
     void loadPreview()
   }, [loadPreview])

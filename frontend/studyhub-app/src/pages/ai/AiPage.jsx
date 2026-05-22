@@ -172,11 +172,9 @@ export default function AiPage() {
     setChatAreaKey((k) => k + 1)
   }, [promptParam])
 
-  // ── Scholar deep-link support (re-enabled 2026-05-13, wave-5).
-  // /ai?paperId=<canonical-id> fetches the paper context and shows the
-  // PaperContextBanner so the user can start a chat about that paper.
-  // Scholar was removed in commit 69ef2080 and reactivated in commit
-  // e2f5e53d; this re-wires the deep-link to the real backend.
+  // Scholar deep-link: `/ai?paperId=<canonical-id>` fetches the paper
+  // and surfaces a PaperContextBanner so the user can start a chat
+  // anchored on that paper.
   const paperIdParam = searchParams.get('paperId') || ''
   const [paperContext, setPaperContext] = useState(null)
   const [paperContextError, setPaperContextError] = useState(null)
@@ -574,9 +572,23 @@ function ConversationSidebar({
               textAlign: 'center',
               color: 'var(--sh-subtext)',
               fontSize: 13,
+              lineHeight: 1.6,
             }}
           >
-            No conversations yet. Start a new chat!
+            <div
+              style={{
+                fontWeight: 700,
+                color: 'var(--sh-heading)',
+                marginBottom: 6,
+                fontSize: 14,
+              }}
+            >
+              Ask anything, anytime
+            </div>
+            <div>
+              Try &ldquo;explain forking like I&rsquo;m new&rdquo; or &ldquo;summarize my last
+              sheet.&rdquo;
+            </div>
           </div>
         )}
         {conversations.map((conv) => {
@@ -590,12 +602,10 @@ function ConversationSidebar({
           return (
             <div
               key={conv.id}
-              // Outer wrapper is a non-interactive container so the
-              // <button> activator + <button>(Rename) + <button>(Delete)
-              // are siblings, not nested interactive elements (HTML
-              // forbids interactive-in-interactive nesting; screen
-              // readers were getting confused). Copilot a11y finding
-              // 2026-05-03.
+              // Wrapper is non-interactive so the activator, Rename and
+              // Delete buttons can sit as siblings — HTML forbids
+              // interactive-in-interactive nesting, which confuses
+              // screen readers.
               style={{
                 background: isActive ? 'var(--sh-soft)' : 'transparent',
                 borderLeft: isActive ? '3px solid var(--sh-brand)' : '3px solid transparent',
