@@ -25,6 +25,13 @@ jobs:
       # Switched 2026-05-22 after EUSAGE on @emnapi/core during wave-12.6
       # blocked every PR + main from merging.
       - run: npm ci
+      # Prisma client is generated, not installed. Without this step every
+      # backend test importing @prisma/client throws "did not initialize
+      # yet". There is no postinstall hook on backend/package.json — the
+      # generate command must run explicitly. `npx` doesn't accept
+      # --prefix, so use working-directory.
+      - run: npx prisma generate
+        working-directory: backend
       - run: npm --prefix backend run lint
       - run: npm --prefix frontend/studyhub-app run lint
       - run: npm --prefix backend test
