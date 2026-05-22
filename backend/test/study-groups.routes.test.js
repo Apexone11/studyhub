@@ -136,6 +136,10 @@ const mockTargets = new Map([
       groupMediaUploadLimiter: mocks.groupMediaUploadLimiter,
       groupReportLimiter: mocks.groupReportLimiter,
       groupAppealLimiter: mocks.groupAppealLimiter,
+      // Achievements router loads transitively via badge trigger sites
+      // and crashes router.post if achievementShareLimiter is undefined.
+      // Pass-through middleware so the route registration succeeds.
+      achievementShareLimiter: vi.fn((_req, _res, next) => next()),
     },
   ],
   [

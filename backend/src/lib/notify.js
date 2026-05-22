@@ -379,9 +379,15 @@ async function createNotification(
   // inside the same hour (Copilot review #3, 2026-05-03).
   let dedupMessageMarker = null
   if (dedupKey) {
-    if (_isDuplicate(userId, type, dedupKey)) {
-      return null
-    }
+    // In-app dedup uses the DB substring check below as its source of
+    // truth. The in-memory _emailDedup map is reserved for EMAIL dedup
+    // (gated inside _maybeSendNotificationEmail) — checking it here as
+    // an unconditional bail would also suppress the in-app notification
+    // every time the email path successfully delivered a prior message,
+    // which is not the intended behavior (in-app fires every time,
+    // email is the throttled channel). Bug was introduced when the same
+    // map was reused for both purposes — fixed 2026-05-22.
+    //
     // Embed a stable marker derived from the dedupKey into the persisted
     // message so the DB query can find prior rows for the SAME key. The
     // marker is invisible-ish but discoverable by `contains:` filtering.
@@ -398,6 +404,10 @@ async function createNotification(
         select: { id: true },
       })
       if (recent) {
+        // Persist to the email-dedup map too so the next email path
+        // skips even if its own in-memory record was lost (process
+        // restart). Same-call replays of an in-app duplicate should
+        // not bypass email dedup.
         _recordSent(userId, type, dedupKey)
         return null
       }
@@ -429,7 +439,13 @@ async function createNotification(
       },
     })
 
-    if (dedupKey) _recordSent(userId, type, dedupKey)
+    // Note: do NOT _recordSent here. The email path
+    // (_maybeSendNotificationEmail) records on successful send, which is
+    // what _isDuplicate at the top of this function reads on the NEXT
+    // call. Recording here was a regression that made the email path
+    // skip on first send because it saw its own pre-emptive recording
+    // (2026-05-22 fix). For non-email notifications the DB-substring
+    // dedup at lines 388-407 above is what protects against duplicates.
 
     // Real-time push: emit to the user's personal socket room so any open tab
     // surfaces the notification immediately instead of waiting up to 30s for

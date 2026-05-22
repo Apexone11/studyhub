@@ -147,9 +147,18 @@ describe('Security headers on API routes', () => {
   it('HSTS is set when NODE_ENV=production', async () => {
     // Require a fresh app with production mode to test HSTS
     const prevEnv = process.env.NODE_ENV
+    const prevFieldKey = process.env.FIELD_ENCRYPTION_KEY
+    const prevProvenance = process.env.PROVENANCE_SECRET
+    const prevR2Bucket = process.env.R2_BUCKET_AI_ATTACHMENTS
     process.env.NODE_ENV = 'production'
     // Set dummy frontend URL so CORS doesn't reject everything
     process.env.FRONTEND_URL = 'http://localhost:5173'
+    // secretValidator.js fails closed in production when REQUIRED_IN_PRODUCTION
+    // secrets are missing (CLAUDE.md A9). Provide dummies so the boot check
+    // passes — they never reach a real crypto / storage call in this test.
+    process.env.FIELD_ENCRYPTION_KEY = 'a'.repeat(64)
+    process.env.PROVENANCE_SECRET = 'b'.repeat(64)
+    process.env.R2_BUCKET_AI_ATTACHMENTS = 'studyhub-ai-attachments-test'
     try {
       const appPath = require.resolve('../src/index')
       delete require.cache[appPath]
@@ -163,6 +172,12 @@ describe('Security headers on API routes', () => {
     } finally {
       process.env.NODE_ENV = prevEnv
       delete process.env.FRONTEND_URL
+      if (prevFieldKey === undefined) delete process.env.FIELD_ENCRYPTION_KEY
+      else process.env.FIELD_ENCRYPTION_KEY = prevFieldKey
+      if (prevProvenance === undefined) delete process.env.PROVENANCE_SECRET
+      else process.env.PROVENANCE_SECRET = prevProvenance
+      if (prevR2Bucket === undefined) delete process.env.R2_BUCKET_AI_ATTACHMENTS
+      else process.env.R2_BUCKET_AI_ATTACHMENTS = prevR2Bucket
     }
   })
 })

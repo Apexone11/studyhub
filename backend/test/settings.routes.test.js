@@ -205,6 +205,11 @@ describe('settings routes', () => {
       mocks.prisma.user.findUnique.mockResolvedValue({
         id: 42,
         passwordHash,
+        // PATCH /password short-circuits with 409 PASSWORD_NOT_SET when
+        // `passwordSetByUser` is falsy (Google OAuth users with a random
+        // generated hash). Tests that exercise the real password flow
+        // must set this true.
+        passwordSetByUser: true,
       })
       mocks.prisma.user.update.mockResolvedValue({})
 
@@ -264,6 +269,7 @@ describe('settings routes', () => {
       mocks.prisma.user.findUnique.mockResolvedValue({
         id: 42,
         passwordHash,
+        passwordSetByUser: true,
       })
 
       const response = await request(app)
@@ -501,6 +507,10 @@ describe('settings routes', () => {
         id: 42,
         username: 'test_user',
         passwordHash,
+        // DELETE /account also requires passwordSetByUser=true for the
+        // confirm-password path (same 409 PASSWORD_NOT_SET short-circuit
+        // as PATCH /password).
+        passwordSetByUser: true,
       })
       mocks.deleteUserAccount.deleteUserAccount.mockResolvedValue()
 
@@ -545,6 +555,7 @@ describe('settings routes', () => {
         id: 42,
         username: 'test_user',
         passwordHash,
+        passwordSetByUser: true,
       })
 
       const response = await request(app)

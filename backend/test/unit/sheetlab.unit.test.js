@@ -89,6 +89,9 @@ const mocks = vi.hoisted(() => {
     sheetContributionReviewLimiter: passThrough,
     sheetAttachmentDownloadLimiter: passThrough,
     sheetLeaderboardLimiter: passThrough,
+    // Achievements router loads transitively via badge trigger sites
+    // and crashes router.post if achievementShareLimiter is undefined.
+    achievementShareLimiter: passThrough,
   }
 
   return {
@@ -109,6 +112,24 @@ const mockTargets = new Map([
   [require.resolve('../../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../../src/lib/activityTracker'), mocks.activityTracker],
   [require.resolve('../../src/lib/badges'), mocks.badges],
+  // sheetLab.commits.controller migrated from lib/badges to the
+  // achievements barrel (destructures checkAndAwardBadgesLegacy as
+  // checkAndAwardBadges). Without mocking the barrel + engine the real
+  // implementations run, our mocks.badges.checkAndAwardBadges is never
+  // called, and the assertion at the end of the commit test fails.
+  // Wire both paths to the same vi.fn so either import wins.
+  [
+    require.resolve('../../src/modules/achievements/achievements.engine'),
+    {
+      checkAndAwardBadgesLegacy: mocks.badges.checkAndAwardBadges,
+      emitAchievementEvent: vi.fn().mockResolvedValue(undefined),
+      EVENT_KINDS: {
+        SHEET_PUBLISH: 'sheet.publish',
+        SHEET_FORK: 'sheet.fork',
+        SHEETLAB_COMMIT: 'sheetlab.commit',
+      },
+    },
+  ],
   [require.resolve('../../src/lib/accessControl'), mocks.accessControl],
   [require.resolve('../../src/middleware/auth'), mocks.requireAuth],
   [require.resolve('../../src/core/auth/optionalAuth'), mocks.optionalAuthFn],
