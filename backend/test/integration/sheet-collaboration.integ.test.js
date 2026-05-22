@@ -404,7 +404,55 @@ const mockTargets = new Map([
   [
     require.resolve('../../src/modules/payments/payments.constants'),
     {
-      PLANS: { free: { uploadsPerMonth: -1, privateGroups: 0, aiMessagesPerDay: 30 } },
+      // All 4 plans must be present — getDailyLimit / attachments service
+      // destructure PLANS[plan].* for non-free plans too. Partial mock
+      // crashes any code path that hits a plan we didn't enumerate.
+      PLANS: {
+        free: {
+          uploadsPerMonth: -1,
+          privateGroups: 0,
+          aiMessagesPerDay: 30,
+          aiDocumentsPerDay: 3,
+          aiDocumentMaxPages: 40,
+          aiDocumentMaxBytes: 5 * 1024 * 1024,
+          aiDocumentDailyTokenSubcap: 50_000,
+          aiDocumentRetentionMaxDays: 0,
+          aiDocumentTotalStorageMaxBytes: 100 * 1024 * 1024,
+        },
+        donor: {
+          uploadsPerMonth: 15,
+          privateGroups: 4,
+          aiMessagesPerDay: 60,
+          aiDocumentsPerDay: 5,
+          aiDocumentMaxPages: 60,
+          aiDocumentMaxBytes: 15 * 1024 * 1024,
+          aiDocumentDailyTokenSubcap: 200_000,
+          aiDocumentRetentionMaxDays: 7,
+          aiDocumentTotalStorageMaxBytes: 1024 * 1024 * 1024,
+        },
+        pro_monthly: {
+          uploadsPerMonth: -1,
+          privateGroups: 10,
+          aiMessagesPerDay: 120,
+          aiDocumentsPerDay: 20,
+          aiDocumentMaxPages: 100,
+          aiDocumentMaxBytes: 30 * 1024 * 1024,
+          aiDocumentDailyTokenSubcap: 500_000,
+          aiDocumentRetentionMaxDays: 30,
+          aiDocumentTotalStorageMaxBytes: 5 * 1024 * 1024 * 1024,
+        },
+        pro_yearly: {
+          uploadsPerMonth: -1,
+          privateGroups: 10,
+          aiMessagesPerDay: 120,
+          aiDocumentsPerDay: 20,
+          aiDocumentMaxPages: 100,
+          aiDocumentMaxBytes: 30 * 1024 * 1024,
+          aiDocumentDailyTokenSubcap: 500_000,
+          aiDocumentRetentionMaxDays: 30,
+          aiDocumentTotalStorageMaxBytes: 5 * 1024 * 1024 * 1024,
+        },
+      },
       DONATION_MIN_CENTS: 100,
       DONATION_MAX_CENTS: 100000,
       DONATION_MESSAGE_MAX_LENGTH: 280,

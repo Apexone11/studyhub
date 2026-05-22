@@ -154,11 +154,13 @@ describe('buildContext', () => {
 
     await buildContext(7, { currentPage: '/notes/50' })
 
+    // Note model uses `private` (boolean) — `visibility` was removed in the
+    // schema rework. Access control: owner OR public (not-private).
     expect(mocks.prisma.note.findFirst).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           id: 50,
-          OR: [{ userId: 7 }, { visibility: 'public' }],
+          OR: [{ userId: 7 }, { private: false }],
         }),
       }),
     )

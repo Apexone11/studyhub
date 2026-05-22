@@ -92,6 +92,10 @@ const mocks = vi.hoisted(() => {
       readLimiter: (_req, _res, next) => next(),
       usersFollowLimiter: (_req, _res, next) => next(),
       roleChangeLimiter: (_req, _res, next) => next(),
+      // Achievements router loads transitively via badge trigger sites
+      // and crashes router.post if these are undefined. Pass-through.
+      achievementShareLimiter: (_req, _res, next) => next(),
+      writeLimiter: (_req, _res, next) => next(),
     },
   }
 })

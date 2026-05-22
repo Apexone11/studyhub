@@ -24,6 +24,13 @@ const mocks = vi.hoisted(() => {
     preferences: { findUnique: vi.fn() },
     conversationParticipant: { findMany: vi.fn() },
     studyGroupMember: { findMany: vi.fn() },
+    // Models the export controller added after this test was written
+    // (Hub AI v2 + Scholar). Unmocked queries throw and the route
+    // returns 500. Default to empty arrays so the export shape is valid.
+    aiAttachment: { findMany: vi.fn().mockResolvedValue([]) },
+    aiUsageLog: { findMany: vi.fn().mockResolvedValue([]) },
+    scholarAnnotation: { findMany: vi.fn().mockResolvedValue([]) },
+    scholarDiscussionThread: { findMany: vi.fn().mockResolvedValue([]) },
   }
 
   return {
@@ -65,7 +72,11 @@ beforeAll(() => {
   app = express()
   app.use(express.json())
   app.use((req, _res, next) => {
-    req.user = { userId: mocks.state.userId, username: mocks.state.username, role: mocks.state.role }
+    req.user = {
+      userId: mocks.state.userId,
+      username: mocks.state.username,
+      role: mocks.state.role,
+    }
     next()
   })
   app.use('/', controller)

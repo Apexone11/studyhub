@@ -155,19 +155,28 @@ router.get('/html', async (req, res) => {
 
     const isRuntime = tokenType === 'html-runtime'
 
-    // Tier 2 + safe-preview token: still strip scripts (the safe view).
-    // Tier 2 + runtime token: serve the interactive document — same isolation
-    // sandbox as Tier 0/1 (allow-scripts allow-forms, no allow-same-origin),
-    // CSP `script-src 'unsafe-inline'`, no network/connect.
+    // Tier 2 (HIGH_RISK) CSP gating:
+    //   - safe-preview token → SAFE CSP (script-src 'none').
+    //   - runtime token + PUBLISHED → RUNTIME CSP (script-src 'unsafe-inline').
+    //     Admin's publish IS the safety review (CLAUDE.md HTML Security
+    //     Policy "Tier 2 PUBLISHED → interactive for all authenticated
+    //     viewers").
+    //   - runtime token + UNPUBLISHED (admin / owner preview via
+    //     allowUnpublished) → SAFE CSP. An unpublished Tier 2 sheet has
+    //     not been reviewed yet; admins inspecting it should not execute
+    //     its scripts, only read the source. This closes the gap where
+    //     an admin viewing flagged-high-risk content would unintentionally
+    //     run the script payload (2026-05-22 fix).
     if (effectiveTier >= RISK_TIER.HIGH_RISK) {
-      const outputHtml = isRuntime
+      const allowInteractive = isRuntime && isPublished
+      const outputHtml = allowInteractive
         ? buildInteractiveDocument({ title: sheet.title, html: sheet.content })
         : buildPreviewDocument({ title: sheet.title, html: sheet.content })
       res.setHeader('Cache-Control', 'private, no-store, max-age=0')
       res.setHeader('Content-Type', 'text/html; charset=utf-8')
       res.setHeader(
         'Content-Security-Policy',
-        buildPreviewCsp(isRuntime ? RUNTIME_DIRECTIVES : SAFE_PREVIEW_DIRECTIVES, res),
+        buildPreviewCsp(allowInteractive ? RUNTIME_DIRECTIVES : SAFE_PREVIEW_DIRECTIVES, res),
       )
       return res.status(200).send(outputHtml)
     }

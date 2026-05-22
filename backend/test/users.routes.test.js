@@ -39,6 +39,12 @@ const mocks = vi.hoisted(() => {
     },
     enrollment: {
       findMany: vi.fn(),
+      // follow-suggestions cold-start gate counts enrollments; without
+      // this mock the handler throws TypeError and returns 500.
+      count: vi.fn().mockResolvedValue(0),
+    },
+    hashtagFollow: {
+      count: vi.fn().mockResolvedValue(0),
     },
   }
 
@@ -84,6 +90,10 @@ const mocks = vi.hoisted(() => {
       readLimiter: (_req, _res, next) => next(),
       usersFollowLimiter: (_req, _res, next) => next(),
       roleChangeLimiter: (_req, _res, next) => next(),
+      // Achievements router loads transitively via badge trigger sites
+      // and crashes router.post if these are undefined. Pass-through.
+      achievementShareLimiter: (_req, _res, next) => next(),
+      writeLimiter: (_req, _res, next) => next(),
     },
   }
 })
@@ -483,6 +493,10 @@ describe('users routes', () => {
   describe('GET /me/follow-suggestions', () => {
     it('ranks suggestions by any shared school and returns all school IDs', async () => {
       mocks.prisma.userFollow.findMany.mockResolvedValue([])
+      // Cold-start gate: handler returns [] early when the user has no
+      // follows AND no enrollments AND no hashtag follows. This test
+      // exercises the suggestion path, so it needs at least one enrollment.
+      mocks.prisma.enrollment.count.mockResolvedValue(1)
       mocks.prisma.user.findUnique.mockResolvedValue({
         enrollments: [{ course: { school: { id: 20 } } }, { course: { school: { id: 10 } } }],
       })

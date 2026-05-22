@@ -77,7 +77,9 @@ function createPrismaMock() {
       deleteMany: createDeleteManyMock(),
     },
     announcementMedia: {
-      findMany: vi.fn(async () => [{ url: 'https://cdn.studyhub.test/announcements/9/banner.jpg' }]),
+      findMany: vi.fn(async () => [
+        { url: 'https://cdn.studyhub.test/announcements/9/banner.jpg' },
+      ]),
     },
     deletionReason: {
       create: vi.fn(async () => ({ id: 1 })),
@@ -126,7 +128,9 @@ function createPrismaMock() {
       deleteMany: createDeleteManyMock(),
     },
     note: {
-      findMany: vi.fn(async () => [{ id: 31, content: '![image](/uploads/note-images/current-note.png)' }]),
+      findMany: vi.fn(async () => [
+        { id: 31, content: '![image](/uploads/note-images/current-note.png)' },
+      ]),
       deleteMany: createDeleteManyMock(),
     },
     noteComment: {
@@ -144,16 +148,18 @@ function createPrismaMock() {
       deleteMany: createDeleteManyMock(),
     },
     video: {
-      findMany: vi.fn(async () => [{
-        id: 41,
-        r2Key: 'videos/42/original.mp4',
-        thumbnailR2Key: 'videos/42/thumb.jpg',
-        hlsManifestR2Key: 'videos/42/manifest.m3u8',
-        variants: {
-          '720p': { key: 'videos/42/720p.mp4' },
+      findMany: vi.fn(async () => [
+        {
+          id: 41,
+          r2Key: 'videos/42/original.mp4',
+          thumbnailR2Key: 'videos/42/thumb.jpg',
+          hlsManifestR2Key: 'videos/42/manifest.m3u8',
+          variants: {
+            '720p': { key: 'videos/42/720p.mp4' },
+          },
+          captions: [{ vttR2Key: 'videos/42/captions/en.vtt' }],
         },
-        captions: [{ vttR2Key: 'videos/42/captions/en.vtt' }],
-      }]),
+      ]),
       deleteMany: createDeleteManyMock(),
     },
     videoAppeal: {
@@ -217,6 +223,26 @@ function createPrismaMock() {
     aiConversation: {
       deleteMany: createDeleteManyMock(),
     },
+    // Hub AI v2 + Scholar models — added to deleteUserAccount.js for
+    // GDPR Art. 17 erasure (L13-HIGH-1). Unmocked → TypeError on tx.X.
+    aiAttachment: {
+      findMany: vi.fn().mockResolvedValue([]),
+      deleteMany: createDeleteManyMock(),
+    },
+    aiUploadIdempotency: {
+      deleteMany: createDeleteManyMock(),
+    },
+    userAiStorageQuota: {
+      deleteMany: createDeleteManyMock(),
+    },
+    scholarAnnotation: {
+      deleteMany: createDeleteManyMock(),
+    },
+    scholarDiscussionThread: {
+      // Soft-deleted not hard-deleted — preserves the discussion thread
+      // for other participants but blanks the author's contribution.
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
   }
 
   const prisma = {
@@ -275,20 +301,12 @@ describe('deleteUserAccount', () => {
     expect(mocks.stripe.subscriptions.cancel).toHaveBeenCalledWith('sub_123')
     expect(tx.verificationChallenge.deleteMany).toHaveBeenCalledWith({
       where: {
-        OR: [
-          { userId: 42 },
-          { username: 'test_user' },
-          { email: 'user@studyhub.test' },
-        ],
+        OR: [{ userId: 42 }, { username: 'test_user' }, { email: 'user@studyhub.test' }],
       },
     })
     expect(tx.videoAppeal.deleteMany).toHaveBeenCalledWith({
       where: {
-        OR: [
-          { videoId: { in: [41] } },
-          { originalVideoId: { in: [41] } },
-          { uploaderId: 42 },
-        ],
+        OR: [{ videoId: { in: [41] } }, { originalVideoId: { in: [41] } }, { uploaderId: 42 }],
       },
     })
     expect(tx.video.deleteMany).toHaveBeenCalledWith({ where: { userId: 42 } })

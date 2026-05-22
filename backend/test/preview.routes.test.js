@@ -225,8 +225,14 @@ describe('preview routes', () => {
       expect(csp).not.toMatch(/script-src 'unsafe-inline'/)
     })
 
-    it('Tier 2 (HIGH_RISK) runtime still gets safe CSP regardless of token type', async () => {
+    it('Tier 2 (HIGH_RISK) UNPUBLISHED + runtime token gets safe CSP (admin inspection)', async () => {
+      // Admin / owner viewing an unpublished Tier 2 sheet via allowUnpublished
+      // should never get scripts — the sheet hasn't been approved. CLAUDE.md
+      // HTML Security Policy "Tier 2 PUBLISHED → interactive" intentionally
+      // requires publication state. Without this guard, an admin loading a
+      // flagged-high-risk draft would unintentionally execute its payload.
       mocks.state.sheet.htmlRiskTier = 2
+      mocks.state.sheet.status = 'draft'
       mocks.state.payload.type = 'html-runtime'
       mocks.state.payload.tier = 2
       mocks.state.payload.allowUnpublished = true
@@ -237,6 +243,22 @@ describe('preview routes', () => {
       const csp = response.headers['content-security-policy']
       expect(csp).toMatch(/script-src 'none'/)
       expect(csp).not.toMatch(/script-src 'unsafe-inline'/)
+    })
+
+    it('Tier 2 (HIGH_RISK) PUBLISHED + runtime token gets interactive CSP (post-review)', async () => {
+      // Per CLAUDE.md HTML Security Policy: once an admin (or AI reviewer)
+      // publishes a Tier 2 sheet, the sandboxed runtime opens to any
+      // authenticated viewer. The publish action IS the safety review.
+      mocks.state.sheet.htmlRiskTier = 2
+      mocks.state.sheet.status = 'published'
+      mocks.state.payload.type = 'html-runtime'
+      mocks.state.payload.tier = 2
+
+      const response = await request(app).get('/html').query({ token: 'runtime-high-risk-pub' })
+
+      expect(response.status).toBe(200)
+      const csp = response.headers['content-security-policy']
+      expect(csp).toMatch(/script-src 'unsafe-inline'/)
     })
   })
 })
