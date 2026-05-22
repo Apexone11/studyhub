@@ -18,8 +18,13 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-      - run: npm ci --prefix backend
-      - run: npm ci --prefix frontend/studyhub-app
+      # Use root npm ci so the root lockfile + workspaces resolve as one
+      # tree. `npm ci --prefix <workspace>` reads only the workspace
+      # lockfile, which drifts vs root whenever Dependabot updates a
+      # transitive (CLAUDE.md "Workspace lockfile sync — non-negotiable").
+      # Switched 2026-05-22 after EUSAGE on @emnapi/core during wave-12.6
+      # blocked every PR + main from merging.
+      - run: npm ci
       - run: npm --prefix backend run lint
       - run: npm --prefix frontend/studyhub-app run lint
       - run: npm --prefix backend test
@@ -34,7 +39,7 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-      - run: npm ci --prefix frontend/studyhub-app
+      - run: npm ci
       - run: npm --prefix frontend/studyhub-app run build
       - name: Run Lighthouse CI
         uses: treosh/lighthouse-ci-action@v12
@@ -51,7 +56,7 @@ jobs:
         with:
           node-version: 20
           cache: 'npm'
-      - run: npm ci --prefix frontend/studyhub-app
+      - run: npm ci
       - run: npm --prefix frontend/studyhub-app run build
       - name: Check bundle size
         run: |
