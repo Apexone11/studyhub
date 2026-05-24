@@ -147,7 +147,7 @@ describe('prefetch module', () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
 
       // Assert: data is in cache
-      const cacheEntry = cache.get('/api/courses/enrolled')
+      const cacheEntry = cache.get('/api/courses/schools')
       expect(cacheEntry).toBeDefined()
       expect(cacheEntry.data).toEqual(testData)
       expect(typeof cacheEntry.timestamp).toBe('number')
@@ -322,7 +322,7 @@ describe('prefetch module', () => {
       )
     })
 
-    it('maps /my-courses to /api/courses/enrolled', async () => {
+    it('maps /my-courses to /api/courses/schools', async () => {
       global.fetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({}),
@@ -332,7 +332,7 @@ describe('prefetch module', () => {
       await new Promise((resolve) => setTimeout(resolve, 10))
 
       expect(global.fetch).toHaveBeenCalledWith(
-        'http://localhost:4000/api/courses/enrolled',
+        'http://localhost:4000/api/courses/schools',
         expect.any(Object),
       )
     })
