@@ -150,15 +150,25 @@ describe('Security headers on API routes', () => {
     const prevFieldKey = process.env.FIELD_ENCRYPTION_KEY
     const prevProvenance = process.env.PROVENANCE_SECRET
     const prevR2Bucket = process.env.R2_BUCKET_AI_ATTACHMENTS
+    const prevJwt = process.env.JWT_SECRET
+    const prevDbUrl = process.env.DATABASE_URL
     process.env.NODE_ENV = 'production'
     // Set dummy frontend URL so CORS doesn't reject everything
     process.env.FRONTEND_URL = 'http://localhost:5173'
-    // secretValidator.js fails closed in production when REQUIRED_IN_PRODUCTION
-    // secrets are missing (CLAUDE.md A9). Provide dummies so the boot check
-    // passes — they never reach a real crypto / storage call in this test.
+    // secretValidator.js fails closed in production when REQUIRED +
+    // REQUIRED_IN_PRODUCTION secrets are missing (CLAUDE.md A9). On Windows
+    // dev these come from backend/.env; on CI Linux .env isn't shipped so
+    // we must set them here. Provide dummies — they never reach a real
+    // crypto / storage / DB call in this test.
     process.env.FIELD_ENCRYPTION_KEY = 'a'.repeat(64)
     process.env.PROVENANCE_SECRET = 'b'.repeat(64)
     process.env.R2_BUCKET_AI_ATTACHMENTS = 'studyhub-ai-attachments-test'
+    if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
+      process.env.JWT_SECRET = 'c'.repeat(32)
+    }
+    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.length < 10) {
+      process.env.DATABASE_URL = 'postgresql://test@localhost:5432/test'
+    }
     try {
       const appPath = require.resolve('../src/index')
       delete require.cache[appPath]
@@ -178,6 +188,10 @@ describe('Security headers on API routes', () => {
       else process.env.PROVENANCE_SECRET = prevProvenance
       if (prevR2Bucket === undefined) delete process.env.R2_BUCKET_AI_ATTACHMENTS
       else process.env.R2_BUCKET_AI_ATTACHMENTS = prevR2Bucket
+      if (prevJwt === undefined) delete process.env.JWT_SECRET
+      else process.env.JWT_SECRET = prevJwt
+      if (prevDbUrl === undefined) delete process.env.DATABASE_URL
+      else process.env.DATABASE_URL = prevDbUrl
     }
   })
 })

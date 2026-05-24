@@ -119,6 +119,14 @@ function isPathWithinRoot(candidatePath, rootDirectory) {
 function isManagedLeafFileName(fileName) {
   const normalized = String(fileName || '')
   if (!normalized || normalized.includes('\0')) return false
+  // Reject path separators explicitly. `path.basename` treats `\` as a
+  // separator on Windows but NOT on POSIX, so 'sub\\file.jpg' would
+  // pass `=== path.basename(it)` on Linux/macOS (CI runs on Linux) but
+  // fail on Windows dev. Belt-and-suspenders defense against directory
+  // traversal that's consistent across OS — added 2026-05-22 after the
+  // CI Linux failure on upload.security path-separator test surfaced
+  // the platform-dependent gap.
+  if (/[\\/]/.test(normalized)) return false
   return normalized === path.basename(normalized)
 }
 
