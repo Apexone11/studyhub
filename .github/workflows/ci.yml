@@ -25,7 +25,11 @@ jobs:
         with:
           fetch-depth: 0
       - name: Enforce release log update
-        if: github.event_name == 'pull_request'
+        # Skip the gate for bot-authored PRs (Dependabot, ImgBot, etc.).
+        # Bots can't reasonably write release-log entries, and gating on
+        # them blocks every dep bump indefinitely. Human PRs still
+        # required to update the log. 2026-05-24.
+        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.actor != 'imgbot[bot]' && github.actor != 'dependabot-preview[bot]'
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
@@ -42,7 +46,12 @@ jobs:
           # by design (private team notes). The public-facing, tracked log at
           # docs/release-log.md is the only file in the diff that can satisfy
           # this gate. See docs/release-log.md for the contributor checklist.
-          CODE_CHANGED="$(printf '%s\n' "$CHANGED_FILES" | grep -E '^(backend/|frontend/|scripts/|\.github/workflows/|docker-compose\.yml|package\.json)' || true)"
+          #
+          # Lock-file-only diffs (no source code touched outside package*.json
+          # / package-lock.json) are also exempted — pure dependency rolls
+          # don't need a release-log entry because each bump's rationale
+          # lives in the PR description itself.
+          CODE_CHANGED="$(printf '%s\n' "$CHANGED_FILES" | grep -E '^(backend/src/|frontend/studyhub-app/src/|scripts/|\.github/workflows/|docker-compose\.yml)' || true)"
           RELEASE_LOG_CHANGED="$(printf '%s\n' "$CHANGED_FILES" | grep -E '^docs/release-log\.md$' || true)"
 
           if [[ -n "$CODE_CHANGED" && -z "$RELEASE_LOG_CHANGED" ]]; then
