@@ -43,7 +43,7 @@
     "@react-oauth/google": "^0.13.4",
     "@sentry/react": "^10.51.0",
     "@tanstack/react-virtual": "^3.13.23",
-    "@tiptap/core": "^2.27.2",
+    "@tiptap/core": "^3.23.6",
     "@tiptap/extension-code-block-lowlight": "^2.11.5",
     "@tiptap/extension-image": "^2.11.5",
     "@tiptap/extension-link": "^2.11.5",
