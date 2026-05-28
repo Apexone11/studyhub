@@ -1,6 +1,7 @@
 const express = require('express')
 const bcrypt = require('bcryptjs')
 const prisma = require('../../lib/prisma')
+const log = require('../../lib/logger')
 const { checkAndPromoteTrust } = require('../../lib/trustGate')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { loginLimiter } = require('./auth.constants')
@@ -94,19 +95,53 @@ router.post('/login', loginLimiter, async (req, res) => {
     // has `mfaRequired = true`, force the path through 2FA on every
     // login regardless of risk band. Admins with mfaRequired but no
     // 2FA configured get a 403 telling the frontend to route to
-    // /settings/security/setup-2fa first. Fail-CLOSED: any error
-    // reading the flag treats enforcement as OFF (matches the rest of
-    // the auth flow's "never lock out the founder" stance — admin MFA
-    // can be relaxed via the flag while we investigate).
-    let adminMfaEnforced = false
-    try {
-      const flag = await prisma.featureFlag.findUnique({
-        where: { name: 'flag_admin_mfa_required' },
-        select: { enabled: true },
-      })
-      adminMfaEnforced = Boolean(flag && flag.enabled === true)
-    } catch {
+    // /settings/security/setup-2fa first.
+    //
+    // CLAUDE.md §12 decision #20 (founder-locked 2026-04-24) — flag
+    // evaluation is fail-CLOSED. For admin MFA specifically: a flag-
+    // table read error treats enforcement as ON, because the worst
+    // outcome of "flag table is down, admin must complete 2FA they
+    // already configured" is a redirect through Path B; the worst
+    // outcome of fail-OPEN is silent MFA bypass during a database
+    // incident, which is the exact failure mode flags are designed to
+    // prevent. A missing flag row is treated the same way (decision
+    // #20 — flag absence is fail-closed).
+    //
+    // EMERGENCY OVERRIDE: setting EMERGENCY_DISABLE_ADMIN_MFA=true in
+    // Railway env disables enforcement. Direct env-var access required;
+    // this is the sealed-glass-break for the "founder is locked out
+    // and needs to deploy" scenario. Override is logged loudly so the
+    // incident trail exists.
+    let adminMfaEnforced = true
+    // Case + whitespace tolerant: a founder under stress at 3am typing
+    // "True", "TRUE", or " true " in the Railway dashboard still gets
+    // the sealed-glass-break behaviour. Anything other than truthy
+    // "true" leaves enforcement on.
+    const emergencyDisableRaw = process.env.EMERGENCY_DISABLE_ADMIN_MFA
+    const emergencyDisable =
+      typeof emergencyDisableRaw === 'string' && emergencyDisableRaw.trim().toLowerCase() === 'true'
+    if (emergencyDisable) {
       adminMfaEnforced = false
+      log.warn(
+        { event: 'auth.admin_mfa_emergency_disabled' },
+        'EMERGENCY_DISABLE_ADMIN_MFA is set — admin MFA is bypassed. Unset before resuming normal ops.',
+      )
+    } else {
+      try {
+        const flag = await prisma.featureFlag.findUnique({
+          where: { name: 'flag_admin_mfa_required' },
+          select: { enabled: true },
+        })
+        // Explicit enabled=true → enforce. Explicit enabled=false →
+        // off. Missing row → enforce (decision #20 fail-closed).
+        adminMfaEnforced = flag ? flag.enabled === true : true
+      } catch (err) {
+        log.error(
+          { event: 'auth.admin_mfa_flag_read_failed', err: err?.message || String(err) },
+          'flag_admin_mfa_required read failed — failing closed (admin MFA enforced)',
+        )
+        adminMfaEnforced = true
+      }
     }
     // Path A: enforced admin without 2FA configured — block session,
     // tell the frontend to send the user to setup.

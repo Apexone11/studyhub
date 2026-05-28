@@ -22,8 +22,26 @@ async function getAnime() {
 
 /* ── Reduced-motion gate ─────────────────────────────────── */
 
-const prefersReducedMotion = () =>
-  typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+// Wave-12.12 — the gate now honours TWO signals:
+//   1. The OS-level `prefers-reduced-motion: reduce` media query
+//      (universal accessibility default).
+//   2. The `data-battery-saver="on"` attribute on <body>, written by
+//      the useBatterySaver hook when the user opts in via Settings.
+//
+// Both short-circuit the anime.js timelines to a single `utils.set(...)`
+// call so no rAF loop runs. CSS-side disable (index.css wave-12.11)
+// covers transitions / animations / will-change; this JS-side gate
+// covers anime.js + the per-helper rAF loops the CSS rule can't reach.
+const prefersReducedMotion = () => {
+  if (typeof window === 'undefined') return false
+  if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    return true
+  }
+  if (typeof document !== 'undefined' && document.body) {
+    if (document.body.getAttribute('data-battery-saver') === 'on') return true
+  }
+  return false
+}
 
 /* ── Sync fallback for reduced-motion ───────────────────── */
 

@@ -68,7 +68,13 @@ router.post('/login/challenge', loginLimiter, async (req, res) => {
       // best-effort
     }
 
-    const authenticatedUser = await issueAuthenticatedSession(res, user.id, req)
+    // mfaVerified: true — the user just completed the email-OTP factor.
+    // The new session's `mfaVerifiedAt` is stamped at creation so
+    // requireRecentMfa permits admin-sensitive routes for the next
+    // 15 minutes without prompting again.
+    const authenticatedUser = await issueAuthenticatedSession(res, user.id, req, null, {
+      mfaVerified: true,
+    })
 
     // Log the successful challenge resolution separately from login.success
     // so login activity shows both events.

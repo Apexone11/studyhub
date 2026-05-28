@@ -894,6 +894,23 @@ body,
   }
 }
 
+/* Battery Saver mode (wave-12.11). The useBatterySaver hook writes
+   `data-battery-saver="on"` on <body> when the user opts in via
+   Settings OR when prefers-reduced-motion: reduce is set. Same
+   disable-animations rule scope as the media query above, gated on
+   the attribute instead of the OS-level signal. The data-motion="keep"
+   escape hatch still works for celebrations / first-creation moments
+   that the founder marked as worth preserving even when reduced. */
+body[data-battery-saver='on'] *:not([data-motion='keep']),
+body[data-battery-saver='on'] *:not([data-motion='keep'])::before,
+body[data-battery-saver='on'] *:not([data-motion='keep'])::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+  will-change: auto !important;
+}
+
 body {
   font-family: var(--font);
   background: var(--sh-bg);

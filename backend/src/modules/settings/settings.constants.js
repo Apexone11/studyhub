@@ -34,6 +34,13 @@ const PREF_ENUM_KEYS = {
   profileVisibility: ['public', 'enrolled', 'private'],
   theme: ['system', 'light', 'dark'],
   fontSize: ['small', 'medium', 'large'],
+  // Wave-12.11 — Data Saver + Battery Saver tri-state. `auto` honors
+  // the platform signal (Save-Data header for data-saver,
+  // prefers-reduced-motion for battery-saver). Validated through the
+  // same allowlist path as theme/fontSize so an attacker can't smuggle
+  // arbitrary strings into Prisma.
+  dataSaverMode: ['on', 'off', 'auto'],
+  batterySaverMode: ['on', 'off', 'auto'],
 }
 
 module.exports = {

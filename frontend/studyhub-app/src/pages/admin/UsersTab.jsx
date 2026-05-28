@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { API } from '../../config'
+import { showToast } from '../../lib/toast'
 import { Pager } from './AdminWidgets'
 import { FONT, tableHeadStyle, tableCell, tableCellStrong, pillButton } from './adminConstants'
 
@@ -38,6 +39,8 @@ export default function UsersTab({
   usersState,
   currentUserId,
   patchRole,
+  patchTrustLevel,
+  patchMfaRequired,
   deleteUser,
   loadPagedData,
 }) {
@@ -92,37 +95,30 @@ export default function UsersTab({
     }
   }, [grantTarget, badgeCatalog])
 
+  // Wave-12.12 — these used to use raw fetch which bypassed the
+  // admin apiJson wrapper. After requireRecentMfa() was applied to
+  // both endpoints in this same wave, an admin with a stale session
+  // would have hit a silent 403 here with no step-up prompt. Routing
+  // through the patchTrustLevel / patchMfaRequired methods on
+  // useAdminData fixes both: the step-up modal fires automatically
+  // and any other error surfaces via the standard apiJson throw +
+  // showToast pattern.
   async function handleTrustLevelChange(userId, trustLevel) {
     try {
-      await fetch(`${API}/api/admin/users/${userId}/trust-level`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ trustLevel }),
-      })
-      void loadPagedData('users', usersState.page)
-    } catch {
-      /* silent */
+      await patchTrustLevel(userId, trustLevel)
+    } catch (err) {
+      // apiJson already threw with a useful message — surface it.
+      // The select widget reverts visually on the next loadPagedData
+      // (called inside patchTrustLevel) regardless of success.
+      showToast(err.message || 'Trust level update failed.', 'error')
     }
   }
 
   async function handleMfaToggle(userId, nextValue) {
     try {
-      const r = await fetch(`${API}/api/admin/users/${userId}/mfa`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ mfaRequired: nextValue }),
-      })
-      if (!r.ok) {
-        const data = await r.json().catch(() => ({}))
-        // Admin will already see a non-checked checkbox so reload the
-        // page anyway to reset the visual state from the server.
-        if (data?.error) window.alert(data.error)
-      }
-      void loadPagedData('users', usersState.page)
-    } catch {
-      /* silent */
+      await patchMfaRequired(userId, nextValue)
+    } catch (err) {
+      showToast(err.message || 'Could not update MFA requirement.', 'error')
     }
   }
 

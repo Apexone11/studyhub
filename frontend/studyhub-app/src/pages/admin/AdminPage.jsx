@@ -320,6 +320,8 @@ export default function AdminPage() {
                         usersState={d.usersState}
                         currentUserId={d.user.id}
                         patchRole={d.patchRole}
+                        patchTrustLevel={d.patchTrustLevel}
+                        patchMfaRequired={d.patchMfaRequired}
                         deleteUser={d.deleteUser}
                         loadPagedData={d.loadPagedData}
                       />

@@ -166,10 +166,12 @@ router.post('/authenticate/verify', webauthnLimiter, async (req, res) => {
       return res.status(401).json({ error: result.error || 'Authentication failed.' })
     }
 
-    // Update counter
+    // Update counter + lastUsedAt. lastUsedAt is the audit signal the
+    // admin portal renders so the founder can spot a passkey that
+    // hasn't been used in months and retire it (wave-12.11).
     await prisma.webAuthnCredential.update({
       where: { id: storedCredential.id },
-      data: { counter: result.newCounter },
+      data: { counter: result.newCounter, lastUsedAt: new Date() },
     })
 
     // Issue session
@@ -205,6 +207,7 @@ router.get('/credentials', requireAuth, requireAdmin, async (req, res) => {
         deviceType: true,
         backedUp: true,
         createdAt: true,
+        lastUsedAt: true,
       },
       orderBy: { createdAt: 'desc' },
     })

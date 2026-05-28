@@ -77,15 +77,25 @@ async function uploadObject(key, body, options = {}) {
   if (!client) throw new Error('R2 storage is not configured.')
 
   const command = new PutObjectCommand({
-    Bucket: R2_BUCKET_NAME,
+    // Per-call bucket override lets dedicated buckets (AI attachments,
+    // scholar PDFs, upload-volume backup) live alongside the default
+    // public bucket without forking the helper. When omitted, the
+    // original R2_BUCKET_NAME applies (backward compatible).
+    Bucket: options.bucket || R2_BUCKET_NAME,
     Key: key,
     Body: body,
     ContentType: options.contentType || 'application/octet-stream',
+    // Required when Body is a stream — AWS SDK can't compute the
+    // length from a ReadStream so it would otherwise fall back to
+    // chunked encoding, which some R2 endpoints reject on large
+    // objects. Buffers / strings: SDK derives length itself.
+    ...(options.contentLength !== undefined ? { ContentLength: options.contentLength } : {}),
+    ...(options.cacheControl ? { CacheControl: options.cacheControl } : {}),
     ...(options.metadata ? { Metadata: options.metadata } : {}),
   })
 
   await client.send(command)
-  return { key, url: getPublicUrl(key) }
+  return { key, url: getPublicUrl(key, options.bucket) }
 }
 
 /**
@@ -134,14 +144,14 @@ async function deleteObject(key) {
  * @param {string} key - Object key
  * @returns {Promise<boolean>}
  */
-async function objectExists(key) {
+async function objectExists(key, bucket) {
   const client = getClient()
   if (!client) return false
 
   try {
     await client.send(
       new HeadObjectCommand({
-        Bucket: R2_BUCKET_NAME,
+        Bucket: bucket || R2_BUCKET_NAME,
         Key: key,
       }),
     )

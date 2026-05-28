@@ -319,9 +319,12 @@ describe('POST /api/webauthn/authenticate/verify', () => {
       message: expect.stringMatching(/successful/i),
       user: { id: 1, username: 'admin_user', role: 'admin' },
     })
+    // wave-12.11 — verify now also stamps lastUsedAt for admin-portal
+    // visibility. The Date is freshly constructed inside the handler
+    // so we assert shape, not exact value.
     expect(mocks.prisma.webAuthnCredential.update).toHaveBeenCalledWith({
       where: { id: 10 },
-      data: { counter: 5 },
+      data: { counter: 5, lastUsedAt: expect.any(Date) },
     })
     expect(mocks.authTokens.signAuthToken).toHaveBeenCalledTimes(1)
     expect(mocks.authTokens.setAuthCookie).toHaveBeenCalledTimes(1)

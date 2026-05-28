@@ -1,14 +1,18 @@
-import { useRef } from 'react'
-import { createPortal } from 'react-dom'
-import { useFocusTrap } from '../lib/useFocusTrap'
-
 /**
- * Reusable confirmation dialog that replaces window.confirm().
+ * ConfirmDialog — reusable confirmation dialog that replaces
+ * `window.confirm()`. Returns null when closed; renders a focus-trapped
+ * alertdialog otherwise.
  *
- * Portaled to document.body so the position:fixed overlay isn't
- * trapped by an animated ancestor's transform (which creates a new
- * containing block and breaks viewport centering — CLAUDE.md
- * "Common Bugs and Pitfalls" #8). Returns null when SSR'ed.
+ * 2026-05-27 — migrated from bespoke `createPortal` + `useFocusTrap` to
+ * the shared `<FocusTrappedDialog>` primitive (modal-focus-trap
+ * migration). Behaviour preserved:
+ *   - role="alertdialog" (urgent confirm/cancel semantic per W3C APG)
+ *   - Initial focus on the Confirm button (legacy behaviour). For new
+ *     destructive flows, prefer routing through useAiPermission which
+ *     focuses Reject instead (CLAUDE.md "Universal AI permission
+ *     framework").
+ *   - Escape closes via onCancel.
+ *   - Backdrop click closes via onCancel.
  *
  * Props:
  *  open          — boolean, whether to show the dialog
@@ -20,6 +24,8 @@ import { useFocusTrap } from '../lib/useFocusTrap'
  *  onConfirm     — callback when user confirms
  *  onCancel      — callback when user cancels / dismisses
  */
+import FocusTrappedDialog from './Modal/FocusTrappedDialog'
+
 export default function ConfirmDialog({
   open,
   title = 'Are you sure?',
@@ -30,59 +36,50 @@ export default function ConfirmDialog({
   onConfirm,
   onCancel,
 }) {
-  const confirmRef = useRef(null)
-  const trapRef = useFocusTrap({ active: open, onClose: onCancel, initialFocusRef: confirmRef })
-
-  if (!open) return null
-  if (typeof document === 'undefined') return null
-
   const isDanger = variant === 'danger'
 
-  return createPortal(
-    <div style={styles.overlay} onClick={onCancel} role="presentation">
-      <div
-        ref={trapRef}
-        style={styles.modal}
-        onClick={(e) => e.stopPropagation()}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="confirm-dialog-title"
-      >
-        <h3 id="confirm-dialog-title" style={styles.title}>
-          {title}
-        </h3>
-        {message && <p style={styles.message}>{message}</p>}
-        <div style={styles.actions}>
-          <button onClick={onCancel} style={styles.cancelBtn}>
-            {cancelLabel}
-          </button>
-          <button
-            ref={confirmRef}
-            onClick={onConfirm}
-            style={{
-              ...styles.confirmBtn,
-              background: isDanger ? 'var(--sh-danger)' : 'var(--sh-info)',
-            }}
-          >
-            {confirmLabel}
-          </button>
-        </div>
+  return (
+    <FocusTrappedDialog
+      open={open}
+      onClose={onCancel}
+      role="alertdialog"
+      ariaLabelledBy="confirm-dialog-title"
+      // Initial focus on Confirm. Pre-existing behaviour — see component
+      // docblock for the "destructive flows should land on Cancel"
+      // caveat and the recommended useAiPermission route.
+      initialFocusSelector="[data-autofocus]"
+      mobileLayout="centered"
+      overlayStyle={styles.overlay}
+      panelStyle={styles.modal}
+    >
+      <h3 id="confirm-dialog-title" style={styles.title}>
+        {title}
+      </h3>
+      {message && <p style={styles.message}>{message}</p>}
+      <div style={styles.actions}>
+        <button onClick={onCancel} style={styles.cancelBtn}>
+          {cancelLabel}
+        </button>
+        <button
+          data-autofocus
+          onClick={onConfirm}
+          style={{
+            ...styles.confirmBtn,
+            background: isDanger ? 'var(--sh-danger)' : 'var(--sh-info)',
+          }}
+        >
+          {confirmLabel}
+        </button>
       </div>
-    </div>,
-    document.body,
+    </FocusTrappedDialog>
   )
 }
 
 const styles = {
   overlay: {
-    position: 'fixed',
-    inset: 0,
     background: 'var(--sh-overlay, rgba(15, 23, 42, 0.5))',
     backdropFilter: 'blur(3px)',
     zIndex: 600,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
     fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
   },
   modal: {
@@ -90,6 +87,7 @@ const styles = {
     borderRadius: 18,
     padding: 'clamp(20px, 3vw, 28px)',
     width: 'min(420px, 90vw)',
+    maxWidth: 'min(420px, 90vw)',
     boxShadow: '0 16px 48px rgba(15, 23, 42, 0.2)',
   },
   title: {

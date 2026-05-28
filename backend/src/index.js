@@ -894,6 +894,15 @@ async function startServer() {
       ).unref()
     }, msUntilNextFour).unref()
 
+    // Wave-12.11 — daily mirror of /data/uploads to R2 so user-
+    // uploaded photos survive a Railway volume crash. No-ops
+    // gracefully when R2_BUCKET_UPLOAD_BACKUP is unset. Recovery
+    // procedure documented in docs/internal/security/
+    // RUNBOOK_DB_RESTORE.md "Upload Volume Recovery" section.
+    const { startUploadVolumeBackup } = require('./lib/jobs/uploadVolumeBackup')
+    const { UPLOADS_DIR } = require('./lib/storage')
+    startUploadVolumeBackup({ uploadsDir: UPLOADS_DIR })
+
     log.info({ port: PORT }, `Server running on http://localhost:${PORT}`)
   })
 

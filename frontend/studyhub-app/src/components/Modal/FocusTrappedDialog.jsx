@@ -90,6 +90,12 @@ export default function FocusTrappedDialog({
   overlayStyle,
   panelStyle,
   panelClassName,
+  // W3C ARIA distinguishes `dialog` (general) from `alertdialog`
+  // (urgent — confirm/destroy/legal-enforce flows). Caller picks; we
+  // default to the common case. Added 2026-05-27 for the modal-focus-
+  // trap migration so LegalAcceptanceEnforcementModal preserves its
+  // pre-migration alertdialog semantic.
+  role = 'dialog',
   // Loop M17 — mobile layout strategy on phone widths (<= 767px).
   //   'auto' (default): content-heavy dialogs slide up as a bottom-sheet.
   //   'centered'      : stay centered (use for confirms and celebrations).
@@ -149,9 +155,12 @@ export default function FocusTrappedDialog({
       clickOutsideDeactivates,
       returnFocusOnDeactivate,
       // Try the explicit selector first; fall back to the first
-      // focusable inside the panel if the selector misses.
+      // focusable inside the panel if the selector misses. Scope the
+      // query to the dialog's own subtree via overlayRef so a stray
+      // `[data-autofocus]` elsewhere on the page (dev harnesses, other
+      // mounted components) can't hijack the initial focus target.
       initialFocus: initialFocusSelector
-        ? () => document.querySelector(initialFocusSelector) || undefined
+        ? () => overlayRef.current?.querySelector(initialFocusSelector) || undefined
         : undefined,
       // focus-trap-react fires this when escapeDeactivates / outside-
       // click triggers. We forward to onClose so React state stays the
@@ -162,6 +171,14 @@ export default function FocusTrappedDialog({
       // Allow outside click to deactivate even when the click lands on
       // the overlay (vs panel).
       allowOutsideClick: true,
+      // jsdom's getBoundingClientRect returns zeros for every element,
+      // so focus-trap's default `displayCheck: 'full'` reports "no
+      // tabbable nodes" inside a dialog whose buttons are visibly there
+      // in real browsers. Relax the check only in Vitest. Production /
+      // dev builds keep the strict default that filters out elements
+      // hidden by CSS.
+      tabbableOptions:
+        import.meta.env && import.meta.env.MODE === 'test' ? { displayCheck: 'none' } : undefined,
     }),
     [
       escapeDeactivates,
@@ -250,7 +267,7 @@ export default function FocusTrappedDialog({
     <FocusTrap focusTrapOptions={focusTrapOptions}>
       <div
         ref={overlayRef}
-        role="dialog"
+        role={role}
         aria-modal="true"
         {...dialogA11y}
         {...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {})}

@@ -74,6 +74,12 @@ async function createSession({
   region,
   city,
   riskScore,
+  // When true, stamp `mfaVerifiedAt = NOW()` on the new session row.
+  // Passed by the login-challenge + recovery-code paths after a
+  // successful 2FA factor (email OTP or recovery code). requireRecentMfa
+  // middleware reads this column to enforce step-up on admin-sensitive
+  // routes (wave-12.11).
+  mfaVerified = false,
 }) {
   const jti = generateJti()
   const expiresAt = new Date(Date.now() + SESSION_EXPIRY_MS)
@@ -99,6 +105,7 @@ async function createSession({
       // band) instead of silently downgrading to 29 ("normal").
       riskScore: Number.isFinite(riskScore) ? Math.round(riskScore) : null,
       trustedDeviceId: trustedDeviceId || null,
+      mfaVerifiedAt: mfaVerified ? new Date() : null,
       expiresAt,
     },
   })

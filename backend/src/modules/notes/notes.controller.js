@@ -57,16 +57,70 @@ function parseNoteTags(tagsValue) {
   }
 }
 
+// Explicit allowlist of Note fields safe to expose via the API. The
+// previous `{...note, tags, ...extra}` spread leaked internal columns
+// (contentHash, contentSimhash, lastAuditGrade/Report/At, revision,
+// lastSaveId) AND would auto-leak any future Note column added to
+// the Prisma model. Explicit list means new columns default to NOT
+// being exposed — opt in by adding them to PUBLIC_NOTE_FIELDS.
+//
+// Relation fields (author, course, noteVersions, noteComments,
+// noteStars, noteReactions, noteHighlights, materials) are also in
+// the list — they're present in the response only when the Prisma
+// query `include` loaded them, undefined otherwise.
+//
+// Wave-12.11 (closes the MED finding from the wave-12.10 audit pass).
+const PUBLIC_NOTE_FIELDS = [
+  'id',
+  'title',
+  'content',
+  'userId',
+  'courseId',
+  'private',
+  'allowDownloads',
+  'pinned',
+  'moderationStatus',
+  'downloads',
+  'relatedSheetId',
+  'relatedPaperId',
+  // `revision` is load-bearing for the editor's optimistic-concurrency
+  // path — useNotePersistence.js reads `srv.revision` and uses it as
+  // `baseRevision` on the next autosave. Dropping it from the
+  // response meant ANY note with revision >= 1 saved as 0 on next
+  // edit, triggering a spurious 409 conflict (Codex P1 on wave-12.11).
+  'revision',
+  'createdAt',
+  'updatedAt',
+  // Relation includes — present only when the query loaded them.
+  'author',
+  'course',
+  'noteVersions',
+  'noteComments',
+  'noteStars',
+  'noteReactions',
+  'noteHighlights',
+  'materials',
+]
+
 function serializeNote(note, extra = {}) {
   if (!note || typeof note !== 'object') {
     return note
   }
 
-  return {
-    ...note,
-    tags: parseNoteTags(note.tags),
-    ...extra,
+  const out = {}
+  for (const key of PUBLIC_NOTE_FIELDS) {
+    if (key in note) out[key] = note[key]
   }
+  out.tags = parseNoteTags(note.tags)
+  // `extra` is a TRUSTED-CALLER override channel — fields here are
+  // appended without re-validation, so callers must NEVER pass raw
+  // Prisma row data through it. Used for derived booleans (`isOwner`,
+  // `_starred`, `starred`) and aggregate counts (`starCount`,
+  // `reactionCounts`, `downloads`) computed by the handler. If you
+  // catch yourself spreading a Prisma row into `extra`, stop —
+  // that defeats the allowlist's purpose. Add the field to
+  // PUBLIC_NOTE_FIELDS instead.
+  return { ...out, ...extra }
 }
 
 /**

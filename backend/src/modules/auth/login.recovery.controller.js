@@ -122,7 +122,13 @@ router.post('/login/recovery-code', loginLimiter, async (req, res) => {
       '2FA recovery code consumed',
     )
 
-    const authenticatedUser = await issueAuthenticatedSession(res, user.id, req)
+    // mfaVerified: true — recovery code is an explicit alternative MFA
+    // factor (NIST 800-63B AAL2). Stamp the new session so
+    // requireRecentMfa permits admin-sensitive routes without an
+    // additional step-up prompt.
+    const authenticatedUser = await issueAuthenticatedSession(res, user.id, req, null, {
+      mfaVerified: true,
+    })
 
     try {
       await prisma.securityEvent.create({

@@ -2,6 +2,7 @@ const express = require('express')
 const { captureError } = require('../../monitoring/sentry')
 const prisma = require('../../lib/prisma')
 const log = require('../../lib/logger')
+const { clampPage } = require('../../lib/constants')
 const {
   countActiveStrikes,
   hasActiveRestriction,
@@ -163,7 +164,7 @@ router.post('/reports', reportLimiter, async (req, res) => {
       error: `Invalid targetType. Must be one of: ${Object.keys(REPORTABLE_TYPES).join(', ')}`,
     })
   }
-  if (!Number.isFinite(targetId)) {
+  if (!Number.isInteger(targetId) || targetId < 1) {
     return res.status(400).json({ error: 'Valid targetId is required.' })
   }
   if (!REASON_CATEGORIES.includes(reasonCategory)) {
@@ -322,7 +323,8 @@ router.post('/appeals', appealLimiter, async (req, res) => {
   const reasonCategory =
     typeof req.body?.reasonCategory === 'string' ? req.body.reasonCategory.trim() : null
 
-  if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Valid caseId is required.' })
+  if (!Number.isInteger(caseId) || caseId < 1)
+    return res.status(400).json({ error: 'Valid caseId is required.' })
   if (reason.length < 20) {
     return res.status(400).json({ error: 'Appeal reason must be at least 20 characters.' })
   }
@@ -414,7 +416,7 @@ router.post('/appeals', appealLimiter, async (req, res) => {
 /* GET /my-log — user's own moderation history */
 router.get('/my-log', async (req, res) => {
   try {
-    const page = Math.max(1, parseInt(req.query.page, 10) || 1)
+    const page = clampPage(req.query.page)
     const limit = 20
     const [items, total] = await Promise.all([
       prisma.moderationLog.findMany({

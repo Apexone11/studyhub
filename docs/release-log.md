@@ -28,6 +28,193 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.13 — Codex P1 + P2 fixes on wave-12.11 / 12.12 (2026-05-28)
+
+Two real findings from a Codex review pass on `e9fc07e6`. Both vetted and fixed in our style.
+
+**P1 — `serializeNote` dropped `revision`, breaking the editor's optimistic-concurrency loop.**
+
+Wave-12.11's `PUBLIC_NOTE_FIELDS` allowlist omitted `revision`. `frontend/.../useNotePersistence.js#L248` reads `srv.revision` and uses it as `baseRevision` on the next autosave. With `revision` stripped from the response, the editor saw `Number(undefined ?? 0) === 0` and any note with `revision >= 1` would 409 on the next debounce-triggered save. Added `revision` back to the allowlist with an inline comment so a future cleanup doesn't drop it again.
+
+**P2 — Saver-mode preferences never reached the global hook.**
+
+`buildAuthenticatedUserPayload` didn't include `preferences`, so `SaverModeInitializer` read `user.preferences?.dataSaverMode` as `undefined` and the hooks fell back to localStorage + the platform signal. A user could save "Data Saver: on" in Settings → backend persisted → frontend never honored it across browsers. Two-part fix:
+
+1. **Backend**: `getAuthenticatedUser` now selects `preferences: { select: { dataSaverMode, batterySaverMode } }` (slim — just the two columns the global hook needs at page-load time, not the whole prefs row). `buildAuthenticatedUserPayload` surfaces them as `preferences: { dataSaverMode, batterySaverMode }`. Null-safe: a fresh user with no UserPreferences row defaults both to `'auto'` matching the schema default.
+2. **Frontend**: `DataAndBatteryTab` now calls `setStoredDataSaverMode` + `setStoredBatterySaverMode` after a successful save, so the change takes effect immediately on the current page without a reload (also seeds future first-paints before the session round-trip completes).
+
+Validation: 3387/3393 backend tests pass, 845/855 frontend. Lint clean both projects. Build green.
+
+### Wave-12.12 — step-up MFA expansion + data-saver consumers + battery-saver JS gates (2026-05-27)
+
+Follow-on wave addressing the deferred items from wave-12.11. Backend tests: 3387/3393 pass. Frontend tests: 845/855 pass. Lint clean both projects.
+
+**1. Step-up MFA expanded to 4 more privileged admin routes:**
+
+- `PATCH /api/admin/users/:id/role` — granting / revoking admin role.
+- `PATCH /api/admin/users/:id/trust-level` — affects rate limits + visibility.
+- `PATCH /api/admin/users/:id/mfa` — flipping this OFF on another admin would undo wave-12.8's protection.
+- `POST /api/payments/admin/sync-stripe` — bulk Stripe sync touches every active subscription.
+
+Combined with the wave-12.11 `DELETE /admin/users/:id`, the high-risk admin surface is now covered. Day-to-day moderator routes (badge grants, sheet review, announcements) intentionally remain unprotected — they're frequent enough that step-up every 15 min would create real friction without proportional security gain.
+
+**HIGH audit finding fixed in-wave:** `handleTrustLevelChange` and `handleMfaToggle` in `UsersTab.jsx` called raw `fetch()` directly, bypassing the `apiJson` step-up interceptor. An admin with a stale session would have silently hit a 403 with no modal, no toast, and a select widget that snapped back to the old value with zero feedback. Extracted both into `patchTrustLevel` + `patchMfaRequired` methods on `useAdminData` (matching the existing `patchRole` / `deleteUser` pattern) so step-up flows transparently and errors surface via `showToast`.
+
+**2. Data Saver consumers wired:**
+
+- **Feed lite mode** — when `Save-Data: on`, user pref `dataSaverMode='on'`, or `?lite=1` query param, `GET /api/feed` strips `media[]` arrays and author `coverImageUrl`s before sending. Adds `lite: true` to the payload so the frontend can render a "data saver on" footer.
+- **Frontend feed fetch** — `useFeedData` appends `?lite=1` when `useDataSaver().enabled` is true. Both initial load + load-more paths covered.
+- **Typing indicator suppression** — `useMessagingData.emitTypingStart` + `emitTypingStop` short-circuit when data-saver is on. Receivers still see others' typing indicators normally; the local user just doesn't broadcast their own (saves a Socket.io round-trip per keystroke).
+- **AI streaming gate** — **DEFERRED with documented rationale**. The `aiService.streamMessage` function streams chunks directly to `res`; there's no non-streaming variant. Building a buffering wrapper would add server memory + perceived latency for a marginal bandwidth saving (text deltas are tiny vs. the media + cover images already gated above). The `shouldReturnLite` helper exists; future work can flip the strategy when the cost/benefit shifts.
+
+**3. Battery Saver JS-side gates:**
+
+- **`lib/animations.js`** — `prefersReducedMotion()` now returns true when `<body data-battery-saver="on">` is set, in addition to the OS `prefers-reduced-motion: reduce` query. Cascades to every anime.js helper in the file (fadeInUp, staggerEntrance, pulseHighlight, popScale, countUp, fadeInOnScroll, slideDown) — each already short-circuits to a single `utils.set(...)` call when the gate returns true. No rAF loop runs.
+- **`components/Toast.jsx`** — toast auto-dismiss bumped +50% (3500ms → 5250ms by default) when battery saver is on. Pairs with the founder's "give motion-sensitive readers more time" intent from the original plan.
+- **Lottie + continuous rAF loops** — neither exists in the codebase. Grep was empty; no change needed. The plan's references to these were hypothetical.
+
+Combined with the CSS-side rule shipped in wave-12.11 (`body[data-battery-saver='on'] *:not([data-motion='keep'])` disables animations / transitions / will-change), the JS-side gate now covers the remaining ~20% the CSS rule couldn't reach.
+
+**4. Audit loop:**
+
+A code-reviewer subagent pass on the wave-12.12 diff found 1 HIGH (fixed in-wave above) and ruled out 6 LOW findings (`?lite=1` overriding user `off` pref — `req.user.dataSaverMode` isn't populated by `requireAuth` so the override path is inert; `setImmediate` name collision is harmless in browser; etc).
+
+### Wave-12.11 — admin step-up MFA + volume backup + saver modes + video player (2026-05-27)
+
+Five connected feature shipments + 5 audit-fix items in a single wave. All founder-priority items from the long-tail backlog. Backend tests: 3387/3393 pass (6 documented skips, 0 fails). Frontend tests: 845/855 pass. Lint clean both projects.
+
+**1. Admin MFA step-up enforcement (`requireRecentMfa`)**
+
+Closes the unshipped half of L2.14 from the 2026-04-30 deferred plan. The login-time admin MFA enforcement shipped in wave-12.8; this wave adds the per-action step-up middleware so admin-sensitive routes require a fresh 2FA factor within the last 15 minutes even on already-authenticated sessions.
+
+- New `backend/src/middleware/requireRecentMfa.js` — reads `Session.mfaVerifiedAt` and 403s with `code: 'MFA_STEP_UP_REQUIRED'` when stale or unset. Honours the same `EMERGENCY_DISABLE_ADMIN_MFA` sealed-glass-break as the login flow.
+- New schema column `Session.mfaVerifiedAt DateTime?` + migration `20260527000002_session_mfa_verified_at`. Stamped by `createSession` when called with `mfaVerified: true`.
+- `login.challenge.controller.js` + `login.recovery.controller.js` pass `mfaVerified: true` so newly-issued sessions are pre-stamped — admins don't have to step up again right after a successful 2FA login.
+- New `mfa.stepUp.controller.js` exposes `POST /api/auth/mfa/step-up/start` + `/verify`. Reuses the loginChallenge primitive for OTP and consumeRecoveryCode for recovery-code path. Atomic Session update via updateMany so race conditions can't double-extend.
+- Applied to `DELETE /api/admin/users/:id`. Other privileged admin routes (role grants, plan changes) tracked as follow-on hardening — out of scope this wave.
+- Frontend: new `MfaStepUpProvider` mounted in App.jsx, `MfaStepUpModal` (focus-trap, OTP + recovery-code tabs, "Set up 2FA first" path when user has no 2FA configured), `useMfaStepUp()` hook. Admin `apiJson` interceptor catches `MFA_STEP_UP_REQUIRED` and transparently retries after step-up. **End-to-end functional: a real admin clicking Delete now sees a code prompt, types it, and the delete proceeds.**
+- 12 backend unit tests pinning every branch (no req.user, no sessionJti, missing session row, mfaVerifiedAt null with/without 2FA, stale, fresh, custom window, P2021 graceful degrade, emergency override case + whitespace tolerant, override does NOT bypass without the literal "true").
+
+**2. WebAuthnCredential.lastUsedAt**
+
+- Schema additions + migration `20260527000001_webauthn_last_used_at`.
+- `webauthn.routes.js` verify path writes `lastUsedAt: new Date()` alongside the counter update.
+- `/credentials` list endpoint surfaces `lastUsedAt` so the admin portal can show "last used 3 days ago" per passkey.
+
+**3. serializeNote explicit allowlist**
+
+Closes the MED finding from the wave-12.10 audit. Replaced `{...note, tags, ...extra}` spread with explicit `PUBLIC_NOTE_FIELDS` list. Stripped from API responses: `contentHash`, `contentSimhash`, `lastAuditGrade`, `lastAuditReport`, `lastAuditedAt`, `revision`, `lastSaveId`. Documented `extra` as trusted-caller-only override channel.
+
+**4. Upload volume → R2 backup (user-photo durability)**
+
+Closes the founder-flagged gap "when the server crashes, people's data should not be lost and photos should be stored somewhere." Before this wave, the Railway volume at `/data/uploads` was a single point of failure — every avatar / cover / attachment / school logo / group media file would be permanently gone if the volume corrupted. Now mirrored to R2 nightly.
+
+- New `lib/jobs/uploadVolumeBackup.js` — `runWithHeartbeat`-wrapped daily pass (CLAUDE.md A10). Walks `/data/uploads` recursively, mirrors to R2 with `objectExists` skip-if-already-there. Throttled at 10 uploads/sec (configurable). **Streams files** (not `readFileSync`) so a multi-GB video doesn't OOM Railway hobby tiers — caught by the wave-12.11 audit pass.
+- New `scripts/restoreVolumeFromR2.js` disaster-recovery script. Three modes: `--dry-run` (no writes), default (skip-if-exists), `--force` (overwrite). Handles ListObjectsV2 pagination.
+- `r2Storage.js` — `uploadObject` + `objectExists` now accept optional `bucket` override + `contentLength` (for streamed bodies) + `cacheControl`. Backward-compatible — existing callers don't pass these.
+- `R2_BUCKET_UPLOAD_BACKUP` env var promoted to **REQUIRED_IN_PRODUCTION** so a missing value fails boot loud instead of silently disabling backups (the warn-level startup log wasn't visible in Sentry by default).
+- Runbook section "Upload Volume Recovery" added to `docs/internal/security/RUNBOOK_DB_RESTORE.md` with the full recovery procedure (Guarded Mode → list bucket → dry-run → restore → verify counts → disable Guarded Mode).
+- Documented data-loss window: worst case ~24h of uploads if the volume crashes right before the next backup pass. Tunable via `UPLOAD_BACKUP_INTERVAL_MS`.
+
+**5. Data Saver + Battery Saver modes (v1)**
+
+Closes both founder-priority plans (`docs/internal/plans/data-saver-mode.md` + `battery-saver-mode.md`, both archived this wave with their "v1 shipped" sections detailing what's live vs. what's deferred to per-route consumer integrations).
+
+- Schema additions: `UserPreferences.dataSaverMode` + `batterySaverMode` (both `String @default("auto")`, tri-state on/off/auto).
+- Migration `20260527000003_data_battery_saver_modes` (idempotent guards per CLAUDE.md A5).
+- `PREF_ENUM_KEYS` allowlist validation for both.
+- New Settings tab "Data & Battery" with IconBolt icon between Appearance and Accessibility. Two tri-state selects + inline explainers.
+- New `useDataSaver` hook with `navigator.connection.saveData` auto-trigger.
+- New `useBatterySaver` hook with `prefers-reduced-motion: reduce` auto-trigger. Side-effect writes `data-battery-saver="on"` on `<body>`.
+- New CSS rule in `index.css` targeting `body[data-battery-saver='on'] *:not([data-motion='keep'])` — disables animations, transitions, will-change, scroll-behavior. **End-to-end functional**: a user toggles battery saver → animations stop on next frame without reload. Same `data-motion="keep"` escape hatches as the existing reduced-motion media query, so achievement celebrations + first-creation moments still play.
+- New backend helper `lib/dataSaverNegotiation.js` exporting `isDataSaverRequest`, `isLiteQueryRequest`, `shouldReturnLite` — opt-in for route handlers that want to return lighter responses. 11 unit tests pinning the three-signal contract.
+- New `SaverModeInitializer` mounted in App.jsx so the body attribute toggles immediately when Settings changes.
+
+**6. Video player additions (study-platform features)**
+
+The 807-line StudyHubPlayer was already feature-rich — quality switching, captions, theater mode, PiP, double-tap skip, keyboard shortcuts, etc. Added three study-specific features without disturbing the existing surface ("if it isn't broken don't fix it").
+
+- **Watch-progress persistence**: localStorage per video (keyed on optional `videoId` prop or hashed `src` URL). Auto-resumes from saved position on `loadedmetadata` when > 5s in AND > 10s before end. Throttled save on `timeupdate` (5s interval) + flush on `pause` / `pagehide`. Auto-clears on `ended`. "Resumed from X:XX" pill renders briefly with "Start over" escape.
+- **A-B loop**: `[` sets point A at current time, `]` sets point B, `Shift+L` clears both. Loop indicator pill in top-right shows the bracket. timeupdate handler seeks back to A whenever currentTime crosses B. Designed for re-watching difficult lecture sections.
+- **Keyboard shortcut help overlay**: `?` toggles a focused overlay listing all 13 shortcuts. Closes on `?` again or Escape or backdrop click.
+- All three additions are purely additive — zero behavioral change for users who don't use them. Lint clean, build clean.
+
+**Audit pass — 2 HIGH + 3 MED real findings fixed in-wave:**
+
+A code-reviewer subagent pass on the wave-12.11 diff caught:
+
+- **HIGH** — Video player `ended` listener was anonymous → leaked on every `[`/`]` keypress. Named the handler + included in cleanup.
+- **HIGH** — `serializeNote.extra` channel is back-door for non-allowlisted fields. Currently all callers pass derived booleans / counts only (safe), but added a docblock warning so future callers know the constraint.
+- **MED** — Stale pre-migration sessions verified safe (settings 2FA setup route doesn't apply `requireRecentMfa`, so no chicken-and-egg lockout).
+- **MED** — `R2_BUCKET_UPLOAD_BACKUP` was OPTIONAL → silent backup-disable in prod. Promoted to REQUIRED_IN_PRODUCTION.
+- **MED** — `mirrorFile` used `readFileSync` → OOM on large videos. Switched to `createReadStream` + `ContentLength` header.
+
+### Wave-12.10 — moderation module A11 + A12 sweep (2026-05-27)
+
+Four real CLAUDE.md A-rule violations in the moderation module, all found by an audit subagent on a broad codebase sweep. Moderation got refactored before A11 (originAllowlist on writes) and A12 (Number.isInteger + ≥1 guard for IDs) were locked in, so the module shipped two CSRF-defense-in-depth gaps and 11 weak ID guards.
+
+- **HIGH — A11 — `/api/admin/moderation` adminRouter had no `originAllowlist()`.** Admin endpoints (claim case, review case, issue strike, lift restriction, approve/reject appeal) were CSRF-protected only by the global Origin check in `index.js`, which trusts empty-Origin requests (curl, server-to-server). Per-module `originAllowlist()` is the defense-in-depth layer. The parallel `/api/admin` adminRouter got it in wave-11; the moderation admin router was missed. Added.
+- **HIGH — A11 — `/api/moderation` userRouter (reports + appeals) had no `originAllowlist()`.** Same gap, user-facing side. A malicious cross-origin page could submit a false report or appeal in the victim's name. Added.
+- **HIGH — A12 — 11 sites used `Number.isFinite(id)` instead of `Number.isInteger(id) && id >= 1`.** `Number.isFinite(-1)` is true; `Number.isFinite(1.5)` is true after parseInt-truncation but the convention is to use isInteger. Negative IDs would have hit `where: { id: -1 }` in Prisma. Fixed in `moderation.admin.cases.controller.js` (8 sites), `moderation.admin.enforcement.controller.js` (2), `moderation.user.controller.js` (2). Both validation sites (400 on fail) and one optional-filter site (`if isInteger then set where.userId`).
+- **HIGH — A12 — `moderation.user.controller.js#GET /my-log` used bare `parseInt`.** No radix on the inner call, no isInteger guard. Switched to `clampPage()` from `lib/constants.js` for consistency with the rest of the platform's pagination handling.
+
+Validation: 3362/3368 backend tests pass (6 documented skips, 0 fails). Backend lint clean. The moderation reporting + visibility test suites (15/15) continue passing, confirming the new origin requirement doesn't break the existing supertest flows.
+
+### Wave-12.9 — code-reviewer audit fixes on wave-12.7 / 12.8 (2026-05-27)
+
+Three real findings from a code-reviewer subagent pass on the modal migration + admin MFA work. All have one-line fixes.
+
+- **HIGH — `FocusTrappedDialog` initialFocus selector was document-global.** `document.querySelector(initialFocusSelector)` searched the entire document, so a stray `[data-autofocus]` elsewhere on the page (dev harnesses, other mounted components) could hijack the dialog's initial focus target. Scoped to `overlayRef.current?.querySelector(...)`. Affects `ConfirmDialog`, `AiSheetPreview`, `AttachmentPreview` — all of which now have guaranteed in-dialog focus targets.
+- **MED-HIGH — `LegalAcceptanceEnforcementModal` had no `initialFocusSelector`.** Pre-migration the bespoke `useFocusTrap` may have placed focus differently; without an explicit selector, focus-trap-react falls back to the first tabbable. More importantly: in a brief render race where focus-trap can't find a tabbable, it throws — and an error boundary catching that exception would silently unmount the enforcement modal and let the user past the legal-acceptance gate. Added `data-legal-signout` on the Sign out button + `initialFocusSelector="[data-legal-signout]"` on the dialog so the contract is explicit and testable.
+- **MED — `EMERGENCY_DISABLE_ADMIN_MFA` was case-sensitive.** Strict `=== 'true'` comparison meant a founder under stress typing "True" or "TRUE" in the Railway dashboard would NOT bypass enforcement — the exact moment that flexibility matters most. Switched to `.trim().toLowerCase() === 'true'`. Strict opt-in is preserved — `"1"`, `"yes"`, `"trueish"` all still enforce. Added 2 regression tests pinning both the tolerance (the variants that SHOULD bypass) AND the strictness (the variants that should NOT).
+
+Validation: 41/41 auth.deep tests pass (+2 new variant tests); 21/21 AiSheetPreview + AttachmentPreview tests still pass. Backend + frontend lint clean.
+
+### Wave-12.8.1 — 2FA recovery codes unit test coverage (2026-05-27)
+
+Closes the "Tests required before shipping" gap from `docs/internal/archive/audits/2026-05-achievements/2026-04-30-2fa-recovery-codes-plan.md`. The recovery-codes primitive (`lib/auth/recoveryCodes.js`) had 0 test coverage despite being the security-critical core of the entire feature.
+
+Added `backend/test/recoveryCodes.unit.test.js` with 20 tests covering:
+
+- `generatePlaintextCodes` — count, hex format, randomness.
+- `hashCodes` — bcrypt header, per-code salt, roundtrip verification.
+- `normalizeRecoveryCode` — both canonical and dash-stripped forms, case folding, whitespace, charset/length validation, nullish rejection.
+- `consumeRecoveryCode` — the critical contract: a code matched once cannot be matched again (the single-use property); unknown codes leave the hash list untouched; empty / non-string submissions reject without mutating state.
+
+The implementation itself is unchanged. The constant-time-ish loop guarantee (no early break) is enforced by code review; the test verifies the observable outcome (matched index dropped, others retained).
+
+### Wave-12.8 — admin MFA fail-CLOSED + sealed-glass-break override (2026-05-27)
+
+Closes P1-E (security policy violation) from the 2026-05-14 backend bug hunt. The `flag_admin_mfa_required` read in `auth.login.controller.js` was fail-OPEN — any DB error or missing flag row silently disabled admin MFA enforcement, the exact failure mode CLAUDE.md §12 decision #20 was written to prevent. Flipped to fail-CLOSED with a documented emergency-override env var so the founder can still get in if locked out of their own 2FA device.
+
+**Behaviour:**
+
+- Explicit `flag_admin_mfa_required.enabled === true` → enforce (unchanged).
+- Explicit `enabled === false` → skip enforcement (unchanged — supports rollout pause).
+- Missing row → **now enforces** (was: silently off). Matches decision #20.
+- Prisma read throws → **now enforces** (was: silently off). Structured `auth.admin_mfa_flag_read_failed` log fires so the on-call sees the incident.
+- New `EMERGENCY_DISABLE_ADMIN_MFA=true` Railway env var bypasses the entire enforcement path. Direct env-var access required. Every login that uses it fires `auth.admin_mfa_emergency_disabled` to Sentry so the ops trail exists.
+
+**Files:**
+
+- `backend/src/modules/auth/auth.login.controller.js` — inverted the fail direction, added the override branch, structured logging on both override-fired and flag-read-failed events.
+- `backend/src/lib/secretValidator.js` — added `EMERGENCY_DISABLE_ADMIN_MFA` under `OPTIONAL` so the boot summary counts it when set.
+- `backend/.env.example` — documented the sealed-glass-break with explicit "do NOT enable in normal operations" warning.
+- `backend/test/auth.deep.test.js` — added 4 regression tests pinning each fail direction: missing flag row enforces, DB error enforces, explicit `enabled=false` skips, override bypasses (and skips the flag read entirely so a db-down incident plus an override-set founder still gets in).
+
+Validation: 39/39 auth.deep tests pass; 53/53 across the 4 auth-touching test files (auth.deep, auth.routes, auth.cookies, auth.session.deep, security.headers). Backend lint clean.
+
+### Wave-12.7 — modal focus-trap migration (round 2) (2026-05-27)
+
+Migrated 3 more legacy dialogs to the shared `<FocusTrappedDialog>` primitive so every modal in the app has W3C-compliant focus trapping, Escape, and backdrop-click behaviour wired through one code path:
+
+- `AiSheetPreview.jsx` (SheetPreviewModal) — Hub AI HTML preview window. Previously had no focus trap. Now traps focus, Escape closes, backdrop closes, initial focus lands on the close button.
+- `ReportModal.jsx` — content/user reporting dialog. Migrated off the bespoke `useFocusTrap` hook + `createPortal`. Backdrop click is intentionally disabled so the user doesn't lose a typed report mid-flow.
+- `AttachmentPreview.jsx` (AttachmentPreviewModal) — group / discussion attachment viewer. Fullscreen API integration preserved (ref now lives on an inner wrapper instead of the panel itself). All 10 pre-existing tests still pass.
+- `FocusTrappedDialog.jsx` — added `tabbableOptions: { displayCheck: 'none' }` in the Vitest environment only. jsdom's `getBoundingClientRect()` always returns zeros, so `focus-trap`'s default `displayCheck: 'full'` reported "no tabbable nodes" inside dialogs whose buttons were visibly present in real browsers. Production / dev builds keep the strict default that filters CSS-hidden elements.
+
+Net effect: every visible modal in the app now flows through the same focus-trap + ESC + backdrop pipeline. Legacy `useFocusTrap` hook + ad-hoc keydown handlers no longer compete with one another across surfaces.
+
 ### Wave-12.6 — CI green: 16 failing tests → 0 + 2 prod bug fixes (2026-05-22)
 
 CI was red on `local-main` for weeks because of accumulated test failures + a Prisma client that wasn't regenerated. Backend test suite went from `16 failed | 196 passed` to `3336 passed | 0 failed | 6 documented skips`. This unblocks every Dependabot PR + future merges from passing CI.

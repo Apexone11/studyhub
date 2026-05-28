@@ -24,6 +24,8 @@ import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
 import { SOCKET_EVENTS } from '../../lib/socketEvents'
+import useDataSaver from '../../lib/useDataSaver'
+import { useSession } from '../../lib/session-context'
 
 export function useMessagingData(socket, currentUserId) {
   /* ── State ───────────────────────────────────────────────────────────── */
@@ -35,6 +37,16 @@ export function useMessagingData(socket, currentUserId) {
   const [hasMoreMessages, setHasMoreMessages] = useState(true)
   const [typingUsers, setTypingUsers] = useState(new Map())
   const typingTimerRef = useRef(null)
+
+  // Wave-12.12 — Data Saver consumer. Typing-indicator events fire on
+  // every keystroke (typing:start) + an auto-stop timer (typing:stop).
+  // On a metered connection this is dozens of round-trips per typed
+  // message + a server-pushed broadcast to every other participant.
+  // When data-saver is on we skip the emit entirely — the user can
+  // still send messages; they just don't broadcast "is typing..."
+  // indicators to others.
+  const { user: sessionUser } = useSession()
+  const dataSaver = useDataSaver({ serverMode: sessionUser?.preferences?.dataSaverMode })
   // Holds the AbortController for the in-flight loadMessages() call so
   // a fast conversation switch can cancel the prior fetch and avoid
   // applying stale messages to the wrong thread. Wave-11 P1-2.
@@ -635,6 +647,10 @@ export function useMessagingData(socket, currentUserId) {
   /* ── Typing indicator helpers ────────────────────────────────────────── */
   const emitTypingStart = useCallback(() => {
     if (!socket || !activeConversation) return
+    // Wave-12.12 — skip the per-keystroke broadcast on data-saver.
+    // Sending messages still works; receivers just won't see the
+    // "Alex is typing..." chip.
+    if (dataSaver.enabled) return
     socket.emit(SOCKET_EVENTS.TYPING_START, { conversationId: activeConversation.id })
 
     // Auto-stop after 3 seconds of no input
@@ -644,16 +660,17 @@ export function useMessagingData(socket, currentUserId) {
         socket.emit(SOCKET_EVENTS.TYPING_STOP, { conversationId: activeConversation.id })
       }
     }, 3000)
-  }, [socket, activeConversation])
+  }, [socket, activeConversation, dataSaver.enabled])
 
   const emitTypingStop = useCallback(() => {
     if (!socket || !activeConversation) return
+    if (dataSaver.enabled) return
     socket.emit(SOCKET_EVENTS.TYPING_STOP, { conversationId: activeConversation.id })
     if (typingTimerRef.current) {
       clearTimeout(typingTimerRef.current)
       typingTimerRef.current = null
     }
-  }, [socket, activeConversation])
+  }, [socket, activeConversation, dataSaver.enabled])
 
   /* ── Socket.io event listeners (matching backend event names) ────────── */
   useEffect(() => {

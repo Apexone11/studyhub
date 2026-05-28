@@ -78,10 +78,21 @@ export default function ToastContainer() {
       // role=alert below) still works.
       if (toast.durationMs === 0) return
 
+      // Wave-12.12 — battery-saver UX bump. The plan calls out that
+      // users who have reduced-motion / battery-saver on benefit from
+      // a slightly longer toast window so they can finish reading
+      // without the toast re-firing (motion-sensitive users often
+      // read more slowly). +50% duration when the body attribute is on.
+      const isBatterySaver =
+        typeof document !== 'undefined' &&
+        document.body?.getAttribute('data-battery-saver') === 'on'
+      const baseDuration = toast.durationMs || 3500
+      const effectiveDuration = isBatterySaver ? Math.round(baseDuration * 1.5) : baseDuration
+
       const timer = setTimeout(() => {
         setToasts((prev) => prev.filter((t) => t.id !== toast.id))
         timers.delete(toast.id)
-      }, toast.durationMs || 3500)
+      }, effectiveDuration)
 
       timers.set(toast.id, timer)
     }

@@ -5,6 +5,8 @@ import { useLivePolling } from '../../lib/useLivePolling'
 import { showToast } from '../../lib/toast'
 import { trackEvent } from '../../lib/telemetry'
 import { usePageTiming } from '../../lib/usePageTiming'
+import useDataSaver from '../../lib/useDataSaver'
+import { useSession } from '../../lib/session-context'
 import { canUserDeletePost } from './feedHelpers'
 import { authHeaders } from './feedConstants'
 
@@ -98,11 +100,25 @@ export function useFeedData({ user, search }) {
   const [deletingPostIds, setDeletingPostIds] = useState({})
   const timing = usePageTiming('feed')
 
+  // Wave-12.12 — Data Saver consumer. When enabled, the feed fetch
+  // sends `?lite=1` so the backend strips media arrays + cover
+  // images. The session pref is the source of truth; the hook also
+  // honors navigator.connection.saveData fallback. Backend honors the
+  // Save-Data header independently for users whose pref isn't loaded
+  // yet (e.g. pre-session fetches).
+  const { user: sessionUser } = useSession()
+  const dataSaver = useDataSaver({ serverMode: sessionUser?.preferences?.dataSaverMode })
+
   const loadFeed = useCallback(
     async ({ signal, startTransition } = {}) => {
       const apply = startTransition || ((fn) => fn())
       const params = new URLSearchParams({ limit: '24' })
       if (search) params.set('search', search)
+      // Wave-12.12 — flag the lite path. Safari doesn't send the
+      // Save-Data header so the query param is the only way the
+      // backend learns about the user's pref on the request path
+      // until requireAuth is extended to hydrate the row.
+      if (dataSaver.enabled) params.set('lite', '1')
 
       timing.markFetchStart()
       try {
@@ -156,7 +172,7 @@ export function useFeedData({ user, search }) {
         })
       }
     },
-    [search, timing],
+    [search, timing, dataSaver.enabled],
   )
 
   // Report timing when feed items first arrive
@@ -168,6 +184,7 @@ export function useFeedData({ user, search }) {
     setLoadingMore(true)
     const params = new URLSearchParams({ limit: '24', offset: String(feedState.items.length) })
     if (search) params.set('search', search)
+    if (dataSaver.enabled) params.set('lite', '1')
     try {
       const response = await fetch(`${API}/api/feed?${params.toString()}`, {
         headers: authHeaders(),

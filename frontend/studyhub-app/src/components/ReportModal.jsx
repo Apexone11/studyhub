@@ -7,11 +7,17 @@
  *  targetId      — number
  *  onClose       — callback when modal is dismissed
  *  onReported    — optional callback after successful submission
+ *
+ * 2026-05-27 — migrated from bespoke createPortal + useFocusTrap to the
+ * shared <FocusTrappedDialog> primitive. Form state preservation is
+ * unchanged: the existing useEffect resets `category`, `note`, `error`,
+ * `success`, `submitting` whenever `open` flips to true.
+ * `clickOutsideDeactivates={false}` so backdrop click doesn't lose the
+ * user's typed report mid-flow — they must use Cancel or submit.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
 import { API } from '../config'
-import { useFocusTrap } from '../lib/useFocusTrap'
+import FocusTrappedDialog from './Modal/FocusTrappedDialog'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
@@ -43,7 +49,6 @@ export default function ReportModal({ open, targetType, targetId, onClose, onRep
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
-  const trapRef = useFocusTrap({ active: open, onClose })
 
   /* Reset state on open */
   useEffect(() => {
@@ -98,93 +103,84 @@ export default function ReportModal({ open, targetType, targetId, onClose, onRep
 
   const label = TARGET_LABELS[targetType] || 'content'
 
-  // Portal to body so the fixed-position overlay isn't constrained by
-  // any animated ancestor's transform (CLAUDE.md "Common Bugs" #8).
-  if (typeof document === 'undefined') return null
+  return (
+    <FocusTrappedDialog
+      open={open}
+      onClose={onClose}
+      ariaLabelledBy="report-modal-title"
+      // Backdrop click would discard a typed report mid-flow — force the
+      // user to confirm via Cancel or submit instead.
+      clickOutsideDeactivates={false}
+      mobileLayout="centered"
+      overlayStyle={styles.overlay}
+      panelStyle={styles.modal}
+    >
+      {success ? (
+        <div style={{ textAlign: 'center', padding: '12px 0' }}>
+          <div style={{ fontSize: 36, marginBottom: 12 }}>&#10003;</div>
+          <h3 style={styles.title}>Report submitted</h3>
+          <p style={styles.message}>
+            Thank you for helping keep StudyHub safe. We&apos;ll review this {label} shortly.
+          </p>
+          <button type="button" onClick={onClose} style={styles.primaryBtn}>
+            Done
+          </button>
+        </div>
+      ) : (
+        <form onSubmit={handleSubmit}>
+          <h3 id="report-modal-title" style={styles.title}>
+            Report {label}
+          </h3>
+          <p style={styles.message}>
+            Select the reason that best describes why you&apos;re reporting this {label}.
+          </p>
 
-  return createPortal(
-    <div style={styles.overlay} onClick={onClose} role="presentation">
-      <div
-        ref={trapRef}
-        style={styles.modal}
-        onClick={(e) => e.stopPropagation()}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="report-modal-title"
-      >
-        {success ? (
-          <div style={{ textAlign: 'center', padding: '12px 0' }}>
-            <div style={{ fontSize: 36, marginBottom: 12 }}>&#10003;</div>
-            <h3 style={styles.title}>Report submitted</h3>
-            <p style={styles.message}>
-              Thank you for helping keep StudyHub safe. We&apos;ll review this {label} shortly.
-            </p>
-            <button type="button" onClick={onClose} style={styles.primaryBtn}>
-              Done
+          <div style={styles.reasonGrid}>
+            {REASON_CATEGORIES.map((r) => (
+              <button
+                key={r.value}
+                type="button"
+                onClick={() => {
+                  setCategory(r.value)
+                  setError('')
+                }}
+                style={{
+                  ...styles.reasonChip,
+                  background: category === r.value ? 'var(--sh-brand)' : 'var(--sh-soft)',
+                  color: category === r.value ? '#fff' : 'var(--sh-subtext)',
+                  borderColor: category === r.value ? 'var(--sh-brand)' : 'var(--sh-border)',
+                }}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+
+          <label style={styles.label}>
+            Additional details (optional)
+            <textarea
+              value={note}
+              onChange={(e) => setNote(e.target.value.slice(0, 500))}
+              placeholder="Provide any additional context..."
+              rows={3}
+              style={styles.textarea}
+            />
+            <span style={styles.charCount}>{note.length}/500</span>
+          </label>
+
+          {error && <p style={styles.error}>{error}</p>}
+
+          <div style={styles.actions}>
+            <button type="button" onClick={onClose} style={styles.cancelBtn} disabled={submitting}>
+              Cancel
+            </button>
+            <button type="submit" style={styles.primaryBtn} disabled={submitting || !category}>
+              {submitting ? 'Submitting...' : 'Submit report'}
             </button>
           </div>
-        ) : (
-          <form onSubmit={handleSubmit}>
-            <h3 id="report-modal-title" style={styles.title}>
-              Report {label}
-            </h3>
-            <p style={styles.message}>
-              Select the reason that best describes why you&apos;re reporting this {label}.
-            </p>
-
-            <div style={styles.reasonGrid}>
-              {REASON_CATEGORIES.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  onClick={() => {
-                    setCategory(r.value)
-                    setError('')
-                  }}
-                  style={{
-                    ...styles.reasonChip,
-                    background: category === r.value ? 'var(--sh-brand)' : 'var(--sh-soft)',
-                    color: category === r.value ? '#fff' : 'var(--sh-subtext)',
-                    borderColor: category === r.value ? 'var(--sh-brand)' : 'var(--sh-border)',
-                  }}
-                >
-                  {r.label}
-                </button>
-              ))}
-            </div>
-
-            <label style={styles.label}>
-              Additional details (optional)
-              <textarea
-                value={note}
-                onChange={(e) => setNote(e.target.value.slice(0, 500))}
-                placeholder="Provide any additional context..."
-                rows={3}
-                style={styles.textarea}
-              />
-              <span style={styles.charCount}>{note.length}/500</span>
-            </label>
-
-            {error && <p style={styles.error}>{error}</p>}
-
-            <div style={styles.actions}>
-              <button
-                type="button"
-                onClick={onClose}
-                style={styles.cancelBtn}
-                disabled={submitting}
-              >
-                Cancel
-              </button>
-              <button type="submit" style={styles.primaryBtn} disabled={submitting || !category}>
-                {submitting ? 'Submitting...' : 'Submit report'}
-              </button>
-            </div>
-          </form>
-        )}
-      </div>
-    </div>,
-    document.body,
+        </form>
+      )}
+    </FocusTrappedDialog>
   )
 }
 

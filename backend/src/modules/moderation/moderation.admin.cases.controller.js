@@ -128,7 +128,8 @@ router.get('/cases/overview', async (req, res) => {
 /* GET /cases/:id — Single case with related strikes and appeals */
 router.get('/cases/:id', async (req, res) => {
   const caseId = Number.parseInt(req.params.id, 10)
-  if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Invalid case ID.' })
+  if (!Number.isInteger(caseId) || caseId < 1)
+    return res.status(400).json({ error: 'Invalid case ID.' })
 
   try {
     const modCase = await prisma.moderationCase.findUnique({
@@ -161,7 +162,8 @@ router.get('/cases/:id', async (req, res) => {
 /* POST /cases/:id/claim — Claim a case for triage */
 router.post('/cases/:id/claim', async (req, res) => {
   const caseId = Number.parseInt(req.params.id, 10)
-  if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Invalid case ID.' })
+  if (!Number.isInteger(caseId) || caseId < 1)
+    return res.status(400).json({ error: 'Invalid case ID.' })
 
   try {
     const modCase = await prisma.moderationCase.findUnique({
@@ -201,7 +203,8 @@ router.post('/cases/:id/claim', async (req, res) => {
 /* POST /cases/:id/unclaim — Release a claim */
 router.post('/cases/:id/unclaim', async (req, res) => {
   const caseId = Number.parseInt(req.params.id, 10)
-  if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Invalid case ID.' })
+  if (!Number.isInteger(caseId) || caseId < 1)
+    return res.status(400).json({ error: 'Invalid case ID.' })
 
   try {
     const modCase = await prisma.moderationCase.findUnique({
@@ -241,7 +244,8 @@ router.patch('/cases/:id/review', async (req, res) => {
   const reviewNote =
     typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim().slice(0, 500) : ''
 
-  if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Invalid case ID.' })
+  if (!Number.isInteger(caseId) || caseId < 1)
+    return res.status(400).json({ error: 'Invalid case ID.' })
   if (!['dismiss', 'confirm'].includes(action)) {
     return res.status(400).json({ error: 'Action must be "dismiss" or "confirm".' })
   }
@@ -274,7 +278,8 @@ router.patch('/cases/:id/review', async (req, res) => {
 /* GET /cases/:id/preview — Admin-only preview of reported content */
 router.get('/cases/:id/preview', async (req, res) => {
   const caseId = Number.parseInt(req.params.id, 10)
-  if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Invalid case ID.' })
+  if (!Number.isInteger(caseId) || caseId < 1)
+    return res.status(400).json({ error: 'Invalid case ID.' })
 
   try {
     const modCase = await prisma.moderationCase.findUnique({
@@ -474,7 +479,8 @@ router.post('/strikes', async (req, res) => {
   const reason = typeof req.body?.reason === 'string' ? req.body.reason.trim() : ''
   let caseId = req.body?.caseId ? Number.parseInt(req.body.caseId, 10) : null
 
-  if (!Number.isFinite(userId)) return res.status(400).json({ error: 'Valid userId is required.' })
+  if (!Number.isInteger(userId) || userId < 1)
+    return res.status(400).json({ error: 'Valid userId is required.' })
   if (reason.length < 10)
     return res.status(400).json({ error: 'Reason must be at least 10 characters.' })
   if (reason.length > 1000)
@@ -539,7 +545,7 @@ router.get('/strikes', async (req, res) => {
 
   if (req.query.userId) {
     const userId = Number.parseInt(req.query.userId, 10)
-    if (Number.isFinite(userId)) where.userId = userId
+    if (Number.isInteger(userId) && userId >= 1) where.userId = userId
   }
 
   try {
@@ -572,7 +578,8 @@ router.get('/strikes', async (req, res) => {
 /* GET /cases/:id/plagiarism — Find similar content for plagiarism review */
 router.get('/cases/:id/plagiarism', async (req, res) => {
   const caseId = Number.parseInt(req.params.id, 10)
-  if (!Number.isFinite(caseId)) return res.status(400).json({ error: 'Invalid case ID.' })
+  if (!Number.isInteger(caseId) || caseId < 1)
+    return res.status(400).json({ error: 'Invalid case ID.' })
 
   try {
     const modCase = await prisma.moderationCase.findUnique({
