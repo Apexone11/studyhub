@@ -28,36 +28,6 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
-### Wave-12.14 — Spacing / chrome token pass + wave 12.11-12.13 production readiness verification (2026-05-28)
-
-Founder asked for a "fix the spacing everywhere + confirm everything we shipped is production-ready" pass. Two parallel audits:
-
-**Feature audit (wave 12.11-12.13) — clean.** All 11 features from `d1a3abe0` / `e9fc07e6` / `e80214b4` verified end-to-end: admin step-up MFA (`requireRecentMfa` on 5 routes + frontend interceptor + step-up modal + 12/12 unit tests), `WebAuthnCredential.lastUsedAt`, `serializeNote` allowlist (incl. wave-12.13 `revision` re-add), upload volume → R2 backup (`runWithHeartbeat`-wrapped, streamed-not-buffered, `R2_BUCKET_UPLOAD_BACKUP` REQUIRED_IN_PRODUCTION), Data Saver + Battery Saver modes (`useDataSaver` / `useBatterySaver` exports `setStored*` helpers, `SaverModeInitializer` mounted in `App.jsx`, server-side `dataSaverNegotiation` 3-signal contract, 11/11 unit tests), StudyHubPlayer (watch-progress persistence, A-B loop, `?` keyboard help overlay), feed lite mode (`?lite=1`), typing-indicator suppression, battery-saver JS gates in `animations.js` + `Toast.jsx`, session-payload preferences. CLAUDE.md A-rules A5/A6/A7/A8/A10/A11/A12/A13/A14/A16 all clean. 60/60 wave-12 unit tests pass. Nothing to finish.
-
-**Spacing / chrome pass — fixed.** A spacing audit found ~50 visual drifts; the screenshot-visible one was `.feed-page__aside { top: 86px }` floating ~30px below the actual 56px navbar. Foundation tokens added in `index.css` `:root`: `--sh-nav-h: 56px` (single source of truth for sticky offsets) and `--sh-space-xs/sm/md/lg/xl/2xl/3xl` (CANONICAL 4/8/12/16/20/24/32 step aliases — mapped to existing `--space-*` so old call sites keep working). Then migrated the worst drifts:
-
-- **Sticky offsets** — `.feed-page__aside`, `.settings-nav`, `PageShell` sidebar, `AiPage` sidebar all now compute `top` from `var(--sh-nav-h)`. No more 74 / 80 / 86px guesses.
-- **Split-panel height** — `.notes-split-panel` / `.messages-split-panel` switched from `calc(100vh - 80)` to `calc(100dvh - var(--sh-nav-h))` with `100vh` fallback so mobile Safari's URL bar doesn't clip the bottom of the panel.
-- **Grid gaps** — `.app-three-col-grid` (22 → 20), `.app-two-col-grid` (20), `.profile-cockpit` (20) all on `--sh-space-xl`. Navigating Feed ↔ Sheets ↔ Profile no longer shifts the column gutter.
-- **Duplicate `.settings-layout`** — removed the index.css copy (which conflicted on `gap`); canonical definition lives in `responsive.css` with `gap: var(--sh-space-2xl)`.
-- **Sidebar rhythm** — `.sh-sidebar-nav-link` padding `9px → 8px` (off-step). Phase 1 sectioned-nav section gap 14 → 16 (`--sh-space-lg`); label-to-link gap 6 → 8 (`--sh-space-sm`). Course-entry link padding `'6px 2px' → '10px 8px'` (WCAG 2.5.5 touch target + 8-step).
-- **Skeleton CLS** — `SkeletonCard` padding `'20px 22px' → var(--card-pad)` (matches real `.sh-card`); `SkeletonFeed` gap 14 → 16; removed the per-card padding override. The shimmer ghost no longer visibly shrinks when content loads.
-- **AiBubble** — bubble + chat window `bottom`/`right` use `calc(N + env(safe-area-inset-*, 0px))` so the iPhone home-indicator strip is clear; chat `maxHeight` switched to `100dvh` for the same URL-bar reason.
-- **iOS auto-zoom fix** — `@media (max-width: 767px) .sh-input { font-size: 16px }` floors the input font so iOS Safari doesn't auto-zoom and jolt the layout on focus. Desktop keeps `--type-sm`.
-- **FeedPage banners** — `padding: '10px 14px'`, `'12px 14px'`, `'7px 16px'` all migrated to the 16/8-step.
-
-**Code-reviewer pass — 3 real findings caught + fixed in-wave.** A code-reviewer subagent on the diff caught:
-
-1. **CRITICAL** — `AppSidebar.jsx` drawer-mode `<aside>` still had `top: 74` hardcoded (line 431). Tablet/phone traffic — most real users — would have hit a sticky drawer trigger sitting 18px below the navbar. Migrated to the token.
-2. **IMPORTANT** — `AiPage.jsx` chat-panel `height: calc(100vh - ...)` should have been `100dvh` per the inline comment intent. CSS-in-JS can't do the dual-line `100vh / 100dvh` override pattern, so swapped to `100dvh` directly (95%+ browser support since Sep 2022).
-3. **IMPORTANT** — `.settings-layout` responsive overrides at 1024px + 768px were still in index.css contradicting the "moved to responsive.css" comment, AND the 768 vs 767 breakpoint collision produced a 1-pixel window at exactly 768px where the gap dropped to 12px. Moved BOTH the tablet (768–1024px) and phone (≤767px) overrides into responsive.css with the canonical 767 phone breakpoint, plus migrated the `.settings-nav-btn` mobile overrides over so SettingsPage's phone view still renders correctly.
-
-Bonus migration during the code-reviewer fix pass: also migrated 4 pre-existing hardcoded sticky offsets that didn't ship in this wave's original scope but use the same `top: 74/80` pattern — `index.css .sh-sidebar-sticky`, `MyCoursesPage.jsx`, `ScholarLists.css .scholar-saved__rail`, `ScholarPage.css .scholar-reader__sidecar`. All now compute from `var(--sh-nav-h)`.
-
-Out of scope for this wave (documented in the audit, deferred): a shared `&lt;FormField&gt;` primitive to standardize per-tab form spacing in Settings; a shared `&lt;Modal&gt;` primitive to consolidate the 5 ConfirmDialog reimplementations; bulk migration of remaining ~30 `pageShell(top, bottom)` call sites to one default; bulk 100vh → 100dvh on 40 page roots. Those are structural changes that need founder sign-off on the primitive contract before landing.
-
-Validation: backend lint clean (no changes), frontend lint 0 errors (warning count unchanged at 91 — same warnings as baseline, all pre-existing), frontend build green (1.02s). 12 files changed, ~197 insertions / 74 deletions.
-
 ### Wave-12.13 — Codex P1 + P2 fixes on wave-12.11 / 12.12 (2026-05-28)
 
 Two real findings from a Codex review pass on `e9fc07e6`. Both vetted and fixed in our style.
