@@ -145,30 +145,14 @@ describe('Security headers on API routes', () => {
   })
 
   it('HSTS is set when NODE_ENV=production', async () => {
-    // Require a fresh app with production mode to test HSTS
-    const prevEnv = process.env.NODE_ENV
-    const prevFieldKey = process.env.FIELD_ENCRYPTION_KEY
-    const prevProvenance = process.env.PROVENANCE_SECRET
-    const prevR2Bucket = process.env.R2_BUCKET_AI_ATTACHMENTS
-    const prevJwt = process.env.JWT_SECRET
-    const prevDbUrl = process.env.DATABASE_URL
-    process.env.NODE_ENV = 'production'
-    // Set dummy frontend URL so CORS doesn't reject everything
-    process.env.FRONTEND_URL = 'http://localhost:5173'
-    // secretValidator.js fails closed in production when REQUIRED +
-    // REQUIRED_IN_PRODUCTION secrets are missing (CLAUDE.md A9). On Windows
-    // dev these come from backend/.env; on CI Linux .env isn't shipped so
-    // we must set them here. Provide dummies — they never reach a real
-    // crypto / storage / DB call in this test.
-    process.env.FIELD_ENCRYPTION_KEY = 'a'.repeat(64)
-    process.env.PROVENANCE_SECRET = 'b'.repeat(64)
-    process.env.R2_BUCKET_AI_ATTACHMENTS = 'studyhub-ai-attachments-test'
-    if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
-      process.env.JWT_SECRET = 'c'.repeat(32)
-    }
-    if (!process.env.DATABASE_URL || process.env.DATABASE_URL.length < 10) {
-      process.env.DATABASE_URL = 'postgresql://test@localhost:5432/test'
-    }
+    // helpers/productionSecretsFixture.js handles flipping NODE_ENV to
+    // production AND auto-populating every REQUIRED + REQUIRED_IN_PRODUCTION
+    // secret with a spec-satisfying dummy (length + regex), and returns
+    // a restore() function for the finally block. New secrets added to
+    // secretValidator.js are picked up automatically — no per-test
+    // maintenance. Refined 2026-05-27 per Codex review feedback.
+    const { applyProductionSecretsFixture } = require('./helpers/productionSecretsFixture')
+    const restore = applyProductionSecretsFixture()
     try {
       const appPath = require.resolve('../src/index')
       delete require.cache[appPath]
@@ -180,18 +164,7 @@ describe('Security headers on API routes', () => {
 
       delete require.cache[appPath]
     } finally {
-      process.env.NODE_ENV = prevEnv
-      delete process.env.FRONTEND_URL
-      if (prevFieldKey === undefined) delete process.env.FIELD_ENCRYPTION_KEY
-      else process.env.FIELD_ENCRYPTION_KEY = prevFieldKey
-      if (prevProvenance === undefined) delete process.env.PROVENANCE_SECRET
-      else process.env.PROVENANCE_SECRET = prevProvenance
-      if (prevR2Bucket === undefined) delete process.env.R2_BUCKET_AI_ATTACHMENTS
-      else process.env.R2_BUCKET_AI_ATTACHMENTS = prevR2Bucket
-      if (prevJwt === undefined) delete process.env.JWT_SECRET
-      else process.env.JWT_SECRET = prevJwt
-      if (prevDbUrl === undefined) delete process.env.DATABASE_URL
-      else process.env.DATABASE_URL = prevDbUrl
+      restore()
     }
   })
 })

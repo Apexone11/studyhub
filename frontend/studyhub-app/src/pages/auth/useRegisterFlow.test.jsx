@@ -44,13 +44,20 @@ afterEach(() => {
   sessionStorage.clear()
 })
 
-// Skipped 2026-05-24: paired with RolePickerPage.test.jsx — same roles
-// v2 rework. The hook's "needs_role" branch now routes through a flag
-// gate + a new session-storage shape (was `tempToken`, now
-// `{tempToken, expiresAt}`). Test pre-dates the change. Underlying
-// branch covered by auth.routes backend tests.
-describe.skip('useRegisterFlow — Google needs_role branching', () => {
-  it('stashes tempToken in sessionStorage and routes to /signup/role', async () => {
+// 2026-05-27: narrowed from describe.skip back to a per-it skip on the
+// stale `needs_role` case only (Codex review feedback). The other three
+// cases in this suite — existing-user sign-in, API-error surfacing, and
+// missing-credential — still exercise current behavior and need
+// coverage. Only the first `it` is paired with the RolePickerPage roles
+// v2 drift.
+describe('useRegisterFlow — Google needs_role branching', () => {
+  // Skipped: roles v2 rework changed the hook's `needs_role` branch to
+  // route through a flag gate + a new session-storage shape (was
+  // `tempToken` string, now `{tempToken, expiresAt}` object). Test
+  // pre-dates the change. Underlying branch covered by auth.routes
+  // backend tests; the redirect-to-/signup/role behavior is also
+  // exercised by the e2e signup smoke.
+  it.skip('stashes tempToken in sessionStorage and routes to /signup/role', async () => {
     apiGoogleAuthMock.mockResolvedValue({
       ok: true,
       data: {
