@@ -28,6 +28,27 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.8 — admin MFA fail-CLOSED + sealed-glass-break override (2026-05-27)
+
+Closes P1-E (security policy violation) from the 2026-05-14 backend bug hunt. The `flag_admin_mfa_required` read in `auth.login.controller.js` was fail-OPEN — any DB error or missing flag row silently disabled admin MFA enforcement, the exact failure mode CLAUDE.md §12 decision #20 was written to prevent. Flipped to fail-CLOSED with a documented emergency-override env var so the founder can still get in if locked out of their own 2FA device.
+
+**Behaviour:**
+
+- Explicit `flag_admin_mfa_required.enabled === true` → enforce (unchanged).
+- Explicit `enabled === false` → skip enforcement (unchanged — supports rollout pause).
+- Missing row → **now enforces** (was: silently off). Matches decision #20.
+- Prisma read throws → **now enforces** (was: silently off). Structured `auth.admin_mfa_flag_read_failed` log fires so the on-call sees the incident.
+- New `EMERGENCY_DISABLE_ADMIN_MFA=true` Railway env var bypasses the entire enforcement path. Direct env-var access required. Every login that uses it fires `auth.admin_mfa_emergency_disabled` to Sentry so the ops trail exists.
+
+**Files:**
+
+- `backend/src/modules/auth/auth.login.controller.js` — inverted the fail direction, added the override branch, structured logging on both override-fired and flag-read-failed events.
+- `backend/src/lib/secretValidator.js` — added `EMERGENCY_DISABLE_ADMIN_MFA` under `OPTIONAL` so the boot summary counts it when set.
+- `backend/.env.example` — documented the sealed-glass-break with explicit "do NOT enable in normal operations" warning.
+- `backend/test/auth.deep.test.js` — added 4 regression tests pinning each fail direction: missing flag row enforces, DB error enforces, explicit `enabled=false` skips, override bypasses (and skips the flag read entirely so a db-down incident plus an override-set founder still gets in).
+
+Validation: 39/39 auth.deep tests pass; 53/53 across the 4 auth-touching test files (auth.deep, auth.routes, auth.cookies, auth.session.deep, security.headers). Backend lint clean.
+
 ### Wave-12.7 — modal focus-trap migration (round 2) (2026-05-27)
 
 Migrated 3 more legacy dialogs to the shared `<FocusTrappedDialog>` primitive so every modal in the app has W3C-compliant focus trapping, Escape, and backdrop-click behaviour wired through one code path:

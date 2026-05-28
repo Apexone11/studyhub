@@ -161,6 +161,14 @@ const OPTIONAL = [
   { key: 'WEBAUTHN_ORIGIN', description: 'WebAuthn origin URL' },
   { key: 'GOOGLE_BOOKS_API_KEY', description: 'Google Books API key' },
   { key: 'CSP_REPORT_URI', description: 'CSP violation reporting endpoint' },
+  {
+    key: 'EMERGENCY_DISABLE_ADMIN_MFA',
+    description:
+      'Sealed-glass-break override. Set to "true" in Railway to disable admin MFA ' +
+      'enforcement during an incident (e.g. founder lost their 2FA device). Every ' +
+      'login that uses it emits auth.admin_mfa_emergency_disabled to Sentry. Unset ' +
+      'as soon as the incident is resolved.',
+  },
 ]
 
 function validateSecrets() {

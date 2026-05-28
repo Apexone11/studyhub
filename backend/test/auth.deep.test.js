@@ -388,6 +388,71 @@ describe('POST /login — login flow', () => {
     expect(res.body.setupPath).toBe('/settings/security/setup-2fa')
   })
 
+  // ── Admin MFA fail-closed enforcement (wave-12.8, CLAUDE.md §12 #20) ──
+  //
+  // Pinning the fail direction: any signal that ISN'T an explicit
+  // `enabled=false` row must enforce MFA. Missing rows + DB errors are
+  // the canonical incidents — pre-wave-12.8 both silently disabled
+  // enforcement, which inverted the flag's purpose.
+
+  it('admin MFA fail-closed: MISSING flag row still enforces (no 2FA → 403)', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue(
+      await makeUser({ role: 'admin', mfaRequired: true, twoFaEnabled: false }),
+    )
+    mocks.prisma.featureFlag.findUnique.mockResolvedValue(null)
+    const res = await request(app)
+      .post('/login')
+      .send({ username: 'tester', password: 'Password123' })
+    expect(res.status).toBe(403)
+    expect(res.body.code).toBe('MFA_SETUP_REQUIRED')
+  })
+
+  it('admin MFA fail-closed: DB error on flag read still enforces (no 2FA → 403)', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue(
+      await makeUser({ role: 'admin', mfaRequired: true, twoFaEnabled: false }),
+    )
+    mocks.prisma.featureFlag.findUnique.mockRejectedValue(new Error('P1001: db unreachable'))
+    const res = await request(app)
+      .post('/login')
+      .send({ username: 'tester', password: 'Password123' })
+    expect(res.status).toBe(403)
+    expect(res.body.code).toBe('MFA_SETUP_REQUIRED')
+  })
+
+  it('admin MFA: explicit enabled=false skips enforcement (regular session issued)', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue(
+      await makeUser({ role: 'admin', mfaRequired: true, twoFaEnabled: false }),
+    )
+    mocks.prisma.featureFlag.findUnique.mockResolvedValue({ enabled: false })
+    const res = await request(app)
+      .post('/login')
+      .send({ username: 'tester', password: 'Password123' })
+    expect(res.status).toBe(200)
+    expect(res.body.message).toBe('Login successful!')
+  })
+
+  it('EMERGENCY_DISABLE_ADMIN_MFA=true bypasses enforcement even when flag enforces', async () => {
+    const prev = process.env.EMERGENCY_DISABLE_ADMIN_MFA
+    process.env.EMERGENCY_DISABLE_ADMIN_MFA = 'true'
+    try {
+      mocks.prisma.user.findUnique.mockResolvedValue(
+        await makeUser({ role: 'admin', mfaRequired: true, twoFaEnabled: false }),
+      )
+      mocks.prisma.featureFlag.findUnique.mockResolvedValue({ enabled: true })
+      const res = await request(app)
+        .post('/login')
+        .send({ username: 'tester', password: 'Password123' })
+      expect(res.status).toBe(200)
+      expect(res.body.message).toBe('Login successful!')
+      // The flag DB read MUST be skipped while the override is set, so a
+      // db-down incident plus an override-set founder still gets in.
+      expect(mocks.prisma.featureFlag.findUnique).not.toHaveBeenCalled()
+    } finally {
+      if (prev === undefined) delete process.env.EMERGENCY_DISABLE_ADMIN_MFA
+      else process.env.EMERGENCY_DISABLE_ADMIN_MFA = prev
+    }
+  })
+
   it('login does NOT echo the password back in the response body', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue(await makeUser())
     const res = await request(app)
