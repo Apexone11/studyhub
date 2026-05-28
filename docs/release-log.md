@@ -28,6 +28,23 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.13 — Codex P1 + P2 fixes on wave-12.11 / 12.12 (2026-05-28)
+
+Two real findings from a Codex review pass on `e9fc07e6`. Both vetted and fixed in our style.
+
+**P1 — `serializeNote` dropped `revision`, breaking the editor's optimistic-concurrency loop.**
+
+Wave-12.11's `PUBLIC_NOTE_FIELDS` allowlist omitted `revision`. `frontend/.../useNotePersistence.js#L248` reads `srv.revision` and uses it as `baseRevision` on the next autosave. With `revision` stripped from the response, the editor saw `Number(undefined ?? 0) === 0` and any note with `revision >= 1` would 409 on the next debounce-triggered save. Added `revision` back to the allowlist with an inline comment so a future cleanup doesn't drop it again.
+
+**P2 — Saver-mode preferences never reached the global hook.**
+
+`buildAuthenticatedUserPayload` didn't include `preferences`, so `SaverModeInitializer` read `user.preferences?.dataSaverMode` as `undefined` and the hooks fell back to localStorage + the platform signal. A user could save "Data Saver: on" in Settings → backend persisted → frontend never honored it across browsers. Two-part fix:
+
+1. **Backend**: `getAuthenticatedUser` now selects `preferences: { select: { dataSaverMode, batterySaverMode } }` (slim — just the two columns the global hook needs at page-load time, not the whole prefs row). `buildAuthenticatedUserPayload` surfaces them as `preferences: { dataSaverMode, batterySaverMode }`. Null-safe: a fresh user with no UserPreferences row defaults both to `'auto'` matching the schema default.
+2. **Frontend**: `DataAndBatteryTab` now calls `setStoredDataSaverMode` + `setStoredBatterySaverMode` after a successful save, so the change takes effect immediately on the current page without a reload (also seeds future first-paints before the session round-trip completes).
+
+Validation: 3387/3393 backend tests pass, 845/855 frontend. Lint clean both projects. Build green.
+
 ### Wave-12.12 — step-up MFA expansion + data-saver consumers + battery-saver JS gates (2026-05-27)
 
 Follow-on wave addressing the deferred items from wave-12.11. Backend tests: 3387/3393 pass. Frontend tests: 845/855 pass. Lint clean both projects.

@@ -16,6 +16,8 @@
  * arbitrary strings into the column.
  */
 import { Skeleton } from '../../components/Skeleton'
+import { setStoredDataSaverMode } from '../../lib/useDataSaver'
+import { setStoredBatterySaverMode } from '../../lib/useBatterySaver'
 import { Button, FormField, MsgList, SectionCard, Select } from './settingsShared'
 import { usePreferences } from './settingsState'
 
@@ -118,7 +120,23 @@ export default function DataAndBatteryTab() {
       <Button
         disabled={saving}
         onClick={async () => {
-          await save(['dataSaverMode', 'batterySaverMode'], 'Data &amp; battery preferences saved.')
+          const ok = await save(
+            ['dataSaverMode', 'batterySaverMode'],
+            'Data &amp; battery preferences saved.',
+          )
+          // Wave-12.12 P2 fix — push the new values into the
+          // useDataSaver / useBatterySaver hook caches so the change
+          // takes effect immediately on the current page without a
+          // reload. Without this the user saves "on", but the global
+          // SaverModeInitializer only re-derives from `serverMode`
+          // when the session payload refreshes, which usually requires
+          // a navigation. The hooks ALSO read this localStorage key
+          // for first-paint cache, so this seeds future page loads
+          // before the session round-trip completes.
+          if (ok) {
+            setStoredDataSaverMode(prefs.dataSaverMode)
+            setStoredBatterySaverMode(prefs.batterySaverMode)
+          }
         }}
       >
         {saving ? 'Saving...' : 'Save Preferences'}

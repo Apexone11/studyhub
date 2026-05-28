@@ -83,6 +83,12 @@ const PUBLIC_NOTE_FIELDS = [
   'downloads',
   'relatedSheetId',
   'relatedPaperId',
+  // `revision` is load-bearing for the editor's optimistic-concurrency
+  // path — useNotePersistence.js reads `srv.revision` and uses it as
+  // `baseRevision` on the next autosave. Dropping it from the
+  // response meant ANY note with revision >= 1 saved as 0 on next
+  // edit, triggering a spurious 409 conflict (Codex P1 on wave-12.11).
+  'revision',
   'createdAt',
   'updatedAt',
   // Relation includes — present only when the query loaded them.
