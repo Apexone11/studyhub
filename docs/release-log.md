@@ -28,6 +28,19 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.8.1 — 2FA recovery codes unit test coverage (2026-05-27)
+
+Closes the "Tests required before shipping" gap from `docs/internal/archive/audits/2026-05-achievements/2026-04-30-2fa-recovery-codes-plan.md`. The recovery-codes primitive (`lib/auth/recoveryCodes.js`) had 0 test coverage despite being the security-critical core of the entire feature.
+
+Added `backend/test/recoveryCodes.unit.test.js` with 20 tests covering:
+
+- `generatePlaintextCodes` — count, hex format, randomness.
+- `hashCodes` — bcrypt header, per-code salt, roundtrip verification.
+- `normalizeRecoveryCode` — both canonical and dash-stripped forms, case folding, whitespace, charset/length validation, nullish rejection.
+- `consumeRecoveryCode` — the critical contract: a code matched once cannot be matched again (the single-use property); unknown codes leave the hash list untouched; empty / non-string submissions reject without mutating state.
+
+The implementation itself is unchanged. The constant-time-ish loop guarantee (no early break) is enforced by code review; the test verifies the observable outcome (matched index dropped, others retained).
+
 ### Wave-12.8 — admin MFA fail-CLOSED + sealed-glass-break override (2026-05-27)
 
 Closes P1-E (security policy violation) from the 2026-05-14 backend bug hunt. The `flag_admin_mfa_required` read in `auth.login.controller.js` was fail-OPEN — any DB error or missing flag row silently disabled admin MFA enforcement, the exact failure mode CLAUDE.md §12 decision #20 was written to prevent. Flipped to fail-CLOSED with a documented emergency-override env var so the founder can still get in if locked out of their own 2FA device.
