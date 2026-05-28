@@ -28,6 +28,17 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.10 — moderation module A11 + A12 sweep (2026-05-27)
+
+Four real CLAUDE.md A-rule violations in the moderation module, all found by an audit subagent on a broad codebase sweep. Moderation got refactored before A11 (originAllowlist on writes) and A12 (Number.isInteger + ≥1 guard for IDs) were locked in, so the module shipped two CSRF-defense-in-depth gaps and 11 weak ID guards.
+
+- **HIGH — A11 — `/api/admin/moderation` adminRouter had no `originAllowlist()`.** Admin endpoints (claim case, review case, issue strike, lift restriction, approve/reject appeal) were CSRF-protected only by the global Origin check in `index.js`, which trusts empty-Origin requests (curl, server-to-server). Per-module `originAllowlist()` is the defense-in-depth layer. The parallel `/api/admin` adminRouter got it in wave-11; the moderation admin router was missed. Added.
+- **HIGH — A11 — `/api/moderation` userRouter (reports + appeals) had no `originAllowlist()`.** Same gap, user-facing side. A malicious cross-origin page could submit a false report or appeal in the victim's name. Added.
+- **HIGH — A12 — 11 sites used `Number.isFinite(id)` instead of `Number.isInteger(id) && id >= 1`.** `Number.isFinite(-1)` is true; `Number.isFinite(1.5)` is true after parseInt-truncation but the convention is to use isInteger. Negative IDs would have hit `where: { id: -1 }` in Prisma. Fixed in `moderation.admin.cases.controller.js` (8 sites), `moderation.admin.enforcement.controller.js` (2), `moderation.user.controller.js` (2). Both validation sites (400 on fail) and one optional-filter site (`if isInteger then set where.userId`).
+- **HIGH — A12 — `moderation.user.controller.js#GET /my-log` used bare `parseInt`.** No radix on the inner call, no isInteger guard. Switched to `clampPage()` from `lib/constants.js` for consistency with the rest of the platform's pagination handling.
+
+Validation: 3362/3368 backend tests pass (6 documented skips, 0 fails). Backend lint clean. The moderation reporting + visibility test suites (15/15) continue passing, confirming the new origin requirement doesn't break the existing supertest flows.
+
 ### Wave-12.9 — code-reviewer audit fixes on wave-12.7 / 12.8 (2026-05-27)
 
 Three real findings from a code-reviewer subagent pass on the modal migration + admin MFA work. All have one-line fixes.

@@ -40,7 +40,7 @@ router.get('/restrictions', async (req, res) => {
 /* PATCH /restrictions/:id/lift — Lift a restriction */
 router.patch('/restrictions/:id/lift', async (req, res) => {
   const restrictionId = Number.parseInt(req.params.id, 10)
-  if (!Number.isFinite(restrictionId))
+  if (!Number.isInteger(restrictionId) || restrictionId < 1)
     return res.status(400).json({ error: 'Invalid restriction ID.' })
 
   try {
@@ -129,7 +129,8 @@ router.patch('/appeals/:id/review', async (req, res) => {
   const reviewNote =
     typeof req.body?.reviewNote === 'string' ? req.body.reviewNote.trim().slice(0, 500) : ''
 
-  if (!Number.isFinite(appealId)) return res.status(400).json({ error: 'Invalid appeal ID.' })
+  if (!Number.isInteger(appealId) || appealId < 1)
+    return res.status(400).json({ error: 'Invalid appeal ID.' })
   if (!['approve', 'reject'].includes(action)) {
     return res.status(400).json({ error: 'Action must be "approve" or "reject".' })
   }
