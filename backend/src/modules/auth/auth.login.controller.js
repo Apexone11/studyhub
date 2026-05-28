@@ -113,7 +113,14 @@ router.post('/login', loginLimiter, async (req, res) => {
     // and needs to deploy" scenario. Override is logged loudly so the
     // incident trail exists.
     let adminMfaEnforced = true
-    if (process.env.EMERGENCY_DISABLE_ADMIN_MFA === 'true') {
+    // Case + whitespace tolerant: a founder under stress at 3am typing
+    // "True", "TRUE", or " true " in the Railway dashboard still gets
+    // the sealed-glass-break behaviour. Anything other than truthy
+    // "true" leaves enforcement on.
+    const emergencyDisableRaw = process.env.EMERGENCY_DISABLE_ADMIN_MFA
+    const emergencyDisable =
+      typeof emergencyDisableRaw === 'string' && emergencyDisableRaw.trim().toLowerCase() === 'true'
+    if (emergencyDisable) {
       adminMfaEnforced = false
       log.warn(
         { event: 'auth.admin_mfa_emergency_disabled' },

@@ -155,9 +155,12 @@ export default function FocusTrappedDialog({
       clickOutsideDeactivates,
       returnFocusOnDeactivate,
       // Try the explicit selector first; fall back to the first
-      // focusable inside the panel if the selector misses.
+      // focusable inside the panel if the selector misses. Scope the
+      // query to the dialog's own subtree via overlayRef so a stray
+      // `[data-autofocus]` elsewhere on the page (dev harnesses, other
+      // mounted components) can't hijack the initial focus target.
       initialFocus: initialFocusSelector
-        ? () => document.querySelector(initialFocusSelector) || undefined
+        ? () => overlayRef.current?.querySelector(initialFocusSelector) || undefined
         : undefined,
       // focus-trap-react fires this when escapeDeactivates / outside-
       // click triggers. We forward to onClose so React state stays the

@@ -453,6 +453,55 @@ describe('POST /login — login flow', () => {
     }
   })
 
+  it('EMERGENCY_DISABLE_ADMIN_MFA is case + whitespace tolerant (founder under stress)', async () => {
+    // Real 3am footgun: muscle memory from shell scripts produces
+    // " True " or "TRUE" rather than literal "true". Each must still
+    // trip the sealed-glass-break.
+    const variants = [' true', 'TRUE ', 'True', '\ttrue\n']
+    const prev = process.env.EMERGENCY_DISABLE_ADMIN_MFA
+    try {
+      for (const variant of variants) {
+        process.env.EMERGENCY_DISABLE_ADMIN_MFA = variant
+        mocks.prisma.user.findUnique.mockResolvedValue(
+          await makeUser({ role: 'admin', mfaRequired: true, twoFaEnabled: false }),
+        )
+        mocks.prisma.featureFlag.findUnique.mockResolvedValue({ enabled: true })
+        const res = await request(app)
+          .post('/login')
+          .send({ username: 'tester', password: 'Password123' })
+        expect(res.status, `variant=${JSON.stringify(variant)}`).toBe(200)
+      }
+    } finally {
+      if (prev === undefined) delete process.env.EMERGENCY_DISABLE_ADMIN_MFA
+      else process.env.EMERGENCY_DISABLE_ADMIN_MFA = prev
+    }
+  })
+
+  it('EMERGENCY_DISABLE_ADMIN_MFA="false" / "1" / "yes" do NOT bypass enforcement', async () => {
+    // Pin the strict opt-in: only the literal word "true" disables. Any
+    // other truthy-looking value is treated as "off", so the founder
+    // doesn't accidentally bypass by typing "1" or "yes".
+    const variants = ['false', '1', 'yes', 'TRUEISH']
+    const prev = process.env.EMERGENCY_DISABLE_ADMIN_MFA
+    try {
+      for (const variant of variants) {
+        process.env.EMERGENCY_DISABLE_ADMIN_MFA = variant
+        mocks.prisma.user.findUnique.mockResolvedValue(
+          await makeUser({ role: 'admin', mfaRequired: true, twoFaEnabled: false }),
+        )
+        mocks.prisma.featureFlag.findUnique.mockResolvedValue({ enabled: true })
+        const res = await request(app)
+          .post('/login')
+          .send({ username: 'tester', password: 'Password123' })
+        expect(res.status, `variant=${JSON.stringify(variant)}`).toBe(403)
+        expect(res.body.code).toBe('MFA_SETUP_REQUIRED')
+      }
+    } finally {
+      if (prev === undefined) delete process.env.EMERGENCY_DISABLE_ADMIN_MFA
+      else process.env.EMERGENCY_DISABLE_ADMIN_MFA = prev
+    }
+  })
+
   it('login does NOT echo the password back in the response body', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue(await makeUser())
     const res = await request(app)

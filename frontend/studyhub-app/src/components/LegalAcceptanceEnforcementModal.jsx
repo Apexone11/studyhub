@@ -119,6 +119,13 @@ export default function LegalAcceptanceEnforcementModal() {
       open={open}
       role="alertdialog"
       ariaLabelledBy="legal-enforcement-title"
+      // Land initial focus on Sign out (the safe action) rather than
+      // letting focus-trap-react pick the first tabbable. Explicit
+      // selector makes the contract testable and protects against a
+      // brief render race where focus-trap can't find a tabbable and
+      // throws — which an error boundary would swallow, letting the
+      // user past the enforcement gate unenforced.
+      initialFocusSelector="[data-legal-signout]"
       // Enforcement modal: no dismiss pathways. User MUST sign out or
       // navigate to legal settings.
       escapeDeactivates={false}
@@ -147,6 +154,7 @@ export default function LegalAcceptanceEnforcementModal() {
         )}
       <div style={styles.actions}>
         <button
+          data-legal-signout
           type="button"
           onClick={() => {
             void signOut()

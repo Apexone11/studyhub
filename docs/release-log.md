@@ -28,6 +28,16 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.9 — code-reviewer audit fixes on wave-12.7 / 12.8 (2026-05-27)
+
+Three real findings from a code-reviewer subagent pass on the modal migration + admin MFA work. All have one-line fixes.
+
+- **HIGH — `FocusTrappedDialog` initialFocus selector was document-global.** `document.querySelector(initialFocusSelector)` searched the entire document, so a stray `[data-autofocus]` elsewhere on the page (dev harnesses, other mounted components) could hijack the dialog's initial focus target. Scoped to `overlayRef.current?.querySelector(...)`. Affects `ConfirmDialog`, `AiSheetPreview`, `AttachmentPreview` — all of which now have guaranteed in-dialog focus targets.
+- **MED-HIGH — `LegalAcceptanceEnforcementModal` had no `initialFocusSelector`.** Pre-migration the bespoke `useFocusTrap` may have placed focus differently; without an explicit selector, focus-trap-react falls back to the first tabbable. More importantly: in a brief render race where focus-trap can't find a tabbable, it throws — and an error boundary catching that exception would silently unmount the enforcement modal and let the user past the legal-acceptance gate. Added `data-legal-signout` on the Sign out button + `initialFocusSelector="[data-legal-signout]"` on the dialog so the contract is explicit and testable.
+- **MED — `EMERGENCY_DISABLE_ADMIN_MFA` was case-sensitive.** Strict `=== 'true'` comparison meant a founder under stress typing "True" or "TRUE" in the Railway dashboard would NOT bypass enforcement — the exact moment that flexibility matters most. Switched to `.trim().toLowerCase() === 'true'`. Strict opt-in is preserved — `"1"`, `"yes"`, `"trueish"` all still enforce. Added 2 regression tests pinning both the tolerance (the variants that SHOULD bypass) AND the strictness (the variants that should NOT).
+
+Validation: 41/41 auth.deep tests pass (+2 new variant tests); 21/21 AiSheetPreview + AttachmentPreview tests still pass. Backend + frontend lint clean.
+
 ### Wave-12.8.1 — 2FA recovery codes unit test coverage (2026-05-27)
 
 Closes the "Tests required before shipping" gap from `docs/internal/archive/audits/2026-05-achievements/2026-04-30-2fa-recovery-codes-plan.md`. The recovery-codes primitive (`lib/auth/recoveryCodes.js`) had 0 test coverage despite being the security-critical core of the entire feature.
