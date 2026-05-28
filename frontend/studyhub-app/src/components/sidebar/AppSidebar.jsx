@@ -194,8 +194,14 @@ export default function AppSidebar({ mode = 'fixed' }) {
       {phase1On ? (
         <nav aria-label="Sidebar navigation" className="sh-sidebar-section">
           {visibleSidebarSections(user).map((section) => (
-            <div key={section.key} style={{ marginBottom: 14 }}>
-              <div className="sh-label" style={{ marginBottom: 6, paddingLeft: 2 }}>
+            // 16px between sections (--sh-space-lg) — was 14 off-step;
+            // 8px from label to first link (--sh-space-sm) — was 6.
+            // Standardizes the sectioned-nav rhythm.
+            <div key={section.key} style={{ marginBottom: 'var(--sh-space-lg)' }}>
+              <div
+                className="sh-label"
+                style={{ marginBottom: 'var(--sh-space-sm)', paddingLeft: 2 }}
+              >
                 {section.label}
               </div>
               {section.links.map((link) => {
@@ -350,7 +356,11 @@ export default function AppSidebar({ mode = 'fixed' }) {
                   display: 'flex',
                   alignItems: 'center',
                   gap: 8,
-                  padding: '6px 2px',
+                  // Was '6px 2px' which gave ~21px tall row — too small for
+                  // WCAG 2.5.5 (44×44). The (pointer: coarse) media query
+                  // boosts to 44 globally, but this lifts the desktop rhythm
+                  // to the 8-step at the same time.
+                  padding: '10px 8px',
                   borderBottom: '1px solid var(--sh-border)',
                   textDecoration: 'none',
                   borderRadius: 6,
@@ -418,7 +428,18 @@ export default function AppSidebar({ mode = 'fixed' }) {
 
   if (mode === 'drawer') {
     return (
-      <aside style={{ position: 'sticky', top: 74, alignSelf: 'start', zIndex: 25 }}>
+      // Drawer mode renders on tablet/phone — most real-user traffic. The
+      // sticky `top` must match the other migrated sticky elements
+      // (.feed-page__aside, .settings-nav, PageShell sidebar, AiPage sidebar)
+      // so the drawer trigger doesn't sit 18px below the navbar.
+      <aside
+        style={{
+          position: 'sticky',
+          top: 'calc(var(--sh-nav-h) + var(--sh-space-lg))',
+          alignSelf: 'start',
+          zIndex: 25,
+        }}
+      >
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}

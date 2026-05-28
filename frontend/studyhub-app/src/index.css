@@ -56,6 +56,28 @@
   --space-12: 3rem;
   --space-16: 4rem;
 
+  /* ── Spacing aliases (CANONICAL — use these prefixed names in new code).
+   * Mapped to the unprefixed --space-* above so existing call sites still
+   * work. The 8-step rhythm matches CLAUDE.md ("8/12/16/24/32 step").
+   * If you find yourself reaching for 9, 10, 14, 18, 22 — round to the
+   * nearest token below; off-step values accumulate as visual jitter as
+   * the user navigates between pages. */
+  --sh-space-xs: 0.25rem; /*  4px — chip gaps, tight icon padding */
+  --sh-space-sm: 0.5rem; /*   8px — adjacent buttons, label↔input gap */
+  --sh-space-md: 0.75rem; /*  12px — between form fields */
+  --sh-space-lg: 1rem; /*      16px — between cards (canonical card-gap) */
+  --sh-space-xl: 1.25rem; /*  20px — outer grid gaps, panel content rows */
+  --sh-space-2xl: 1.5rem; /*  24px — page top padding, card-internal padding */
+  --sh-space-3xl: 2rem; /*    32px — section breaks */
+
+  /* ── Chrome dimensions ───────────────────────────────────────────────
+   * Single source of truth for sticky-offset math. The NavBar component
+   * is 56px tall (frontend/.../components/navbar/navbarConstants.js).
+   * Any sticky aside / sticky nav must compute its `top` from this token,
+   * NOT a hardcoded 74 / 80 / 86 pixel value. Bumping the navbar height
+   * here should propagate to every sticky element in one place. */
+  --sh-nav-h: 56px;
+
   /* ── Layout ──────────────────────────────────────────────────────── */
   --page-max-w: 1200px;
   --page-narrow-w: 720px;
@@ -1089,6 +1111,18 @@ textarea {
   outline: none;
 }
 
+/* iOS Safari auto-zooms on input focus when the input's font-size resolves
+ * below 16px. --type-sm clamps to ~13.1–14.7px on phone widths, which
+ * triggered the zoom. Floor to 16px on touch viewports so focus doesn't
+ * jolt the layout. Desktop keeps the smaller font from --type-sm. */
+@media (max-width: 767px) {
+  .sh-input,
+  textarea.sh-input,
+  select.sh-input {
+    font-size: 16px;
+  }
+}
+
 .sh-input:focus {
   border-color: var(--sh-input-focus);
   box-shadow: var(--sh-focus-ring);
@@ -1229,9 +1263,10 @@ textarea.sh-input {
 /* ── Sidebar sticky container with independent scroll ──────────────────── */
 .sh-sidebar-sticky {
   position: sticky;
-  top: 74px;
+  top: calc(var(--sh-nav-h) + var(--sh-space-lg));
   align-self: start;
-  max-height: calc(100vh - 90px);
+  /* 90 was nav (56) + ~34 buffer. Token math: nav + 2 × xl-space = 56 + 40 = 96. */
+  max-height: calc(100dvh - var(--sh-nav-h) - var(--sh-space-xl) * 2);
   overflow-y: auto;
   padding-right: 4px;
 }
@@ -1261,8 +1296,10 @@ textarea.sh-input {
 .sh-sidebar-nav-link {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 9px 12px;
+  gap: var(--sh-space-sm); /* 8px — chip-step icon↔label rhythm */
+  /* 8/12 grid; was 9/12 which is off the 8-step. Touch target is preserved
+   * by the @media (pointer: coarse) rule lower in this file. */
+  padding: var(--sh-space-sm) var(--sh-space-md);
   border-radius: var(--radius);
   text-decoration: none;
   font-size: var(--type-sm);
@@ -4226,18 +4263,19 @@ html[data-reduced-motion='on'] *::after {
 .feed-page__aside {
   align-self: start;
   position: sticky;
-  top: 86px;
+  /* Sticky offset = navbar height + one card-gap of breathing room.
+   * Was a hardcoded 86px which sat 30px below the actual navbar.
+   * Token math: 56 + 16 = 72px. */
+  top: calc(var(--sh-nav-h) + var(--sh-space-lg));
 }
 
-/* ── Settings layout ─────────────────────────────────────────────────── */
-.settings-layout {
-  display: grid;
-  grid-template-columns: 200px 1fr;
-  gap: 24px;
-}
+/* ── Settings nav sticky offset ──────────────────────────────────────
+ * The `.settings-layout` grid itself lives in styles/responsive.css
+ * (single source of truth). Only the sticky offset is co-located here
+ * because it depends on --sh-nav-h. */
 .settings-nav {
   position: sticky;
-  top: 80px;
+  top: calc(var(--sh-nav-h) + var(--sh-space-2xl));
 }
 
 /* ═══ Tablet: 768px–1024px ═══════════════════════════════════════════ */
@@ -4245,10 +4283,9 @@ html[data-reduced-motion='on'] *::after {
   .profile-cockpit {
     grid-template-columns: 1fr;
   }
-  .settings-layout {
-    grid-template-columns: 180px 1fr;
-    gap: 16px;
-  }
+  /* .settings-layout tablet override now lives in styles/responsive.css
+   * to keep all .settings-layout breakpoints in one file (single source
+   * of truth for that class). */
 }
 
 /* ═══ Phone: ≤ 768px ═══════════════════════════════════════════════════ */
@@ -4272,28 +4309,12 @@ html[data-reduced-motion='on'] *::after {
     font-size: 13px;
   }
 
-  /* Settings: stack sidebar above content */
-  .settings-layout {
-    grid-template-columns: 1fr;
-    gap: 12px;
-  }
-  .settings-nav {
-    position: static;
-    display: flex;
-    gap: 4px;
-    overflow-x: auto;
-    padding-bottom: 8px;
-  }
-  .settings-nav::-webkit-scrollbar {
-    display: none;
-  }
-  .settings-nav .settings-nav-btn {
-    white-space: nowrap;
-    flex-shrink: 0;
-    padding: 8px 14px !important;
-    margin-bottom: 0 !important;
-    font-size: 13px !important;
-  }
+  /* .settings-layout and .settings-nav phone overrides now live in
+   * styles/responsive.css with the 767px breakpoint (matches
+   * layoutBreakpoints.phoneMax in src/lib/ui.js). The previous duplicate
+   * here used 768px which collided with responsive.css's 767px and
+   * produced a 1-pixel window at exactly 768px where the gap dropped to
+   * 12 instead of the canonical 24/16. */
 
   /* Feed aside: hide on mobile, shown on demand */
   .feed-aside {
@@ -4415,7 +4436,13 @@ html[data-reduced-motion='on'] *::after {
 .messages-split-panel {
   display: grid;
   gap: 0;
-  height: calc(100vh - 80px);
+  /* 100dvh accommodates mobile Safari's URL bar without the bottom of the
+   * panel sitting behind browser chrome; falls back to 100vh on browsers
+   * that don't support dvh. The chrome height subtracted is the NavBar
+   * token so a single edit propagates everywhere a sticky element offsets
+   * from. */
+  height: calc(100vh - var(--sh-nav-h));
+  height: calc(100dvh - var(--sh-nav-h));
 }
 
 @media (min-width: 768px) {

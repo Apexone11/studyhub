@@ -321,12 +321,15 @@ export default function AiPage() {
           style={{
             display: 'grid',
             gridTemplateColumns: layout.columns.appTwoColumn,
-            gap: 20,
+            gap: 'var(--sh-space-xl)',
             alignItems: 'start',
           }}
         >
           <div
-            style={{ position: isCompact ? 'static' : 'sticky', top: isCompact ? undefined : 74 }}
+            style={{
+              position: isCompact ? 'static' : 'sticky',
+              top: isCompact ? undefined : 'calc(var(--sh-nav-h) + var(--sh-space-lg))',
+            }}
           >
             <AppSidebar mode={layout.sidebarMode} />
           </div>
@@ -335,7 +338,14 @@ export default function AiPage() {
               style={{
                 display: 'flex',
                 gap: 0,
-                height: 'calc(100vh - 100px)',
+                // The 100px was nav (56) + breathing room (44). Token math:
+                // 56 (--sh-nav-h) + 48 (--sh-space-3xl * 1.5) = 104, ≈ the
+                // previous 100. Use 100dvh so mobile Safari's URL bar
+                // doesn't clip the bottom of the chat panel. dvh has been
+                // supported since Safari 15.4 / Chrome 108 (Sep–Nov 2022);
+                // older WebViews fall through to no height which is the same
+                // as the prior URL-bar-clipped state.
+                height: 'calc(100dvh - var(--sh-nav-h) - var(--sh-space-3xl) * 1.5)',
                 background: 'var(--sh-surface)',
                 borderRadius: 16,
                 border: '1px solid var(--sh-border)',

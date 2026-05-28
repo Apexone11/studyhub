@@ -179,8 +179,11 @@ function AiBubbleInner() {
         className={!isOpen && chat?.streaming ? 'sh-ai-bubble-streaming' : undefined}
         style={{
           position: 'fixed',
-          bottom: 24,
-          right: 24,
+          // env(safe-area-inset-*) keeps the bubble clear of the iPhone
+          // home-indicator strip (and any future curved-edge devices).
+          // Falls back to 0px on platforms that don't expose insets.
+          bottom: 'calc(24px + env(safe-area-inset-bottom, 0px))',
+          right: 'calc(24px + env(safe-area-inset-right, 0px))',
           width: 56,
           height: 56,
           borderRadius: '50%',
@@ -232,11 +235,15 @@ function AiBubbleInner() {
           aria-label="Hub AI mini chat"
           style={{
             position: 'fixed',
-            bottom: 88,
-            right: 24,
+            // Anchor above the bubble (which itself respects safe-area-inset-bottom).
+            // 88 = bubble height (56) + bubble margin (24) + 8px gap.
+            bottom: 'calc(88px + env(safe-area-inset-bottom, 0px))',
+            right: 'calc(24px + env(safe-area-inset-right, 0px))',
             width: 'min(420px, calc(100vw - 48px))',
             height: 600,
-            maxHeight: 'calc(100vh - 120px)',
+            // 100dvh on mobile Safari so the chat doesn't get clipped behind
+            // the dynamic URL bar.
+            maxHeight: 'calc(100dvh - 120px - env(safe-area-inset-bottom, 0px))',
             background: 'var(--sh-surface)',
             borderRadius: 16,
             border: '1px solid var(--sh-border)',

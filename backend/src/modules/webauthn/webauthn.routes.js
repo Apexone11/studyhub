@@ -2,7 +2,7 @@ const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
 const { captureError } = require('../../monitoring/sentry')
-const { signAuthToken, setAuthCookie } = require('../../lib/authTokens')
+const { issueAuthenticatedSession } = require('../auth/auth.service')
 const {
   generateRegistrationOptions,
   verifyRegistration,
@@ -174,18 +174,29 @@ router.post('/authenticate/verify', webauthnLimiter, async (req, res) => {
       data: { counter: result.newCounter, lastUsedAt: new Date() },
     })
 
-    // Issue session
-    const fullUser = await prisma.user.findUnique({
-      where: { id: user.id },
-      select: { id: true, username: true, role: true },
+    // Issue session via the canonical login helper — mirrors
+    // login.challenge.controller + login.recovery.controller. The previous
+    // hand-rolled `signAuthToken + setAuthCookie` path bypassed Session
+    // row creation, so the JWT carried no `jti` and requireAuth left
+    // `req.sessionJti` undefined. With the wave-12.11 fail-closed
+    // `requireRecentMfa` middleware, every passkey-authed admin then hit
+    // `MFA_STEP_UP_REQUIRED { reason: 'no_session' }` on PATCH role /
+    // trust-level / mfa, DELETE user, and the Stripe sync route, and the
+    // step-up /verify endpoint 401'd because there was no session row to
+    // refresh — admins were locked out of every gated route via passkey
+    // login (wave-12.15 fix from a Codex P1 finding).
+    //
+    // Passkey is an explicit AAL2 factor per NIST 800-63B ("something you
+    // have"), so passing `mfaVerified: true` stamps `Session.mfaVerifiedAt`
+    // at creation and `requireRecentMfa` permits the next 15 minutes
+    // without a separate step-up prompt.
+    const authenticatedUser = await issueAuthenticatedSession(res, user.id, req, null, {
+      mfaVerified: true,
     })
-
-    const token = signAuthToken(fullUser)
-    setAuthCookie(res, token)
 
     res.json({
       message: 'Login successful!',
-      user: { id: fullUser.id, username: fullUser.username, role: fullUser.role },
+      user: authenticatedUser,
     })
   } catch (error) {
     captureError(error, { route: req.originalUrl, method: req.method })

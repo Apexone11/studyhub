@@ -1091,7 +1091,7 @@ export default function MyCoursesPage() {
                   border: '1px solid var(--sh-border)',
                   padding: '20px 22px',
                   position: 'sticky',
-                  top: 80,
+                  top: 'calc(var(--sh-nav-h) + var(--sh-space-2xl))',
                 }}
               >
                 <h3

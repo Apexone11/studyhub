@@ -614,7 +614,7 @@
   padding: 20px;
   align-self: start;
   position: sticky;
-  top: 80px;
+  top: calc(var(--sh-nav-h) + var(--sh-space-2xl));
 }
 
 .scholar-tabs {
