@@ -28,6 +28,76 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.11 — admin step-up MFA + volume backup + saver modes + video player (2026-05-27)
+
+Five connected feature shipments + 5 audit-fix items in a single wave. All founder-priority items from the long-tail backlog. Backend tests: 3387/3393 pass (6 documented skips, 0 fails). Frontend tests: 845/855 pass. Lint clean both projects.
+
+**1. Admin MFA step-up enforcement (`requireRecentMfa`)**
+
+Closes the unshipped half of L2.14 from the 2026-04-30 deferred plan. The login-time admin MFA enforcement shipped in wave-12.8; this wave adds the per-action step-up middleware so admin-sensitive routes require a fresh 2FA factor within the last 15 minutes even on already-authenticated sessions.
+
+- New `backend/src/middleware/requireRecentMfa.js` — reads `Session.mfaVerifiedAt` and 403s with `code: 'MFA_STEP_UP_REQUIRED'` when stale or unset. Honours the same `EMERGENCY_DISABLE_ADMIN_MFA` sealed-glass-break as the login flow.
+- New schema column `Session.mfaVerifiedAt DateTime?` + migration `20260527000002_session_mfa_verified_at`. Stamped by `createSession` when called with `mfaVerified: true`.
+- `login.challenge.controller.js` + `login.recovery.controller.js` pass `mfaVerified: true` so newly-issued sessions are pre-stamped — admins don't have to step up again right after a successful 2FA login.
+- New `mfa.stepUp.controller.js` exposes `POST /api/auth/mfa/step-up/start` + `/verify`. Reuses the loginChallenge primitive for OTP and consumeRecoveryCode for recovery-code path. Atomic Session update via updateMany so race conditions can't double-extend.
+- Applied to `DELETE /api/admin/users/:id`. Other privileged admin routes (role grants, plan changes) tracked as follow-on hardening — out of scope this wave.
+- Frontend: new `MfaStepUpProvider` mounted in App.jsx, `MfaStepUpModal` (focus-trap, OTP + recovery-code tabs, "Set up 2FA first" path when user has no 2FA configured), `useMfaStepUp()` hook. Admin `apiJson` interceptor catches `MFA_STEP_UP_REQUIRED` and transparently retries after step-up. **End-to-end functional: a real admin clicking Delete now sees a code prompt, types it, and the delete proceeds.**
+- 12 backend unit tests pinning every branch (no req.user, no sessionJti, missing session row, mfaVerifiedAt null with/without 2FA, stale, fresh, custom window, P2021 graceful degrade, emergency override case + whitespace tolerant, override does NOT bypass without the literal "true").
+
+**2. WebAuthnCredential.lastUsedAt**
+
+- Schema additions + migration `20260527000001_webauthn_last_used_at`.
+- `webauthn.routes.js` verify path writes `lastUsedAt: new Date()` alongside the counter update.
+- `/credentials` list endpoint surfaces `lastUsedAt` so the admin portal can show "last used 3 days ago" per passkey.
+
+**3. serializeNote explicit allowlist**
+
+Closes the MED finding from the wave-12.10 audit. Replaced `{...note, tags, ...extra}` spread with explicit `PUBLIC_NOTE_FIELDS` list. Stripped from API responses: `contentHash`, `contentSimhash`, `lastAuditGrade`, `lastAuditReport`, `lastAuditedAt`, `revision`, `lastSaveId`. Documented `extra` as trusted-caller-only override channel.
+
+**4. Upload volume → R2 backup (user-photo durability)**
+
+Closes the founder-flagged gap "when the server crashes, people's data should not be lost and photos should be stored somewhere." Before this wave, the Railway volume at `/data/uploads` was a single point of failure — every avatar / cover / attachment / school logo / group media file would be permanently gone if the volume corrupted. Now mirrored to R2 nightly.
+
+- New `lib/jobs/uploadVolumeBackup.js` — `runWithHeartbeat`-wrapped daily pass (CLAUDE.md A10). Walks `/data/uploads` recursively, mirrors to R2 with `objectExists` skip-if-already-there. Throttled at 10 uploads/sec (configurable). **Streams files** (not `readFileSync`) so a multi-GB video doesn't OOM Railway hobby tiers — caught by the wave-12.11 audit pass.
+- New `scripts/restoreVolumeFromR2.js` disaster-recovery script. Three modes: `--dry-run` (no writes), default (skip-if-exists), `--force` (overwrite). Handles ListObjectsV2 pagination.
+- `r2Storage.js` — `uploadObject` + `objectExists` now accept optional `bucket` override + `contentLength` (for streamed bodies) + `cacheControl`. Backward-compatible — existing callers don't pass these.
+- `R2_BUCKET_UPLOAD_BACKUP` env var promoted to **REQUIRED_IN_PRODUCTION** so a missing value fails boot loud instead of silently disabling backups (the warn-level startup log wasn't visible in Sentry by default).
+- Runbook section "Upload Volume Recovery" added to `docs/internal/security/RUNBOOK_DB_RESTORE.md` with the full recovery procedure (Guarded Mode → list bucket → dry-run → restore → verify counts → disable Guarded Mode).
+- Documented data-loss window: worst case ~24h of uploads if the volume crashes right before the next backup pass. Tunable via `UPLOAD_BACKUP_INTERVAL_MS`.
+
+**5. Data Saver + Battery Saver modes (v1)**
+
+Closes both founder-priority plans (`docs/internal/plans/data-saver-mode.md` + `battery-saver-mode.md`, both archived this wave with their "v1 shipped" sections detailing what's live vs. what's deferred to per-route consumer integrations).
+
+- Schema additions: `UserPreferences.dataSaverMode` + `batterySaverMode` (both `String @default("auto")`, tri-state on/off/auto).
+- Migration `20260527000003_data_battery_saver_modes` (idempotent guards per CLAUDE.md A5).
+- `PREF_ENUM_KEYS` allowlist validation for both.
+- New Settings tab "Data & Battery" with IconBolt icon between Appearance and Accessibility. Two tri-state selects + inline explainers.
+- New `useDataSaver` hook with `navigator.connection.saveData` auto-trigger.
+- New `useBatterySaver` hook with `prefers-reduced-motion: reduce` auto-trigger. Side-effect writes `data-battery-saver="on"` on `<body>`.
+- New CSS rule in `index.css` targeting `body[data-battery-saver='on'] *:not([data-motion='keep'])` — disables animations, transitions, will-change, scroll-behavior. **End-to-end functional**: a user toggles battery saver → animations stop on next frame without reload. Same `data-motion="keep"` escape hatches as the existing reduced-motion media query, so achievement celebrations + first-creation moments still play.
+- New backend helper `lib/dataSaverNegotiation.js` exporting `isDataSaverRequest`, `isLiteQueryRequest`, `shouldReturnLite` — opt-in for route handlers that want to return lighter responses. 11 unit tests pinning the three-signal contract.
+- New `SaverModeInitializer` mounted in App.jsx so the body attribute toggles immediately when Settings changes.
+
+**6. Video player additions (study-platform features)**
+
+The 807-line StudyHubPlayer was already feature-rich — quality switching, captions, theater mode, PiP, double-tap skip, keyboard shortcuts, etc. Added three study-specific features without disturbing the existing surface ("if it isn't broken don't fix it").
+
+- **Watch-progress persistence**: localStorage per video (keyed on optional `videoId` prop or hashed `src` URL). Auto-resumes from saved position on `loadedmetadata` when > 5s in AND > 10s before end. Throttled save on `timeupdate` (5s interval) + flush on `pause` / `pagehide`. Auto-clears on `ended`. "Resumed from X:XX" pill renders briefly with "Start over" escape.
+- **A-B loop**: `[` sets point A at current time, `]` sets point B, `Shift+L` clears both. Loop indicator pill in top-right shows the bracket. timeupdate handler seeks back to A whenever currentTime crosses B. Designed for re-watching difficult lecture sections.
+- **Keyboard shortcut help overlay**: `?` toggles a focused overlay listing all 13 shortcuts. Closes on `?` again or Escape or backdrop click.
+- All three additions are purely additive — zero behavioral change for users who don't use them. Lint clean, build clean.
+
+**Audit pass — 2 HIGH + 3 MED real findings fixed in-wave:**
+
+A code-reviewer subagent pass on the wave-12.11 diff caught:
+
+- **HIGH** — Video player `ended` listener was anonymous → leaked on every `[`/`]` keypress. Named the handler + included in cleanup.
+- **HIGH** — `serializeNote.extra` channel is back-door for non-allowlisted fields. Currently all callers pass derived booleans / counts only (safe), but added a docblock warning so future callers know the constraint.
+- **MED** — Stale pre-migration sessions verified safe (settings 2FA setup route doesn't apply `requireRecentMfa`, so no chicken-and-egg lockout).
+- **MED** — `R2_BUCKET_UPLOAD_BACKUP` was OPTIONAL → silent backup-disable in prod. Promoted to REQUIRED_IN_PRODUCTION.
+- **MED** — `mirrorFile` used `readFileSync` → OOM on large videos. Switched to `createReadStream` + `ContentLength` header.
+
 ### Wave-12.10 — moderation module A11 + A12 sweep (2026-05-27)
 
 Four real CLAUDE.md A-rule violations in the moderation module, all found by an audit subagent on a broad codebase sweep. Moderation got refactored before A11 (originAllowlist on writes) and A12 (Number.isInteger + ≥1 guard for IDs) were locked in, so the module shipped two CSRF-defense-in-depth gaps and 11 weak ID guards.

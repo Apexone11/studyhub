@@ -378,7 +378,7 @@ async function evaluateLoginRisk(userId, req, res) {
  * @param preComputed  optional output of evaluateLoginRisk() — when provided,
  *                     we skip internal risk evaluation and reuse the caller's.
  */
-async function issueAuthenticatedSession(res, userId, req, preComputed = null) {
+async function issueAuthenticatedSession(res, userId, req, preComputed = null, options = {}) {
   const user = await getAuthenticatedUser(userId)
   if (!user) throw new AppError(404, 'User not found.')
 
@@ -398,6 +398,12 @@ async function issueAuthenticatedSession(res, userId, req, preComputed = null) {
       region: geo?.region || null,
       city: geo?.city || null,
       riskScore: riskResult.score,
+      // The login-challenge + recovery-code controllers pass
+      // mfaVerified: true so the new session's `mfaVerifiedAt` column
+      // is stamped at creation — requireRecentMfa then permits
+      // admin-sensitive routes for the next 15 minutes without an
+      // additional step-up prompt (wave-12.11).
+      mfaVerified: Boolean(options.mfaVerified),
     })
     jti = sessionResult.jti
     sessionId = sessionResult.sessionId

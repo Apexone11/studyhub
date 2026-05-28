@@ -3,12 +3,14 @@ import { useNavigate } from 'react-router-dom'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { useSession } from '../../lib/session-context'
+import { useMfaStepUp } from '../../lib/mfaStepUpContext'
 import { showToast } from '../../lib/toast'
 import { authHeaders, createPageState, createAuditState } from './adminConstants'
 
 export function useAdminData() {
   const navigate = useNavigate()
   const { user, clearSession } = useSession()
+  const { requestStepUp } = useMfaStepUp()
 
   const [overview, setOverview] = useState({ loading: true, loaded: false, error: '', stats: null })
   const [usersState, setUsersState] = useState(createPageState)
@@ -44,12 +46,31 @@ export function useAdminData() {
 
   const apiJson = useCallback(
     async (url, options = {}) => {
-      const response = await fetch(`${API}${url}`, {
-        headers: authHeaders(),
-        credentials: 'include',
-        ...options,
-      })
-      const data = await readJsonSafely(response, {})
+      const doFetch = () =>
+        fetch(`${API}${url}`, {
+          headers: authHeaders(),
+          credentials: 'include',
+          ...options,
+        })
+
+      let response = await doFetch()
+      let data = await readJsonSafely(response, {})
+
+      // Step-up MFA handshake (wave-12.11): a 403 with
+      // `code: 'MFA_STEP_UP_REQUIRED'` means the route is gated by
+      // `requireRecentMfa` and the current session hasn't completed
+      // a 2FA factor recently enough. Prompt the user, then retry.
+      if (response.status === 403 && data?.code === 'MFA_STEP_UP_REQUIRED') {
+        const ok = await requestStepUp({
+          setupRequired: Boolean(data?.setupRequired),
+          reason: data?.reason,
+        })
+        if (ok) {
+          response = await doFetch()
+          data = await readJsonSafely(response, {})
+        }
+      }
+
       if (response.status === 401) {
         clearSession()
         navigate('/login', { replace: true })
@@ -65,7 +86,7 @@ export function useAdminData() {
       }
       return data
     },
-    [clearSession, navigate],
+    [clearSession, navigate, requestStepUp],
   )
 
   const loadOverview = useCallback(

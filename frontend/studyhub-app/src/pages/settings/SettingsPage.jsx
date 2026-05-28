@@ -25,6 +25,7 @@ import NotificationsTab from './NotificationsTab'
 import PrivacyTab from './PrivacyTab'
 import AppearanceTab from './AppearanceTab'
 import AccessibilityTab from './AccessibilityTab'
+import DataAndBatteryTab from './DataAndBatteryTab'
 import SubscriptionTab from './SubscriptionTab'
 import ModerationTab from './ModerationTab'
 import ReviewTab from './ReviewTab'
@@ -38,6 +39,7 @@ import {
   IconBell,
   IconEye,
   IconPalette,
+  IconBolt,
   IconUser,
   IconSpark,
   IconUsers,
@@ -53,6 +55,7 @@ const NAV_TABS = [
   { id: 'notifications', label: 'Notifications', icon: IconBell },
   { id: 'privacy', label: 'Privacy', icon: IconEye },
   { id: 'appearance', label: 'Appearance', icon: IconPalette },
+  { id: 'data-battery', label: 'Data & Battery', icon: IconBolt },
   { id: 'accessibility', label: 'Accessibility', icon: IconEye },
   { id: 'account', label: 'Account', icon: IconUser },
   { id: 'subscription', label: 'Subscription', icon: IconSpark },
@@ -325,6 +328,8 @@ export default function SettingsPage() {
             <AppearanceTab />
           </div>
         )
+      case 'data-battery':
+        return <DataAndBatteryTab />
       case 'accessibility':
         return <AccessibilityTab />
       case 'account':

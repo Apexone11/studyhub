@@ -1483,6 +1483,21 @@ export function IconMonitor({ size, ...p }) {
   )
 }
 
+// Bolt — Data & Battery saver tab (wave-12.11)
+export function IconBolt({ size, ...p }) {
+  return (
+    <Svg size={size} {...p}>
+      <path
+        d="M13 2 L4 14 H11 L10 22 L20 10 H13 Z"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinejoin="round"
+        fill="none"
+      />
+    </Svg>
+  )
+}
+
 // Palette — appearance tab
 export function IconPalette({ size, ...p }) {
   return (

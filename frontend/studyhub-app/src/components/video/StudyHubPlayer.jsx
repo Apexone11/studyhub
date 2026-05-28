@@ -8,10 +8,23 @@
  *   - Captions toggle + language selector
  *   - Theater mode (full-width dark layout)
  *   - Loop toggle
+ *   - Picture-in-Picture
  *   - Fullscreen
- *   - Keyboard shortcuts (Space, arrows, M, F, C, T, L)
+ *   - Keyboard shortcuts (Space, arrows, M, F, C, T, L, P, [, ], Shift+L, ?)
  *   - Double-tap left/right to skip 10s (mobile)
  *   - Loading spinner overlay
+ *
+ * Wave-12.11 study-platform additions:
+ *   - **Watch progress persistence** — saves current time to
+ *     localStorage and auto-resumes from where the user left off
+ *     when they reopen the same video. Per-video key keyed on
+ *     `videoId` (optional prop) or a hash of the `src` URL.
+ *   - **A-B loop** — keyboard `[` sets point A, `]` sets point B,
+ *     player loops the [A, B] segment until cleared with `Shift+L`.
+ *     Designed for re-watching difficult sections (lectures, math
+ *     derivations).
+ *   - **Keyboard shortcut overlay** — press `?` to open a help panel
+ *     listing every shortcut. Closes on `?` or `Esc`.
  *
  * Props:
  *   src          — Video source URL (or object { src, type })
@@ -22,8 +35,11 @@
  *   muted        — Boolean (default false, true for feed autoplay)
  *   onTheaterChange — Callback when theater mode toggles
  *   className    — Additional CSS class
+ *   videoId      — String (optional). Stable identifier used as the
+ *                  watch-progress localStorage key. Falls back to a
+ *                  hash of the src URL when omitted.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useRef, useEffect, useState, useCallback } from 'react'
+import { useRef, useEffect, useState, useCallback, useMemo } from 'react'
 import videojs from 'video.js'
 import 'video.js/dist/video-js.css'
 import './studyhub-player.css'
@@ -39,6 +55,7 @@ export default function StudyHubPlayer({
   muted = false,
   onTheaterChange,
   className = '',
+  videoId,
 }) {
   const videoRef = useRef(null)
   const playerRef = useRef(null)
@@ -84,6 +101,39 @@ export default function StudyHubPlayer({
   const [skipIndicator, setSkipIndicator] = useState(null) // { side, seconds }
   const [isPiP, setIsPiP] = useState(false)
 
+  // Wave-12.11 — A-B loop for study repeat sections.
+  // pointA / pointB are seconds-into-video; null means "unset".
+  // When BOTH are set + pointA < pointB, the timeupdate handler
+  // seeks back to pointA whenever currentTime crosses pointB.
+  // Shift+L clears both at once. Indicator is rendered on the seek
+  // bar so users see what's looping.
+  const [pointA, setPointA] = useState(null)
+  const [pointB, setPointB] = useState(null)
+
+  // Wave-12.11 — keyboard shortcut help overlay (`?` toggles).
+  const [showShortcutHelp, setShowShortcutHelp] = useState(false)
+
+  // Wave-12.11 — "Resume from X:XX" pill shown briefly after the
+  // player auto-seeks to the saved position. Null = no pill.
+  const [resumeFromSec, setResumeFromSec] = useState(null)
+
+  // Stable key for watch-progress localStorage. Prefer caller's
+  // explicit videoId; fall back to a stable hash of the src URL so
+  // the persistence still works without callers being updated.
+  const storageKey = useMemo(() => {
+    if (videoId) return `studyhub_video_progress_${videoId}`
+    const srcStr = typeof src === 'string' ? src : src?.src || ''
+    if (!srcStr) return null
+    // djb2 hash — small, fast, no crypto subtle needed on insecure
+    // contexts; we don't need cryptographic strength, just a stable
+    // bucket per URL.
+    let hash = 5381
+    for (let i = 0; i < srcStr.length; i += 1) {
+      hash = ((hash << 5) + hash + srcStr.charCodeAt(i)) | 0
+    }
+    return `studyhub_video_progress_${Math.abs(hash).toString(36)}`
+  }, [videoId, src])
+
   // ── Initialize Video.js ──────────────────────────────────────────────
   useEffect(() => {
     if (!videoRef.current) return
@@ -111,11 +161,31 @@ export default function StudyHubPlayer({
     player.on('canplay', () => setLoading(false))
     player.on('playing', () => setLoading(false))
     player.on('loadedmetadata', () => {
-      setDuration(player.duration() || 0)
+      const dur = player.duration() || 0
+      setDuration(dur)
       setLoading(false)
+
+      // Wave-12.11 — auto-resume from saved position. Only restore
+      // when the saved time is > 5s in AND > 10s before the end
+      // (so users don't auto-resume right before the credits roll).
+      if (storageKey) {
+        try {
+          const saved = Number.parseFloat(localStorage.getItem(storageKey) || '')
+          if (Number.isFinite(saved) && saved > 5 && dur > 0 && saved < dur - 10) {
+            player.currentTime(saved)
+            setResumeFromSec(saved)
+            // Auto-dismiss the resume pill after 4s so it doesn't
+            // sit on the video forever.
+            setTimeout(() => setResumeFromSec(null), 4000)
+          }
+        } catch {
+          /* localStorage unavailable */
+        }
+      }
     })
     player.on('timeupdate', () => {
-      setCurrentTime(player.currentTime() || 0)
+      const t = player.currentTime() || 0
+      setCurrentTime(t)
       // Update buffered range
       const buf = player.buffered()
       if (buf && buf.length > 0) {
@@ -173,6 +243,93 @@ export default function StudyHubPlayer({
       player.src(sourceObj)
     }
   }, [src])
+
+  // Wave-12.11 — watch-progress persistence + A-B loop enforcement.
+  // Both hook into timeupdate but live in a separate effect so the
+  // dependency array stays stable (timeupdate fires ~4Hz).
+  useEffect(() => {
+    const player = playerRef.current
+    if (!player) return undefined
+
+    // Throttled save: persist current time at most every 5 seconds.
+    // Avoids hammering localStorage on every timeupdate tick.
+    let lastSaveMs = 0
+    const handleTimeUpdate = () => {
+      const t = player.currentTime() || 0
+
+      // A-B loop: when both points set and we cross B, jump back to A.
+      if (pointA !== null && pointB !== null && pointA < pointB && t >= pointB) {
+        player.currentTime(pointA)
+        return
+      }
+
+      if (!storageKey) return
+      const now = Date.now()
+      if (now - lastSaveMs < 5000) return
+      lastSaveMs = now
+      try {
+        // Only save when meaningfully into the video. Clear the key
+        // when within the last 5s so a re-watch starts from scratch.
+        const dur = player.duration() || 0
+        if (t > 3 && (dur === 0 || t < dur - 5)) {
+          localStorage.setItem(storageKey, String(Math.floor(t)))
+        } else if (dur > 0 && t >= dur - 5) {
+          localStorage.removeItem(storageKey)
+        }
+      } catch {
+        /* quota / private mode */
+      }
+    }
+    player.on('timeupdate', handleTimeUpdate)
+
+    // Save aggressively on pause / ended so a user who closes the
+    // tab right after pausing doesn't lose their progress.
+    const handleFlush = () => {
+      if (!storageKey) return
+      try {
+        const t = player.currentTime() || 0
+        const dur = player.duration() || 0
+        if (t > 3 && (dur === 0 || t < dur - 5)) {
+          localStorage.setItem(storageKey, String(Math.floor(t)))
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    player.on('pause', handleFlush)
+    // Watched to the end — clear the key so the next visit starts
+    // from the beginning instead of jumping back. Named handler so
+    // the cleanup can remove it; the effect re-runs whenever pointA
+    // or pointB change (every `[` / `]` keypress) so anonymous
+    // closures here accumulate listeners and leak (caught by the
+    // wave-12.11 code-reviewer audit pass).
+    const handleEnded = () => {
+      if (!storageKey) return
+      try {
+        localStorage.removeItem(storageKey)
+      } catch {
+        /* ignore */
+      }
+    }
+    player.on('ended', handleEnded)
+
+    // pagehide is the only event reliably fired when the tab is
+    // closed / navigated away on mobile (visibilitychange doesn't
+    // fire on iOS Safari tab-close). Catches the "user closes the
+    // app mid-video" case.
+    window.addEventListener('pagehide', handleFlush)
+
+    return () => {
+      try {
+        player.off('timeupdate', handleTimeUpdate)
+        player.off('pause', handleFlush)
+        player.off('ended', handleEnded)
+      } catch {
+        /* player already disposed */
+      }
+      window.removeEventListener('pagehide', handleFlush)
+    }
+  }, [storageKey, pointA, pointB])
 
   // ── Control Handlers ─────────────────────────────────────────────────
 
@@ -396,12 +553,51 @@ export default function StudyHubPlayer({
           toggleTheater()
           break
         case 'l':
-        case 'L':
           toggleLoop()
+          break
+        case 'L':
+          // Wave-12.11 — Shift+L clears the A-B loop. The lowercase
+          // 'l' case above still toggles native videojs loop.
+          // Browsers fire 'L' for Shift+L; without shift, autorepeat
+          // keyboards / caps lock get 'L' too — guard so caps lock
+          // doesn't unexpectedly clear the loop.
+          if (e.shiftKey) {
+            e.preventDefault()
+            setPointA(null)
+            setPointB(null)
+          } else {
+            toggleLoop()
+          }
           break
         case 'p':
         case 'P':
           togglePiP()
+          break
+        // Wave-12.11 — A-B loop for study repeat sections.
+        // `[` sets the A point at the current time. `]` sets B.
+        // When both are set, the timeupdate handler loops the
+        // [A, B] segment. Shift+L clears both at once.
+        case '[':
+          e.preventDefault()
+          setPointA(playerRef.current?.currentTime() || 0)
+          break
+        case ']':
+          e.preventDefault()
+          setPointB(playerRef.current?.currentTime() || 0)
+          break
+        // Wave-12.11 — keyboard shortcut help overlay.
+        case '?':
+        case '/':
+          // Browsers fire `?` on Shift+/ and `/` without shift; we
+          // accept either + open the help panel. Escape closes it.
+          e.preventDefault()
+          setShowShortcutHelp((prev) => !prev)
+          break
+        case 'Escape':
+          if (showShortcutHelp) {
+            e.preventDefault()
+            setShowShortcutHelp(false)
+          }
           break
         default:
           break
@@ -422,6 +618,7 @@ export default function StudyHubPlayer({
     toggleLoop,
     togglePiP,
     showControlsTemporarily,
+    showShortcutHelp,
   ])
 
   // ── Fullscreen change listener ───────────────────────────────────────
@@ -537,6 +734,187 @@ export default function StudyHubPlayer({
       {skipIndicator && (
         <div className={`shp-skip-indicator shp-skip-${skipIndicator.side}`}>
           {skipIndicator.side === 'left' ? '<<' : '>>'} {skipIndicator.seconds}s
+        </div>
+      )}
+
+      {/* Wave-12.11 — Resume-from pill. Auto-dismisses in 4s.
+          Visible briefly after the player seeks to the saved position
+          so the user knows it happened (and can scrub back if they
+          wanted to restart from the beginning). */}
+      {resumeFromSec !== null && (
+        <div
+          className="shp-resume-pill"
+          role="status"
+          aria-live="polite"
+          style={{
+            position: 'absolute',
+            top: 16,
+            left: 16,
+            zIndex: 4,
+            background: 'rgba(0, 0, 0, 0.75)',
+            color: '#fff',
+            padding: '8px 14px',
+            borderRadius: 999,
+            fontSize: 12,
+            fontWeight: 600,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+            backdropFilter: 'blur(4px)',
+            pointerEvents: 'auto',
+          }}
+        >
+          <span>Resumed from {formatTime(resumeFromSec)}</span>
+          <button
+            type="button"
+            onClick={() => {
+              seek(0)
+              setResumeFromSec(null)
+            }}
+            style={{
+              background: 'transparent',
+              border: '1px solid rgba(255,255,255,0.4)',
+              color: '#fff',
+              borderRadius: 999,
+              padding: '2px 8px',
+              fontSize: 11,
+              fontWeight: 700,
+              cursor: 'pointer',
+            }}
+          >
+            Start over
+          </button>
+        </div>
+      )}
+
+      {/* Wave-12.11 — A-B loop indicator. Renders a small pill in the
+          top-right when at least one point is set so the user sees the
+          loop bracket without having to remember they set it. */}
+      {(pointA !== null || pointB !== null) && (
+        <div
+          className="shp-ab-loop-indicator"
+          role="status"
+          style={{
+            position: 'absolute',
+            top: 16,
+            right: 16,
+            zIndex: 4,
+            background: 'rgba(99, 102, 241, 0.9)',
+            color: '#fff',
+            padding: '6px 12px',
+            borderRadius: 999,
+            fontSize: 11,
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+          }}
+        >
+          A-B LOOP {pointA !== null ? formatTime(pointA) : '?'} →{' '}
+          {pointB !== null ? formatTime(pointB) : '?'}
+        </div>
+      )}
+
+      {/* Wave-12.11 — Keyboard shortcut help overlay. Toggled with `?`,
+          closes on `?` again or Escape. Listed in the order keys
+          appear on a US QWERTY keyboard. */}
+      {showShortcutHelp && (
+        <div
+          className="shp-shortcut-help"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Keyboard shortcuts"
+          onClick={() => setShowShortcutHelp(false)}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            zIndex: 6,
+            background: 'rgba(0, 0, 0, 0.78)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: 24,
+            backdropFilter: 'blur(4px)',
+          }}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              background: 'rgba(20, 20, 28, 0.96)',
+              color: '#fff',
+              borderRadius: 14,
+              padding: 24,
+              maxWidth: 460,
+              width: '100%',
+              maxHeight: '90%',
+              overflow: 'auto',
+              boxShadow: '0 20px 60px rgba(0,0,0,0.5)',
+              fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
+            }}
+          >
+            <h3 style={{ margin: '0 0 14px', fontSize: 16, fontWeight: 800 }}>
+              Keyboard shortcuts
+            </h3>
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'auto 1fr',
+                gap: '8px 14px',
+                fontSize: 13,
+              }}
+            >
+              {[
+                ['Space / K', 'Play or pause'],
+                ['← / →', 'Skip 5 seconds back / forward'],
+                ['↑ / ↓', 'Volume up / down'],
+                ['M', 'Mute / unmute'],
+                ['F', 'Fullscreen toggle'],
+                ['T', 'Theater mode'],
+                ['P', 'Picture-in-Picture'],
+                ['C', 'Captions menu'],
+                ['L', 'Loop entire video'],
+                ['[ / ]', 'Set A / B point for repeat loop'],
+                ['Shift+L', 'Clear A-B loop'],
+                ['?', 'Toggle this help'],
+                ['Esc', 'Close this help'],
+              ].map(([key, label]) => (
+                <div key={key} style={{ display: 'contents' }}>
+                  <kbd
+                    style={{
+                      fontFamily: 'inherit',
+                      background: 'rgba(255,255,255,0.12)',
+                      border: '1px solid rgba(255,255,255,0.2)',
+                      borderRadius: 6,
+                      padding: '2px 8px',
+                      fontSize: 12,
+                      fontWeight: 700,
+                      textAlign: 'center',
+                      whiteSpace: 'nowrap',
+                    }}
+                  >
+                    {key}
+                  </kbd>
+                  <span style={{ color: 'rgba(255,255,255,0.85)' }}>{label}</span>
+                </div>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowShortcutHelp(false)}
+              style={{
+                marginTop: 18,
+                background: 'rgba(255,255,255,0.12)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: '#fff',
+                borderRadius: 8,
+                padding: '8px 16px',
+                fontSize: 12,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            >
+              Got it
+            </button>
+          </div>
         </div>
       )}
 

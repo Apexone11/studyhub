@@ -127,6 +127,21 @@ const REQUIRED_IN_PRODUCTION = [
     key: 'R2_BUCKET_AI_ATTACHMENTS',
     description: 'Private Cloudflare R2 bucket for Hub AI v2 document uploads.',
   },
+  {
+    // Wave-12.11 — daily mirror of /data/uploads (avatars, covers,
+    // attachments, group media, etc.) to a dedicated R2 bucket so
+    // user-uploaded photos survive a Railway volume crash. Promoted
+    // from OPTIONAL after the wave-12.11 audit pass found a missing
+    // env var would silently disable backups in production — the
+    // startup warning fires at warn level which Sentry doesn't
+    // capture by default. Without it, a volume failure permanently
+    // loses every photo. Fail-loud at boot is the only safe default.
+    key: 'R2_BUCKET_UPLOAD_BACKUP',
+    description:
+      'Private Cloudflare R2 bucket name for the daily volume-uploads mirror. Without it, ' +
+      'Railway volume corruption permanently loses every user-uploaded photo. Recovery ' +
+      'procedure: scripts/restoreVolumeFromR2.js + RUNBOOK_DB_RESTORE.md.',
+  },
 ]
 
 const OPTIONAL = [
@@ -168,6 +183,20 @@ const OPTIONAL = [
       'enforcement during an incident (e.g. founder lost their 2FA device). Every ' +
       'login that uses it emits auth.admin_mfa_emergency_disabled to Sentry. Unset ' +
       'as soon as the incident is resolved.',
+  },
+  // R2_BUCKET_UPLOAD_BACKUP moved to REQUIRED_IN_PRODUCTION (top of
+  // this file) after the wave-12.11 audit — a missing value silently
+  // disables backups in prod, which the warn-level startup log
+  // doesn't surface in Sentry.
+  {
+    key: 'UPLOAD_BACKUP_INTERVAL_MS',
+    description: 'Override the upload-volume → R2 backup cadence. Default 86400000 (24h).',
+  },
+  {
+    key: 'UPLOAD_BACKUP_RATE_LIMIT_PER_SEC',
+    description:
+      'Cap on upload-backup mirror rate (objects/sec). Default 10. Lower if you ' +
+      'see Railway egress spikes during the nightly pass.',
   },
 ]
 

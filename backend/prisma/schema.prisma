@@ -967,6 +967,12 @@ model UserPreferences {
   // "All schools" inline per-picker. Default true matches the founder's
   // intent that most users see their own school first.
   scopeBySchool          Boolean @default(true)
+  // Wave-12.11 — Data Saver + Battery Saver. Both follow the same
+  // "on" / "off" / "auto" pattern. `auto` means honor the platform
+  // signal: Save-Data request header / navigator.connection.saveData
+  // for data-saver; prefers-reduced-motion: reduce for battery-saver.
+  dataSaverMode          String  @default("auto")
+  batterySaverMode       String  @default("auto")
   user                   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
@@ -1303,17 +1309,18 @@ model UserSensitive {
 
 // ── WebAuthn passkey credentials ────────────────────────────
 model WebAuthnCredential {
-  id           Int      @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   userId       Int
-  credentialId String   @unique
+  credentialId String    @unique
   publicKey    Bytes
-  counter      Int      @default(0)
+  counter      Int       @default(0)
   deviceType   String?
-  backedUp     Boolean  @default(false)
+  backedUp     Boolean   @default(false)
   transports   String?
-  name         String   @default("Passkey")
-  createdAt    DateTime @default(now())
-  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String    @default("Passkey")
+  createdAt    DateTime  @default(now())
+  lastUsedAt   DateTime?
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
 }
@@ -2671,6 +2678,11 @@ model Session {
   riskScore       Int?
   trustedDeviceId String?
   lastActiveAt    DateTime  @default(now())
+  // Timestamp of the last MFA verification on this session. Set when
+  // the user completes the email-OTP challenge, redeems a recovery
+  // code, or hits POST /api/auth/mfa/step-up. requireRecentMfa
+  // middleware enforces a max-age window against this column.
+  mfaVerifiedAt   DateTime?
   expiresAt       DateTime
   revokedAt       DateTime?
   createdAt       DateTime  @default(now())

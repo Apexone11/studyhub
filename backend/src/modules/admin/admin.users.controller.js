@@ -7,6 +7,7 @@ const { logModerationEvent } = require('../../lib/moderation/moderationLogger')
 const { auditFromRequest, AUDIT_EVENTS } = require('../../lib/auditLog')
 const { maskEmail } = require('../../lib/fieldEncryption')
 const log = require('../../lib/logger')
+const requireRecentMfa = require('../../middleware/requireRecentMfa')
 const { PAGE_SIZE, parsePage } = require('./admin.constants')
 const { DURATION_7D_MS } = require('../../lib/constants')
 
@@ -357,7 +358,11 @@ router.get('/badges', async (req, res) => {
 })
 
 // ── DELETE /api/admin/users/:id ──────────────────────────────
-router.delete('/users/:id', async (req, res) => {
+// Step-up MFA gate (wave-12.11) — admin must have completed a 2FA
+// factor within the last 15 minutes to delete a user. Frontend
+// interceptor catches the 403 + MFA_STEP_UP_REQUIRED code and opens
+// the step-up modal before retrying.
+router.delete('/users/:id', requireRecentMfa(), async (req, res) => {
   const targetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(targetId) || targetId < 1) {
     return res.status(400).json({ error: 'User id must be a positive integer.' })
