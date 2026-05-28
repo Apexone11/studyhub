@@ -11,6 +11,7 @@ const {
   formatNote,
 } = require('./feed.service')
 const { enrichUsersWithBadges } = require('../../lib/userBadges')
+const { shouldReturnLite } = require('../../lib/dataSaverNegotiation')
 const log = require('../../lib/logger')
 
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
@@ -607,13 +608,41 @@ router.get('/', async (req, res) => {
       // Non-fatal: badges degrade gracefully
     }
 
+    // Wave-12.12 — Data Saver lite mode. When the user opts in (or
+    // their browser sends Save-Data, or they pass ?lite=1), strip the
+    // bandwidth-heavy fields from the response:
+    //   - `media[]` arrays carry image + video URLs + thumbnail sets.
+    //   - `coverImageUrl` on author objects.
+    //   - `posterUrl` / `thumbnailUrl` on video sub-objects.
+    // Text content + counts + author identity all stay so the feed
+    // still renders as a card list, just without rich media. Frontend
+    // renders a text-only badge when media is empty.
+    const lite = shouldReturnLite(req)
+    const responseItems = lite
+      ? slicedItems.map((item) => {
+          const stripped = { ...item }
+          if (Array.isArray(stripped.media)) stripped.media = []
+          // Author cover images are 200KB+ each — strip from the cards.
+          if (stripped.author && stripped.author.coverImageUrl) {
+            stripped.author = { ...stripped.author, coverImageUrl: null }
+          }
+          if (stripped.user && stripped.user.coverImageUrl) {
+            stripped.user = { ...stripped.user, coverImageUrl: null }
+          }
+          return stripped
+        })
+      : slicedItems
+
     const payload = {
-      items: slicedItems,
+      items: responseItems,
       total: items.length,
       limit,
       offset,
       partial: degradedSections.length > 0,
       degradedSections,
+      // Frontend renders a small "Data Saver on" footer when this is
+      // true so the user knows why their feed looks lighter.
+      ...(lite ? { lite: true } : {}),
     }
 
     log.info(

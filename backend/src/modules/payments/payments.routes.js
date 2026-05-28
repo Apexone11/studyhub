@@ -38,6 +38,7 @@ const prisma = require('../../lib/prisma')
 const { getUserPlan } = require('../../lib/getUserPlan')
 const requireAuth = require('../../middleware/auth')
 const originAllowlist = require('../../middleware/originAllowlist')
+const requireRecentMfa = require('../../middleware/requireRecentMfa')
 
 const router = express.Router()
 
@@ -481,6 +482,12 @@ router.post(
   requireAuth,
   requireAdmin,
   requireTrustedOrigin,
+  // Step-up MFA (wave-12.12) — this can write to every active
+  // subscription's plan + Stripe-customer-id field. A compromised
+  // admin session looping this could silently downgrade real
+  // subscriptions or rewrite billing metadata in bulk. Step-up
+  // prevents a stolen session from auto-replaying.
+  requireRecentMfa(),
   async (_req, res) => {
     try {
       const stripe = service.getStripe()

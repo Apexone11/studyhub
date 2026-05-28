@@ -113,6 +113,19 @@ function fakeOriginAllowlistFactory() {
 fakeOriginAllowlistFactory.normalizeOrigin = (v) => v
 fakeOriginAllowlistFactory.buildTrustedOrigins = () => new Set()
 
+// requireRecentMfa is applied to a growing set of privileged routes
+// (wave-12.12 — role grant, mfa toggle, trust-level, delete user).
+// These tests assert admin-route correctness, not the step-up gate
+// itself (that has its own dedicated unit test). Mock the factory
+// to a pass-through so the existing assertions don't need to be
+// rewritten to mint a session.mfaVerifiedAt row.
+function fakeRequireRecentMfaFactory() {
+  return function fakeRequireRecentMfa(_req, _res, next) {
+    next()
+  }
+}
+fakeRequireRecentMfaFactory.DEFAULT_WINDOW_MS = 15 * 60_000
+
 const mockTargets = new Map([
   [require.resolve('../src/lib/prisma'), mocks.prisma],
   [require.resolve('../src/middleware/auth'), mocks.auth],
@@ -120,6 +133,7 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/deleteUserAccount'), { deleteUserAccount: mocks.deleteUserAccount }],
   [require.resolve('../src/lib/html/htmlSecurity'), mocks.htmlSecurity],
   [require.resolve('../src/middleware/originAllowlist'), fakeOriginAllowlistFactory],
+  [require.resolve('../src/middleware/requireRecentMfa'), fakeRequireRecentMfaFactory],
 ])
 
 const originalModuleLoad = Module._load

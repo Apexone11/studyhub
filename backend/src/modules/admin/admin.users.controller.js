@@ -159,7 +159,10 @@ router.get('/users/search', async (req, res) => {
 })
 
 // ── PATCH /api/admin/users/:id/role ──────────────────────────
-router.patch('/users/:id/role', async (req, res) => {
+// Step-up MFA (wave-12.12) — granting / revoking admin role is the
+// single most consequential admin action. A compromised admin session
+// MUST not be able to silently promote a co-conspirator to admin.
+router.patch('/users/:id/role', requireRecentMfa(), async (req, res) => {
   const { role } = req.body || {}
   if (!['admin', 'student'].includes(role)) {
     return res.status(400).json({ error: 'Role must be "admin" or "student".' })
@@ -195,7 +198,10 @@ router.patch('/users/:id/role', async (req, res) => {
 })
 
 // ── PATCH /api/admin/users/:id/trust-level ──────────────────
-router.patch('/users/:id/trust-level', async (req, res) => {
+// Step-up MFA (wave-12.12) — trust level affects rate-limit
+// allowances + content visibility. Promoting a sock-puppet to
+// "trusted" then using it for abuse is a documented attack pattern.
+router.patch('/users/:id/trust-level', requireRecentMfa(), async (req, res) => {
   const { trustLevel } = req.body || {}
   if (!['new', 'trusted', 'restricted'].includes(trustLevel)) {
     return res.status(400).json({ error: 'Trust level must be "new", "trusted", or "restricted".' })
@@ -245,7 +251,12 @@ router.patch('/users/:id/trust-level', async (req, res) => {
 // the login flow blocks the session cookie until the user completes 2FA
 // setup — flipping this to true on a regular admin forces them through
 // the gate. Behavior shipped 2026-04-30 in auth.login.controller.js.
-router.patch('/users/:id/mfa', async (req, res) => {
+//
+// Step-up MFA (wave-12.12) — flipping this OFF on a target admin
+// account undoes the protection wave-12.8 added. Step-up required so
+// a compromised admin session can't silently disable MFA enforcement
+// on the founder seat or another admin.
+router.patch('/users/:id/mfa', requireRecentMfa(), async (req, res) => {
   const targetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(targetId) || targetId < 1) {
     return res.status(400).json({ error: 'User id must be a positive integer.' })

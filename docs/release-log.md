@@ -28,6 +28,40 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.12 — step-up MFA expansion + data-saver consumers + battery-saver JS gates (2026-05-27)
+
+Follow-on wave addressing the deferred items from wave-12.11. Backend tests: 3387/3393 pass. Frontend tests: 845/855 pass. Lint clean both projects.
+
+**1. Step-up MFA expanded to 4 more privileged admin routes:**
+
+- `PATCH /api/admin/users/:id/role` — granting / revoking admin role.
+- `PATCH /api/admin/users/:id/trust-level` — affects rate limits + visibility.
+- `PATCH /api/admin/users/:id/mfa` — flipping this OFF on another admin would undo wave-12.8's protection.
+- `POST /api/payments/admin/sync-stripe` — bulk Stripe sync touches every active subscription.
+
+Combined with the wave-12.11 `DELETE /admin/users/:id`, the high-risk admin surface is now covered. Day-to-day moderator routes (badge grants, sheet review, announcements) intentionally remain unprotected — they're frequent enough that step-up every 15 min would create real friction without proportional security gain.
+
+**HIGH audit finding fixed in-wave:** `handleTrustLevelChange` and `handleMfaToggle` in `UsersTab.jsx` called raw `fetch()` directly, bypassing the `apiJson` step-up interceptor. An admin with a stale session would have silently hit a 403 with no modal, no toast, and a select widget that snapped back to the old value with zero feedback. Extracted both into `patchTrustLevel` + `patchMfaRequired` methods on `useAdminData` (matching the existing `patchRole` / `deleteUser` pattern) so step-up flows transparently and errors surface via `showToast`.
+
+**2. Data Saver consumers wired:**
+
+- **Feed lite mode** — when `Save-Data: on`, user pref `dataSaverMode='on'`, or `?lite=1` query param, `GET /api/feed` strips `media[]` arrays and author `coverImageUrl`s before sending. Adds `lite: true` to the payload so the frontend can render a "data saver on" footer.
+- **Frontend feed fetch** — `useFeedData` appends `?lite=1` when `useDataSaver().enabled` is true. Both initial load + load-more paths covered.
+- **Typing indicator suppression** — `useMessagingData.emitTypingStart` + `emitTypingStop` short-circuit when data-saver is on. Receivers still see others' typing indicators normally; the local user just doesn't broadcast their own (saves a Socket.io round-trip per keystroke).
+- **AI streaming gate** — **DEFERRED with documented rationale**. The `aiService.streamMessage` function streams chunks directly to `res`; there's no non-streaming variant. Building a buffering wrapper would add server memory + perceived latency for a marginal bandwidth saving (text deltas are tiny vs. the media + cover images already gated above). The `shouldReturnLite` helper exists; future work can flip the strategy when the cost/benefit shifts.
+
+**3. Battery Saver JS-side gates:**
+
+- **`lib/animations.js`** — `prefersReducedMotion()` now returns true when `<body data-battery-saver="on">` is set, in addition to the OS `prefers-reduced-motion: reduce` query. Cascades to every anime.js helper in the file (fadeInUp, staggerEntrance, pulseHighlight, popScale, countUp, fadeInOnScroll, slideDown) — each already short-circuits to a single `utils.set(...)` call when the gate returns true. No rAF loop runs.
+- **`components/Toast.jsx`** — toast auto-dismiss bumped +50% (3500ms → 5250ms by default) when battery saver is on. Pairs with the founder's "give motion-sensitive readers more time" intent from the original plan.
+- **Lottie + continuous rAF loops** — neither exists in the codebase. Grep was empty; no change needed. The plan's references to these were hypothetical.
+
+Combined with the CSS-side rule shipped in wave-12.11 (`body[data-battery-saver='on'] *:not([data-motion='keep'])` disables animations / transitions / will-change), the JS-side gate now covers the remaining ~20% the CSS rule couldn't reach.
+
+**4. Audit loop:**
+
+A code-reviewer subagent pass on the wave-12.12 diff found 1 HIGH (fixed in-wave above) and ruled out 6 LOW findings (`?lite=1` overriding user `off` pref — `req.user.dataSaverMode` isn't populated by `requireAuth` so the override path is inert; `setImmediate` name collision is harmless in browser; etc).
+
 ### Wave-12.11 — admin step-up MFA + volume backup + saver modes + video player (2026-05-27)
 
 Five connected feature shipments + 5 audit-fix items in a single wave. All founder-priority items from the long-tail backlog. Backend tests: 3387/3393 pass (6 documented skips, 0 fails). Frontend tests: 845/855 pass. Lint clean both projects.
