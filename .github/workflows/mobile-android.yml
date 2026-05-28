@@ -4,6 +4,13 @@ permissions:
   contents: read
 
 on:
+  # Mobile work is paused per CLAUDE.md memory (2026-04-23, files
+  # preserved for resume). Until mobile is unpaused, the Android build
+  # runs only on direct pushes to main + on mobile-v* release tags + on
+  # manual workflow_dispatch. Removed the pull_request trigger 2026-05-27
+  # to stop burning ~10 Actions minutes on every Dependabot frontend
+  # patch (the biggest spender in the budget audit). Re-add the
+  # pull_request trigger when mobile work resumes.
   push:
     branches: ['main']
     tags:
@@ -11,11 +18,7 @@ on:
     paths:
       - 'frontend/studyhub-app/**'
       - '.github/workflows/mobile-android.yml'
-  pull_request:
-    branches: ['main']
-    paths:
-      - 'frontend/studyhub-app/**'
-      - '.github/workflows/mobile-android.yml'
+  workflow_dispatch:
 
 jobs:
   build-debug:
