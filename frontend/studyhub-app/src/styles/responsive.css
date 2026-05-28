@@ -16,7 +16,10 @@
  * Phone:   single column, everything stacked                               */
 .app-three-col-grid {
   display: grid;
-  gap: 22px;
+  /* Was 22px; standardized at 20px (--sh-space-xl) to match .app-two-col-grid
+   * and .profile-cockpit so navigating between Feed and a 2-column page
+   * doesn't visibly shift the column gutter. */
+  gap: var(--sh-space-xl);
   align-items: start;
   grid-template-columns: minmax(220px, 250px) minmax(0, 1fr) minmax(260px, 300px);
 }
@@ -88,7 +91,7 @@
  * Compact: single column                                                   */
 .app-two-col-grid {
   display: grid;
-  gap: 20px;
+  gap: var(--sh-space-xl); /* 20px — matches .app-three-col-grid */
   align-items: start;
   grid-template-columns: minmax(220px, 250px) minmax(0, 1fr);
 }
@@ -233,7 +236,9 @@
   padding: 0 4px;
 }
 
-.profile-tabs::-webkit-scrollbar { display: none; }
+.profile-tabs::-webkit-scrollbar {
+  display: none;
+}
 
 .profile-tab-btn {
   padding: 8px 18px;
@@ -246,7 +251,9 @@
   font-family: inherit;
   cursor: pointer;
   white-space: nowrap;
-  transition: background 0.15s, color 0.15s;
+  transition:
+    background 0.15s,
+    color 0.15s;
   min-height: 44px;
 }
 
@@ -268,7 +275,7 @@
 /* Two-column cockpit layout (own profile overview) */
 .profile-cockpit {
   display: grid;
-  gap: 20px;
+  gap: var(--sh-space-xl); /* 20px — matches .app-two-col-grid + .app-three-col-grid */
   align-items: start;
   grid-template-columns: 1.15fr 0.85fr;
 }
@@ -316,10 +323,16 @@
 }
 
 /* ── Settings page ─────────────────────────────────────────────────────── */
+/* Canonical .settings-layout definition + ALL its breakpoints. The
+ * desktop rule, tablet override, and phone override all live in this file
+ * so a future agent has a single source of truth. Previously the tablet
+ * override was in index.css and collided with the phone override at
+ * exactly 768px wide (index.css used 768, responsive.css uses 767),
+ * producing a 1px window where the gap dropped to 12px. */
 .settings-layout {
   display: grid;
   grid-template-columns: 200px 1fr;
-  gap: 28px;
+  gap: var(--sh-space-2xl);
 }
 
 .settings-nav {
@@ -327,17 +340,27 @@
   flex-direction: column;
 }
 
+/* Tablet: narrower nav column, tighter gap. */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .settings-layout {
+    grid-template-columns: 180px 1fr;
+    gap: var(--sh-space-lg);
+  }
+}
+
+/* Phone: stacked layout, horizontal scrollable nav. */
 @media (max-width: 767px) {
   .settings-layout {
     grid-template-columns: 1fr;
-    gap: 16px;
+    gap: var(--sh-space-lg);
   }
 
   .settings-nav {
+    position: static;
     flex-direction: row;
     overflow-x: auto;
-    gap: 6px;
-    padding-bottom: 6px;
+    gap: var(--sh-space-xs);
+    padding-bottom: var(--sh-space-sm);
   }
 
   .settings-nav::-webkit-scrollbar {
@@ -347,6 +370,12 @@
   .settings-nav-btn {
     white-space: nowrap;
     flex-shrink: 0;
+    /* !important defeats the inline padding/margin/font-size that
+     * SettingsPage.jsx applies for the desktop vertical-nav layout,
+     * so the buttons render as horizontal-scrollable pills on phone. */
+    padding: var(--sh-space-sm) var(--sh-space-md) !important;
+    margin-bottom: 0 !important;
+    font-size: var(--type-sm) !important;
   }
 }
 

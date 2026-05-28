@@ -26,7 +26,7 @@ export function PageShell({ nav, sidebar, children }) {
           style={{
             display: 'grid',
             gridTemplateColumns: layout.columns.appTwoColumn,
-            gap: 20,
+            gap: 'var(--sh-space-xl)',
             alignItems: 'start',
           }}
         >
@@ -34,7 +34,9 @@ export function PageShell({ nav, sidebar, children }) {
             className="sh-page-shell__sidebar"
             style={{
               position: layout.isCompact ? 'static' : 'sticky',
-              top: layout.isCompact ? undefined : 74,
+              // 56 (nav) + 16 (--sh-space-lg) = 72. Was a hardcoded 74 that
+              // didn't match the navbar's actual 56px height.
+              top: layout.isCompact ? undefined : 'calc(var(--sh-nav-h) + var(--sh-space-lg))',
             }}
           >
             {responsiveSidebar}

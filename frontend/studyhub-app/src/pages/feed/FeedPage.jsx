@@ -190,7 +190,7 @@ export default function FeedPage() {
             <main
               className="sh-ambient-main feed-page__main"
               id="main-content"
-              style={{ display: 'grid', gap: 18 }}
+              style={{ display: 'grid', gap: 'var(--sh-space-lg)' }}
             >
               {phase1On && user ? (
                 <section
@@ -251,7 +251,7 @@ export default function FeedPage() {
                     background: 'var(--sh-info-bg)',
                     border: '1px solid var(--sh-info-border)',
                     borderRadius: 12,
-                    padding: '14px 16px',
+                    padding: '12px 16px',
                     display: 'flex',
                     alignItems: 'center',
                     gap: 12,
@@ -280,7 +280,7 @@ export default function FeedPage() {
                       color: '#fff',
                       border: 'none',
                       borderRadius: 8,
-                      padding: '7px 16px',
+                      padding: '8px 16px',
                       fontSize: 13,
                       fontWeight: 700,
                       textDecoration: 'none',
@@ -320,7 +320,7 @@ export default function FeedPage() {
                     background: 'var(--sh-info-bg)',
                     border: '1px solid var(--sh-info-border)',
                     borderRadius: 12,
-                    padding: '10px 14px',
+                    padding: '10px 16px',
                     fontSize: 13,
                     fontWeight: 600,
                     color: 'var(--sh-brand)',
@@ -393,7 +393,7 @@ export default function FeedPage() {
                         color: 'var(--sh-warning-text)',
                         border: '1px solid var(--sh-warning-border)',
                         borderRadius: 14,
-                        padding: '12px 14px',
+                        padding: '12px 16px',
                         fontSize: 13,
                         lineHeight: 1.6,
                       }}
@@ -409,7 +409,7 @@ export default function FeedPage() {
                         color: 'var(--sh-danger-text)',
                         border: '1px solid var(--sh-danger)',
                         borderRadius: 14,
-                        padding: '12px 14px',
+                        padding: '12px 16px',
                         fontSize: 13,
                         display: 'flex',
                         alignItems: 'center',

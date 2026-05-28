@@ -28,7 +28,12 @@ export function Skeleton({ width = '100%', height = 16, circle, size, borderRadi
   )
 }
 
-/** Card-shaped skeleton with header row + content lines. */
+/** Card-shaped skeleton with header row + content lines.
+ *
+ * Padding matches `.sh-card` (--card-pad: clamp(16px, ..., 24px)) so the
+ * loading ghost is the same width/height as the real card. Was '20px 22px'
+ * which made the shimmer ~4px wider than the resolved content, producing a
+ * visible CLS jolt the moment data loaded. */
 export function SkeletonCard({ style }) {
   return (
     <div
@@ -36,7 +41,7 @@ export function SkeletonCard({ style }) {
         background: 'var(--sh-surface, #fff)',
         borderRadius: 16,
         border: '1px solid var(--sh-border, #e2e8f0)',
-        padding: '20px 22px',
+        padding: 'var(--card-pad)',
         ...style,
       }}
     >
@@ -116,12 +121,14 @@ export function SkeletonSheetGrid({ count = 4 }) {
   )
 }
 
-/** Feed skeleton with multiple post cards. */
+/** Feed skeleton with multiple post cards. Matches FeedPage main column
+ * gap (--sh-space-lg = 16px) so the shimmer-to-resolved transition has no
+ * visible step in the inter-card gutter. */
 export function SkeletonFeed({ count = 3 }) {
   return (
-    <div style={{ display: 'grid', gap: 14 }}>
+    <div style={{ display: 'grid', gap: 'var(--sh-space-lg)' }}>
       {Array.from({ length: count }).map((_, i) => (
-        <SkeletonCard key={i} style={{ padding: '22px 24px' }} />
+        <SkeletonCard key={i} />
       ))}
     </div>
   )

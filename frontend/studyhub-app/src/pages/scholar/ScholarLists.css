@@ -25,7 +25,7 @@
   border-radius: 12px;
   padding: 14px;
   position: sticky;
-  top: 80px;
+  top: calc(var(--sh-nav-h) + var(--sh-space-2xl));
   display: flex;
   flex-direction: column;
   gap: 4px;
