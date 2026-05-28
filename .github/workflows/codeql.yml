@@ -12,12 +12,19 @@
 name: "CodeQL Advanced"
 
 on:
+  # CodeQL covers the security-scanning need on every merge to main + a
+  # weekly scheduled scan. Removed the pull_request trigger 2026-05-27 —
+  # the repo doesn't have GitHub code-scanning enabled at the org level
+  # (every PR-time CodeQL run hits "Code scanning is not enabled for
+  # this repository. Please enable code scanning in the repository
+  # settings." and fails), so every PR-time run was wasted Actions
+  # minutes. Re-add the pull_request trigger after enabling code
+  # scanning under Settings → Security.
   push:
-    branches: [ "main", "approved-branch" ]
-  pull_request:
     branches: [ "main", "approved-branch" ]
   schedule:
     - cron: '25 9 * * 4'
+  workflow_dispatch:
 
 jobs:
   analyze:
