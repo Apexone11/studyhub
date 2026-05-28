@@ -48,11 +48,19 @@ const mocks = vi.hoisted(() => {
       }
       next()
     }),
-    authTokens: {
-      signAuthToken: vi.fn(() => 'signed-token-xyz'),
-      setAuthCookie: vi.fn((res) => res),
-      getAuthTokenFromRequest: vi.fn(() => null),
-      verifyAuthToken: vi.fn(),
+    authService: {
+      // wave-12.15 — passkey verify now delegates to the canonical
+      // login helper so a real Session row is created with the JWT
+      // carrying a `jti`. Mock returns the authenticated-user payload
+      // shape that the helper produces (id, username, role, csrfToken,
+      // counts, preferences, etc.) so the route handler's `res.json`
+      // sees a realistic body.
+      issueAuthenticatedSession: vi.fn(async () => ({
+        id: 1,
+        username: 'admin_user',
+        role: 'admin',
+        csrfToken: 'csrf-token-xyz',
+      })),
     },
     sentry: {
       captureError: vi.fn(),
@@ -67,7 +75,7 @@ const mockTargets = new Map([
   [require.resolve('../../src/lib/prisma'), mocks.prisma],
   [require.resolve('../../src/middleware/auth'), mocks.requireAuth],
   [require.resolve('../../src/middleware/requireAdmin'), mocks.requireAdmin],
-  [require.resolve('../../src/lib/authTokens'), mocks.authTokens],
+  [require.resolve('../../src/modules/auth/auth.service'), mocks.authService],
   [require.resolve('../../src/monitoring/sentry'), mocks.sentry],
   [require.resolve('../../src/lib/rateLimiters'), mocks.rateLimiters],
   [require.resolve('../../src/lib/webauthn/webauthn'), mocks.webauthnLib],
@@ -301,10 +309,12 @@ describe('POST /api/webauthn/authenticate/verify', () => {
     username: 'admin_user',
   }
 
-  it('updates counter, issues session, and returns user on success', async () => {
-    mocks.prisma.user.findUnique
-      .mockResolvedValueOnce({ id: 1, username: 'admin_user', role: 'admin' })
-      .mockResolvedValueOnce({ id: 1, username: 'admin_user', role: 'admin' })
+  it('updates counter, issues session via the canonical helper, and returns user on success', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValueOnce({
+      id: 1,
+      username: 'admin_user',
+      role: 'admin',
+    })
     mocks.prisma.webAuthnCredential.findUnique.mockResolvedValue({
       id: 10,
       userId: 1,
@@ -319,15 +329,24 @@ describe('POST /api/webauthn/authenticate/verify', () => {
       message: expect.stringMatching(/successful/i),
       user: { id: 1, username: 'admin_user', role: 'admin' },
     })
-    // wave-12.11 — verify now also stamps lastUsedAt for admin-portal
-    // visibility. The Date is freshly constructed inside the handler
-    // so we assert shape, not exact value.
+    // wave-12.11 — verify also stamps lastUsedAt for admin-portal visibility.
     expect(mocks.prisma.webAuthnCredential.update).toHaveBeenCalledWith({
       where: { id: 10 },
       data: { counter: 5, lastUsedAt: expect.any(Date) },
     })
-    expect(mocks.authTokens.signAuthToken).toHaveBeenCalledTimes(1)
-    expect(mocks.authTokens.setAuthCookie).toHaveBeenCalledTimes(1)
+    // wave-12.15 — must go through issueAuthenticatedSession (creates a
+    // real Session row + JWT with `jti`) so the wave-12.11 fail-closed
+    // requireRecentMfa middleware doesn't lock passkey-authed admins out
+    // of step-up-gated routes. mfaVerified:true stamps Session.mfaVerifiedAt
+    // because passkey is an AAL2 factor per NIST 800-63B.
+    expect(mocks.authService.issueAuthenticatedSession).toHaveBeenCalledTimes(1)
+    expect(mocks.authService.issueAuthenticatedSession).toHaveBeenCalledWith(
+      expect.anything(), // res
+      1, // userId
+      expect.anything(), // req
+      null, // preComputed risk
+      { mfaVerified: true },
+    )
   })
 
   it('returns 401 when the WebAuthn library reports a counter/replay failure', async () => {
@@ -347,7 +366,9 @@ describe('POST /api/webauthn/authenticate/verify', () => {
 
     expect(res.status).toBe(401)
     expect(mocks.prisma.webAuthnCredential.update).not.toHaveBeenCalled()
-    expect(mocks.authTokens.signAuthToken).not.toHaveBeenCalled()
+    // wave-12.15 — failed auth must NOT create a session; the new
+    // issueAuthenticatedSession path stays unreached on counter/replay.
+    expect(mocks.authService.issueAuthenticatedSession).not.toHaveBeenCalled()
   })
 
   it('returns 401 when the resolved user is not an admin', async () => {
