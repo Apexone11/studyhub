@@ -1,23 +1,32 @@
-import { createPortal } from 'react-dom'
+/**
+ * LegalAcceptanceEnforcementModal — gates the entire app for any
+ * authenticated user who's missing acceptance for the current legal
+ * version. Renders nothing when not gating; renders an unskippable
+ * dialog otherwise (no Escape close, no backdrop close — only "Sign
+ * out" or "Go to Settings → Legal" advance the user).
+ *
+ * 2026-05-27 — migrated from the bespoke `createPortal` + `useFocusTrap`
+ * pattern to the shared `<FocusTrappedDialog>` primitive (modal-focus-
+ * trap migration). Behaviour preserved:
+ *   - role="alertdialog" (urgent semantic per W3C ARIA APG §3.9.2)
+ *   - Escape does NOT close (enforcement — user must act)
+ *   - Backdrop click does NOT close (same reason)
+ *   - aria-labelledby still points at the visible title heading
+ */
 import { useLocation, useNavigate } from 'react-router-dom'
 import { LEGAL_DOCUMENT_LABELS } from '../lib/legalVersions'
 import { useSession } from '../lib/session-context'
-import { useFocusTrap } from '../lib/useFocusTrap'
+import FocusTrappedDialog from './Modal/FocusTrappedDialog'
 
 const styles = {
-  overlay: {
-    position: 'fixed',
-    inset: 0,
+  overlayOverride: {
     zIndex: 1200,
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
     background: 'rgba(15, 23, 42, 0.62)',
     backdropFilter: 'blur(6px)',
   },
-  modal: {
+  panelOverride: {
     width: 'min(480px, 100%)',
+    maxWidth: '100%',
     borderRadius: 20,
     border: '1px solid var(--sh-border)',
     background: 'var(--sh-surface)',
@@ -104,55 +113,56 @@ export default function LegalAcceptanceEnforcementModal() {
   const isOnLegalSettings = location.pathname === '/settings' && activeTab === 'legal'
   const legalAcceptance = user?.legalAcceptance || null
   const open = Boolean(isAuthenticated && legalAcceptance?.needsAcceptance && !isOnLegalSettings)
-  const trapRef = useFocusTrap({ active: open, escapeCloses: false })
 
-  if (!open) return null
-
-  return createPortal(
-    <div style={styles.overlay} role="presentation">
-      <div
-        ref={trapRef}
-        style={styles.modal}
-        role="alertdialog"
-        aria-modal="true"
-        aria-labelledby="legal-enforcement-title"
-      >
-        <span style={styles.badge}>Action Required</span>
-        <h2 id="legal-enforcement-title" style={styles.title}>
-          Review the latest StudyHub legal documents to continue
-        </h2>
-        <p style={styles.body}>
-          Your account is missing acceptance for the current StudyHub legal version. Open Settings
-          &gt; Legal and accept the latest documents to keep using the platform.
-        </p>
-        {Array.isArray(legalAcceptance?.missingRequiredDocuments) &&
-          legalAcceptance.missingRequiredDocuments.length > 0 && (
-            <ul style={styles.list}>
-              {legalAcceptance.missingRequiredDocuments.map((slug) => (
-                <li key={slug}>{getDocumentLabel(slug)}</li>
-              ))}
-            </ul>
-          )}
-        <div style={styles.actions}>
-          <button
-            type="button"
-            onClick={() => {
-              void signOut()
-            }}
-            style={styles.secondaryButton}
-          >
-            Sign out
-          </button>
-          <button
-            type="button"
-            onClick={() => navigate(legalAcceptance?.remediationPath || '/settings?tab=legal')}
-            style={styles.primaryButton}
-          >
-            Go to Settings &gt; Legal
-          </button>
-        </div>
+  return (
+    <FocusTrappedDialog
+      open={open}
+      role="alertdialog"
+      ariaLabelledBy="legal-enforcement-title"
+      // Enforcement modal: no dismiss pathways. User MUST sign out or
+      // navigate to legal settings.
+      escapeDeactivates={false}
+      clickOutsideDeactivates={false}
+      // Stay centered on phones — confirmation-style, not a content
+      // sheet.
+      mobileLayout="centered"
+      overlayStyle={styles.overlayOverride}
+      panelStyle={styles.panelOverride}
+    >
+      <span style={styles.badge}>Action Required</span>
+      <h2 id="legal-enforcement-title" style={styles.title}>
+        Review the latest StudyHub legal documents to continue
+      </h2>
+      <p style={styles.body}>
+        Your account is missing acceptance for the current StudyHub legal version. Open Settings
+        &gt; Legal and accept the latest documents to keep using the platform.
+      </p>
+      {Array.isArray(legalAcceptance?.missingRequiredDocuments) &&
+        legalAcceptance.missingRequiredDocuments.length > 0 && (
+          <ul style={styles.list}>
+            {legalAcceptance.missingRequiredDocuments.map((slug) => (
+              <li key={slug}>{getDocumentLabel(slug)}</li>
+            ))}
+          </ul>
+        )}
+      <div style={styles.actions}>
+        <button
+          type="button"
+          onClick={() => {
+            void signOut()
+          }}
+          style={styles.secondaryButton}
+        >
+          Sign out
+        </button>
+        <button
+          type="button"
+          onClick={() => navigate(legalAcceptance?.remediationPath || '/settings?tab=legal')}
+          style={styles.primaryButton}
+        >
+          Go to Settings &gt; Legal
+        </button>
       </div>
-    </div>,
-    document.body,
+    </FocusTrappedDialog>
   )
 }

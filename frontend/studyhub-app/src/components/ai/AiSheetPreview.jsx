@@ -4,11 +4,15 @@
  * Extracts HTML from markdown code blocks (```html ... ```) and renders
  * them in a sandboxed iframe. Offers "Edit in Sheet Lab" and "Publish"
  * actions.
+ *
+ * 2026-05-27 — modal migrated from bespoke createPortal+overlay to the
+ * shared <FocusTrappedDialog> primitive. Focus is now trapped + ESC /
+ * backdrop click close cleanly. Iframe sandbox unchanged (CLAUDE.md A14).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createPortal } from 'react-dom'
 import ComponentErrorBoundary from '../ComponentErrorBoundary'
+import FocusTrappedDialog from '../Modal/FocusTrappedDialog'
 import { IconSheets, IconPen, IconX, IconEye } from '../Icons'
 
 /**
@@ -97,11 +101,7 @@ export function SheetPreviewBar({ html, conversationTitle }) {
         </p>
       )}
 
-      {showPreview &&
-        createPortal(
-          <SheetPreviewModal html={html} onClose={() => setShowPreview(false)} />,
-          document.body,
-        )}
+      {showPreview && <SheetPreviewModal html={html} onClose={() => setShowPreview(false)} />}
     </ComponentErrorBoundary>
   )
 }
@@ -145,67 +145,62 @@ function SheetPreviewModal({ html, onClose }) {
   }, [html])
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        zIndex: 10000,
-        background: 'var(--sh-modal-overlay, rgba(0,0,0,0.6))',
+    <FocusTrappedDialog
+      open
+      onClose={onClose}
+      ariaLabel="Sheet Preview"
+      initialFocusSelector="[data-sheet-preview-close]"
+      mobileLayout="fullscreen"
+      overlayStyle={{ zIndex: 10000, background: 'var(--sh-modal-overlay, rgba(0,0,0,0.6))' }}
+      panelStyle={{
+        padding: 0,
+        gap: 0,
+        borderRadius: 16,
+        maxWidth: 900,
+        width: '100%',
+        height: '85vh',
         display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: 20,
+        flexDirection: 'column',
+        overflow: 'hidden',
       }}
-      onClick={onClose}
     >
       <div
         style={{
-          background: 'var(--sh-surface)',
-          borderRadius: 16,
-          width: '100%',
-          maxWidth: 900,
-          height: '85vh',
+          padding: '12px 20px',
+          borderBottom: '1px solid var(--sh-border)',
           display: 'flex',
-          flexDirection: 'column',
-          overflow: 'hidden',
+          alignItems: 'center',
+          justifyContent: 'space-between',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
-        <div
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <IconSheets size={16} style={{ color: 'var(--sh-brand)' }} />
+          <span style={{ fontSize: 14, fontWeight: 700 }}>Sheet Preview</span>
+        </div>
+        <button
+          data-sheet-preview-close
+          type="button"
+          onClick={onClose}
+          aria-label="Close preview"
           style={{
-            padding: '12px 20px',
-            borderBottom: '1px solid var(--sh-border)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            padding: 4,
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <IconSheets size={16} style={{ color: 'var(--sh-brand)' }} />
-            <span style={{ fontSize: 14, fontWeight: 700 }}>Sheet Preview</span>
-          </div>
-          <button
-            onClick={onClose}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 4,
-            }}
-          >
-            <IconX size={18} style={{ color: 'var(--sh-muted)' }} />
-          </button>
-        </div>
-        <iframe
-          src={iframeSrc}
-          // Match the published-runtime sandbox so interactive sheets
-          // preview the same way they'll run after publish. CLAUDE.md
-          // A14 — never combine `allow-scripts` with `allow-same-origin`.
-          sandbox="allow-scripts allow-popups allow-forms"
-          title="Sheet Preview"
-          style={{ flex: 1, border: 'none', width: '100%' }}
-        />
+          <IconX size={18} style={{ color: 'var(--sh-muted)' }} />
+        </button>
       </div>
-    </div>
+      <iframe
+        src={iframeSrc}
+        // Match the published-runtime sandbox so interactive sheets
+        // preview the same way they'll run after publish. CLAUDE.md
+        // A14 — never combine `allow-scripts` with `allow-same-origin`.
+        sandbox="allow-scripts allow-popups allow-forms"
+        title="Sheet Preview"
+        style={{ flex: 1, border: 'none', width: '100%' }}
+      />
+    </FocusTrappedDialog>
   )
 }

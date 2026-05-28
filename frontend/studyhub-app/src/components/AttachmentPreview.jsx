@@ -14,14 +14,21 @@
  *   - Audio:   <audio controls>.
  *   - Other:   shows file metadata + a "Download" CTA.
  *
- * Fullscreen: uses the standard Fullscreen API on the modal container.
- * ESC, click-outside, and the close button all dismiss.
+ * Fullscreen: uses the standard Fullscreen API on a wrapper inside the
+ * dialog panel. ESC, click-outside, and the close button all dismiss.
  *
- * Accessibility: focus is trapped on the close button when the modal
- * opens; Escape closes; backdrop click closes.
+ * Accessibility: focus is trapped via <FocusTrappedDialog>; Tab cycles
+ * within the dialog (W3C ARIA Authoring Practices §3.9 — Modal Dialog
+ * Pattern); Escape closes; backdrop click closes; initial focus lands on
+ * the close button so keyboard users can dismiss with Enter.
+ *
+ * 2026-05-27 — migrated from bespoke createPortal + manual Escape /
+ * backdrop / focus handling to <FocusTrappedDialog>. Fullscreen API
+ * target is now an inner wrapper div (panel chrome is hidden by the
+ * browser's fullscreen mode regardless of where the target sits).
  * ════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useRef, useState } from 'react'
-import { createPortal } from 'react-dom'
+import FocusTrappedDialog from './Modal/FocusTrappedDialog'
 
 const KIND_LABELS = {
   image: 'Image',
@@ -59,21 +66,8 @@ function inferKind(name = '', url = '', type = '') {
 
 export function AttachmentPreviewModal({ attachment, onClose }) {
   const containerRef = useRef(null)
-  const closeButtonRef = useRef(null)
   const [isFullscreen, setIsFullscreen] = useState(false)
   const kind = attachment.kind || inferKind(attachment.name, attachment.url, attachment.type)
-
-  useEffect(() => {
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [onClose])
-
-  useEffect(() => {
-    closeButtonRef.current?.focus()
-  }, [])
 
   useEffect(() => {
     function handleFullscreenChange() {
@@ -95,40 +89,42 @@ export function AttachmentPreviewModal({ attachment, onClose }) {
     }
   }
 
-  function handleBackdropClick(event) {
-    if (event.target === event.currentTarget) onClose()
-  }
-
-  return createPortal(
-    <div
-      role="presentation"
-      onClick={handleBackdropClick}
-      style={{
-        position: 'fixed',
-        inset: 0,
+  return (
+    <FocusTrappedDialog
+      open
+      onClose={onClose}
+      ariaLabel={attachment.name || 'Attachment preview'}
+      // Land focus on the close button (legacy behaviour) so keyboard
+      // users can dismiss with Enter the moment the modal opens.
+      initialFocusSelector="[data-attachment-close]"
+      mobileLayout="fullscreen"
+      overlayStyle={{
         background: 'rgba(0,0,0,0.65)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
         padding: 24,
         zIndex: 10000,
+      }}
+      panelStyle={{
+        padding: 0,
+        gap: 0,
+        background: 'var(--sh-surface)',
+        borderRadius: isFullscreen ? 0 : 14,
+        border: isFullscreen ? 'none' : '1px solid var(--sh-border)',
+        width: 'min(960px, 100%)',
+        maxWidth: 'min(960px, 100%)',
+        maxHeight: isFullscreen ? '100%' : '90vh',
+        height: isFullscreen ? '100%' : 'auto',
       }}
     >
       <div
         ref={containerRef}
-        role="dialog"
-        aria-modal="true"
-        aria-label={attachment.name || 'Attachment preview'}
         style={{
-          background: 'var(--sh-surface)',
-          borderRadius: isFullscreen ? 0 : 14,
-          border: isFullscreen ? 'none' : '1px solid var(--sh-border)',
-          width: 'min(960px, 100%)',
-          maxHeight: isFullscreen ? '100%' : '90vh',
-          height: isFullscreen ? '100%' : 'auto',
           display: 'flex',
           flexDirection: 'column',
+          width: '100%',
+          height: '100%',
+          minHeight: 0,
           overflow: 'hidden',
+          background: 'var(--sh-surface)',
         }}
       >
         <header
@@ -190,7 +186,7 @@ export function AttachmentPreviewModal({ attachment, onClose }) {
               </a>
             ) : null}
             <button
-              ref={closeButtonRef}
+              data-attachment-close
               type="button"
               onClick={onClose}
               style={iconButtonStyle}
@@ -278,8 +274,7 @@ export function AttachmentPreviewModal({ attachment, onClose }) {
           )}
         </div>
       </div>
-    </div>,
-    document.body,
+    </FocusTrappedDialog>
   )
 }
 

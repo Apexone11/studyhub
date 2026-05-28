@@ -28,6 +28,17 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.7 — modal focus-trap migration (round 2) (2026-05-27)
+
+Migrated 3 more legacy dialogs to the shared `<FocusTrappedDialog>` primitive so every modal in the app has W3C-compliant focus trapping, Escape, and backdrop-click behaviour wired through one code path:
+
+- `AiSheetPreview.jsx` (SheetPreviewModal) — Hub AI HTML preview window. Previously had no focus trap. Now traps focus, Escape closes, backdrop closes, initial focus lands on the close button.
+- `ReportModal.jsx` — content/user reporting dialog. Migrated off the bespoke `useFocusTrap` hook + `createPortal`. Backdrop click is intentionally disabled so the user doesn't lose a typed report mid-flow.
+- `AttachmentPreview.jsx` (AttachmentPreviewModal) — group / discussion attachment viewer. Fullscreen API integration preserved (ref now lives on an inner wrapper instead of the panel itself). All 10 pre-existing tests still pass.
+- `FocusTrappedDialog.jsx` — added `tabbableOptions: { displayCheck: 'none' }` in the Vitest environment only. jsdom's `getBoundingClientRect()` always returns zeros, so `focus-trap`'s default `displayCheck: 'full'` reported "no tabbable nodes" inside dialogs whose buttons were visibly present in real browsers. Production / dev builds keep the strict default that filters CSS-hidden elements.
+
+Net effect: every visible modal in the app now flows through the same focus-trap + ESC + backdrop pipeline. Legacy `useFocusTrap` hook + ad-hoc keydown handlers no longer compete with one another across surfaces.
+
 ### Wave-12.6 — CI green: 16 failing tests → 0 + 2 prod bug fixes (2026-05-22)
 
 CI was red on `local-main` for weeks because of accumulated test failures + a Prisma client that wasn't regenerated. Backend test suite went from `16 failed | 196 passed` to `3336 passed | 0 failed | 6 documented skips`. This unblocks every Dependabot PR + future merges from passing CI.

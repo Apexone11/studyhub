@@ -90,6 +90,12 @@ export default function FocusTrappedDialog({
   overlayStyle,
   panelStyle,
   panelClassName,
+  // W3C ARIA distinguishes `dialog` (general) from `alertdialog`
+  // (urgent — confirm/destroy/legal-enforce flows). Caller picks; we
+  // default to the common case. Added 2026-05-27 for the modal-focus-
+  // trap migration so LegalAcceptanceEnforcementModal preserves its
+  // pre-migration alertdialog semantic.
+  role = 'dialog',
   // Loop M17 — mobile layout strategy on phone widths (<= 767px).
   //   'auto' (default): content-heavy dialogs slide up as a bottom-sheet.
   //   'centered'      : stay centered (use for confirms and celebrations).
@@ -162,6 +168,14 @@ export default function FocusTrappedDialog({
       // Allow outside click to deactivate even when the click lands on
       // the overlay (vs panel).
       allowOutsideClick: true,
+      // jsdom's getBoundingClientRect returns zeros for every element,
+      // so focus-trap's default `displayCheck: 'full'` reports "no
+      // tabbable nodes" inside a dialog whose buttons are visibly there
+      // in real browsers. Relax the check only in Vitest. Production /
+      // dev builds keep the strict default that filters out elements
+      // hidden by CSS.
+      tabbableOptions:
+        import.meta.env && import.meta.env.MODE === 'test' ? { displayCheck: 'none' } : undefined,
     }),
     [
       escapeDeactivates,
@@ -250,7 +264,7 @@ export default function FocusTrappedDialog({
     <FocusTrap focusTrapOptions={focusTrapOptions}>
       <div
         ref={overlayRef}
-        role="dialog"
+        role={role}
         aria-modal="true"
         {...dialogA11y}
         {...(ariaDescribedBy ? { 'aria-describedby': ariaDescribedBy } : {})}
