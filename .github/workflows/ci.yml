@@ -25,15 +25,11 @@ jobs:
         with:
           fetch-depth: 0
       - name: Enforce release log update
-        # Skip the gate for any bot-authored PR. GitHub App accounts use
-        # the `[bot]` suffix (`dependabot[bot]`, `imgbot[bot]`, Renovate,
-        # custom apps, etc.), so the suffix check covers every current
-        # AND future automation account without per-bot maintenance.
+        # Skip the gate for bot-authored PRs (Dependabot, ImgBot, etc.).
         # Bots can't reasonably write release-log entries, and gating on
         # them blocks every dep bump indefinitely. Human PRs still
-        # required to update the log. 2026-05-24, refined 2026-05-27 per
-        # Codex review feedback.
-        if: github.event_name == 'pull_request' && !endsWith(github.actor, '[bot]')
+        # required to update the log. 2026-05-24.
+        if: github.event_name == 'pull_request' && github.actor != 'dependabot[bot]' && github.actor != 'imgbot[bot]' && github.actor != 'dependabot-preview[bot]'
         run: |
           set -euo pipefail
           cd "$GITHUB_WORKSPACE"
