@@ -37,6 +37,7 @@ The risky/decision findings surfaced in wave-12.17, applied after verifying each
 - Mobile: the phone bottom-nav now ships — the finished component was never mounted (its `@smoke` test was failing); mounted in the authenticated chrome (self-gates to phone viewports, hidden on /ai + auth + onboarding).
 - Perf: the study-groups list endpoint no longer fan-outs ~8 queries per group (up to ~800/request) — counts, course, and viewer membership are batched into a handful of `groupBy`/`findMany` calls; response shape unchanged.
 - Scholar: "Share to study group" now works from a paper (shares as a link to the paper's Scholar page); removed 3 superseded duplicate Scholar action components (Generate-sheet / Cite-into-note / Recently-viewed already exist inline on the paper page) + a dead hook.
+- Build: regenerated the root `package-lock.json` to match the workspace `package.json` versions — unblocks Cloudflare Pages `npm ci` (`EUSAGE` lockfile drift across capacitor / playwright / sentry / react / dompurify / aws-sdk / etc.).
 
 ### Wave-12.17 — 10-loop audit fixes (security / features / perf / a11y) (2026-05-28)
 
