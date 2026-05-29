@@ -17,6 +17,8 @@
 const express = require('express')
 const multer = require('multer')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { captureError } = require('../../monitoring/sentry')
 const log = require('../../lib/logger')
 const { runWithHeartbeat } = require('../../lib/jobs/heartbeat')
@@ -48,6 +50,12 @@ const {
 } = require('./video.constants')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — CSRF defense in depth on writes (upload/init, upload/chunk,
+// upload/complete, upload/abort, caption upload/delete, video delete, thumbnail
+// regenerate/replace). GET/HEAD/OPTIONS short-circuit per the originAllowlist
+// middleware, so the streaming and media-proxy reads keep working.
+router.use(originAllowlist())
 
 // ── Server-side chunk buffer ────────────────────────────────────────────
 // Frontend sends 2 MB chunks (to fit under Railway HTTP/2 proxy limits).
@@ -924,7 +932,10 @@ router.post('/:id/captions', requireAuth, captionUpload.single('file'), async (r
  */
 router.delete('/:id/captions/:language', requireAuth, async (req, res) => {
   try {
-    const videoId = parseInt(req.params.id, 10)
+    const videoId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(videoId) || videoId < 1) {
+      return sendError(res, 400, 'Invalid id.', ERROR_CODES.BAD_REQUEST)
+    }
     const { language } = req.params
 
     const video = await prisma.video.findUnique({ where: { id: videoId } })

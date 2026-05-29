@@ -16,6 +16,7 @@ export default function FollowSuggestions() {
   const [suggestions, setSuggestions] = useState([])
   const [loading, setLoading] = useState(true)
   const [followingSet, setFollowingSet] = useState(new Set())
+  const [requestedSet, setRequestedSet] = useState(new Set())
 
   useEffect(() => {
     fetch(`${API}/api/users/me/follow-suggestions`, { credentials: 'include' })
@@ -33,7 +34,16 @@ export default function FollowSuggestions() {
         headers: { 'Content-Type': 'application/json' },
       })
       if (res.ok) {
-        setFollowingSet((prev) => new Set([...prev, username]))
+        // Hydrate UI from server response — private accounts return
+        // `{ following: false, requested: true }` and must show "Requested",
+        // not "Following" (CLAUDE.md A4: no optimistic merge that masks the
+        // server's persisted state).
+        const data = await res.json().catch(() => ({}))
+        if (data.requested) {
+          setRequestedSet((prev) => new Set([...prev, username]))
+        } else if (data.following) {
+          setFollowingSet((prev) => new Set([...prev, username]))
+        }
       }
     } catch {
       /* ignore */
@@ -53,6 +63,7 @@ export default function FollowSuggestions() {
       <div style={{ display: 'grid', gap: 8 }}>
         {suggestions.slice(0, 6).map((user) => {
           const isFollowed = followingSet.has(user.username)
+          const isRequested = requestedSet.has(user.username)
           const followerCount =
             typeof user.followerCount === 'number' ? user.followerCount : user._count?.followers
           const sheetCount =
@@ -110,16 +121,16 @@ export default function FollowSuggestions() {
               </Link>
               <button
                 type="button"
-                onClick={() => !isFollowed && handleFollow(user.username)}
-                disabled={isFollowed}
+                onClick={() => !isFollowed && !isRequested && handleFollow(user.username)}
+                disabled={isFollowed || isRequested}
                 style={{
                   ...followBtnStyle,
-                  background: isFollowed ? 'var(--sh-soft)' : 'var(--sh-brand)',
-                  color: isFollowed ? 'var(--sh-muted)' : '#fff',
-                  cursor: isFollowed ? 'default' : 'pointer',
+                  background: isFollowed || isRequested ? 'var(--sh-soft)' : 'var(--sh-brand)',
+                  color: isFollowed || isRequested ? 'var(--sh-muted)' : '#fff',
+                  cursor: isFollowed || isRequested ? 'default' : 'pointer',
                 }}
               >
-                {isFollowed ? 'Following' : 'Follow'}
+                {isFollowed ? 'Following' : isRequested ? 'Requested' : 'Follow'}
               </button>
             </div>
           )

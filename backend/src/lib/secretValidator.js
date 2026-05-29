@@ -25,6 +25,25 @@ const RECOMMENDED = [
       'Resend webhook signing key (svix). Without it the strict-mode handler 503s on every webhook; ' +
       'with it the handler verifies signatures and stores delivery + suppression events. Added 2026-05-14.',
   },
+  {
+    key: 'RESEND_API_KEY',
+    description:
+      'Resend API key for outbound email delivery (lib/email/emailTransport.js). ' +
+      'Missing in dev = email falls back to jsonTransport/SMTP; missing in prod = ' +
+      'verification, reset, and admin notification mail silently no-ops.',
+  },
+  {
+    key: 'EMAIL_USER',
+    description:
+      'SMTP username for the fallback nodemailer transport (lib/email/emailTransport.js). ' +
+      'Only used when EMAIL_TRANSPORT is not resend; pair with EMAIL_PASS.',
+  },
+  {
+    key: 'EMAIL_PASS',
+    description:
+      'SMTP password / app-password for the fallback nodemailer transport ' +
+      '(lib/email/emailTransport.js). Pair with EMAIL_USER.',
+  },
   { key: 'SENTRY_DSN', description: 'Error monitoring' },
   // FRONTEND_URL was previously listed here as RECOMMENDED only — promoted
   // to REQUIRED_IN_PRODUCTION (line ~87) wave-11 2026-05-14 so missing

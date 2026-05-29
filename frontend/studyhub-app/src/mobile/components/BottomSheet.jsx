@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import anime from '../lib/animeCompat'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 
 const DRAG_DISMISS_THRESHOLD = 120
 
@@ -178,19 +179,36 @@ export default function BottomSheet({
     }
   }, [mounted])
 
+  // Focus trap + Escape-to-close. Attaches to the dialog root so Tab
+  // cycling stays inside the sheet and Esc dismisses via the same
+  // animated close path as the backdrop button.
+  const trapRef = useFocusTrap({ active: mounted, onClose: animateClose })
+
+  // Land first focus on the dialog itself so screen readers announce
+  // the sheet immediately instead of a child control.
+  useEffect(() => {
+    if (mounted && trapRef.current) {
+      trapRef.current.focus()
+    }
+  }, [mounted, trapRef])
+
   if (!mounted) return null
 
   const heightClass = fullHeight ? 'mob-bottom-sheet--full' : ''
 
   return createPortal(
     <div
+      ref={trapRef}
       className="mob-bottom-sheet-overlay"
       aria-modal="true"
       role="dialog"
       aria-labelledby={title ? 'mob-bottom-sheet-title' : undefined}
+      tabIndex={-1}
     >
-      <div
+      <button
         ref={backdropRef}
+        type="button"
+        aria-label="Close"
         className="mob-bottom-sheet-backdrop"
         onClick={animateClose}
         style={{ opacity: 0 }}

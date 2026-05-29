@@ -101,7 +101,34 @@ async function main() {
     for (const obj of list.Contents || []) {
       scanned += 1
       const relativePath = obj.Key.slice(KEY_PREFIX.length)
+
+      // Defense in depth: R2 is external storage. A compromised R2 credential
+      // or misconfigured bucket policy could inject keys like
+      // 'upload-volume-backup/../../etc/cron.d/payload', which path.join would
+      // happily resolve outside UPLOADS_DIR. Refuse any relative path that
+      // contains '..' segments or is absolute, and verify the resolved
+      // destination stays under UPLOADS_DIR.
+      if (
+        !relativePath ||
+        relativePath.startsWith('/') ||
+        relativePath.startsWith('\\') ||
+        path.isAbsolute(relativePath) ||
+        relativePath.split(/[\\/]/).includes('..')
+      ) {
+        console.warn(`REFUSED unsafe key (traversal attempt): ${obj.Key}`)
+        failed += 1
+        continue
+      }
+
       const destination = path.join(UPLOADS_DIR, relativePath)
+
+      const resolvedDest = path.resolve(destination)
+      const resolvedRoot = path.resolve(UPLOADS_DIR)
+      if (resolvedDest !== resolvedRoot && !resolvedDest.startsWith(resolvedRoot + path.sep)) {
+        console.warn(`REFUSED escape from UPLOADS_DIR: ${obj.Key} → ${resolvedDest}`)
+        failed += 1
+        continue
+      }
 
       if (fs.existsSync(destination) && !force) {
         skipped += 1

@@ -768,6 +768,18 @@ async function streamMessage({
           )
           streamedRawLength = safeRawLength
         }
+      } else if (event.type === 'message_start' && event.message?.usage) {
+        // Anthropic emits the prompt token count on message_start; capture
+        // it so an aborted stream can still record what the input cost.
+        totalInputTokens = event.message.usage.input_tokens || totalInputTokens
+        cacheReadInputTokens = event.message.usage.cache_read_input_tokens || cacheReadInputTokens
+        cacheCreationInputTokens =
+          event.message.usage.cache_creation_input_tokens || cacheCreationInputTokens
+      } else if (event.type === 'message_delta' && event.usage) {
+        // Cumulative output token count is emitted on each message_delta;
+        // overwrite (do not add) since usage.output_tokens is a running
+        // total per Anthropic SSE spec.
+        totalOutputTokens = event.usage.output_tokens || totalOutputTokens
       }
     }
 
@@ -785,6 +797,61 @@ async function streamMessage({
             metadata: { partial: true },
           },
         })
+      }
+      // wave-12.19 round-2: aborted streams previously left the reserved
+      // Anthropic spend on the global daily ceiling AND skipped per-user
+      // usage tracking. That let a free-tier user spam abort to receive
+      // free partial text. Fix: record the partial usage captured from
+      // the stream (message_start input_tokens + last message_delta
+      // output_tokens) and refund the over-estimate back to the global
+      // ceiling. Fire-and-forget so abort cleanup never blocks the
+      // response. Fall back to a char-based output estimate (~3.5
+      // chars/token) when Anthropic never emitted a message_delta.
+      // TODO(wave-12.19): if Anthropic ever adds a stream.usage accessor
+      // for aborted streams, prefer that over the char-heuristic fallback.
+      if (totalOutputTokens === 0 && fullResponse.length > 0) {
+        totalOutputTokens = Math.ceil(fullResponse.length / 3.5)
+      }
+      try {
+        const {
+          COST_PER_1K_INPUT_CENTS,
+          COST_PER_1K_OUTPUT_CENTS,
+        } = require('./attachments/attachments.constants')
+        const actualCostCents = Math.ceil(
+          (totalInputTokens / 1000) * COST_PER_1K_INPUT_CENTS +
+            (totalOutputTokens / 1000) * COST_PER_1K_OUTPUT_CENTS,
+        )
+        void recordActualUsage({
+          userId,
+          tokensIn: totalInputTokens,
+          tokensOut: totalOutputTokens,
+          documentTokens: docPageEst * 250,
+          costCents: actualCostCents,
+          documentCount: hasAttachments ? resolvedAttachments.length : 0,
+          cacheReadInputTokens,
+          cacheCreationInputTokens,
+        }).catch((err) => {
+          log.warn(
+            { event: 'ai.abort.usage_record_failed', err: err?.message, userId },
+            'Failed to record partial usage on aborted stream',
+          )
+        })
+        if (spendReservation.costEstCents > actualCostCents) {
+          void refundSpendDelta({
+            estCents: spendReservation.costEstCents,
+            actualCents: actualCostCents,
+          }).catch((err) => {
+            log.warn(
+              { event: 'ai.abort.refund_failed', err: err?.message, userId },
+              'Failed to refund spend reservation on aborted stream',
+            )
+          })
+        }
+      } catch (err) {
+        log.warn(
+          { event: 'ai.abort.cleanup_failed', err: err?.message, userId },
+          'Failed to schedule abort cleanup',
+        )
       }
       return
     }

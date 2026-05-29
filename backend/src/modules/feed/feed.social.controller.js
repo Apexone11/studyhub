@@ -305,6 +305,9 @@ router.post(
   commentReactLimiter,
   async (req, res) => {
     const commentId = Number.parseInt(req.params.commentId, 10)
+    if (!Number.isInteger(commentId) || commentId < 1) {
+      return sendError(res, 400, 'Invalid comment id.', ERROR_CODES.BAD_REQUEST)
+    }
     const { userId } = req.user
     const { type } = req.body || {}
 

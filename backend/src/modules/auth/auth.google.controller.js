@@ -24,6 +24,12 @@ const VALID_ACCOUNT_TYPES = ['student', 'teacher', 'other']
 const TEMP_TOKEN_EXPIRES_IN = '15m'
 const TEMP_TOKEN_EXPIRES_MS = 15 * 60 * 1000
 const TEMP_TOKEN_TYPE = 'google_pending'
+// Google's documented token-endpoint SLA is well under 10s; cap upstream stalls
+// so a slow Google response doesn't tie up every signup request.
+const GOOGLE_OAUTH_FETCH_TIMEOUT_MS = 10000
+// Response is small JSON (~1-2 KB). Cap at 64 KB to defend against a hostile
+// or misbehaving upstream streaming an unbounded body.
+const GOOGLE_OAUTH_FETCH_MAX_BYTES = 64 * 1024
 
 function getJwtSecret() {
   if (!process.env.JWT_SECRET) throw new Error('JWT_SECRET is not configured.')
@@ -488,24 +494,92 @@ router.post('/google/code', googleLimiter, async (req, res) => {
 
   try {
     // Exchange authorization code for tokens via Google's token endpoint.
-    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        code,
-        client_id: process.env.GOOGLE_CLIENT_ID,
-        client_secret: process.env.GOOGLE_CLIENT_SECRET,
-        redirect_uri: redirectUri,
-        grant_type: 'authorization_code',
-      }),
-    })
+    // Hard timeout + response size cap so a slow or hostile upstream cannot
+    // stall every signup path or stream an unbounded body into memory.
+    let tokenResponse
+    try {
+      tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: process.env.GOOGLE_CLIENT_ID,
+          client_secret: process.env.GOOGLE_CLIENT_SECRET,
+          redirect_uri: redirectUri,
+          grant_type: 'authorization_code',
+        }),
+        signal: AbortSignal.timeout(GOOGLE_OAUTH_FETCH_TIMEOUT_MS),
+      })
+    } catch (err) {
+      if (err?.name === 'TimeoutError' || err?.name === 'AbortError') {
+        return sendError(
+          res,
+          504,
+          'Google sign-in timed out. Please try again.',
+          ERROR_CODES.INTERNAL,
+        )
+      }
+      throw err
+    }
 
     if (!tokenResponse.ok) {
       const err = await tokenResponse.json().catch(() => ({}))
       throw new AppError(401, err.error_description || 'Failed to exchange Google code.')
     }
 
-    const tokens = await tokenResponse.json()
+    // Read body with an explicit size cap. Response is small JSON; anything
+    // larger than 64 KB is either a bug or an attack.
+    const declaredLength = Number(tokenResponse.headers.get('content-length'))
+    if (Number.isFinite(declaredLength) && declaredLength > GOOGLE_OAUTH_FETCH_MAX_BYTES) {
+      return sendError(res, 502, 'Google sign-in failed. Please try again.', ERROR_CODES.INTERNAL)
+    }
+    let rawBody = ''
+    try {
+      const reader = tokenResponse.body?.getReader()
+      if (reader) {
+        const decoder = new TextDecoder()
+        let received = 0
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+          received += value.byteLength
+          if (received > GOOGLE_OAUTH_FETCH_MAX_BYTES) {
+            try {
+              await reader.cancel()
+            } catch {
+              /* ignore */
+            }
+            return sendError(
+              res,
+              502,
+              'Google sign-in failed. Please try again.',
+              ERROR_CODES.INTERNAL,
+            )
+          }
+          rawBody += decoder.decode(value, { stream: true })
+        }
+        rawBody += decoder.decode()
+      } else {
+        rawBody = await tokenResponse.text()
+        if (rawBody.length > GOOGLE_OAUTH_FETCH_MAX_BYTES) {
+          return sendError(
+            res,
+            502,
+            'Google sign-in failed. Please try again.',
+            ERROR_CODES.INTERNAL,
+          )
+        }
+      }
+    } catch {
+      throw new AppError(401, 'Failed to read Google token response.')
+    }
+
+    let tokens
+    try {
+      tokens = JSON.parse(rawBody)
+    } catch {
+      throw new AppError(401, 'Google returned an unreadable token response.')
+    }
     if (!tokens.id_token) {
       throw new AppError(401, 'Google did not return an identity token.')
     }

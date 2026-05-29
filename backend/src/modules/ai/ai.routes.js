@@ -262,10 +262,26 @@ router.post('/messages', requireAuth, requireTrustedOrigin, aiMessageLimiter, as
     // keeps long-lived connections warm against intermediate proxies.
     res.write(': open\n\n')
 
+    // SSE heartbeat — Cloudflare/Railway proxies kill idle connections after
+    // ~30-100s. Send a comment line every 15s so the connection stays open
+    // even between Anthropic delta events.
+    const heartbeat = setInterval(() => {
+      try {
+        res.write(':heartbeat\n\n')
+      } catch {
+        /* connection closed */
+      }
+    }, 15000)
+    heartbeat.unref()
+    res.on('finish', () => clearInterval(heartbeat))
+
     // Track client disconnects so we can abort Claude mid-stream
     // and avoid wasting tokens / persisting orphaned messages.
     const abortController = new AbortController()
-    req.on('close', () => abortController.abort())
+    req.on('close', () => {
+      clearInterval(heartbeat)
+      abortController.abort()
+    })
 
     // Fetch full user record for rate-limit evaluation.
     const prisma = require('../../lib/prisma')

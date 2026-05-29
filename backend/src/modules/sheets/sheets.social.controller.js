@@ -1,6 +1,7 @@
 const express = require('express')
 const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
+const log = require('../../lib/logger')
 const requireAuth = require('../../core/auth/requireAuth')
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
 const { parsePositiveInt } = require('../../core/http/validate')
@@ -76,14 +77,25 @@ router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
     })
 
     if (createdStar) {
-      await createNotification(prisma, {
-        userId: visibility.userId,
-        type: 'star',
-        message: `${req.user.username} starred your sheet "${visibility.title || 'sheet'}".`,
-        actorId: userId,
-        sheetId,
-        linkPath: `/sheets/${sheetId}`,
-      })
+      // Wrapped in try/catch so a transient notify failure doesn't 500
+      // the star request — the starredSheet row is already persisted and
+      // stars-count already incremented, so failing here would leave the
+      // UI un-starred while the DB shows starred (Sourcery audit 2026-05-28).
+      try {
+        await createNotification(prisma, {
+          userId: visibility.userId,
+          type: 'star',
+          message: `${req.user.username} starred your sheet "${visibility.title || 'sheet'}".`,
+          actorId: userId,
+          sheetId,
+          linkPath: `/sheets/${sheetId}`,
+        })
+      } catch (notifyErr) {
+        log.warn(
+          { event: 'sheets.star_notify_failed', sheetId, err: notifyErr?.message },
+          'Failed to notify sheet owner of star',
+        )
+      }
       // Achievements V2 — emit STAR_RECEIVED for the sheet's author. Only on
       // newly-created stars, not on the un-star (delete) branch, so toggling
       // doesn't double-count.

@@ -20,12 +20,16 @@ const {
 } = require('./sheets.service')
 const { serializeSheet } = require('./sheets.serializer')
 const { createNotification } = require('../../lib/notify')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const log = require('../../lib/logger')
 
 const router = express.Router()
 
 router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
   const sheetId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(sheetId) || sheetId < 1) {
+    return sendError(res, 400, 'Invalid sheet id.', ERROR_CODES.BAD_REQUEST)
+  }
   const { title, description, content, courseId, allowDownloads, allowEditing, removeAttachment } =
     req.body || {}
 
@@ -98,8 +102,16 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     if (requestedContentFormat) {
       data.contentFormat = requestedContentFormat
     }
-    if (courseId) {
-      data.courseId = Number.parseInt(courseId, 10)
+    if (courseId !== undefined) {
+      if (courseId === null) {
+        data.courseId = null
+      } else {
+        const parsedCourseId = Number.parseInt(courseId, 10)
+        if (!Number.isInteger(parsedCourseId) || parsedCourseId < 1) {
+          return res.status(400).json({ error: 'Invalid courseId.' })
+        }
+        data.courseId = parsedCourseId
+      }
     }
     // Owner-control toggles. Logged so production can correlate "the
     // toggle didn't stick" reports against actual DB persistence.

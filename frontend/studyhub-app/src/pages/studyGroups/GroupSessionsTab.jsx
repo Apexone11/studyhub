@@ -1,10 +1,15 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
 import { formatSessionTime, formatDuration, getSessionStatusLabel } from './studyGroupsHelpers'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 import { styles } from './GroupDetailTabs.styles'
 
 export function GroupSessionsTab({ groupId, sessions, onAdd, onRsvp, isAdminOrMod, isMember }) {
   const [addModalOpen, setAddModalOpen] = useState(false)
+  // Focus trap + Escape-to-close + scroll-lock. Hook runs every render
+  // (above the early return per rules-of-hooks); the trap only activates
+  // when active:addModalOpen is true.
+  const trapRef = useFocusTrap({ active: addModalOpen, onClose: () => setAddModalOpen(false) })
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -100,6 +105,7 @@ export function GroupSessionsTab({ groupId, sessions, onAdd, onRsvp, isAdminOrMo
           addModalOpen && (
             <div style={styles.modalOverlay} onClick={() => setAddModalOpen(false)}>
               <div
+                ref={trapRef}
                 style={styles.modalContent}
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
@@ -353,6 +359,7 @@ export function GroupSessionsTab({ groupId, sessions, onAdd, onRsvp, isAdminOrMo
         addModalOpen && (
           <div style={styles.modalOverlay} onClick={() => setAddModalOpen(false)}>
             <div
+              ref={trapRef}
               style={styles.modalContent}
               onClick={(e) => e.stopPropagation()}
               role="dialog"

@@ -18,6 +18,7 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const sectionsService = require('./sections.service')
@@ -28,6 +29,9 @@ const {
 } = require('./sections.constants')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — CSRF defense in depth on writes (short-circuits GET/HEAD/OPTIONS).
+router.use(originAllowlist())
 
 function requireTeacher(req, res, next) {
   if (!isTeacherAccount(req.user)) {

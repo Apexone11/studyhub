@@ -17,6 +17,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useNavigate } from 'react-router-dom'
 import { API } from '../../../config'
+import { useFocusTrap } from '../../../lib/useFocusTrap'
 import { authHeaders } from './uploadSheetConstants'
 import { FONT } from './uploadSheetConstants'
 
@@ -73,6 +74,12 @@ export default function DraftsPickerModal({ open, onClose, currentDraftId, onBef
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [open, onClose])
+
+  // Trap Tab + Shift+Tab inside the dialog so keyboard focus can't
+  // wander to background controls; the hook also autofocuses the first
+  // focusable element on mount. Escape is handled by the listener
+  // above, so pass escapeCloses=false to avoid double-firing onClose.
+  const trapRef = useFocusTrap({ active: open, escapeCloses: false })
 
   // Both navigation paths only change the query string, which means the
   // useSafeBlocker in useUploadSheet (pathname-only diff) does NOT fire.
@@ -158,6 +165,7 @@ export default function DraftsPickerModal({ open, onClose, currentDraftId, onBef
   return createPortal(
     <div role="presentation" onClick={onClose} style={overlayStyle}>
       <div
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-label="My drafts"

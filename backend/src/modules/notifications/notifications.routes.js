@@ -2,12 +2,19 @@ const express = require('express')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { captureError } = require('../../monitoring/sentry')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { cacheControl } = require('../../lib/cacheControl')
 const prisma = require('../../lib/prisma')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — CSRF defense in depth on writes. `originAllowlist` short-
+// circuits GET/HEAD/OPTIONS so applying it at the router level is safe even
+// though the bell's inbox read uses GET; only the mark-read / delete writes
+// pay the trusted-origin check.
+router.use(originAllowlist())
 
 // Strip the trailing `[dedup:...]` marker that notify.js embeds into the
 // persisted message so the in-app dedup query can match repeat events.

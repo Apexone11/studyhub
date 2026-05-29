@@ -16,6 +16,7 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const materialsService = require('./materials.service')
@@ -28,6 +29,10 @@ const {
 } = require('./materials.constants')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — CSRF defense-in-depth on writes. Short-circuits GET/HEAD/OPTIONS,
+// so applying at router.use is safe for this mixed read+write surface.
+router.use(originAllowlist())
 
 function requireTeacher(req, res, next) {
   if (!isTeacherAccount(req.user)) {

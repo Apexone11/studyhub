@@ -11,6 +11,7 @@ import Chip from '../components/Chip'
 import AiMarkdown from '../../components/ai/AiMarkdown'
 import AiThinkingDots from '../../components/ai/AiThinkingDots'
 import { useAiChat } from '../../lib/useAiChat'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 import { useToast } from '../hooks/useToast'
 
 /* ── Small inline icons ─────────────────────────────────────────── */
@@ -282,6 +283,8 @@ function ConversationsDrawer({
     onClose()
   }, [onClose])
 
+  const trapRef = useFocusTrap({ active: open, onClose: handleClose })
+
   if (!open) return null
 
   return (
@@ -303,6 +306,7 @@ function ConversationsDrawer({
       />
       {/* Drawer panel */}
       <aside
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-label="Conversations"

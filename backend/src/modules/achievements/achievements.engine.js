@@ -123,16 +123,19 @@ async function evaluateAndAward(prisma, userId, kind, metadata) {
     return statsCache[name]
   }
 
-  const awarded = []
-  for (const badge of allBadges) {
-    if (heldSlugs.has(badge.slug)) continue
-    if (!shouldEvaluateForKind(badge, kind)) continue
-    const passes = await evaluateCriteria(prisma, userId, badge, metadata, getStats)
-    if (passes) {
+  // Each badge is independent and UserBadge's unique constraint (P2002 handled
+  // in awardBadge) guarantees no double-award, so evaluate in parallel.
+  const results = await Promise.all(
+    allBadges.map(async (badge) => {
+      if (heldSlugs.has(badge.slug)) return null
+      if (!shouldEvaluateForKind(badge, kind)) return null
+      const passes = await evaluateCriteria(prisma, userId, badge, metadata, getStats)
+      if (!passes) return null
       const ok = await awardBadge(prisma, userId, badge)
-      if (ok) awarded.push(badge.slug)
-    }
-  }
+      return ok ? badge.slug : null
+    }),
+  )
+  const awarded = results.filter((slug) => slug !== null)
   return awarded
 }
 

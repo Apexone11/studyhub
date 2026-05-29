@@ -547,6 +547,9 @@ async function _maybeSendNotificationEmail(
   if (queue.items.length >= BURST_THRESHOLD) {
     if (!queue.timer) {
       queue.timer = setTimeout(() => _flushBurstDigest(prisma, userId), BURST_FLUSH_DELAY_MS)
+      // Defensively guard against test environments (jsdom, fake timers) that
+      // mock setTimeout and may not return a Timeout object with .unref().
+      if (queue.timer && typeof queue.timer.unref === 'function') queue.timer.unref()
     }
     if (effectiveDedupKey) _recordSent(userId, type, effectiveDedupKey)
     return

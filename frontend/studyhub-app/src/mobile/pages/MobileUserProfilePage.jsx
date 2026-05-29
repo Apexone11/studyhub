@@ -15,6 +15,7 @@ import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
 import { resolveImageUrl } from '../../lib/imageUrls'
 import MobileTopBar from '../components/MobileTopBar'
+import { useToast } from '../hooks/useToast'
 
 async function fetchProfileByUsername(username) {
   const res = await fetch(`${API}/api/users/${encodeURIComponent(username)}`, {
@@ -60,6 +61,7 @@ export default function MobileUserProfilePage() {
   const { username } = useParams()
   const navigate = useNavigate()
   const { user: currentUser } = useSession()
+  const toast = useToast()
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -93,8 +95,11 @@ export default function MobileUserProfilePage() {
   const handleFollowToggle = useCallback(async () => {
     if (!profile || followBusy) return
     setFollowBusy(true)
+    // Per CLAUDE.md A4 — never optimistically toggle to the inverse of what
+    // was sent. Await the server, then hydrate from data.following /
+    // data.requested so private accounts land on "Requested" instead of
+    // briefly showing "Following".
     const next = !profile.isFollowedByMe
-    setProfile((prev) => (prev ? { ...prev, isFollowedByMe: next } : prev))
     try {
       const result = await postFollow(username, next)
       setProfile((prev) =>
@@ -114,11 +119,16 @@ export default function MobileUserProfilePage() {
           : prev,
       )
     } catch {
-      setProfile((prev) => (prev ? { ...prev, isFollowedByMe: !next } : prev))
+      toast.show({
+        message: next
+          ? 'Could not follow. Please try again.'
+          : 'Could not unfollow. Please try again.',
+        kind: 'error',
+      })
     } finally {
       setFollowBusy(false)
     }
-  }, [profile, username, followBusy])
+  }, [profile, username, followBusy, toast])
 
   const handleStartDm = useCallback(() => {
     if (!profile?.id) return

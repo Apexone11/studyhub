@@ -632,11 +632,16 @@ export function useMessagingData(socket, currentUserId) {
           showToast('Failed to update mute status', 'error')
           return
         }
-        setConversations((prev) => prev.map((conv) => (conv.id === id ? { ...conv, muted } : conv)))
+        // A4: hydrate from server response rather than assuming the requested value persisted.
+        const data = await response.json().catch(() => ({}))
+        const persistedMuted = typeof data?.muted === 'boolean' ? data.muted : muted
+        setConversations((prev) =>
+          prev.map((conv) => (conv.id === id ? { ...conv, muted: persistedMuted } : conv)),
+        )
         if (activeConversation?.id === id) {
-          setActiveConversation((prev) => (prev ? { ...prev, muted } : prev))
+          setActiveConversation((prev) => (prev ? { ...prev, muted: persistedMuted } : prev))
         }
-        showToast(muted ? 'Conversation muted' : 'Conversation unmuted', 'success')
+        showToast(persistedMuted ? 'Conversation muted' : 'Conversation unmuted', 'success')
       } catch {
         showToast('Failed to update mute status', 'error')
       }

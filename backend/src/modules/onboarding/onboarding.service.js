@@ -218,20 +218,26 @@ async function handleCoursesStep(userId, payload, updateData) {
     throw serviceError(404, `Courses not found: ${missing.join(', ')}`)
   }
 
-  // Create enrollments (skip duplicates)
-  for (const courseId of courseIds) {
-    const exists = await prisma.enrollment.findFirst({
-      where: { userId, courseId },
+  // Create enrollments (skip duplicates) — one findMany + one createMany
+  // instead of N findFirst + N create round-trips per course.
+  try {
+    const existing = await prisma.enrollment.findMany({
+      where: { userId, courseId: { in: courseIds } },
+      select: { courseId: true },
     })
-    if (!exists) {
-      try {
-        await prisma.enrollment.create({
-          data: { userId, courseId },
-        })
-      } catch (err) {
-        log.warn({ err, userId, courseId }, 'Failed to create course enrollment during onboarding')
-      }
+    const existingIds = new Set(existing.map((e) => e.courseId))
+    const missingEnrollments = courseIds
+      .filter((courseId) => !existingIds.has(courseId))
+      .map((courseId) => ({ userId, courseId }))
+
+    if (missingEnrollments.length > 0) {
+      await prisma.enrollment.createMany({
+        data: missingEnrollments,
+        skipDuplicates: true,
+      })
     }
+  } catch (err) {
+    log.warn({ err, userId }, 'Failed to create course enrollments during onboarding')
   }
 
   updateData.coursesAdded = courseIds.length

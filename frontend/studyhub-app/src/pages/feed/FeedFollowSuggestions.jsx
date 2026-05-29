@@ -12,6 +12,7 @@ import UserAvatar from '../../components/UserAvatar'
 import useFetch from '../../lib/useFetch'
 import { API } from '../../config'
 import { isSelfLearner } from '../../lib/roleCopy'
+import { showToast } from '../../lib/toast'
 
 export default function FeedFollowSuggestions({ accountType } = {}) {
   const { data: suggestions, loading } = useFetch('/api/users/me/follow-suggestions', {
@@ -19,12 +20,14 @@ export default function FeedFollowSuggestions({ accountType } = {}) {
     transform: (data) => (Array.isArray(data) ? data : []),
     swr: 5 * 60 * 1000,
   })
-  const [followingSet, setFollowingSet] = useState(new Set())
+  // Tracks per-username follow state: 'following' | 'pending'. Hydrated from
+  // the server response (data.following vs data.requested) per CLAUDE.md A4 —
+  // private accounts return { following: false, requested: true } so the UI
+  // must distinguish "Pending" from "Following".
+  const [followStatus, setFollowStatus] = useState({})
   const [expanded, setExpanded] = useState(false)
 
   const handleFollow = useCallback(async (username) => {
-    // Optimistic: show "Following" immediately.
-    setFollowingSet((prev) => new Set([...prev, username]))
     try {
       const res = await fetch(`${API}/api/users/${encodeURIComponent(username)}/follow`, {
         method: 'POST',
@@ -32,20 +35,18 @@ export default function FeedFollowSuggestions({ accountType } = {}) {
         headers: { 'Content-Type': 'application/json' },
       })
       if (!res.ok) {
-        // Rollback on server error.
-        setFollowingSet((prev) => {
-          const next = new Set(prev)
-          next.delete(username)
-          return next
-        })
+        showToast('Could not follow. Please try again.', 'error')
+        return
       }
+      const data = await res.json().catch(() => ({}))
+      const nextStatus = data.requested ? 'pending' : data.following ? 'following' : null
+      if (!nextStatus) {
+        showToast('Could not follow. Please try again.', 'error')
+        return
+      }
+      setFollowStatus((prev) => ({ ...prev, [username]: nextStatus }))
     } catch {
-      // Rollback on network error.
-      setFollowingSet((prev) => {
-        const next = new Set(prev)
-        next.delete(username)
-        return next
-      })
+      showToast('Could not follow. Please try again.', 'error')
     }
   }, [])
 
@@ -64,7 +65,10 @@ export default function FeedFollowSuggestions({ accountType } = {}) {
     >
       <div style={{ display: 'grid', gap: 8 }}>
         {suggestions.slice(0, visibleCount).map((user) => {
-          const isFollowed = followingSet.has(user.username)
+          const status = followStatus[user.username]
+          const isFollowed = status === 'following'
+          const isPending = status === 'pending'
+          const isActioned = isFollowed || isPending
           const followerCount =
             typeof user.followerCount === 'number' ? user.followerCount : user._count?.followers
           const hasFollowerCount = typeof followerCount === 'number'
@@ -113,8 +117,8 @@ export default function FeedFollowSuggestions({ accountType } = {}) {
               </Link>
               <button
                 type="button"
-                onClick={() => !isFollowed && handleFollow(user.username)}
-                disabled={isFollowed}
+                onClick={() => !isActioned && handleFollow(user.username)}
+                disabled={isActioned}
                 style={{
                   fontSize: 11,
                   fontWeight: 700,
@@ -123,13 +127,13 @@ export default function FeedFollowSuggestions({ accountType } = {}) {
                   border: 'none',
                   fontFamily: 'inherit',
                   flexShrink: 0,
-                  background: isFollowed ? 'var(--sh-soft)' : 'var(--sh-brand)',
-                  color: isFollowed ? 'var(--sh-muted)' : 'var(--sh-surface)',
-                  cursor: isFollowed ? 'default' : 'pointer',
+                  background: isActioned ? 'var(--sh-soft)' : 'var(--sh-brand)',
+                  color: isActioned ? 'var(--sh-muted)' : 'var(--sh-surface)',
+                  cursor: isActioned ? 'default' : 'pointer',
                   transition: 'background .15s',
                 }}
               >
-                {isFollowed ? 'Following' : 'Follow'}
+                {isFollowed ? 'Following' : isPending ? 'Pending' : 'Follow'}
               </button>
             </div>
           )

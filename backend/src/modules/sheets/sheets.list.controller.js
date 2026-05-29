@@ -8,6 +8,7 @@ const { serializeSheet } = require('./sheets.serializer')
 const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
 const { searchSheetsFTS } = require('../../lib/fullTextSearch')
 const { cache } = require('../../lib/cache')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 /* RISK_TIER removed — sheet listings no longer filter by htmlRiskTier
  * (security enforcement is in the sheet viewer / HTML preview endpoints) */
 
@@ -105,8 +106,20 @@ router.get('/', optionalAuth, async (req, res) => {
       where.status = SHEET_STATUS.PUBLISHED
     }
 
-    if (courseId) where.courseId = Number.parseInt(courseId, 10)
-    if (schoolId) where.course = { schoolId: Number.parseInt(schoolId, 10) }
+    if (courseId !== undefined && courseId !== '') {
+      const parsedCourseId = Number.parseInt(courseId, 10)
+      if (!Number.isInteger(parsedCourseId) || parsedCourseId < 1) {
+        return sendError(res, 400, 'Invalid courseId.', ERROR_CODES.BAD_REQUEST)
+      }
+      where.courseId = parsedCourseId
+    }
+    if (schoolId !== undefined && schoolId !== '') {
+      const parsedSchoolId = Number.parseInt(schoolId, 10)
+      if (!Number.isInteger(parsedSchoolId) || parsedSchoolId < 1) {
+        return sendError(res, 400, 'Invalid schoolId.', ERROR_CODES.BAD_REQUEST)
+      }
+      where.course = { schoolId: parsedSchoolId }
+    }
 
     const formatCandidate = typeof format === 'string' ? format.trim().toLowerCase() : ''
     if (formatCandidate === 'html') {

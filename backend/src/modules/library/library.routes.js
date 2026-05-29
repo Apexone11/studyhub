@@ -7,7 +7,8 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const optionalAuth = require('../../core/auth/optionalAuth')
-const { libraryWriteLimiter, libraryReadLimiter } = require('../../lib/rateLimiters')
+const originAllowlist = require('../../middleware/originAllowlist')
+const { libraryWriteLimiter, libraryReadLimiter, adminLimiter } = require('../../lib/rateLimiters')
 const { cacheControl } = require('../../lib/cacheControl')
 
 const {
@@ -29,6 +30,10 @@ const {
 } = require('./library.controller')
 
 const router = express.Router()
+
+// CLAUDE.md A11: defense-in-depth CSRF on every write route in this module.
+// originAllowlist() short-circuits on GET/HEAD/OPTIONS, so reads still pass.
+router.use(originAllowlist())
 
 // ── BOOK BROWSING & SEARCH ──────────────────────────────────────────────────
 
@@ -73,7 +78,7 @@ router.get(
  * Trigger a sync of popular books to the CachedBook table.
  * Admin only.
  */
-router.post('/admin/sync-catalog', requireAuth, syncCatalogHandler)
+router.post('/admin/sync-catalog', requireAuth, adminLimiter, syncCatalogHandler)
 
 // ── SHELVES CRUD ────────────────────────────────────────────────────────────
 

@@ -19,6 +19,7 @@ import { IconUpload, IconX, IconInfoCircle } from '../../components/Icons'
 import { uploadGroupMedia, updateGroupBackground } from './groupMediaService'
 import { resolveGroupImageUrl } from './studyGroupsHelpers'
 import { showToast } from '../../lib/toast'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 
 // Client-side guards. Server caps at 25 MB and a strict mime allowlist;
 // these stricter limits give the user a fast, friendly rejection for
@@ -77,6 +78,11 @@ export default function GroupBackgroundPicker({
     window.addEventListener('keydown', handler)
     return () => window.removeEventListener('keydown', handler)
   }, [open, onClose, confirmingClear])
+
+  // Tab/Shift+Tab containment + scroll-lock. Escape is handled above so
+  // the confirm-clear inline state can intercept it; pass escapeCloses:
+  // false to keep this trap focused on focus containment only.
+  const trapRef = useFocusTrap({ active: open, escapeCloses: false })
 
   if (!open) return null
 
@@ -192,6 +198,7 @@ export default function GroupBackgroundPicker({
   return createPortal(
     <div style={overlayStyle} onClick={onClose}>
       <div
+        ref={trapRef}
         style={dialogStyle}
         role="dialog"
         aria-modal="true"

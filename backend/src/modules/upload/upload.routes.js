@@ -287,6 +287,10 @@ router.post('/attachment/:sheetId', requireAuth, uploadAttachmentLimiter, (req, 
     }
 
     const sheetId = Number.parseInt(req.params.sheetId, 10)
+    if (!Number.isInteger(sheetId) || sheetId < 1) {
+      safeUnlinkFile(req.file?.path)
+      return sendError(res, 400, 'Invalid sheet id.', ERROR_CODES.BAD_REQUEST)
+    }
     try {
       const sheet = await prisma.studySheet.findUnique({
         where: { id: sheetId },

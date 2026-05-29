@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import MediaComposer from './MediaComposer'
 import UserAvatar from '../../components/UserAvatar'
 import AttachmentPreview from '../../components/AttachmentPreview'
 import MentionText from '../../components/MentionText'
 import { resolveImageUrl } from '../../lib/imageUrls'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 import { formatRelativeTime, getPostTypeLabel } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 
@@ -503,6 +504,18 @@ export function GroupDiscussionsTab({
   // the discussion body on submit.
   const [attachments, setAttachments] = useState([])
 
+  // a11y: New-Post dialog needs Escape→close, Tab/Shift+Tab focus
+  // containment, and autofocus on the first focusable (the Title
+  // input). useFocusTrap covers all three. The Title ref is the
+  // explicit initial focus target so we land on the field a user is
+  // most likely to start typing in, rather than the dialog container.
+  const newPostTitleRef = useRef(null)
+  const newPostDialogRef = useFocusTrap({
+    active: newPostModalOpen,
+    onClose: () => setNewPostModalOpen(false),
+    initialFocusRef: newPostTitleRef,
+  })
+
   const handleCreateClick = () => {
     setFormData({ title: '', content: '', type: 'discussion' })
     setAttachments([])
@@ -625,6 +638,7 @@ export function GroupDiscussionsTab({
           newPostModalOpen && (
             <div style={styles.modalOverlay} onClick={() => setNewPostModalOpen(false)}>
               <div
+                ref={newPostDialogRef}
                 style={styles.modalContent}
                 onClick={(e) => e.stopPropagation()}
                 role="dialog"
@@ -641,6 +655,7 @@ export function GroupDiscussionsTab({
                       Title
                     </label>
                     <input
+                      ref={newPostTitleRef}
                       id="post-title"
                       type="text"
                       style={styles.input}
@@ -841,8 +856,17 @@ export function GroupDiscussionsTab({
       {createPortal(
         newPostModalOpen && (
           <div style={styles.modalOverlay} onClick={() => setNewPostModalOpen(false)}>
-            <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
-              <h3 style={styles.sectionTitle}>New Discussion Post</h3>
+            <div
+              ref={newPostDialogRef}
+              style={styles.modalContent}
+              onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="new-post-title"
+            >
+              <h3 style={styles.sectionTitle} id="new-post-title">
+                New Discussion Post
+              </h3>
               {error && <div style={styles.error}>{error}</div>}
               <form onSubmit={handleSubmit}>
                 <div style={styles.formGroup}>
@@ -850,6 +874,7 @@ export function GroupDiscussionsTab({
                     Title
                   </label>
                   <input
+                    ref={newPostTitleRef}
                     id="post-title"
                     type="text"
                     style={styles.input}

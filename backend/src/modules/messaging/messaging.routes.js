@@ -77,22 +77,25 @@ router.get('/unread-total', requireAuth, async (req, res) => {
       },
     })
 
-    let total = 0
-    for (const cp of participants) {
-      try {
-        const count = await prisma.message.count({
-          where: {
-            conversationId: cp.conversationId,
-            createdAt: { gt: cp.lastReadAt || new Date(0) },
-            senderId: { not: userId },
-            deletedAt: null,
-          },
-        })
-        total += count
-      } catch {
-        // Skip on error
-      }
-    }
+    // Compute per-conversation unread counts in parallel to avoid the
+    // serial-await N+1 over prisma.message.count. Each count is wrapped
+    // so a single failed query degrades gracefully (returns 0) instead
+    // of aborting the whole total.
+    const counts = await Promise.all(
+      participants.map((cp) =>
+        prisma.message
+          .count({
+            where: {
+              conversationId: cp.conversationId,
+              createdAt: { gt: cp.lastReadAt || new Date(0) },
+              senderId: { not: userId },
+              deletedAt: null,
+            },
+          })
+          .catch(() => 0),
+      ),
+    )
+    const total = counts.reduce((sum, n) => sum + n, 0)
 
     res.json({ total })
   } catch (err) {

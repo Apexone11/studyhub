@@ -23,6 +23,14 @@ const {
 
 // ── Escapers ────────────────────────────────────────────────────────────
 
+// RIS / BibTeX exporter input sanitizer — CR/LF in any user-controlled
+// field allows record injection (RIS) or comment escape (BibTeX). Both
+// formats are line-oriented; collapsing to a single space preserves
+// readability without breaking the format.
+function stripNewlines(value) {
+  return String(value ?? '').replace(/[\r\n]+/g, ' ')
+}
+
 function _escapeBibtex(value) {
   if (value === null || value === undefined) return ''
   let s = String(value)
@@ -79,12 +87,12 @@ function _yearOf(paper) {
 function _bibtex(paper) {
   const key = _escapeBibtex(_bibKey(paper))
   const fields = []
-  fields.push(`  title  = {{${_escapeBibtex(paper.title || '')}}}`)
+  fields.push(`  title  = {{${_escapeBibtex(stripNewlines(paper.title || ''))}}}`)
   const authors = _authorList(paper)
   if (authors.length > 0) {
-    fields.push(`  author = {${authors.map((a) => _escapeBibtex(a)).join(' and ')}}`)
+    fields.push(`  author = {${authors.map((a) => _escapeBibtex(stripNewlines(a))).join(' and ')}}`)
   }
-  if (paper.venue) fields.push(`  journal = {${_escapeBibtex(paper.venue)}}`)
+  if (paper.venue) fields.push(`  journal = {${_escapeBibtex(stripNewlines(paper.venue))}}`)
   fields.push(`  year   = {${_escapeBibtex(_yearOf(paper))}}`)
   if (paper.doi) fields.push(`  doi    = {${_escapeBibtex(paper.doi)}}`)
   if (paper.arxivId) fields.push(`  eprint = {${_escapeBibtex(paper.arxivId)}}`)
@@ -94,12 +102,12 @@ function _bibtex(paper) {
 function _ris(paper) {
   const lines = []
   lines.push('TY  - JOUR')
-  for (const a of _authorList(paper)) lines.push(`AU  - ${a}`)
-  if (paper.title) lines.push(`TI  - ${paper.title}`)
-  if (paper.venue) lines.push(`JO  - ${paper.venue}`)
+  for (const a of _authorList(paper)) lines.push(`AU  - ${stripNewlines(a)}`)
+  if (paper.title) lines.push(`TI  - ${stripNewlines(paper.title)}`)
+  if (paper.venue) lines.push(`JO  - ${stripNewlines(paper.venue)}`)
   if (paper.publishedAt) lines.push(`PY  - ${_yearOf(paper)}`)
   if (paper.doi) lines.push(`DO  - ${paper.doi}`)
-  if (paper.abstract) lines.push(`AB  - ${paper.abstract.replace(/\r?\n/g, ' ')}`)
+  if (paper.abstract) lines.push(`AB  - ${stripNewlines(paper.abstract)}`)
   lines.push('ER  - ')
   // RIS lines should use CRLF per spec; many tools accept LF.
   return lines.join('\r\n') + '\r\n'
@@ -218,6 +226,7 @@ module.exports = {
   // Test seams
   _escapeBibtex,
   _escapeHtml,
+  stripNewlines,
   _bibtex,
   _ris,
   _cslJson,
