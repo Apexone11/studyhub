@@ -28,61 +28,6 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
-### Wave-12.19 — 100-loop ecosystem audit: round-1 + round-2 + final 10-loop verification (2026-05-29)
-
-Founder-requested deep audit with adversarial verification at every step. Three nested workflows: round-1 ecosystem audit (14 finders × 71 confirmed), round-2 critic-gap audit (10 finders × 41 confirmed), final 10-loop verification. 56 files modified, +1,400/-470 lines, ~14M output tokens across ~170 sub-agents. Both backend (3,398/3,398 non-flaky) and frontend (837/837) suites pass; lint + build clean.
-
-- Security A11 (CSRF defense-in-depth): added `router.use(originAllowlist())` to 10 modules that previously relied only on the global Origin check — featureFlags, library, video, materials, notifications, onboarding, provenance, referrals, reviews, sections.
-- Security A12 (parseInt guards): added `Number.parseInt + Number.isInteger` guards to 12 numeric-ID endpoints across feed (comment react), messaging (PATCH/DELETE/GET conversations + poll vote), sheets (create/list/update courseId, schoolId), notes (createNote courseId), upload (sheet-attachment), video (caption DELETE).
-- Security A8 (PII redaction): extended pino redact list to cover `email`, `phone`, `fullName`, `ipAddress`, `password` and their `context.*` / wildcard variants.
-- Security A9 (secret registration): registered `RESEND_API_KEY`, `EMAIL_USER`, `EMAIL_PASS` in `secretValidator.js` (RECOMMENDED tier); removed dead `OPENAI_API_KEY` from `.env.example` (repo uses Anthropic exclusively).
-- Security (new): CSV formula-injection neutralizer (`csvSafe`) applied to moderation log CSV export (CWE-1236 Excel/Sheets formula evaluation).
-- Security (new): RIS / BibTeX exporter `stripNewlines` on free-text fields — prevents record-injection in scholar citation exports.
-- Security (new): Scholar discussion now rejects `visibility=school` when viewer has no school enrollment (was silently posting global — cross-school leak); rejects replies to soft-deleted parent threads.
-- Security (new): SSE heartbeat (15s `:heartbeat`) on `POST /api/ai/messages` — prevents Cloudflare/Railway proxies killing long streams.
-- Security (new): aborted SSE refunds reserved Anthropic spend AND records partial usage — closes the abort-to-get-free-text bypass and stops the daily-ceiling drift.
-- Security (new): outbound HTTP hardening — `library.service.js` (volumeId allowlist + redirect:manual + 5 MB cap), `gifs.service.js` (host re-validation on 3xx + size cap), `auth.google.controller.js` (timeout + size cap), `email/emailTransport.js` (timeout on Resend) — SSRF / amplification defense.
-- Security (new): path-traversal guards in `scripts/restoreVolumeFromR2.js` (R2 key trust hardening — DR-time defense).
-- Security (new): JTI rotation on successful MFA elevation in `mfa.stepUp.controller.js` — prevents captured-JWT inheriting elevated privilege.
-- A4 (no optimistic UI): 7 follow/star/mute/join handlers now hydrate from server response — `MobileSheetDetail` (star), `FeedFollowSuggestions` / `WelcomeToFeedPanel` / `FollowSuggestions` / `MobileUserProfilePage` (follow with `requested`-vs-`following` branching for private accounts), `useMessagingData` (mute), `MobileStudyGroupDetail` (join).
-- a11y (modals): focus-trap + Escape close wired into 9 dialogs — `NoteVersionDiff`, `DraftsPickerModal`, `GroupBackgroundPicker`, `GroupDiscussionsTab` (new-post), `GroupMembersTab` (action + invite), `GroupResourcesTab`, `GroupSessionsTab`, mobile `BottomSheet`, `MobileAiPage` (ConversationsDrawer). BottomSheet backdrop converted from `<div onClick>` to `<button>` for keyboard activation.
-- a11y (video player): Speed / Quality / Caption popup triggers in `StudyHubPlayer` converted from `<div onClick>` to `<button type="button">` with `aria-haspopup="menu"` + `aria-expanded` (WCAG 2.1.1).
-- Perf: 5 N+1 patterns batched — `achievements.engine.js` (per-badge eval), `moderation.admin.cases.controller.js` (plagiarism-match preview), `onboarding.service.js` (enrollment step), `plagiarism.service.js` (AI pass match enrichment), `messaging.routes.js` (unread-total per-conversation count parallelized).
-- Sourcery PR findings: 4 addressed — note-star + sheet-star both wrapped in best-effort try/catch + log.warn (the silent-notify-failure-500s pattern); 3 release-log grammar fixes.
-- Tests: 5 new regression test files covering A11 origin allowlist, A12 messaging conversations id guard, A12 feed comment react id guard, A4 feed follow hydration, a11y group discussions modal (Escape + role+aria).
-- Hardening misc: burst-digest `setTimeout` now `.unref()`-guarded in `notify.js`.
-
-### Wave-12.18 — audit follow-through: the 5 surfaced findings (2026-05-28)
-
-The risky/decision findings surfaced in wave-12.17, applied after verifying each caveat. Code-reviewed; touched test areas are green.
-
-- Security: passkey (WebAuthn) routes now apply the fail-closed Origin allowlist (A11), matching `/api/auth` — closes a CSRF defense-in-depth gap on the session-issuing + credential-delete routes.
-- Fix: achievement unlocks now appear in the notification bell — the award path passed `actorId === userId`, which tripped the self-notify guard and silently dropped every unlock.
-- Mobile: the phone bottom-nav now ships — the finished component was never mounted (its `@smoke` test was failing); mounted in the authenticated chrome (self-gates to phone viewports, hidden on /ai + auth + onboarding).
-- Perf: the study-groups list endpoint no longer fans out ~8 queries per group (up to ~800/request) — counts, course, and viewer membership are batched into a handful of `groupBy`/`findMany` calls; response shape unchanged.
-- Scholar: "Share to study group" now works from a paper (shares as a link to the paper's Scholar page); removed 3 superseded duplicate Scholar action components (Generate-sheet / Cite-into-note / Recently-viewed already exist inline on the paper page) + a dead hook.
-- Build: regenerated the root `package-lock.json` to match the workspace `package.json` versions — unblocks Cloudflare Pages `npm ci` (`EUSAGE` lockfile drift across capacitor / playwright / sentry / react / dompurify / aws-sdk / etc.).
-
-### Wave-12.17 — 10-loop audit fixes (security / features / perf / a11y) (2026-05-28)
-
-Findings from a 10-loop multi-agent audit; each was adversarially re-verified before fixing (CLAUDE.md A21). Safe fixes applied; risky ones (WebAuthn CSRF, achievement-notify, study-groups N+1, MobileBottomNav) surfaced for founder sign-off.
-
-- Fix: Scholar "Recent / Trending / Similar papers" rails now populate — a Prisma `{ not: null }` query crashed and the catch silently returned an empty list, so the discover hub shipped dark.
-- Fix: following a person or joining a group from the For You feed now surfaces an error toast on failure instead of silently appearing to succeed; same for the note star toggle.
-- Feature: starring a note now notifies the note owner; cancelling or rescheduling a group session now notifies members who RSVP'd.
-- A11y: reduced-motion users keep a moving loading spinner (was frozen); the conflict-compare and create/edit group modals now trap focus, close on Escape, and expose an accessible name.
-- Perf: messages inbox + message-request/archived lists compute unread counts in parallel; the onboarding tour bundle no longer loads on the /feed landing page (lazy).
-- Cleanup: removed 5 consumer-less feature-flag network requests fired on every page load; Settings "Security alerts" loading now shows a skeleton.
-- Hardening: sheetLab content-write routes apply the Origin allowlist (A11); materials archive/assignment-delete validate numeric ids (A12).
-
-### Wave-12.16 — UI/UX Bucket A finish + group-background preview fix (2026-05-28)
-
-- Fix: study-group "Change background" modal no longer shows "Could not load preview image" — the preview now resolves the image URL against the API origin like the header does.
-- A11y: reduced-motion users keep legible loading spinners (the `data-motion="keep"` escape hatch is now honored across all reduced-motion code paths), while all other motion still respects the preference.
-- Messages: the conversation list shows a skeleton instead of bare "Loading conversations…" text on first paint.
-- Safety: deleting a Library reading bookmark now asks for confirmation; deleting a shelf uses the styled focus-trapped confirm dialog.
-- Consistency: Hub AI, Study Groups, Playground, and Notifications now show a trailing breadcrumb like the other authenticated pages.
-
 ### Wave-12.15 — Codex P1 + P2 fixes on wave-12.11 / 12.13 (2026-05-28)
 
 Two real findings from a Codex review pass on `3b09f25a`. Both verified against actual code by our own audit loop (CLAUDE.md A21) before fixing.
@@ -114,7 +59,7 @@ Validation: backend lint clean, frontend lint 0 errors (91 warnings = baseline),
 
 Founder asked for a "fix the spacing everywhere + confirm everything we shipped is production-ready" pass. Two parallel audits:
 
-**Feature audit (wave 12.11-12.13) — clean.** All 11 features from `d1a3abe0` / `e9fc07e6` / `e80214b4` verified end-to-end: admin step-up MFA (`requireRecentMfa` on 5 routes + frontend interceptor + step-up modal + 12/12 unit tests), `WebAuthnCredential.lastUsedAt`, `serializeNote` allowlist (incl. wave-12.13 `revision` re-add), upload volume → R2 backup (`runWithHeartbeat`-wrapped, streamed-not-buffered, `R2_BUCKET_UPLOAD_BACKUP` REQUIRED_IN_PRODUCTION), Data Saver + Battery Saver modes (`useDataSaver` / `useBatterySaver` export `setStored*` helpers, `SaverModeInitializer` mounted in `App.jsx`, server-side `dataSaverNegotiation` 3-signal contract, 11/11 unit tests), StudyHubPlayer (watch-progress persistence, A-B loop, `?` keyboard help overlay), feed lite mode (`?lite=1`), typing-indicator suppression, battery-saver JS gates in `animations.js` + `Toast.jsx`, session-payload preferences. CLAUDE.md A-rules A5/A6/A7/A8/A10/A11/A12/A13/A14/A16 all clean. 60/60 wave-12 unit tests pass. Nothing to finish.
+**Feature audit (wave 12.11-12.13) — clean.** All 11 features from `d1a3abe0` / `e9fc07e6` / `e80214b4` verified end-to-end: admin step-up MFA (`requireRecentMfa` on 5 routes + frontend interceptor + step-up modal + 12/12 unit tests), `WebAuthnCredential.lastUsedAt`, `serializeNote` allowlist (incl. wave-12.13 `revision` re-add), upload volume → R2 backup (`runWithHeartbeat`-wrapped, streamed-not-buffered, `R2_BUCKET_UPLOAD_BACKUP` REQUIRED_IN_PRODUCTION), Data Saver + Battery Saver modes (`useDataSaver` / `useBatterySaver` exports `setStored*` helpers, `SaverModeInitializer` mounted in `App.jsx`, server-side `dataSaverNegotiation` 3-signal contract, 11/11 unit tests), StudyHubPlayer (watch-progress persistence, A-B loop, `?` keyboard help overlay), feed lite mode (`?lite=1`), typing-indicator suppression, battery-saver JS gates in `animations.js` + `Toast.jsx`, session-payload preferences. CLAUDE.md A-rules A5/A6/A7/A8/A10/A11/A12/A13/A14/A16 all clean. 60/60 wave-12 unit tests pass. Nothing to finish.
 
 **Spacing / chrome pass — fixed.** A spacing audit found ~50 visual drifts; the screenshot-visible one was `.feed-page__aside { top: 86px }` floating ~30px below the actual 56px navbar. Foundation tokens added in `index.css` `:root`: `--sh-nav-h: 56px` (single source of truth for sticky offsets) and `--sh-space-xs/sm/md/lg/xl/2xl/3xl` (CANONICAL 4/8/12/16/20/24/32 step aliases — mapped to existing `--space-*` so old call sites keep working). Then migrated the worst drifts:
 
