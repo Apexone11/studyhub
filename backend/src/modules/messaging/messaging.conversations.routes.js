@@ -110,10 +110,10 @@ router.get('/', requireAuth, async (req, res) => {
       take: limitNum,
     })
 
-    // Compute unread counts per conversation
-    for (const cp of conversations) {
-      await attachUnreadCount(cp, req.user.userId)
-    }
+    // Compute unread counts per conversation in parallel — each is an
+    // independent count query; the prior serial await loop was an N+1
+    // latency drag (one round-trip per conversation, up to 100).
+    await Promise.all(conversations.map((cp) => attachUnreadCount(cp, req.user.userId)))
 
     // Filter out conversations with blocked users and format response
     const result = conversations

@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => {
       delete: vi.fn(),
       deleteMany: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(async () => []),
     },
     studyGroupResource: {
       findUnique: vi.fn(),
@@ -43,6 +44,7 @@ const mocks = vi.hoisted(() => {
       update: vi.fn(),
       delete: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(async () => []),
     },
     groupSession: {
       findUnique: vi.fn(),
@@ -51,6 +53,7 @@ const mocks = vi.hoisted(() => {
       update: vi.fn(),
       delete: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(async () => []),
     },
     groupSessionRsvp: {
       findUnique: vi.fn(),
@@ -81,6 +84,7 @@ const mocks = vi.hoisted(() => {
       update: vi.fn(),
       delete: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(async () => []),
     },
     groupDiscussionReply: {
       findUnique: vi.fn(),

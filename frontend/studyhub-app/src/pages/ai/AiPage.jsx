@@ -276,7 +276,7 @@ export default function AiPage() {
   if (authStatus !== 'ready') {
     return (
       <div style={{ minHeight: '100vh', background: 'var(--sh-bg)', fontFamily: PAGE_FONT }}>
-        <Navbar />
+        <Navbar crumbs={[{ label: 'Hub AI', to: '/ai' }]} />
         <div style={pageShell('app')}>
           <div
             style={{
@@ -315,7 +315,7 @@ export default function AiPage() {
           Wave-11 audit L4-5. */}
       <h1 className="sr-only">Hub AI</h1>
       <AiStreamAnnouncer streaming={chat.streaming} error={chat.error} stopped={stopped} />
-      <Navbar />
+      <Navbar crumbs={[{ label: 'Hub AI', to: '/ai' }]} />
       <div style={pageShell('app')}>
         <div
           style={{

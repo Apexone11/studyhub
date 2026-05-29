@@ -316,6 +316,51 @@ router.patch('/:sessionId', writeLimiter, requireAuth, async (req, res) => {
       data: updates,
     })
 
+    // Notify RSVP'd (going/maybe) members when a session is cancelled or
+    // moved — they opted in, and the create-session path already notifies, so
+    // a cancel/reschedule should too. Gated on an ACTUAL change so a
+    // title/description-only edit doesn't spam. Fire-and-forget like POST.
+    const becameCancelled = updates.status === 'cancelled' && session.status !== 'cancelled'
+    const timeChanged =
+      updates.scheduledAt !== undefined &&
+      new Date(updates.scheduledAt).getTime() !== new Date(session.scheduledAt).getTime()
+    if (becameCancelled || timeChanged) {
+      try {
+        const groupData = await prisma.studyGroup.findUnique({
+          where: { id: groupId },
+          select: { name: true },
+        })
+        const rsvps = await prisma.groupSessionRsvp.findMany({
+          where: {
+            sessionId,
+            status: { in: ['going', 'maybe'] },
+            userId: { not: req.user.userId },
+          },
+          select: { userId: true },
+        })
+        if (rsvps.length > 0 && groupData) {
+          const message = becameCancelled
+            ? `${req.user.username} cancelled "${updated.title}" in ${groupData.name}`
+            : `${req.user.username} rescheduled "${updated.title}" in ${groupData.name}`
+          await createNotifications(
+            prisma,
+            rsvps.map((r) => ({
+              userId: r.userId,
+              type: 'group_session',
+              message,
+              actorId: req.user.userId,
+              linkPath: `/study-groups/${groupId}`,
+            })),
+          )
+        }
+      } catch (notifErr) {
+        log.warn(
+          { event: 'studyGroups.sessions.update_notify_failed', err: notifErr.message },
+          'Failed to create session update notifications',
+        )
+      }
+    }
+
     res.json({
       id: updated.id,
       groupId: updated.groupId,

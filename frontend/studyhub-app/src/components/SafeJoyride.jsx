@@ -1,11 +1,12 @@
-import { Component } from 'react'
-import * as JoyrideModule from 'react-joyride'
+import { Component, Suspense, lazy } from 'react'
 import { captureComponentError } from '../lib/telemetry'
 
 // react-joyride v3's ESM build uses a re-export pattern that rolldown
-// (Vite 8 bundler) cannot resolve as a default import. Namespace import
-// + fallback handles both bundler quirks and version differences.
-const Joyride = JoyrideModule.default || JoyrideModule
+// (Vite 8 bundler) cannot resolve as a default import. Normalize
+// default-or-namespace inside the dynamic import. Lazy so the ~825K
+// `onboarding` chunk is fetched only when a tour actually runs — not
+// eagerly modulepreloaded onto the /feed landing chunk and 10 other routes.
+const Joyride = lazy(() => import('react-joyride').then((m) => ({ default: m.default || m })))
 
 /**
  * Wraps react-joyride in an error boundary so that React 19 incompatibilities
@@ -36,9 +37,15 @@ class JoyrideErrorBoundary extends Component {
 }
 
 export default function SafeJoyride(props) {
+  // props.run is always supplied by useTutorial.joyrideProps and already folds
+  // in steps.length > 0. Early-return when no tour is running so the dynamic
+  // import never fires for returning / tutorial-disabled users.
+  if (!props.run) return null
   return (
     <JoyrideErrorBoundary>
-      <Joyride {...props} />
+      <Suspense fallback={null}>
+        <Joyride {...props} />
+      </Suspense>
     </JoyrideErrorBoundary>
   )
 }

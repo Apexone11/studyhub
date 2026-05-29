@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { IconUpload, IconX, IconInfoCircle } from '../../components/Icons'
 import { uploadGroupMedia, updateGroupBackground } from './groupMediaService'
+import { resolveGroupImageUrl } from './studyGroupsHelpers'
 import { showToast } from '../../lib/toast'
 
 // Client-side guards. Server caps at 25 MB and a strict mime allowlist;
@@ -237,7 +238,7 @@ export default function GroupBackgroundPicker({
         >
           {pendingUrl ? (
             <img
-              src={pendingUrl}
+              src={resolveGroupImageUrl(pendingUrl)}
               alt="Group background preview"
               style={{
                 width: '100%',

@@ -11,8 +11,18 @@ const {
 } = require('../../lib/webauthn/webauthn')
 const prisma = require('../../lib/prisma')
 const { webauthnLimiter } = require('../../lib/rateLimiters')
+const originAllowlist = require('../../middleware/originAllowlist')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — passkey routes mutate auth state (POST /authenticate/verify
+// issues a full session; POST /register/verify persists a credential; DELETE
+// /credentials/:id removes an admin passkey) but this module is mounted
+// separately from /api/auth, so it must opt into the fail-closed Origin
+// allowlist itself. Same allowlist /api/auth already enforces (so the native
+// client, which passes /api/auth at login, is unaffected). Short-circuits
+// GET/HEAD/OPTIONS, so GET /credentials is untouched.
+router.use(originAllowlist())
 
 // ── Registration (admin-only, requires auth) ────────────────────────────
 

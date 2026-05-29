@@ -1,5 +1,6 @@
 import { Button, Message, MsgList, SectionCard, ToggleRow } from './settingsShared'
 import { usePreferences } from './settingsState'
+import { Skeleton } from '../../components/Skeleton'
 
 const ALERT_KEYS = ['alertOnNewCountry', 'alertOnNewCity', 'blockAnonymousIp']
 
@@ -8,8 +9,15 @@ export default function SecurityAlertsSection() {
 
   if (loading) {
     return (
-      <SectionCard title="Security alerts" subtitle="Loading your preferences...">
-        <div style={{ color: 'var(--sh-muted)', fontSize: 13 }}>Loading...</div>
+      <SectionCard
+        title="Security alerts"
+        subtitle="Control how StudyHub notifies you about unusual sign-in attempts."
+      >
+        <div style={{ display: 'grid', gap: 10 }}>
+          <Skeleton width="100%" height={56} />
+          <Skeleton width="100%" height={56} />
+          <Skeleton width="100%" height={56} />
+        </div>
       </SectionCard>
     )
   }

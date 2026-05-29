@@ -32,7 +32,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { usePageTitle } from '../../lib/usePageTitle'
-import useFetch from '../../lib/useFetch'
+import useFetch, { cache as fetchCache, clearFetchCache } from '../../lib/useFetch'
 import { API } from '../../config'
 import { showToast } from '../../lib/toast'
 import { useAiPermission } from '../../lib/aiPermissionContext'
@@ -43,6 +43,7 @@ import DiscussionThread from './discussion/DiscussionThread'
 import AnnotationToolbar from './annotation/AnnotationToolbar'
 import ScholarShell from './ScholarShell'
 import SimilarInLibraryBadge from './integration/SimilarInLibraryBadge'
+import ShareToStudyGroupButton from './integration/ShareToStudyGroupButton'
 import parseSseForSheetId from './integration/parseSseForSheetId'
 import useScholarShortcuts from './shortcuts/useScholarShortcuts'
 import ScholarKeyboardShortcutsModal, {
@@ -495,6 +496,13 @@ export default function ScholarPaperPage() {
         /* graceful: server returned no body */
       }
       setSavedOverride(persisted)
+      // Invalidate the Saved page's SWR entries (scholar-saved:<query> +
+      // scholar-saved:shelves) so it doesn't paint a stale list after the
+      // user navigates there. clearFetchCache has no prefix mode, so iterate
+      // a snapshot of the exported cache Map.
+      for (const key of [...fetchCache.keys()]) {
+        if (key.startsWith('scholar-saved:')) clearFetchCache(key)
+      }
       showToast(persisted ? 'Saved to your shelf' : 'Removed from shelf', 'success')
     } catch (err) {
       showToast(err?.message || 'Could not save paper', 'error')
@@ -575,10 +583,9 @@ export default function ScholarPaperPage() {
         return
       }
       // Stream the SSE body and look for the new sheet id via the
-      // shared helper (also used by GenerateSheetFromPaperButton).
-      // Returns null on no-body / no-match — handled below by handing
-      // off to /ai. Sourcery bot review 2026-05-13 flagged the prior
-      // duplicated inline parser.
+      // shared parseSseForSheetId helper. Returns null on no-body /
+      // no-match — handled below by handing off to /ai. Sourcery bot
+      // review 2026-05-13 flagged the prior duplicated inline parser.
       const newSheetId = await parseSseForSheetId(aiRes).catch(() => null)
       if (newSheetId) {
         navigate(`/sheets/${newSheetId}/lab`)
@@ -1016,6 +1023,13 @@ export default function ScholarPaperPage() {
               no saved papers similar to this one, so safe to render
               unconditionally. */}
           {paper ? <SimilarInLibraryBadge paper={paper} /> : null}
+
+          {/* Share this paper into a study group as a link resource. */}
+          {paper ? (
+            <div style={{ marginTop: 10 }}>
+              <ShareToStudyGroupButton paper={paper} />
+            </div>
+          ) : null}
 
           <div className="scholar-paper__sidebar-card">
             <h3 className="scholar-paper__sidebar-card-title">Recently viewed</h3>

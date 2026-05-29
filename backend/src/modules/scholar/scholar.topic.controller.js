@@ -256,10 +256,11 @@ async function discoverPapers(req, res) {
         ? [{ publishedAt: 'desc' }, { citationCount: 'desc' }]
         : [{ citationCount: 'desc' }, { publishedAt: 'desc' }]
 
-    // Only papers with a title — keeps the hub clean of partial/stub rows
-    // from search caching that don't yet have full metadata.
+    // ScholarPaper.title is non-nullable, so every row qualifies. The prior
+    // `where: { title: { not: null } }` both crashed under Prisma 6.19+
+    // (Common Bugs #3: never `field: { not: null }`) and was a no-op — its
+    // catch silently returned results:[], so the discover hub rendered empty.
     const rows = await prisma.scholarPaper.findMany({
-      where: { title: { not: null } },
       orderBy,
       take: limit,
     })

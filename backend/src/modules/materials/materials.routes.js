@@ -99,8 +99,12 @@ router.post('/', writeLimiter, requireAuth, requireTeacher, async (req, res) => 
 
 // PATCH /api/materials/:id/archive  —  teacher: archive a material (soft delete).
 router.patch('/:id/archive', writeLimiter, requireAuth, requireTeacher, async (req, res) => {
+  const id = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(id) || id < 1) {
+    return sendError(res, 400, 'Invalid material id.', ERROR_CODES.BAD_REQUEST)
+  }
   try {
-    const material = await materialsService.archiveMaterial(req.params.id, req.user.userId)
+    const material = await materialsService.archiveMaterial(id, req.user.userId)
     return res.json({ material })
   } catch (err) {
     if (err.code === 'NOT_FOUND') return sendError(res, 404, err.message, ERROR_CODES.NOT_FOUND)
@@ -158,8 +162,12 @@ router.post('/assign', writeLimiter, requireAuth, requireTeacher, async (req, re
 
 // DELETE /api/materials/assignments/:id  —  teacher: remove an assignment.
 router.delete('/assignments/:id', writeLimiter, requireAuth, requireTeacher, async (req, res) => {
+  const id = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(id) || id < 1) {
+    return sendError(res, 400, 'Invalid assignment id.', ERROR_CODES.BAD_REQUEST)
+  }
   try {
-    const result = await materialsService.deleteAssignment(req.params.id, req.user.userId)
+    const result = await materialsService.deleteAssignment(id, req.user.userId)
     return res.json(result)
   } catch (err) {
     if (err.code === 'FORBIDDEN') return sendError(res, 403, err.message, ERROR_CODES.FORBIDDEN)

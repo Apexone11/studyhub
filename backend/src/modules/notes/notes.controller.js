@@ -1298,7 +1298,7 @@ async function starNote(req, res) {
   try {
     const note = await prisma.note.findUnique({
       where: { id: noteId },
-      select: { id: true, private: true, userId: true },
+      select: { id: true, private: true, userId: true, title: true },
     })
     if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
     if (!canReadNote(note, req.user))
@@ -1310,6 +1310,22 @@ async function starNote(req, res) {
     if (existing) return res.json({ starred: true })
 
     await prisma.noteStar.create({ data: { userId: req.user.userId, noteId } })
+
+    // Notify the note owner — mirrors the sheet-star fan-out in
+    // sheets.social.controller. The explicit self-check matches the
+    // comment-notify precedent above (createNotification also self-guards);
+    // placed after the create + `existing` early-return so a re-star can't
+    // double-notify.
+    if (note.userId !== req.user.userId) {
+      await createNotification(prisma, {
+        userId: note.userId,
+        type: 'star',
+        message: `${req.user.username} starred your note "${note.title || 'note'}".`,
+        actorId: req.user.userId,
+        linkPath: `/notes/${noteId}`,
+      })
+    }
+
     res.json({ starred: true })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })

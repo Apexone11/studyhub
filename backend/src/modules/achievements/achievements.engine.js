@@ -405,20 +405,20 @@ async function awardBadge(prisma, userId, badge) {
     // notifications module isn't available or fails, the badge still awards.
     try {
       const { createNotification } = require('../../lib/notify')
+      // No actorId: the platform awards the badge, so actorId === userId would
+      // trip createNotification's self-notify guard and silently drop every
+      // unlock from the bell (the type is even registered in notify.js +
+      // notificationIcons.js, expecting delivery). `metadata` isn't a
+      // recognized createNotification field; the dedupKey still prevents
+      // duplicate rows. The celebration modal is driven by the separate
+      // ACHIEVEMENT_UNLOCK socket event below, so the bell won't double-fire it.
       await createNotification(prisma, {
         userId,
         type: 'achievement_unlock',
         message: `Achievement unlocked: ${badge.name}.`,
-        actorId: userId,
         linkPath: `/achievements/${badge.slug}`,
         priority: 'low',
         dedupKey: `achievement:${badge.slug}`,
-        metadata: {
-          slug: badge.slug,
-          name: badge.name,
-          tier: badge.tier,
-          xp: badge.xp,
-        },
       })
     } catch {
       // Notification creation is best-effort; badge award itself already succeeded.

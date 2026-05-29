@@ -13,6 +13,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import UserAvatar from '../../components/UserAvatar'
 import { API } from '../../config'
+import { showToast } from '../../lib/toast'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 
@@ -348,13 +349,16 @@ function GroupCard({ group }) {
     e.preventDefault()
     setIsJoining(true)
     try {
-      await fetch(`${API}/api/study-groups/${group.id}/join`, {
+      const response = await fetch(`${API}/api/study-groups/${group.id}/join`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       })
+      if (!response.ok) {
+        showToast('Could not join the group. Please try again.', 'error')
+      }
     } catch {
-      // ignore
+      showToast('Could not join the group. Please try again.', 'error')
     } finally {
       setIsJoining(false)
     }
@@ -425,9 +429,13 @@ function PersonCard({ person }) {
           headers: { 'Content-Type': 'application/json' },
         },
       )
-      if (response.ok) setIsFollowing(true)
+      if (!response.ok) {
+        setIsFollowing(false)
+        showToast('Could not follow. Please try again.', 'error')
+      }
     } catch {
       setIsFollowing(false)
+      showToast('Could not follow. Please try again.', 'error')
     }
   }
 

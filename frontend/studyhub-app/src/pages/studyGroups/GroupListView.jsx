@@ -191,7 +191,7 @@ export default function GroupListView() {
 
   return (
     <>
-      <Navbar />
+      <Navbar crumbs={[{ label: 'Study Groups', to: '/study-groups' }]} />
       <div className="sh-app-page" style={styles.page}>
         <div className="sh-ambient-shell" style={pageShell('app', 26, 48)}>
           <div className="sh-ambient-grid" style={styles.appGrid}>

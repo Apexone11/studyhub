@@ -143,9 +143,12 @@ async function getSimilar(req, res) {
     // overlap. JSONB topic indexing is deferred to v2.
     const candidateWindow = Math.min(Math.max(limit * 6, 60), 200)
     const candidates = await prisma.scholarPaper.findMany({
+      // `id: { not: id }` is valid (not against a value). The removed
+      // `title: { not: null }` crashed under Prisma 6.19+ (Common Bugs #3)
+      // and was a no-op (title is non-nullable) — its catch silently returned
+      // an empty list, so the "Similar papers" tab was always empty.
       where: {
         id: { not: id },
-        title: { not: null },
       },
       orderBy: [{ citationCount: 'desc' }, { publishedAt: 'desc' }],
       take: candidateWindow,

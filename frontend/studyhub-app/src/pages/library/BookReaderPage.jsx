@@ -14,6 +14,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import useBookReader from './useBookReader'
 import { hasPreview, getPreviewLink } from './libraryHelpers'
 import PendingButton from '../../components/buttons/PendingButton'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import './BookReaderPage.css'
 
 /**
@@ -34,6 +35,9 @@ export default function BookReaderPage() {
   const [bookmarkLabel, setBookmarkLabel] = useState('')
   const [bookmarkNote, setBookmarkNote] = useState('')
   const [saving, setSaving] = useState(false)
+  // Bookmark pending deletion — drives the ConfirmDialog so a single click
+  // can't silently destroy a bookmark (was an unconfirmed delete before).
+  const [pendingDeleteBookmark, setPendingDeleteBookmark] = useState(null)
 
   const {
     book,
@@ -95,6 +99,12 @@ export default function BookReaderPage() {
       setBookmarkLabel('')
       setBookmarkNote('')
     }
+  }
+
+  const handleConfirmDeleteBookmark = async () => {
+    if (!pendingDeleteBookmark) return
+    await removeBookmark(pendingDeleteBookmark.id)
+    setPendingDeleteBookmark(null)
   }
 
   // Error state
@@ -270,7 +280,7 @@ export default function BookReaderPage() {
                           </div>
                           <button
                             className="reader-bookmark-panel__delete-btn"
-                            onClick={() => removeBookmark(bm.id)}
+                            onClick={() => setPendingDeleteBookmark(bm)}
                             aria-label={`Delete bookmark: ${bm.label}`}
                           >
                             x
@@ -283,6 +293,21 @@ export default function BookReaderPage() {
               </div>,
               document.body,
             )}
+
+          <ConfirmDialog
+            open={pendingDeleteBookmark !== null}
+            title="Delete bookmark?"
+            message={
+              pendingDeleteBookmark
+                ? `Delete "${pendingDeleteBookmark.label}"? This can't be undone.`
+                : ''
+            }
+            confirmLabel="Delete"
+            cancelLabel="Keep"
+            variant="danger"
+            onConfirm={handleConfirmDeleteBookmark}
+            onCancel={() => setPendingDeleteBookmark(null)}
+          />
 
           {/* Iframe loading indicator */}
           {!iframeLoaded && !iframeError && (

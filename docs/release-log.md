@@ -28,6 +28,36 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.18 — audit follow-through: the 5 surfaced findings (2026-05-28)
+
+The risky/decision findings surfaced in wave-12.17, applied after verifying each caveat. Code-reviewed; touched test areas green.
+
+- Security: passkey (WebAuthn) routes now apply the fail-closed Origin allowlist (A11), matching `/api/auth` — closes a CSRF defense-in-depth gap on the session-issuing + credential-delete routes.
+- Fix: achievement unlocks now appear in the notification bell — the award path passed `actorId === userId`, which tripped the self-notify guard and silently dropped every unlock.
+- Mobile: the phone bottom-nav now ships — the finished component was never mounted (its `@smoke` test was failing); mounted in the authenticated chrome (self-gates to phone viewports, hidden on /ai + auth + onboarding).
+- Perf: the study-groups list endpoint no longer fan-outs ~8 queries per group (up to ~800/request) — counts, course, and viewer membership are batched into a handful of `groupBy`/`findMany` calls; response shape unchanged.
+- Scholar: "Share to study group" now works from a paper (shares as a link to the paper's Scholar page); removed 3 superseded duplicate Scholar action components (Generate-sheet / Cite-into-note / Recently-viewed already exist inline on the paper page) + a dead hook.
+
+### Wave-12.17 — 10-loop audit fixes (security / features / perf / a11y) (2026-05-28)
+
+Findings from a 10-loop multi-agent audit; each was adversarially re-verified before fixing (CLAUDE.md A21). Safe fixes applied; risky ones (WebAuthn CSRF, achievement-notify, study-groups N+1, MobileBottomNav) surfaced for founder sign-off.
+
+- Fix: Scholar "Recent / Trending / Similar papers" rails now populate — a Prisma `{ not: null }` query crashed and the catch silently returned an empty list, so the discover hub shipped dark.
+- Fix: following a person or joining a group from the For You feed now surfaces an error toast on failure instead of silently appearing to succeed; same for the note star toggle.
+- Feature: starring a note now notifies the note owner; cancelling or rescheduling a group session now notifies members who RSVP'd.
+- A11y: reduced-motion users keep a moving loading spinner (was frozen); the conflict-compare and create/edit group modals now trap focus, close on Escape, and expose an accessible name.
+- Perf: messages inbox + message-request/archived lists compute unread counts in parallel; the onboarding tour bundle no longer loads on the /feed landing page (lazy).
+- Cleanup: removed 5 consumer-less feature-flag network requests fired on every page load; Settings "Security alerts" loading now shows a skeleton.
+- Hardening: sheetLab content-write routes apply the Origin allowlist (A11); materials archive/assignment-delete validate numeric ids (A12).
+
+### Wave-12.16 — UI/UX Bucket A finish + group-background preview fix (2026-05-28)
+
+- Fix: study-group "Change background" modal no longer shows "Could not load preview image" — the preview now resolves the image URL against the API origin like the header does.
+- A11y: reduced-motion users keep legible loading spinners (the `data-motion="keep"` escape hatch is now honored across all reduced-motion code paths), while all other motion still respects the preference.
+- Messages: the conversation list shows a skeleton instead of bare "Loading conversations…" text on first paint.
+- Safety: deleting a Library reading bookmark now asks for confirmation; deleting a shelf uses the styled focus-trapped confirm dialog.
+- Consistency: Hub AI, Study Groups, Playground, and Notifications now show a trailing breadcrumb like the other authenticated pages.
+
 ### Wave-12.15 — Codex P1 + P2 fixes on wave-12.11 / 12.13 (2026-05-28)
 
 Two real findings from a Codex review pass on `3b09f25a`. Both verified against actual code by our own audit loop (CLAUDE.md A21) before fixing.

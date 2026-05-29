@@ -156,10 +156,9 @@ router.get('/requests', requireAuth, async (req, res) => {
       },
     })
 
-    // Compute unread counts
-    for (const cp of pending) {
-      await attachUnreadCount(cp, req.user.userId)
-    }
+    // Compute unread counts in parallel (see conversations route — avoids
+    // the serial-await N+1 over per-conversation count queries).
+    await Promise.all(pending.map((cp) => attachUnreadCount(cp, req.user.userId)))
 
     // Filter blocked users
     const requests = pending
@@ -338,10 +337,9 @@ router.get('/archived', requireAuth, async (req, res) => {
       take: limitNum,
     })
 
-    // Compute unread counts
-    for (const cp of archived) {
-      await attachUnreadCount(cp, req.user.userId)
-    }
+    // Compute unread counts in parallel (see conversations route — avoids
+    // the serial-await N+1 over per-conversation count queries).
+    await Promise.all(archived.map((cp) => attachUnreadCount(cp, req.user.userId)))
 
     // Filter blocked users
     const result = archived

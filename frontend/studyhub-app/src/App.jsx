@@ -91,6 +91,7 @@ import { AiPermissionProvider } from './lib/useAiPermission'
 import MfaStepUpProvider from './lib/MfaStepUpProvider'
 import SaverModeInitializer from './components/SaverModeInitializer'
 import OfflineIndicator from './components/OfflineIndicator'
+import MobileBottomNav from './components/sidebar/MobileBottomNav'
 import LegalAcceptanceEnforcementModal from './components/LegalAcceptanceEnforcementModal'
 import CookieConsentBanner from './components/CookieConsentBanner'
 import SwUpdateAutoReloader from './components/SwUpdateAutoReloader'
@@ -877,6 +878,13 @@ function AppRoutes() {
                     <AchievementUnlockModal />
                   </Suspense>
                   <AuthenticatedBubble />
+                  {/* Phone-viewport bottom nav. Self-gates to authenticated
+                  phone widths and hides on /ai, auth, /onboarding, /m/* — so
+                  it renders nothing on desktop. Lives in the global
+                  authenticated chrome like the sidebar/bubble. (A @smoke spec
+                  asserts it visible on /feed at phone width; it had been built
+                  but never mounted — wave-12.17.) */}
+                  <MobileBottomNav />
                 </MfaStepUpProvider>
               </AiPermissionProvider>
             </ChatPanelProvider>
