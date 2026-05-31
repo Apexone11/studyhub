@@ -22,7 +22,12 @@ const { captureError } = require('../../monitoring/sentry')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { createAiMessageLimiter } = require('../../lib/rateLimiters')
 const prisma = require('../../lib/prisma')
-const { DEFAULT_MODEL, SYSTEM_PROMPT, AI_RATE_LIMIT_RPM } = require('./ai.constants')
+const {
+  DEFAULT_MODEL,
+  SYSTEM_PROMPT,
+  AI_RATE_LIMIT_RPM,
+  anthropicRequestOptions,
+} = require('./ai.constants')
 const { redactPII } = require('./ai.context')
 const { reserveSpend, refundSpendDelta, recordActualUsage } = require('./ai.spendCeiling')
 
@@ -94,12 +99,15 @@ async function runAi({ req, res, userMsg, maxOutputTokens, parseAsJson = false }
   const client = getClient()
   let response
   try {
-    response = await client.messages.create({
-      model: DEFAULT_MODEL,
-      max_tokens: maxOutputTokens,
-      system: SYSTEM_PROMPT,
-      messages: [{ role: 'user', content: redactPII(userMsg) }],
-    })
+    response = await client.messages.create(
+      {
+        model: DEFAULT_MODEL,
+        max_tokens: maxOutputTokens,
+        system: SYSTEM_PROMPT,
+        messages: [{ role: 'user', content: redactPII(userMsg) }],
+      },
+      anthropicRequestOptions(req),
+    )
   } catch (err) {
     // Anthropic call failed mid-flight — refund the reservation so a
     // crash doesn't permanently consume the day's spend ceiling.

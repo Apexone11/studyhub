@@ -22,6 +22,10 @@ const ACTIVITY_WEIGHTS = {
 const SUPPORTED_PERIODS = new Set(['weekly', 'monthly', 'alltime'])
 const DEFAULT_PERIOD = 'weekly'
 
+// 'alltime' is capped to a rolling window so a public, unauthenticated request
+// never aggregates the entire UserDailyActivity history.
+const ALLTIME_WINDOW_DAYS = 365
+
 /**
  * Calculate score for an activity record
  * @param {Object} activity - {commits, sheets, reviews, comments}
@@ -50,10 +54,13 @@ function getDateRange(period) {
     start.setDate(end.getDate() - 7)
   } else if (normalizedPeriod === 'monthly') {
     start.setMonth(end.getMonth() - 1)
+  } else {
+    // 'alltime' is bounded to a rolling 365-day window so a public request
+    // never scans the full activity history.
+    start.setDate(end.getDate() - ALLTIME_WINDOW_DAYS)
   }
-  // For 'alltime', the date filter is disabled by returning null.
 
-  return { start: normalizedPeriod === 'alltime' ? null : start, end }
+  return { start, end }
 }
 
 /**
@@ -68,11 +75,8 @@ async function getLeaderboard(prisma, period = 'weekly', limit = 20) {
   try {
     const { start, end } = getDateRange(period)
 
-    // Build where clause for date range
-    const dateWhere = {}
-    if (start) {
-      dateWhere.date = { gte: start, lt: end }
-    }
+    // Always date-bounded now (weekly/monthly relative, 'alltime' = rolling 365d).
+    const dateWhere = { date: { gte: start, lt: end } }
 
     // Aggregate activity by userId
     const aggregated = await prisma.userDailyActivity.groupBy({
@@ -86,8 +90,29 @@ async function getLeaderboard(prisma, period = 'weekly', limit = 20) {
       },
     })
 
-    // Fetch user details for all aggregated users
-    const userIds = aggregated.map((row) => row.userId)
+    // Score + rank from the aggregate alone (no user data needed yet), then
+    // slice to the top-N BEFORE hydrating users. Hydrating every aggregated
+    // userId first was O(all-users) on a public request; only the N rows that
+    // survive the slice ever need a user lookup.
+    const ranked = aggregated
+      .map((row) => {
+        const breakdown = {
+          commits: row._sum.commits || 0,
+          sheets: row._sum.sheets || 0,
+          reviews: row._sum.reviews || 0,
+          comments: row._sum.comments || 0,
+        }
+        return {
+          userId: row.userId,
+          score: calculateActivityScore(breakdown),
+          breakdown,
+        }
+      })
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit)
+
+    // Fetch user details for only the top-N aggregated users.
+    const userIds = ranked.map((row) => row.userId)
     const users = await prisma.user.findMany({
       where: { id: { in: userIds } },
       select: { id: true, username: true, avatarUrl: true },
@@ -96,32 +121,22 @@ async function getLeaderboard(prisma, period = 'weekly', limit = 20) {
     // Create a map for quick lookup
     const userMap = Object.fromEntries(users.map((u) => [u.id, u]))
 
-    // Calculate scores and build leaderboard
-    const leaderboard = aggregated
+    // Build leaderboard, dropping any rows whose user no longer exists, and
+    // assign ranks over the surviving order.
+    const leaderboard = ranked
       .map((row) => {
         const user = userMap[row.userId]
         if (!user) return null
-
-        const breakdown = {
-          commits: row._sum.commits || 0,
-          sheets: row._sum.sheets || 0,
-          reviews: row._sum.reviews || 0,
-          comments: row._sum.comments || 0,
-        }
-
-        const score = calculateActivityScore(breakdown)
 
         return {
           userId: row.userId,
           username: user.username,
           avatarUrl: user.avatarUrl || null,
-          score,
-          breakdown,
+          score: row.score,
+          breakdown: row.breakdown,
         }
       })
       .filter(Boolean)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, limit)
       .map((entry, index) => ({
         ...entry,
         rank: index + 1,

@@ -14,6 +14,7 @@ const SOCKET_EVENTS = require('../../lib/socketEvents')
 const {
   parseId,
   requireGroupMember,
+  requireActiveGroupMember,
   isGroupAdmin,
   isGroupAdminOrMod,
   isMutedInGroup,
@@ -32,8 +33,10 @@ async function listDiscussions(req, res) {
       return res.status(400).json({ error: 'Invalid group ID.' })
     }
 
-    // Check membership
-    const member = await requireGroupMember(groupId, req.user.userId)
+    // Active-membership gate — a pending/invited/banned member must not be
+    // able to read a private group's discussions (requireGroupMember returns
+    // those rows too, so a bare existence check leaked them).
+    const member = await requireActiveGroupMember(groupId, req.user.userId)
     if (!member) {
       return res.status(404).json({ error: 'Not a member.' })
     }
@@ -67,8 +70,9 @@ async function listDiscussions(req, res) {
         where,
         include: {
           author: { select: { id: true, username: true, avatarUrl: true } },
-          replies: { select: { id: true } },
-          upvotes: { select: { userId: true } },
+          // Count-only relations via _count so we don't over-fetch every
+          // reply id + every upvote row just to call .length on them.
+          _count: { select: { replies: true, upvotes: true } },
         },
         orderBy: [{ pinned: 'desc' }, { createdAt: 'desc' }],
         skip: offsetNum,
@@ -76,6 +80,19 @@ async function listDiscussions(req, res) {
       }),
       prisma.groupDiscussionPost.count({ where }),
     ])
+
+    // userHasUpvoted: one batched query over the page's postIds filtered to
+    // the viewer, then a Set membership test — instead of pulling every
+    // post's full upvote list into memory.
+    const postIds = posts.map((p) => p.id)
+    let upvotedSet = new Set()
+    if (postIds.length > 0) {
+      const myUpvotes = await prisma.discussionUpvote.findMany({
+        where: { postId: { in: postIds }, userId: req.user.userId },
+        select: { postId: true },
+      })
+      upvotedSet = new Set(myUpvotes.map((u) => u.postId))
+    }
 
     const formatted = posts.map((p) => ({
       id: p.id,
@@ -89,9 +106,9 @@ async function listDiscussions(req, res) {
       resolved: p.resolved,
       status: p.status || 'published',
       attachments: p.attachments || null,
-      replyCount: p.replies.length,
-      upvoteCount: p.upvotes.length,
-      userHasUpvoted: p.upvotes.some((u) => u.userId === req.user.userId),
+      replyCount: p._count?.replies ?? 0,
+      upvoteCount: p._count?.upvotes ?? 0,
+      userHasUpvoted: upvotedSet.has(p.id),
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
     }))
@@ -114,8 +131,9 @@ async function createDiscussion(req, res) {
       return res.status(400).json({ error: 'Invalid group ID.' })
     }
 
-    // Check membership
-    const member = await requireGroupMember(groupId, req.user.userId)
+    // Active-membership gate — a pending/invited/banned member must not be
+    // able to create posts in a private group.
+    const member = await requireActiveGroupMember(groupId, req.user.userId)
     if (!member) {
       return res.status(404).json({ error: 'Not a member.' })
     }
@@ -370,8 +388,9 @@ async function getDiscussion(req, res) {
       return res.status(400).json({ error: 'Invalid IDs.' })
     }
 
-    // Check membership
-    const member = await requireGroupMember(groupId, req.user.userId)
+    // Active-membership gate — a pending/invited/banned member must not be
+    // able to read a private group's discussion threads.
+    const member = await requireActiveGroupMember(groupId, req.user.userId)
     if (!member) {
       return res.status(404).json({ error: 'Not a member.' })
     }
@@ -714,8 +733,9 @@ async function createReply(req, res) {
       return res.status(400).json({ error: 'Invalid IDs.' })
     }
 
-    // Check membership
-    const member = await requireGroupMember(groupId, req.user.userId)
+    // Active-membership gate — a pending/invited/banned member must not be
+    // able to reply in a private group.
+    const member = await requireActiveGroupMember(groupId, req.user.userId)
     if (!member) {
       return res.status(404).json({ error: 'Not a member.' })
     }
@@ -726,6 +746,17 @@ async function createReply(req, res) {
 
     if (!post || post.groupId !== groupId) {
       return res.status(404).json({ error: 'Post not found.' })
+    }
+
+    // Replicate getDiscussion's visibility model — a non-mod must not be
+    // able to reply to (and thereby leak the existence of, via the reply
+    // notification) a 'removed' or another user's 'pending_approval' post.
+    const canModerate = member.role === 'admin' || member.role === 'moderator'
+    if (!canModerate) {
+      const isAuthor = post.userId === req.user.userId
+      if (post.status === 'removed' || (post.status === 'pending_approval' && !isAuthor)) {
+        return res.status(404).json({ error: 'Post not found.' })
+      }
     }
 
     const { content, isAnswer = false } = req.body
@@ -1072,6 +1103,17 @@ async function upvotePost(req, res) {
       return res.status(404).json({ error: 'Post not found.' })
     }
 
+    // Same visibility model as getDiscussion — a non-mod must not be able to
+    // upvote (and thereby probe the existence of) a 'removed' or another
+    // user's 'pending_approval' post.
+    const canModerate = member.role === 'admin' || member.role === 'moderator'
+    if (!canModerate) {
+      const isAuthor = post.userId === req.user.userId
+      if (post.status === 'removed' || (post.status === 'pending_approval' && !isAuthor)) {
+        return res.status(404).json({ error: 'Post not found.' })
+      }
+    }
+
     // Toggle: check if already upvoted
     const existing = await prisma.discussionUpvote.findUnique({
       where: { postId_userId: { postId, userId: req.user.userId } },
@@ -1113,10 +1155,24 @@ async function upvoteReply(req, res) {
 
     const reply = await prisma.groupDiscussionReply.findUnique({
       where: { id: replyId },
-      include: { post: { select: { groupId: true } } },
+      include: { post: { select: { groupId: true, status: true, userId: true } } },
     })
     if (!reply || reply.post.groupId !== groupId) {
       return res.status(404).json({ error: 'Reply not found.' })
+    }
+
+    // Same visibility model as getDiscussion — a non-mod must not be able to
+    // upvote a reply on a 'removed' or another user's 'pending_approval'
+    // post (the reply only exists because the post does).
+    const canModerate = member.role === 'admin' || member.role === 'moderator'
+    if (!canModerate) {
+      const isAuthor = reply.post.userId === req.user.userId
+      if (
+        reply.post.status === 'removed' ||
+        (reply.post.status === 'pending_approval' && !isAuthor)
+      ) {
+        return res.status(404).json({ error: 'Reply not found.' })
+      }
     }
 
     const existing = await prisma.discussionUpvote.findUnique({

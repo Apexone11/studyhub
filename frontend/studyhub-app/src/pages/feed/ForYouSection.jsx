@@ -344,6 +344,7 @@ function SheetCard({ sheet }) {
 
 function GroupCard({ group }) {
   const [isJoining, setIsJoining] = useState(false)
+  const [joinState, setJoinState] = useState(null)
 
   const handleJoin = async (e) => {
     e.preventDefault()
@@ -354,7 +355,12 @@ function GroupCard({ group }) {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       })
-      if (!response.ok) {
+      if (response.ok) {
+        // Reconcile from the persisted status — a private group lands
+        // 'pending', not 'active', so the button must reflect that (A4).
+        const data = await response.json().catch(() => ({}))
+        setJoinState(data.status === 'pending' ? 'pending' : 'joined')
+      } else {
         showToast('Could not join the group. Please try again.', 'error')
       }
     } catch {
@@ -363,6 +369,14 @@ function GroupCard({ group }) {
       setIsJoining(false)
     }
   }
+
+  const joinLabel = isJoining
+    ? 'Joining...'
+    : joinState === 'pending'
+      ? 'Requested'
+      : joinState === 'joined'
+        ? 'Joined'
+        : 'Join group'
 
   return (
     <div style={cardContainerStyle} onMouseEnter={applyHover} onMouseLeave={clearHover}>
@@ -405,21 +419,24 @@ function GroupCard({ group }) {
       <button
         type="button"
         onClick={handleJoin}
-        disabled={isJoining}
-        style={primaryBtnStyle(isJoining)}
+        disabled={isJoining || joinState !== null}
+        style={primaryBtnStyle(isJoining || joinState !== null)}
       >
-        {isJoining ? 'Joining...' : 'Join group'}
+        {joinLabel}
       </button>
     </div>
   )
 }
 
 function PersonCard({ person }) {
-  const [isFollowing, setIsFollowing] = useState(false)
+  // null = not followed; 'following' = active follow; 'requested' = pending
+  // follow request on a private account. Reconciled from the server, never
+  // toggled blindly to the inverse of what was sent (A4).
+  const [followState, setFollowState] = useState(null)
 
   const handleFollow = async (e) => {
     e.preventDefault()
-    setIsFollowing(true)
+    if (followState !== null) return
     try {
       const response = await fetch(
         `${API}/api/users/${encodeURIComponent(person.username)}/follow`,
@@ -429,15 +446,23 @@ function PersonCard({ person }) {
           headers: { 'Content-Type': 'application/json' },
         },
       )
-      if (!response.ok) {
-        setIsFollowing(false)
+      if (response.ok) {
+        // A private-account follow lands 'pending' (requested:true), an
+        // open account lands active (following:true). Hydrate from the
+        // persisted response rather than assuming "Following".
+        const data = await response.json().catch(() => ({}))
+        setFollowState(data.following ? 'following' : data.requested ? 'requested' : null)
+      } else {
         showToast('Could not follow. Please try again.', 'error')
       }
     } catch {
-      setIsFollowing(false)
       showToast('Could not follow. Please try again.', 'error')
     }
   }
+
+  const isPending = followState !== null
+  const followLabel =
+    followState === 'following' ? 'Following' : followState === 'requested' ? 'Requested' : 'Follow'
 
   return (
     <Link
@@ -476,15 +501,15 @@ function PersonCard({ person }) {
       <button
         type="button"
         onClick={handleFollow}
-        disabled={isFollowing}
+        disabled={isPending}
         style={{
-          ...primaryBtnStyle(isFollowing),
-          background: isFollowing ? 'var(--sh-soft)' : 'var(--sh-brand)',
-          color: isFollowing ? 'var(--sh-muted)' : '#fff',
-          cursor: isFollowing ? 'default' : 'pointer',
+          ...primaryBtnStyle(isPending),
+          background: isPending ? 'var(--sh-soft)' : 'var(--sh-brand)',
+          color: isPending ? 'var(--sh-muted)' : '#fff',
+          cursor: isPending ? 'default' : 'pointer',
         }}
       >
-        {isFollowing ? 'Following' : 'Follow'}
+        {followLabel}
       </button>
     </Link>
   )

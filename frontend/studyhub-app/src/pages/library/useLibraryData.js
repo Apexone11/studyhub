@@ -2,10 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
-import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
+import { readJsonSafely } from '../../lib/http'
 import { cache as swrCache } from '../../lib/useFetch'
-
-const SWR_TTL = 5 * 60 * 1000 // 5 minutes
 
 export default function useLibraryData() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -26,6 +24,8 @@ export default function useLibraryData() {
 
   // Fetch books with SWR caching
   useEffect(() => {
+    const controller = new AbortController()
+
     async function fetchBooks() {
       const params = new URLSearchParams()
       if (search) params.append('search', search)
@@ -41,16 +41,14 @@ export default function useLibraryData() {
       if (cached && cached.data) {
         setBooks(cached.data.books || [])
         setTotalCount(cached.data.totalCount || 0)
+        setUsingCache(cached.data.source === 'cache')
+        setUnavailable(cached.data.unavailable === true)
         setEndOfResults(Boolean(cached.data.endOfResults))
         setError('')
-
-        const age = Date.now() - cached.timestamp
-        if (age < SWR_TTL) {
-          setLoading(false)
-          fetchFromApi(params, cacheKey, true)
-          return
-        }
-
+        // Serve the cached payload instantly, then revalidate in the
+        // background regardless of age — the background fetch corrects any
+        // staleness. (The age<TTL branch used to be byte-identical to the
+        // else, so it was dead duplication; collapsed here.)
         setLoading(false)
         fetchFromApi(params, cacheKey, true)
         return
@@ -69,11 +67,15 @@ export default function useLibraryData() {
         const response = await fetch(`${API}/api/library/search?${params.toString()}`, {
           credentials: 'include',
           headers: authHeaders(),
+          signal: controller.signal,
         })
 
         if (!response.ok) {
-          const text = await response.text()
-          const data = readJsonSafely(text)
+          // readJsonSafely takes the Response (not a pre-read string) and is
+          // async — the old `readJsonSafely(text)` lost the server message and
+          // left `data` a pending Promise, so the error fell through to the
+          // bare `HTTP <status>` fallback every time.
+          const data = await readJsonSafely(response, {})
           if (response.status === 401 || response.status === 403) {
             throw new Error('Session expired. Books are still available -- try refreshing.')
           }
@@ -81,6 +83,7 @@ export default function useLibraryData() {
         }
 
         const data = await response.json()
+        if (controller.signal.aborted) return
         setBooks(data.books || [])
         setTotalCount(data.totalCount || 0)
         setUsingCache(data.source === 'cache')
@@ -96,18 +99,24 @@ export default function useLibraryData() {
           swrCache.set(cacheKey, { data, timestamp: Date.now() })
         }
       } catch (err) {
+        if (err?.name === 'AbortError') return
         if (!isBackground) {
-          const msg = getApiErrorMessage(err)
+          // `err` is an Error here — its message already holds the
+          // server-supplied text (see the !response.ok branch above), so
+          // read `err.message` rather than `getApiErrorMessage(err)`, which
+          // looks for `err.error` and would silently return undefined.
+          const msg = err?.message || 'Could not load books. Please try again.'
           setError(msg)
           setBooks([])
           setTotalCount(0)
         }
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) setLoading(false)
       }
     }
 
     fetchBooks()
+    return () => controller.abort()
   }, [search, category, sort, page, language])
 
   // Prefetch next page (only when we don't already know it's empty)
@@ -125,10 +134,12 @@ export default function useLibraryData() {
     const cached = swrCache.get(cacheKey)
 
     if (!cached) {
+      const controller = new AbortController()
       const timer = setTimeout(() => {
         fetch(`${API}/api/library/search?${params.toString()}`, {
           credentials: 'include',
           headers: authHeaders(),
+          signal: controller.signal,
         })
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
@@ -142,7 +153,10 @@ export default function useLibraryData() {
           .catch(() => {})
       }, 1000)
 
-      return () => clearTimeout(timer)
+      return () => {
+        clearTimeout(timer)
+        controller.abort()
+      }
     }
     return undefined
   }, [search, category, sort, page, language, endOfResults])

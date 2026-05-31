@@ -221,6 +221,12 @@ export default function NoteViewerPage() {
 
       setReactionState({ likes: newLikes, dislikes: newDislikes, userReaction: newType })
 
+      // Snapshot the pre-click state so a rejected write can roll back
+      // instead of leaving the optimistic reaction applied (A4).
+      const revert = () => {
+        setReactionState({ likes, dislikes, userReaction: oldType })
+        showToast('Could not update reaction.', 'error')
+      }
       try {
         const res = await fetch(`${API}/api/notes/${note.id}/react`, {
           method: 'POST',
@@ -235,9 +241,11 @@ export default function NoteViewerPage() {
             dislikes: data.reactionCounts.dislike,
             userReaction: data.userReaction,
           })
+        } else {
+          revert()
         }
       } catch {
-        setReactionState({ likes, dislikes, userReaction: oldType })
+        revert()
       }
     },
     [user, note, userReaction, likes, dislikes],

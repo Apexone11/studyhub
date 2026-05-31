@@ -20,6 +20,7 @@ const { signatureMatchesExpected, validateMagicBytes } = require('../../lib/file
 const {
   parseId,
   requireGroupMember,
+  requireActiveGroupMember,
   isGroupAdmin,
   isMutedInGroup,
   validateTitle,
@@ -125,8 +126,9 @@ router.get('/', readLimiter, requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid group ID.' })
     }
 
-    // Check membership
-    const member = await requireGroupMember(groupId, req.user.userId)
+    // Active-membership gate — a pending/invited/banned member must not be
+    // able to read a private group's shared resources.
+    const member = await requireActiveGroupMember(groupId, req.user.userId)
     if (!member) {
       return res.status(404).json({ error: 'Not a member.' })
     }
@@ -231,7 +233,9 @@ router.post('/upload', groupMediaUploadLimiter, requireAuth, (req, res) => {
         return res.status(400).json({ error: 'Invalid group ID.' })
       }
 
-      const member = await requireGroupMember(groupId, req.user.userId)
+      // Active-membership gate — a pending/invited/banned member must not be
+      // able to upload media into a private group.
+      const member = await requireActiveGroupMember(groupId, req.user.userId)
       if (!member) {
         safeUnlinkFile(req.file.path)
         return res.status(404).json({ error: 'Not a member.' })
@@ -289,8 +293,9 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid group ID.' })
     }
 
-    // Check membership
-    const member = await requireGroupMember(groupId, req.user.userId)
+    // Active-membership gate — a pending/invited/banned member must not be
+    // able to add resources to a private group.
+    const member = await requireActiveGroupMember(groupId, req.user.userId)
     if (!member) {
       return res.status(404).json({ error: 'Not a member.' })
     }

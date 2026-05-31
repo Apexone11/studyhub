@@ -4,7 +4,7 @@ const { captureError } = require('../../core/monitoring/sentry')
 const log = require('../../lib/logger')
 const requireAuth = require('../../core/auth/requireAuth')
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
-const { parsePositiveInt } = require('../../core/http/validate')
+const { parseBoundedInt } = require('../../core/http/validate')
 const { assertOwnerOrAdmin, sendForbidden } = require('../../lib/accessControl')
 const { createNotification } = require('../../lib/notify')
 const { notifyMentionedUsers } = require('../../lib/mentions')
@@ -118,7 +118,7 @@ router.get('/:id/comments', async (req, res) => {
   req._timingStart = Date.now()
   const sheetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
-  const limit = parsePositiveInt(req.query.limit, 20)
+  const limit = parseBoundedInt(req.query.limit, 20, 50)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
   const sort = req.query.sort || 'newest' // 'newest', 'oldest', 'top'
 
@@ -401,6 +401,9 @@ router.post(
   commentReactLimiter,
   async (req, res) => {
     const commentId = Number.parseInt(req.params.commentId, 10)
+    if (!Number.isInteger(commentId) || commentId < 1) {
+      return sendError(res, 400, 'Invalid comment id.', ERROR_CODES.BAD_REQUEST)
+    }
     const { userId } = req.user
     const { type } = req.body || {}
 
@@ -466,6 +469,9 @@ router.post(
 
 router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (req, res) => {
   const commentId = Number.parseInt(req.params.commentId, 10)
+  if (!Number.isInteger(commentId) || commentId < 1) {
+    return sendError(res, 400, 'Invalid comment id.', ERROR_CODES.BAD_REQUEST)
+  }
 
   try {
     const comment = await prisma.comment.findUnique({ where: { id: commentId } })
@@ -493,8 +499,16 @@ router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (re
 // ── PATCH /:id/comments/:commentId ── edit comment content
 router.patch('/:id/comments/:commentId', requireAuth, commentLimiter, async (req, res) => {
   try {
-    const sheetId = Number(req.params.id)
-    const commentId = Number(req.params.commentId)
+    const sheetId = Number.parseInt(req.params.id, 10)
+    const commentId = Number.parseInt(req.params.commentId, 10)
+    if (
+      !Number.isInteger(sheetId) ||
+      sheetId < 1 ||
+      !Number.isInteger(commentId) ||
+      commentId < 1
+    ) {
+      return sendError(res, 400, 'Invalid id.', ERROR_CODES.BAD_REQUEST)
+    }
     const { content } = req.body
 
     if (!content || typeof content !== 'string' || content.trim().length === 0) {

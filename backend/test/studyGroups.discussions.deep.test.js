@@ -36,6 +36,7 @@ const mocks = vi.hoisted(() => {
     },
     discussionUpvote: {
       findUnique: vi.fn(),
+      findMany: vi.fn().mockResolvedValue([]),
       count: vi.fn().mockResolvedValue(0),
       create: vi.fn(),
       delete: vi.fn(),
@@ -157,8 +158,9 @@ describe('Discussions: GET /', () => {
       {
         ...basePost(),
         author: { id: 42, username: 'caller', avatarUrl: null },
-        replies: [{ id: 1 }],
-        upvotes: [],
+        // listDiscussions now counts via _count (relation aggregate) instead of
+        // materializing every reply/upvote row (2026-05-31 perf fix).
+        _count: { replies: 1, upvotes: 0 },
       },
     ])
     mocks.prisma.groupDiscussionPost.count.mockResolvedValue(1)

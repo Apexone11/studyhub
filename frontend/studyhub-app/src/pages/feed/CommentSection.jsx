@@ -6,6 +6,7 @@ import UserAvatar from '../../components/UserAvatar'
 import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { resolveImageUrl } from '../../lib/imageUrls'
+import { showToast } from '../../lib/toast'
 import {
   authHeaders,
   timeAgo,
@@ -181,10 +182,31 @@ function useComments(postId, initialCount = 0) {
 
   const reactToComment = useCallback(
     async (commentId, type) => {
+      // Snapshot the pre-click reaction so a rejected write can roll back
+      // immediately instead of flickering until loadComments resolves (A4).
+      let snapshot = null
+      const rollback = () => {
+        if (!snapshot) return
+        setComments((current) =>
+          updateCommentInTree(current, commentId, (comment) => ({
+            ...comment,
+            userReaction: snapshot.userReaction,
+            reactionCounts: snapshot.reactionCounts,
+          })),
+        )
+        showToast('Could not save reaction.', 'error')
+      }
       try {
         // Optimistic update - walk 3 levels
         setComments((current) =>
           updateCommentInTree(current, commentId, (comment) => {
+            if (!snapshot) {
+              snapshot = {
+                userReaction: comment.userReaction ?? null,
+                reactionCounts: { ...(comment.reactionCounts || { like: 0, dislike: 0 }) },
+              }
+            }
+
             const oldType = comment.userReaction
             const newType = oldType === type ? null : type
 
@@ -216,9 +238,12 @@ function useComments(postId, initialCount = 0) {
         )
 
         if (!response.ok) {
+          rollback()
+          // Backstop — reconcile against server truth on the next tick.
           await loadComments()
         }
       } catch {
+        rollback()
         await loadComments()
       }
     },

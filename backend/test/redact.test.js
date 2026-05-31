@@ -2,7 +2,13 @@ import { describe, expect, it } from 'vitest'
 import { createRequire } from 'node:module'
 
 const require = createRequire(import.meta.url)
-const { REDACTED, maskEmail, redactObject, redactHeaders, safeRequestContext } = require('../src/lib/redact')
+const {
+  REDACTED,
+  maskEmail,
+  redactObject,
+  redactHeaders,
+  safeRequestContext,
+} = require('../src/lib/redact')
 
 describe('redact', () => {
   describe('maskEmail', () => {
@@ -41,12 +47,28 @@ describe('redact', () => {
 
     it('redacts all known sensitive keys', () => {
       const cases = [
-        'passwordHash', 'newPassword', 'currentPassword', 'confirmPassword',
-        'token', 'accessToken', 'refreshToken', 'resetToken', 'jwt',
-        'cookie', 'cookies', 'authorization', 'set-cookie', 'x-csrf-token',
-        'twoFaCode', 'emailVerificationCode',
-        'ciphertext', 'encryptedDataKey', 'plaintext',
-        'secretKey', 'apiKey', 'secret',
+        'passwordHash',
+        'newPassword',
+        'currentPassword',
+        'confirmPassword',
+        'token',
+        'accessToken',
+        'refreshToken',
+        'resetToken',
+        'jwt',
+        'cookie',
+        'cookies',
+        'authorization',
+        'set-cookie',
+        'x-csrf-token',
+        'twoFaCode',
+        'emailVerificationCode',
+        'ciphertext',
+        'encryptedDataKey',
+        'plaintext',
+        'secretKey',
+        'apiKey',
+        'secret',
       ]
       for (const key of cases) {
         const result = redactObject({ [key]: 'sensitive-value' })
@@ -100,6 +122,32 @@ describe('redact', () => {
       // Should not throw, deep parts become REDACTED
       expect(result).toBeDefined()
     })
+
+    // CLAUDE.md A8 defense-in-depth: PII that leaks into a free-text string
+    // value (not a known sensitive key) is scrubbed by pattern.
+    it('scrubs an email embedded in a non-sensitive string value', () => {
+      const result = redactObject({ note: 'reach me at jane.doe@example.com please' })
+      expect(result.note).toBe('reach me at [redacted-email] please')
+    })
+
+    it('scrubs phone, IPv4, and SSN in a string value', () => {
+      const result = redactObject({ msg: 'call 555-123-4567 from 192.168.1.42 ssn 123-45-6789' })
+      expect(result.msg).toContain('[redacted-phone]')
+      expect(result.msg).toContain('[redacted-ip]')
+      expect(result.msg).toContain('[redacted-ssn]')
+      expect(result.msg).not.toContain('192.168.1.42')
+    })
+
+    it('scrubs PII in a top-level string', () => {
+      expect(redactObject('contact me@me.co')).toBe('contact [redacted-email]')
+    })
+
+    it('leaves PII-free strings untouched', () => {
+      expect(redactObject({ name: 'alice', url: '/api/sheets/123' })).toEqual({
+        name: 'alice',
+        url: '/api/sheets/123',
+      })
+    })
   })
 
   describe('redactHeaders', () => {
@@ -137,7 +185,7 @@ describe('redact', () => {
         method: 'POST',
         originalUrl: '/api/auth/login',
         ip: '127.0.0.1',
-        get: (h) => h === 'user-agent' ? 'TestAgent/1.0' : undefined,
+        get: (h) => (h === 'user-agent' ? 'TestAgent/1.0' : undefined),
         user: { id: 42 },
         body: { password: 'SHOULD_NOT_APPEAR' },
         headers: { cookie: 'SHOULD_NOT_APPEAR' },

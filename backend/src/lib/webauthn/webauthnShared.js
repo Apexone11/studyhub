@@ -6,6 +6,22 @@ const crypto = require('node:crypto')
 const { runWithHeartbeat } = require('../jobs/heartbeat')
 
 const RP_NAME = 'StudyHub'
+
+// Fail-closed in production: a missing WEBAUTHN_RP_ID / WEBAUTHN_ORIGIN
+// would fall back to localhost values, which silently break admin passkey
+// auth (clientDataJSON.origin / rpIdHash mismatch → every verify fails).
+// Refuse to boot rather than ship a broken auth path. Mirrors the
+// fail-closed pattern in lib/provenance.js:51. Dev/test keep the
+// localhost fallback so contributors don't need to configure these.
+if (process.env.NODE_ENV === 'production') {
+  if (!process.env.WEBAUTHN_RP_ID || !process.env.WEBAUTHN_ORIGIN) {
+    throw new Error(
+      'WEBAUTHN_RP_ID and WEBAUTHN_ORIGIN are required in production. ' +
+        'Without them passkey auth verifies against localhost and always fails.',
+    )
+  }
+}
+
 const RP_ID = process.env.WEBAUTHN_RP_ID || 'localhost'
 const ORIGIN = process.env.WEBAUTHN_ORIGIN || 'http://localhost:5173'
 

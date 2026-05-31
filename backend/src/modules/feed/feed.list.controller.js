@@ -2,7 +2,7 @@ const express = require('express')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const { getBlockedUserIds, getMutedUserIds } = require('../../lib/social/blockFilter')
-const { parsePositiveInt } = require('../../core/http/validate')
+const { parseBoundedInt } = require('../../core/http/validate')
 const {
   settleSection,
   formatAnnouncement,
@@ -83,7 +83,7 @@ function scoreFeedItem(item, userContext = null) {
 
 router.get('/', async (req, res) => {
   const startedAt = Date.now()
-  const limit = parsePositiveInt(req.query.limit, 20)
+  const limit = parseBoundedInt(req.query.limit, 20, 50)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
   // For `sort=ranked` we pull a wider candidate window so the JS scorer
   // has enough material to outrank a pure recency feed. The window must

@@ -251,13 +251,16 @@ function initSocketIO(httpServer) {
       socket.on(SOCKET_EVENTS.MESSAGE_READ, async (data) => {
         try {
           const { conversationId, messageId } = data
-          if (!conversationId) return
+          // CLAUDE.md A12 — client-supplied id; reject non-ints before Prisma
+          // so a malformed value can't throw + spray Sentry noise.
+          const cid = Number.parseInt(conversationId, 10)
+          if (!Number.isInteger(cid) || cid < 1) return
 
           // Update lastReadAt for the conversation participant
           await prisma.conversationParticipant.update({
             where: {
               conversationId_userId: {
-                conversationId,
+                conversationId: cid,
                 userId: socket.userId,
               },
             },
@@ -265,9 +268,9 @@ function initSocketIO(httpServer) {
           })
 
           // Broadcast read receipt to conversation
-          io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.MESSAGE_READ, {
+          io.to(`conversation:${cid}`).emit(SOCKET_EVENTS.MESSAGE_READ, {
             userId: socket.userId,
-            conversationId,
+            conversationId: cid,
             messageId,
             readAt: new Date().toISOString(),
           })
@@ -280,14 +283,17 @@ function initSocketIO(httpServer) {
       socket.on(SOCKET_EVENTS.CONVERSATION_JOIN, async (data) => {
         try {
           const { conversationId } = data
-          if (!conversationId) return
+          // CLAUDE.md A12 — client-supplied id; reject non-ints before Prisma
+          // so a malformed value can't throw + spray Sentry noise.
+          const cid = Number.parseInt(conversationId, 10)
+          if (!Number.isInteger(cid) || cid < 1) return
           if (isSocketRateLimited(socket.id, 'join', 30)) return
 
           // Verify user is a participant
           const participant = await prisma.conversationParticipant.findUnique({
             where: {
               conversationId_userId: {
-                conversationId,
+                conversationId: cid,
                 userId: socket.userId,
               },
             },
@@ -295,12 +301,12 @@ function initSocketIO(httpServer) {
 
           if (!participant) return
 
-          socket.join(`conversation:${conversationId}`)
+          socket.join(`conversation:${cid}`)
 
           // Notify others in conversation
-          io.to(`conversation:${conversationId}`).emit(SOCKET_EVENTS.USER_JOINED, {
+          io.to(`conversation:${cid}`).emit(SOCKET_EVENTS.USER_JOINED, {
             userId: socket.userId,
-            conversationId,
+            conversationId: cid,
           })
         } catch (err) {
           captureError(err, { source: 'socketio-conversation-join' })
@@ -399,6 +405,9 @@ function emitToUser(userId, event, payload) {
  * @returns {object}
  */
 function parseCookies(cookieHeader = '') {
+  // Start from a null-prototype object and skip the three reserved keys so a
+  // crafted `__proto__=...` cookie in the handshake header can't pollute
+  // Object.prototype (prototype-pollution-shaped sink).
   return cookieHeader
     .split(';')
     .map((cookie) => cookie.trim())
@@ -408,10 +417,11 @@ function parseCookies(cookieHeader = '') {
       if (separatorIndex === -1) return cookies
 
       const key = cookie.slice(0, separatorIndex).trim()
+      if (key === '__proto__' || key === 'constructor' || key === 'prototype') return cookies
       const value = cookie.slice(separatorIndex + 1).trim()
       cookies[key] = decodeURIComponent(value)
       return cookies
-    }, {})
+    }, Object.create(null))
 }
 
 module.exports = {

@@ -74,17 +74,23 @@ router.post('/reset-password', requireTrustedOrigin, forgotLimiter, async (req, 
   const newPassword = typeof body.newPassword === 'string' ? body.newPassword : ''
 
   if (!token || !newPassword) {
-    return res.status(400).json({ error: 'Token and new password are required.' })
+    return sendError(res, 400, 'Token and new password are required.', ERROR_CODES.BAD_REQUEST)
   }
   if (newPassword.length < PASSWORD_MIN_LENGTH) {
-    return res
-      .status(400)
-      .json({ error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` })
+    return sendError(
+      res,
+      400,
+      `Password must be at least ${PASSWORD_MIN_LENGTH} characters.`,
+      ERROR_CODES.VALIDATION,
+    )
   }
   if (!/[A-Z]/.test(newPassword) || !/\d/.test(newPassword)) {
-    return res
-      .status(400)
-      .json({ error: 'Password must include at least one capital letter and one number.' })
+    return sendError(
+      res,
+      400,
+      'Password must include at least one capital letter and one number.',
+      ERROR_CODES.VALIDATION,
+    )
   }
 
   try {
@@ -95,9 +101,31 @@ router.post('/reset-password', requireTrustedOrigin, forgotLimiter, async (req, 
     })
 
     if (!resetToken || resetToken.expiresAt < new Date()) {
-      return res
-        .status(400)
-        .json({ error: 'Reset link is invalid or has expired. Please request a new one.' })
+      return sendError(
+        res,
+        400,
+        'Reset link is invalid or has expired. Please request a new one.',
+        ERROR_CODES.VALIDATION,
+      )
+    }
+
+    // NIST 800-63B §5.1.1.2 + OWASP ASVS V2.1.1 — reject same-as-current on
+    // reset. If the user is here it's either a forgotten password or a
+    // compromised credential; setting the same string defeats the rotation.
+    // The user row is already loaded via `include: { user: true }`, so no
+    // extra query. We don't check full history (no UserPasswordHistory table
+    // yet — separate plan). Google-signup users with no passwordHash skip
+    // this (correct — there's no current credential to differ from).
+    if (resetToken.user?.passwordHash) {
+      const sameAsCurrent = await bcrypt.compare(newPassword, resetToken.user.passwordHash)
+      if (sameAsCurrent) {
+        return sendError(
+          res,
+          400,
+          'New password must be different from your current password.',
+          ERROR_CODES.PASSWORD_UNCHANGED,
+        )
+      }
     }
 
     // Phase 5: check against HIBP before allowing password reset
@@ -105,10 +133,13 @@ router.post('/reset-password', requireTrustedOrigin, forgotLimiter, async (req, 
       const { checkPasswordBreach } = require('../../lib/passwordSafety')
       const breach = await checkPasswordBreach(newPassword)
       if (breach.breached) {
-        return res.status(400).json({
-          error: `This password has appeared in ${breach.count.toLocaleString()} data breaches. Please choose a different password.`,
-          code: 'BREACHED_PASSWORD',
-        })
+        return sendError(
+          res,
+          400,
+          `This password has appeared in ${breach.count.toLocaleString()} data breaches. Please choose a different password.`,
+          ERROR_CODES.BREACHED_PASSWORD,
+          { breachCount: breach.count },
+        )
       }
     } catch {
       /* HIBP unreachable — allow reset to proceed */

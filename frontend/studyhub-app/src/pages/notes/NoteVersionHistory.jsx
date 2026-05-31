@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils.js'
 import { showToast } from '../../lib/toast'
+import { useFocusTrap } from '../../lib/useFocusTrap.js'
 import NoteVersionDiff from './NoteVersionDiff.jsx'
 
 const PAGE_FONT = 'Plus Jakarta Sans, sans-serif'
@@ -216,6 +217,11 @@ export default function NoteVersionHistory({ noteId, onRestore, onClose, flushPe
     }
   })
 
+  // Focus trap + Escape-to-close + scroll-lock for the slide-out panel.
+  // Replaces the bespoke document keydown listener so Escape isn't
+  // double-handled and focus can't escape into the inert page behind.
+  const focusTrapRef = useFocusTrap({ active: true, onClose })
+
   useEffect(() => {
     try {
       window.localStorage?.setItem(FILTER_STORAGE_KEY, filterKey)
@@ -254,17 +260,6 @@ export default function NoteVersionHistory({ noteId, onRestore, onClose, flushPe
 
     fetchVersions()
   }, [noteId])
-
-  // Handle escape key to close panel
-  useEffect(() => {
-    const handler = (e) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handler)
-    return () => {
-      document.removeEventListener('keydown', handler)
-    }
-  }, [onClose])
 
   async function handleSaveVersion() {
     if (!noteId) return
@@ -362,6 +357,10 @@ export default function NoteVersionHistory({ noteId, onRestore, onClose, flushPe
 
       {/* Slide-out panel */}
       <div
+        ref={focusTrapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Version History"
         style={{
           position: 'fixed',
           top: 0,

@@ -22,6 +22,7 @@ import { authHeaders } from '../shared/pageUtils'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { showToast } from '../../lib/toast'
 import { IconFlag } from '../../components/Icons'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 
 const REASONS = [
   { value: 'spam', label: 'Spam or fake group' },
@@ -48,15 +49,10 @@ export default function ReportGroupModal({ open, onClose, groupId, groupName, on
     }
   }, [open, groupId])
 
-  // Escape closes.
-  useEffect(() => {
-    if (!open) return
-    const handler = (event) => {
-      if (event.key === 'Escape') onClose?.()
-    }
-    window.addEventListener('keydown', handler)
-    return () => window.removeEventListener('keydown', handler)
-  }, [open, onClose])
+  // Focus trap + Escape-to-close + body scroll-lock. Replaces the bespoke
+  // window keydown listener so Escape isn't double-handled and focus stays
+  // inside the dialog.
+  const trapRef = useFocusTrap({ active: open, onClose })
 
   if (!open) return null
 
@@ -87,6 +83,7 @@ export default function ReportGroupModal({ open, onClose, groupId, groupName, on
 
   const modal = (
     <div
+      ref={trapRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="report-group-title"

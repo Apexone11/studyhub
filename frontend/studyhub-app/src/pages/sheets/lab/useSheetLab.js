@@ -54,54 +54,63 @@ export default function useSheetLab() {
 
   // Load sheet info. Retries once on 404 to absorb the brief race that happens
   // immediately after a fork is created and the user is redirected here.
-  const reloadSheet = useCallback(async () => {
-    if (!Number.isInteger(sheetId)) return
-    const fetchOnce = async () => {
-      const response = await fetch(`${API}/api/sheets/${sheetId}`, {
-        headers: authHeaders(),
-        credentials: 'include',
-      })
-      const data = await readJsonSafely(response, {})
-      return { response, data }
-    }
-    try {
-      let { response, data } = await fetchOnce()
-      if (isAuthSessionFailure(response, data)) {
-        clearSession()
-        navigate('/login', { replace: true })
-        return
+  // `signal` is supplied only by the effect-driven load so it cancels on a
+  // rapid sheetId change / unmount; user-initiated reloads (publish) pass none.
+  const reloadSheet = useCallback(
+    async (signal) => {
+      if (!Number.isInteger(sheetId)) return
+      const fetchOnce = async () => {
+        const response = await fetch(`${API}/api/sheets/${sheetId}`, {
+          headers: authHeaders(),
+          credentials: 'include',
+          signal,
+        })
+        const data = await readJsonSafely(response, {})
+        return { response, data }
       }
-      if (response.status === 404) {
-        // Race after fork: wait briefly and retry once before surfacing an error.
-        await new Promise((resolve) => setTimeout(resolve, 800))
-        ;({ response, data } = await fetchOnce())
+      try {
+        let { response, data } = await fetchOnce()
         if (isAuthSessionFailure(response, data)) {
           clearSession()
           navigate('/login', { replace: true })
           return
         }
+        if (response.status === 404) {
+          // Race after fork: wait briefly and retry once before surfacing an error.
+          await new Promise((resolve) => setTimeout(resolve, 800))
+          ;({ response, data } = await fetchOnce())
+          if (isAuthSessionFailure(response, data)) {
+            clearSession()
+            navigate('/login', { replace: true })
+            return
+          }
+        }
+        if (!response.ok) {
+          throw new Error(
+            response.status === 404
+              ? 'Hang tight — this sheet is still loading. If it does not appear in a moment, it may have been removed.'
+              : getApiErrorMessage(data, 'Could not load sheet.'),
+          )
+        }
+        setSheet(data)
+        setError('')
+      } catch (err) {
+        if (err?.name === 'AbortError') return
+        setError(err.message)
       }
-      if (!response.ok) {
-        throw new Error(
-          response.status === 404
-            ? 'Hang tight — this sheet is still loading. If it does not appear in a moment, it may have been removed.'
-            : getApiErrorMessage(data, 'Could not load sheet.'),
-        )
-      }
-      setSheet(data)
-      setError('')
-    } catch (err) {
-      setError(err.message)
-    }
-  }, [sheetId, clearSession, navigate])
+    },
+    [sheetId, clearSession, navigate],
+  )
 
   useEffect(() => {
     if (!Number.isInteger(sheetId)) {
       setError('Invalid sheet ID.')
       setLoading(false)
-      return
+      return undefined
     }
-    reloadSheet()
+    const controller = new AbortController()
+    reloadSheet(controller.signal)
+    return () => controller.abort()
   }, [sheetId, reloadSheet])
 
   // Route guard: non-owners of non-published sheets get redirected (unless editing is allowed)
@@ -135,15 +144,17 @@ export default function useSheetLab() {
     }
   }, [sheet, user, searchParams])
 
-  // Load commits
+  // Load commits. `signal` is supplied only by the effect-driven load so it
+  // cancels on a rapid sheetId change / unmount; user-initiated reloads (after
+  // create / restore) pass none and run to completion.
   const loadCommits = useCallback(
-    async (targetPage = 1) => {
+    async (targetPage = 1, signal) => {
       if (!Number.isInteger(sheetId)) return
       setLoading(true)
       try {
         const response = await fetch(
           `${API}/api/sheets/${sheetId}/lab/commits?page=${targetPage}&limit=20`,
-          { headers: authHeaders(), credentials: 'include' },
+          { headers: authHeaders(), credentials: 'include', signal },
         )
         const data = await readJsonSafely(response, {})
         if (isAuthSessionFailure(response, data)) {
@@ -158,16 +169,19 @@ export default function useSheetLab() {
         setTotalPages(data.totalPages || 1)
         setError('')
       } catch (err) {
+        if (err?.name === 'AbortError') return
         setError(err.message)
       } finally {
-        setLoading(false)
+        if (!signal?.aborted) setLoading(false)
       }
     },
     [sheetId, clearSession, navigate],
   )
 
   useEffect(() => {
-    loadCommits(1)
+    const controller = new AbortController()
+    loadCommits(1, controller.signal)
+    return () => controller.abort()
   }, [loadCommits])
 
   // Animate timeline on first data load
@@ -199,24 +213,28 @@ export default function useSheetLab() {
     [searchParams, setSearchParams],
   )
 
+  // `signal` is supplied only by the URL-param-driven load so it cancels on
+  // unmount / rapid param change; the click-driven toggle passes none.
   const loadCommitContent = useCallback(
-    async (commitId) => {
+    async (commitId, signal) => {
       setExpandedCommitId(commitId)
       setLoadingContent(true)
       try {
         const response = await fetch(`${API}/api/sheets/${sheetId}/lab/commits/${commitId}`, {
           headers: authHeaders(),
           credentials: 'include',
+          signal,
         })
         const data = await readJsonSafely(response, {})
         if (!response.ok)
           throw new Error(getApiErrorMessage(data, 'Could not load commit content.'))
         setExpandedContent(data.commit?.content || '')
       } catch (err) {
+        if (err?.name === 'AbortError') return
         showToast(err.message, 'error')
         setExpandedContent(null)
       } finally {
-        setLoadingContent(false)
+        if (!signal?.aborted) setLoadingContent(false)
       }
     },
     [sheetId],
@@ -236,11 +254,13 @@ export default function useSheetLab() {
   useEffect(() => {
     const commitParam = searchParams.get('commit')
     const commitId = Number.parseInt(commitParam || '', 10)
-    if (!Number.isInteger(commitId)) return
+    if (!Number.isInteger(commitId)) return undefined
     const commitExistsOnPage = commits.some((commit) => commit.id === commitId)
-    if (!commitExistsOnPage) return
-    if (expandedCommitId === commitId) return
-    loadCommitContent(commitId)
+    if (!commitExistsOnPage) return undefined
+    if (expandedCommitId === commitId) return undefined
+    const controller = new AbortController()
+    loadCommitContent(commitId, controller.signal)
+    return () => controller.abort()
   }, [searchParams, commits, expandedCommitId, loadCommitContent])
 
   // Fetch auto-summary when create modal opens

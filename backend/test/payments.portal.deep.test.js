@@ -203,6 +203,7 @@ describe('POST /api/payments/portal', () => {
     await request(app).post('/api/payments/portal').set('Origin', 'http://localhost:5173').send({})
     expect(mocks.stripeBillingPortal.sessions.create).toHaveBeenCalledWith(
       expect.objectContaining({ customer: 'cus_42' }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) }),
     )
   })
 

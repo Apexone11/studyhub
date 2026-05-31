@@ -486,7 +486,7 @@ export default function LibraryPage() {
         )}
 
         {/* Main Content */}
-        <main className="library-main">
+        <main id="main-content" className="library-main">
           {/* Cache fallback notice */}
           {usingCache && !error && (
             <div className="library-notice">

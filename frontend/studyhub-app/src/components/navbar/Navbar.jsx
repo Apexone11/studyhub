@@ -26,9 +26,8 @@ import StreakChip from './StreakChip'
 /* ChatPanel lazy-loaded above */
 import { IconMessages } from '../Icons'
 import { S, getConfig, handleIconHover } from './navbarConstants'
-import { API } from '../../config'
-import { authHeaders } from '../../pages/shared/pageUtils'
 import { useChatPanel } from '../../lib/chatPanelContext.js'
+import { useUnread } from '../../lib/unreadContext.js'
 
 // ─── COMPONENT ────────────────────────────────────────────────────
 /**
@@ -79,34 +78,9 @@ export default function Navbar({
     setChatOpenLocal(value)
     setChatPanelOpen(value)
   }
-  // unread messages count for badge
-  const [unreadMessages, setUnreadMessages] = useState(0)
-
-  // Fetch unread count on mount + poll every 30s
-  useEffect(() => {
-    if (!user) return
-    let cancelled = false
-    async function fetchCount() {
-      try {
-        const res = await fetch(`${API}/api/messages/unread-total`, {
-          credentials: 'include',
-          headers: authHeaders(),
-        })
-        if (res.ok && !cancelled) {
-          const data = await res.json()
-          setUnreadMessages(data.total || 0)
-        }
-      } catch {
-        /* silent */
-      }
-    }
-    fetchCount()
-    const interval = setInterval(fetchCount, 30000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [user])
+  // unread messages count for badge — single shared poller in UnreadContext
+  // (Navbar bell + MobileBottomNav badge consume the same source). Decision #L1-2.
+  const { total: unreadMessages, refresh: refreshUnread } = useUnread()
 
   // Global Ctrl+K / Cmd+K shortcut to open search
   useEffect(() => {
@@ -283,18 +257,9 @@ export default function Navbar({
                 open={chatOpen}
                 onClose={() => {
                   setChatOpen(false)
-                  // Re-fetch unread count after closing chat (user may have read messages)
-                  if (user) {
-                    fetch(`${API}/api/messages/unread-total`, {
-                      credentials: 'include',
-                      headers: authHeaders(),
-                    })
-                      .then((r) => (r.ok ? r.json() : null))
-                      .then((d) => {
-                        if (d) setUnreadMessages(d.total || 0)
-                      })
-                      .catch(() => {})
-                  }
+                  // Re-fetch unread count after closing chat (user may have read
+                  // messages). Delegates to the shared UnreadContext poller.
+                  refreshUnread()
                 }}
               />
             </Suspense>

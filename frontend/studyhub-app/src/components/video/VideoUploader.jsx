@@ -20,6 +20,7 @@ import { lazy, Suspense, useRef, useState, useCallback, useEffect } from 'react'
 import useVideoUpload, { UPLOAD_STATUS } from '../../lib/useVideoUpload'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
+import { showToast } from '../../lib/toast'
 
 const VideoThumbnailEditor = lazy(() => import('./VideoThumbnailEditor'))
 
@@ -604,17 +605,25 @@ function VideoProcessingProgress({ videoId }) {
   }, [videoId])
 
   const toggleDownloadable = async () => {
+    const requested = !downloadable
     setToggling(true)
     try {
       const res = await fetch(`${API}/api/video/${videoId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify({ downloadable: !downloadable }),
+        body: JSON.stringify({ downloadable: requested }),
       })
-      if (res.ok) setDownloadable(!downloadable)
+      if (res.ok) {
+        // Hydrate from the persisted value the PATCH echoes back rather
+        // than toggling to the inverse of what was sent (A4).
+        const data = await res.json().catch(() => ({}))
+        setDownloadable(data.downloadable ?? requested)
+      } else {
+        showToast('Could not update download setting.', 'error')
+      }
     } catch {
-      /* silent */
+      showToast('Could not update download setting.', 'error')
     } finally {
       setToggling(false)
     }

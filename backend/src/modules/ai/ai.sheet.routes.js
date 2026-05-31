@@ -32,7 +32,12 @@ const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { createAiMessageLimiter } = require('../../lib/rateLimiters')
 const prisma = require('../../lib/prisma')
 const log = require('../../lib/logger')
-const { DEFAULT_MODEL, SYSTEM_PROMPT, AI_RATE_LIMIT_RPM } = require('./ai.constants')
+const {
+  DEFAULT_MODEL,
+  SYSTEM_PROMPT,
+  AI_RATE_LIMIT_RPM,
+  anthropicRequestOptions,
+} = require('./ai.constants')
 const { redactPII } = require('./ai.context')
 const { reserveSpend, refundSpendDelta, recordActualUsage } = require('./ai.spendCeiling')
 const {
@@ -213,12 +218,15 @@ Keep \`layer\` matching the pass that surfaced the issue. If there are no issues
       }
 
       const client = getClient()
-      const response = await client.messages.create({
-        model: DEFAULT_MODEL,
-        max_tokens: maxOutputTokens,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: redactPII(instruction) }],
-      })
+      const response = await client.messages.create(
+        {
+          model: DEFAULT_MODEL,
+          max_tokens: maxOutputTokens,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: redactPII(instruction) }],
+        },
+        anthropicRequestOptions(req),
+      )
 
       // Reconcile actual usage with reservation. If anything throws
       // AFTER this point, the catch block refunds the full estimate
@@ -526,12 +534,15 @@ ${sheetContent}`
       }
 
       const client = getClient()
-      const response = await client.messages.create({
-        model: DEFAULT_MODEL,
-        max_tokens: maxOutputTokens,
-        system: SYSTEM_PROMPT,
-        messages: [{ role: 'user', content: redactPII(userMsg) }],
-      })
+      const response = await client.messages.create(
+        {
+          model: DEFAULT_MODEL,
+          max_tokens: maxOutputTokens,
+          system: SYSTEM_PROMPT,
+          messages: [{ role: 'user', content: redactPII(userMsg) }],
+        },
+        anthropicRequestOptions(req),
+      )
 
       if (reservation && response.usage) {
         try {

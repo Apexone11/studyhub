@@ -126,14 +126,20 @@ router.get('/:id/attachment/preview', requireAuth, attachmentDownloadLimiter, as
         attachmentUrl: true,
         attachmentName: true,
         attachmentType: true,
+        allowDownloads: true,
       },
     })
 
     if (!sheet) return res.status(404).json({ error: 'Sheet not found.' })
+    const isOwnerOrAdmin =
+      req.user && (req.user.userId === sheet.userId || req.user.role === 'admin')
     if (!canReadSheet(sheet, req.user)) {
       return res.status(404).json({ error: 'Sheet not found.' })
     }
     if (!sheet.attachmentUrl) return res.status(404).json({ error: 'Attachment not found.' })
+    if (!isOwnerOrAdmin && !sheet.allowDownloads) {
+      return sendForbidden(res, 'Downloads are disabled for this sheet.')
+    }
 
     const localPath = resolveAttachmentPath(sheet.attachmentUrl)
     if (!localPath || !fs.existsSync(localPath)) {

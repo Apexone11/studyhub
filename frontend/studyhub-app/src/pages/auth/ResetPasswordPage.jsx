@@ -57,6 +57,15 @@ function ResetPasswordPage() {
       })
       const data = await res.json()
       if (!res.ok) {
+        // Surface "new password must differ from current" inline on the
+        // field so the user knows exactly what to change, rather than in
+        // the generic banner.
+        if (data.code === 'PASSWORD_UNCHANGED') {
+          const msg = data.error || 'New password must be different from your current password.'
+          setErrors({ newPassword: msg })
+          focusFirstError({ newPassword: msg })
+          return
+        }
         setError(data.error || 'Something went wrong.')
         return
       }

@@ -2,7 +2,7 @@ const express = require('express')
 const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const optionalAuth = require('../../core/auth/optionalAuth')
-const { parsePositiveInt } = require('../../core/http/validate')
+const { parseBoundedInt } = require('../../core/http/validate')
 const { SHEET_STATUS, AUTHOR_SELECT, leaderboardLimiter } = require('./sheets.constants')
 const { serializeSheet } = require('./sheets.serializer')
 const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
@@ -141,7 +141,7 @@ router.get('/', optionalAuth, async (req, res) => {
     const allowedSort = ['createdAt', 'stars', 'downloads', 'forks', 'updatedAt', 'recommended']
     const sortCandidate = typeof sort === 'string' && sort.trim() ? sort : orderByParam
     const sortField = allowedSort.includes(sortCandidate) ? sortCandidate : 'createdAt'
-    const take = parsePositiveInt(limit, 20)
+    const take = parseBoundedInt(limit, 20, 100)
     const skip = Math.max(0, Number.parseInt(offset, 10) || 0)
 
     if (starred === '1') {

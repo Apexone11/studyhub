@@ -249,6 +249,24 @@ describe('payments.constants', () => {
   })
 })
 
+describe('buildStripeIdempotencyKey()', () => {
+  it('builds a prefixed, action+user-scoped key', () => {
+    const key = paymentsService.buildStripeIdempotencyKey('checkout.subscription', 42)
+    expect(key).toMatch(/^sh-checkout\.subscription-42-\d+-[0-9a-f]{12}$/)
+  })
+
+  it('falls back to anon when userId is missing and appends extra', () => {
+    const key = paymentsService.buildStripeIdempotencyKey('checkout.donation', null, '500')
+    expect(key).toMatch(/^sh-checkout\.donation-anon-\d+-[0-9a-f]{12}-500$/)
+  })
+
+  it('produces a unique key per call (random suffix)', () => {
+    const a = paymentsService.buildStripeIdempotencyKey('portal.create', 1)
+    const b = paymentsService.buildStripeIdempotencyKey('portal.create', 1)
+    expect(a).not.toBe(b)
+  })
+})
+
 describe('payments.service — Webhook Handlers', () => {
   describe('handleCheckoutCompleted() — subscription', () => {
     it('upserts subscription record with correct status and plan', async () => {

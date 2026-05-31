@@ -44,6 +44,11 @@ const mocks = vi.hoisted(() => ({
       const n = Number.parseInt(v, 10)
       return Number.isInteger(n) && n > 0 ? n : fallback
     }),
+    parseBoundedInt: vi.fn((v, fallback, max) => {
+      const n = Number.parseInt(v, 10)
+      if (!Number.isInteger(n) || n <= 0) return Math.min(fallback, max)
+      return Math.min(n, max)
+    }),
   },
   // Use a serializer that echoes minimal shape — the route under test attaches
   // commentCount/starred via opts.

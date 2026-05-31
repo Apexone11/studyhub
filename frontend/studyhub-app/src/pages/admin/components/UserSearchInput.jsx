@@ -12,6 +12,7 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
   const [searchError, setSearchError] = useState(false)
   const timerRef = useRef(null)
   const wrapperRef = useRef(null)
+  const abortRef = useRef(null)
 
   useEffect(() => {
     function handleClick(e) {
@@ -23,16 +24,28 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
 
+  useEffect(
+    () => () => {
+      clearTimeout(timerRef.current)
+      abortRef.current?.abort()
+    },
+    [],
+  )
+
   const search = useCallback((q) => {
     if (q.length < 2) {
       setResults([])
       setOpen(false)
       return
     }
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
     setLoading(true)
     setSearchError(false)
     fetch(`${API}/api/admin/users/search?q=${encodeURIComponent(q)}&limit=10`, {
       credentials: 'include',
+      signal: controller.signal,
     })
       .then((r) => r.json())
       .then((data) => {
@@ -40,18 +53,25 @@ export default function UserSearchInput({ value, onChange, label = 'User' }) {
         setSearchError(false)
         setOpen(true)
       })
-      .catch(() => {
+      .catch((err) => {
+        if (err?.name === 'AbortError') return
         setResults([])
         setSearchError(true)
         setOpen(true)
       })
-      .finally(() => setLoading(false))
+      .finally(() => {
+        if (abortRef.current === controller) {
+          abortRef.current = null
+          setLoading(false)
+        }
+      })
   }, [])
 
   const handleInput = (e) => {
     const val = e.target.value
     setQuery(val)
     clearTimeout(timerRef.current)
+    abortRef.current?.abort()
     timerRef.current = setTimeout(() => search(val), 300)
   }
 

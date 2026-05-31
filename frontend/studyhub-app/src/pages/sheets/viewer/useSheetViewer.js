@@ -638,12 +638,22 @@ export default function useSheetViewer() {
   }
 
   const reactToComment = async (commentId, type) => {
+    // Snapshot the pre-click reaction + counts so a rejected write can be
+    // rolled back instead of staying inflated until the next 60s poll (A4).
+    let snapshot = null
     try {
       // Optimistic update
       setCommentsState((current) => ({
         ...current,
         comments: current.comments.map((comment) => {
           if (comment.id !== commentId) return comment
+
+          if (!snapshot) {
+            snapshot = {
+              userReaction: comment.userReaction ?? null,
+              reactionCounts: { ...(comment.reactionCounts || { like: 0, dislike: 0 }) },
+            }
+          }
 
           const oldType = comment.userReaction
           const newType = oldType === type ? null : type
@@ -682,7 +692,24 @@ export default function useSheetViewer() {
         throw new Error(getApiErrorMessage(data, 'Could not save reaction.'))
       }
     } catch (error) {
-      setCommentsState((current) => ({ ...current, error: error.message }))
+      // Restore the optimistic count to the pre-click snapshot.
+      if (snapshot) {
+        setCommentsState((current) => ({
+          ...current,
+          comments: current.comments.map((comment) =>
+            comment.id === commentId
+              ? {
+                  ...comment,
+                  userReaction: snapshot.userReaction,
+                  reactionCounts: snapshot.reactionCounts,
+                }
+              : comment,
+          ),
+          error: error.message,
+        }))
+      } else {
+        setCommentsState((current) => ({ ...current, error: error.message }))
+      }
     }
   }
 

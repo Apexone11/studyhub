@@ -153,4 +153,20 @@ describe('TopicPickerModal', () => {
     await user.keyboard('{Escape}')
     expect(onClose).toHaveBeenCalled()
   })
+
+  it('labels the search and custom-topic inputs for screen readers', async () => {
+    mockCatalog()
+    render(
+      <TopicPickerModal
+        open
+        onClose={() => {}}
+        followedNames={[]}
+        onFollow={() => {}}
+        onUnfollow={() => {}}
+      />,
+    )
+    await screen.findByText('Machine Learning')
+    expect(screen.getByRole('searchbox', { name: 'Search topics' })).toBeInTheDocument()
+    expect(screen.getByRole('textbox', { name: 'Custom topic name' })).toBeInTheDocument()
+  })
 })

@@ -6,6 +6,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect } from 'react'
 import { API } from '../config'
+import { useFocusTrap } from '../lib/useFocusTrap'
 
 /* ── Inline video player for announcement videos ───────────────────────── */
 
@@ -140,6 +141,13 @@ function ImageGallery({ images }) {
   const [lightboxIndex, setLightboxIndex] = useState(null)
   const count = images.length
 
+  // Focus trap + Escape-to-close + scroll-lock while the lightbox overlay
+  // is open. Active only when an image is being viewed.
+  const lightboxRef = useFocusTrap({
+    active: lightboxIndex !== null,
+    onClose: () => setLightboxIndex(null),
+  })
+
   if (count === 0) return null
 
   const gridStyle =
@@ -183,11 +191,18 @@ function ImageGallery({ images }) {
           .map((img, idx) => {
             const isFirst3 = count === 3 && idx === 0
             return (
-              <div
+              <button
                 key={img.id || idx}
+                type="button"
+                aria-label={`View image ${idx + 1}`}
                 style={{
                   position: 'relative',
                   cursor: 'pointer',
+                  padding: 0,
+                  border: 'none',
+                  background: 'none',
+                  display: 'block',
+                  width: '100%',
                   ...(isFirst3 ? { gridColumn: '1 / -1' } : {}),
                 }}
                 onClick={() => setLightboxIndex(idx)}
@@ -222,7 +237,7 @@ function ImageGallery({ images }) {
                     +{count - 4}
                   </div>
                 )}
-              </div>
+              </button>
             )
           })
           .slice(0, count > 4 ? 4 : count)}
@@ -231,7 +246,11 @@ function ImageGallery({ images }) {
       {/* Simple lightbox */}
       {lightboxIndex !== null && (
         <div
+          ref={lightboxRef}
           onClick={() => setLightboxIndex(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image viewer"
           style={{
             position: 'fixed',
             inset: 0,

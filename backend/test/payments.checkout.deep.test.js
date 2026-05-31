@@ -311,6 +311,7 @@ describe('POST /api/payments/checkout/subscription', () => {
           studyhub_username: 'tester',
         }),
       }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) }),
     )
   })
 
@@ -323,6 +324,7 @@ describe('POST /api/payments/checkout/subscription', () => {
     expect(mocks.stripeCustomer.create).not.toHaveBeenCalled()
     expect(mocks.stripeCheckout.create).toHaveBeenCalledWith(
       expect.objectContaining({ customer: 'cus_existing_999' }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) }),
     )
   })
 

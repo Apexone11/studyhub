@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => {
     },
     userPinnedSheet: {
       findMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
     userPreferences: {
       findMany: vi.fn(),
@@ -487,6 +488,39 @@ describe('users routes', () => {
 
       expect(response.status).toBe(404)
       expect(response.body).toMatchObject({ error: 'User not found.' })
+    })
+  })
+
+  describe('DELETE /me/pinned-sheets/:sheetId', () => {
+    // CLAUDE.md A12 — deletePinnedSheet read `Number(req.params.sheetId)` with no
+    // validation before prisma.userPinnedSheet.deleteMany. A non-numeric id coerced
+    // to NaN and reached Prisma; a negative id passed straight through.
+    it('rejects a non-numeric sheetId with 400', async () => {
+      const response = await request(app).delete('/me/pinned-sheets/abc')
+
+      expect(response.status).toBe(400)
+      expect(response.body.code).toBe('BAD_REQUEST')
+      expect(mocks.prisma.userPinnedSheet.deleteMany).not.toHaveBeenCalled()
+    })
+
+    it('rejects a negative sheetId with 400', async () => {
+      const response = await request(app).delete('/me/pinned-sheets/-5')
+
+      expect(response.status).toBe(400)
+      expect(response.body.code).toBe('BAD_REQUEST')
+      expect(mocks.prisma.userPinnedSheet.deleteMany).not.toHaveBeenCalled()
+    })
+
+    it('removes the pin for a clean positive integer id', async () => {
+      mocks.prisma.userPinnedSheet.deleteMany.mockResolvedValue({ count: 1 })
+
+      const response = await request(app).delete('/me/pinned-sheets/7')
+
+      expect(response.status).toBe(200)
+      expect(response.body).toMatchObject({ removed: true })
+      expect(mocks.prisma.userPinnedSheet.deleteMany).toHaveBeenCalledWith({
+        where: { userId: 42, sheetId: 7 },
+      })
     })
   })
 

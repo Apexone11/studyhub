@@ -17,7 +17,7 @@ const prisma = require('../../lib/prisma')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const {
   parseId,
-  requireGroupMember,
+  requireActiveGroupMember,
   isGroupAdminOrMod,
   validateTitle,
   validateDescription,
@@ -41,8 +41,9 @@ router.get('/', readLimiter, requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid group ID.' })
     }
 
-    // Check membership
-    const member = await requireGroupMember(groupId, req.user.userId)
+    // Active-membership gate — a pending/invited/banned member must not be
+    // able to read a private group's scheduled sessions.
+    const member = await requireActiveGroupMember(groupId, req.user.userId)
     if (!member) {
       return res.status(404).json({ error: 'Not a member.' })
     }
@@ -431,8 +432,9 @@ router.post('/:sessionId/rsvp', writeLimiter, requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid IDs.' })
     }
 
-    // Check membership
-    const member = await requireGroupMember(groupId, req.user.userId)
+    // Active-membership gate — a pending/invited/banned member must not be
+    // able to RSVP to a private group's sessions.
+    const member = await requireActiveGroupMember(groupId, req.user.userId)
     if (!member) {
       return res.status(404).json({ error: 'Not a member.' })
     }

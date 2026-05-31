@@ -111,13 +111,30 @@ async function bulkAssign({ teacherId, materialIds, sectionIds, dueAt }) {
   const skipped = []
   let created = 0
 
+  // CLAUDE.md A12 — validate every id is a positive integer before the Prisma
+  // `in` clause. A bare `.map(Number)` would coerce "abc" → NaN and feed it to
+  // the query, producing a 500 instead of a clean 400.
+  const toPositiveIntList = (ids, label) =>
+    ids.map((raw) => {
+      const parsed = Number.parseInt(raw, 10)
+      if (!Number.isInteger(parsed) || parsed < 1 || String(raw).trim() !== String(parsed)) {
+        const err = new Error(`${label} must contain positive integers only.`)
+        err.code = 'VALIDATION'
+        throw err
+      }
+      return parsed
+    })
+
+  const materialIdInts = toPositiveIntList(materialIds, 'materialIds')
+  const sectionIdInts = toPositiveIntList(sectionIds, 'sectionIds')
+
   const [materials, sections] = await Promise.all([
     prisma.material.findMany({
-      where: { id: { in: materialIds.map(Number) }, teacherId },
+      where: { id: { in: materialIdInts }, teacherId },
       select: { id: true },
     }),
     prisma.section.findMany({
-      where: { id: { in: sectionIds.map(Number) }, teacherId },
+      where: { id: { in: sectionIdInts }, teacherId },
       select: { id: true },
     }),
   ])
@@ -135,13 +152,13 @@ async function bulkAssign({ teacherId, materialIds, sectionIds, dueAt }) {
   const existingSet = new Set(existing.map((e) => existingKey(e.materialId, e.sectionId)))
 
   const toInsert = []
-  for (const mid of materialIds.map(Number)) {
+  for (const mid of materialIdInts) {
     if (!ownedMaterialIds.has(mid)) {
-      for (const sid of sectionIds)
-        skipped.push({ materialId: mid, sectionId: Number(sid), reason: 'material_not_owned' })
+      for (const sid of sectionIdInts)
+        skipped.push({ materialId: mid, sectionId: sid, reason: 'material_not_owned' })
       continue
     }
-    for (const sid of sectionIds.map(Number)) {
+    for (const sid of sectionIdInts) {
       if (!ownedSectionIds.has(sid)) {
         skipped.push({ materialId: mid, sectionId: sid, reason: 'section_not_owned' })
         continue

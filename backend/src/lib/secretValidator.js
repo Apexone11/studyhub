@@ -161,6 +161,22 @@ const REQUIRED_IN_PRODUCTION = [
       'Railway volume corruption permanently loses every user-uploaded photo. Recovery ' +
       'procedure: scripts/restoreVolumeFromR2.js + RUNBOOK_DB_RESTORE.md.',
   },
+  {
+    // WebAuthn relying-party ID. Without it lib/webauthn/webauthnShared.js
+    // falls back to "localhost", which makes every passkey verify fail in
+    // prod (rpIdHash mismatch). Promoted to REQUIRED_IN_PRODUCTION alongside
+    // the prod-throw added in webauthnShared.js.
+    key: 'WEBAUTHN_RP_ID',
+    description:
+      'WebAuthn relying-party ID (e.g. getstudyhub.org). Required for admin passkey auth.',
+  },
+  {
+    // WebAuthn origin. Without it the localhost fallback makes
+    // clientDataJSON.origin mismatch and every passkey verify fails.
+    key: 'WEBAUTHN_ORIGIN',
+    description:
+      'WebAuthn origin URL (e.g. https://getstudyhub.org). Required for admin passkey auth.',
+  },
 ]
 
 const OPTIONAL = [
@@ -191,8 +207,10 @@ const OPTIONAL = [
   { key: 'STRIPE_PRICE_ID_PRO', description: 'Stripe Pro monthly price ID' },
   { key: 'STRIPE_PRICE_ID_PRO_YEARLY', description: 'Stripe Pro yearly price ID' },
   { key: 'STRIPE_PRICE_ID_DONATION', description: 'Stripe donation price ID (legacy)' },
-  { key: 'WEBAUTHN_RP_ID', description: 'WebAuthn relying-party ID' },
-  { key: 'WEBAUTHN_ORIGIN', description: 'WebAuthn origin URL' },
+  // WEBAUTHN_RP_ID + WEBAUTHN_ORIGIN promoted to REQUIRED_IN_PRODUCTION
+  // (top of this file) — a missing value falls back to localhost and
+  // silently breaks admin passkey auth in prod (lib/webauthn/webauthnShared.js
+  // now throws at boot to match).
   { key: 'GOOGLE_BOOKS_API_KEY', description: 'Google Books API key' },
   { key: 'CSP_REPORT_URI', description: 'CSP violation reporting endpoint' },
   {

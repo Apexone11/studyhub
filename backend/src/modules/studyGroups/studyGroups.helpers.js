@@ -14,12 +14,32 @@ function parseId(val) {
 }
 
 /**
- * Get membership record or null
+ * Get membership record or null.
+ *
+ * NOTE: this returns the row for ANY status (active / pending / invited /
+ * banned). Callers that gate a privileged read or write MUST check
+ * `member.status === 'active'` themselves — use requireActiveGroupMember
+ * for the common "must be an active member" gate so a pending or banned
+ * user cannot read/write a private group's sub-resources.
  */
 async function requireGroupMember(groupId, userId) {
   return prisma.studyGroupMember.findUnique({
     where: { groupId_userId: { groupId, userId } },
   })
+}
+
+/**
+ * Get membership record only when the caller is an ACTIVE member.
+ * Returns the row on hit, null when the user is not a member OR their
+ * membership is still pending/invited/banned. This is the gate the
+ * create/read sub-resource handlers use so an un-approved or banned
+ * user can't read discussions/resources/sessions or create posts in a
+ * private group.
+ */
+async function requireActiveGroupMember(groupId, userId) {
+  const member = await requireGroupMember(groupId, userId)
+  if (!member || member.status !== 'active') return null
+  return member
 }
 
 /**
@@ -343,6 +363,7 @@ function formatGroupFromBatch(group, batch = {}) {
 module.exports = {
   parseId,
   requireGroupMember,
+  requireActiveGroupMember,
   isGroupAdmin,
   isGroupAdminOrMod,
   isBlockedFromGroup,

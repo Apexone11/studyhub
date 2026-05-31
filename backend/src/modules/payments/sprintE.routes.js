@@ -373,38 +373,41 @@ router.post(
       const unitAmount = price.unit_amount || 499
       const totalAmount = unitAmount * months
 
-      const session = await stripe.checkout.sessions.create({
-        customer: await service.getOrCreateCustomer({
-          id: userId,
-          email: gifterUser?.email || '',
-          username: gifterUser?.username || req.user.username,
-        }),
-        mode: 'payment',
-        payment_method_types: ['card'],
-        line_items: [
-          {
-            price_data: {
-              currency: 'usd',
-              product_data: {
-                name: `StudyHub Pro Gift (${months} month${months > 1 ? 's' : ''})`,
-                description: `Gift subscription for ${recipientEmail}`,
+      const session = await stripe.checkout.sessions.create(
+        {
+          customer: await service.getOrCreateCustomer({
+            id: userId,
+            email: gifterUser?.email || '',
+            username: gifterUser?.username || req.user.username,
+          }),
+          mode: 'payment',
+          payment_method_types: ['card'],
+          line_items: [
+            {
+              price_data: {
+                currency: 'usd',
+                product_data: {
+                  name: `StudyHub Pro Gift (${months} month${months > 1 ? 's' : ''})`,
+                  description: `Gift subscription for ${recipientEmail}`,
+                },
+                unit_amount: totalAmount,
               },
-              unit_amount: totalAmount,
+              quantity: 1,
             },
-            quantity: 1,
+          ],
+          success_url: `${frontendUrl}/settings?tab=subscription&gift=success`,
+          cancel_url: `${frontendUrl}/settings?tab=subscription&gift=canceled`,
+          metadata: {
+            type: 'gift',
+            studyhub_user_id: String(userId),
+            gift_code: giftCode,
+            recipient_email: recipientEmail,
+            plan: giftPlan,
+            duration_months: String(months),
           },
-        ],
-        success_url: `${frontendUrl}/settings?tab=subscription&gift=success`,
-        cancel_url: `${frontendUrl}/settings?tab=subscription&gift=canceled`,
-        metadata: {
-          type: 'gift',
-          studyhub_user_id: String(userId),
-          gift_code: giftCode,
-          recipient_email: recipientEmail,
-          plan: giftPlan,
-          duration_months: String(months),
         },
-      })
+        { idempotencyKey: service.buildStripeIdempotencyKey('checkout.gift', userId, giftCode) },
+      )
 
       // Create pending gift record
       await prisma.giftSubscription.create({
@@ -582,12 +585,21 @@ router.post(
       if (sub.stripeSubscriptionId && !sub.stripeSubscriptionId.startsWith('gift_')) {
         try {
           const stripe = service.getStripe()
-          await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-            pause_collection: {
-              behavior: 'void',
-              resumes_at: Math.floor(Date.now() / 1000) + pauseDays * 86400,
+          await stripe.subscriptions.update(
+            sub.stripeSubscriptionId,
+            {
+              pause_collection: {
+                behavior: 'void',
+                resumes_at: Math.floor(Date.now() / 1000) + pauseDays * 86400,
+              },
             },
-          })
+            {
+              idempotencyKey: service.buildStripeIdempotencyKey(
+                'subscription.pause',
+                req.user?.userId,
+              ),
+            },
+          )
         } catch (stripeErr) {
           log.warn(
             { err: stripeErr.message },
@@ -647,9 +659,13 @@ router.post(
       if (sub?.stripeSubscriptionId && !sub.stripeSubscriptionId.startsWith('gift_')) {
         try {
           const stripe = service.getStripe()
-          await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-            pause_collection: '',
-          })
+          await stripe.subscriptions.update(
+            sub.stripeSubscriptionId,
+            {
+              pause_collection: '',
+            },
+            { idempotencyKey: service.buildStripeIdempotencyKey('subscription.resume', userId) },
+          )
         } catch (stripeErr) {
           log.warn({ err: stripeErr.message }, 'Failed to resume Stripe subscription')
         }
@@ -759,26 +775,29 @@ router.post(
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
 
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        mode: 'subscription',
-        payment_method_types: ['card'],
-        line_items: [{ price: planDef.stripePriceId, quantity: 1 }],
-        subscription_data: {
-          trial_period_days: trialDays,
+      const session = await stripe.checkout.sessions.create(
+        {
+          customer: customerId,
+          mode: 'subscription',
+          payment_method_types: ['card'],
+          line_items: [{ price: planDef.stripePriceId, quantity: 1 }],
+          subscription_data: {
+            trial_period_days: trialDays,
+            metadata: {
+              studyhub_user_id: String(userId),
+              plan: 'pro_monthly',
+            },
+          },
+          success_url: `${frontendUrl}/settings?payment=success&trial=true`,
+          cancel_url: `${frontendUrl}/pricing?payment=canceled`,
           metadata: {
             studyhub_user_id: String(userId),
             plan: 'pro_monthly',
+            is_trial: 'true',
           },
         },
-        success_url: `${frontendUrl}/settings?payment=success&trial=true`,
-        cancel_url: `${frontendUrl}/pricing?payment=canceled`,
-        metadata: {
-          studyhub_user_id: String(userId),
-          plan: 'pro_monthly',
-          is_trial: 'true',
-        },
-      })
+        { idempotencyKey: service.buildStripeIdempotencyKey('checkout.trial', userId) },
+      )
 
       res.json({ url: session.url, trialDays })
     } catch (error) {
@@ -862,26 +881,35 @@ router.post(
 
       const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173'
 
-      const session = await stripe.checkout.sessions.create({
-        customer: customerId,
-        mode: 'subscription',
-        payment_method_types: ['card'],
-        line_items: [{ price: planDef.stripePriceId, quantity: 1 }],
-        discounts: [{ coupon: coupon.id }],
-        success_url: `${frontendUrl}/settings?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${frontendUrl}/pricing?payment=canceled`,
-        metadata: {
-          studyhub_user_id: String(userId),
-          plan: selectedPlan,
-          student_discount: 'true',
-        },
-        subscription_data: {
+      const session = await stripe.checkout.sessions.create(
+        {
+          customer: customerId,
+          mode: 'subscription',
+          payment_method_types: ['card'],
+          line_items: [{ price: planDef.stripePriceId, quantity: 1 }],
+          discounts: [{ coupon: coupon.id }],
+          success_url: `${frontendUrl}/settings?payment=success&session_id={CHECKOUT_SESSION_ID}`,
+          cancel_url: `${frontendUrl}/pricing?payment=canceled`,
           metadata: {
             studyhub_user_id: String(userId),
             plan: selectedPlan,
+            student_discount: 'true',
+          },
+          subscription_data: {
+            metadata: {
+              studyhub_user_id: String(userId),
+              plan: selectedPlan,
+            },
           },
         },
-      })
+        {
+          idempotencyKey: service.buildStripeIdempotencyKey(
+            'checkout.studentDiscount',
+            userId,
+            selectedPlan,
+          ),
+        },
+      )
 
       res.json({ url: session.url, discount: '20%' })
     } catch (error) {
