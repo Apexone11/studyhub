@@ -7,6 +7,7 @@ const { SHEET_STATUS, AUTHOR_SELECT, leaderboardLimiter } = require('./sheets.co
 const { serializeSheet } = require('./sheets.serializer')
 const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
 const { searchSheetsFTS } = require('../../lib/fullTextSearch')
+const courseAliasing = require('../../lib/courseAliasing')
 const { cache } = require('../../lib/cache')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 /* RISK_TIER removed — sheet listings no longer filter by htmlRiskTier
@@ -136,6 +137,18 @@ router.get('/', optionalAuth, async (req, res) => {
     const sheetTextSearchClauses = buildSheetTextSearchClauses(search)
     if (sheetTextSearchClauses.length) {
       where.OR = sheetTextSearchClauses
+      // G2-4 — also surface sheets whose course is a cross-school equivalent of
+      // the searched topic (e.g. "intro programming" -> CMSC131 + CS61A sheets).
+      // No-op when flag_course_aliasing is off or the query matches no topic;
+      // a school-scoped query (where.course.schoolId set) still constrains the
+      // result, so this only widens cross-school searches.
+      const expandedCourseIds = await courseAliasing.expandQueryToCourseIds(search, {
+        userId: req.user?.userId,
+        role: req.user?.role,
+      })
+      if (expandedCourseIds.length) {
+        where.OR.push({ courseId: { in: expandedCourseIds } })
+      }
     }
 
     const allowedSort = ['createdAt', 'stars', 'downloads', 'forks', 'updatedAt', 'recommended']

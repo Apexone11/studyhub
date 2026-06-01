@@ -79,6 +79,9 @@ const mocks = vi.hoisted(() => ({
     AUTHOR_SELECT: { id: true, username: true, avatarUrl: true, isStaffVerified: true },
     leaderboardLimiter: (_req, _res, next) => next(),
   },
+  courseAliasing: {
+    expandQueryToCourseIds: vi.fn().mockResolvedValue([]),
+  },
 }))
 
 const mockTargets = new Map([
@@ -91,6 +94,9 @@ const mockTargets = new Map([
   [require.resolve('../src/lib/sheetSearch'), mocks.sheetSearch],
   [require.resolve('../src/lib/fullTextSearch'), mocks.fullTextSearch],
   [require.resolve('../src/lib/cache'), mocks.cache],
+  // G2-4 search expansion — stub to a no-op so the search tests don't attempt
+  // a real flag/prisma round-trip (the controller calls expandQueryToCourseIds).
+  [require.resolve('../src/lib/courseAliasing'), mocks.courseAliasing],
 ])
 
 const originalModuleLoad = Module._load

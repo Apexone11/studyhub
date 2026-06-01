@@ -17,6 +17,7 @@ const bcrypt = require('bcryptjs')
 const { createPrismaClient } = require('../src/lib/prisma')
 const { assertLocalDatabase } = require('./assertLocalDatabase')
 const { seedFeatureFlags } = require('./seedFeatureFlags')
+const { seedCourseAliases } = require('./seedCourseAliases')
 const { extractPreviewText } = require('../src/lib/sheets/extractPreviewText')
 
 require('dotenv').config({ path: path.resolve(__dirname, '..', '.env') })
@@ -707,6 +708,7 @@ async function main() {
   await seedSheetsGridFixture(studentUsers)
   await seedCreatorAuditConsent(users)
   await seedAchievementsV2(users)
+  await seedCourseAliases(prisma)
   await seedFeatureFlags(prisma)
 
   console.log('Local beta users are ready:')

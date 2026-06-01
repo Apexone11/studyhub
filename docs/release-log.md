@@ -28,6 +28,14 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.23 — Self-learner Explore (G2-3) + Course aliasing (G2-4) (2026-05-31)
+
+Two cross-school discovery features, research-upgraded (CIP taxonomy, pg_trgm, GitHub-Explore patterns), both behind fail-closed flags + seeded for the local demo. Backend 3,503/3,503 + frontend 873/873 green; lint + build clean.
+
+- **Course aliasing (G2-4).** New `CourseAlias` + `TopicCanonical` (CIP-coded) tables map many school-specific courses to one topic, so searching "intro programming" surfaces CMSC131 + CS61A + 6.0001 sheets together (Postgres `pg_trgm` fuzzy match, GIN-indexed). The Sheets browse page shows an "Equivalent at other schools" card when filtered to a single course. New endpoints `GET /api/courses/topics` + `GET /api/courses/:id/equivalents`; topic expansion wired into `/api/sheets` search. Curated ~15-topic seed (`seedCourseAliases.js`). Gated by `flag_course_aliasing` (search/equivalents fall back to literal matching when off).
+- **Self-learner Explore (G2-3).** New `/explore` page — a cross-school discovery surface with topic chips (shared `TopicCanonical` catalog), a "Trending this week" shelf, and Sheets / Notes / Study-groups shelves. Backend `/api/explore/{sheets,trending,notes,study-groups,topics}` is read-only, block-filtered, bounded (`parseBoundedInt`), and gated by `flag_explore_tab` (fail-closed 503). Sidebar "Explore" entry added.
+- Tests: `courseAliasing` (21), `courses.equivalents` (7), `explore.routes` (15) backend; `ExplorePage` (3) + `CourseEquivalents` (6) frontend. Both flags added to `SHIPPED_DESIGN_V2_FLAGS`; `seedCourseAliases` runs in the `seed:beta` chain; `ecosystem.md` updated with both modules + interconnections.
+
 ### Wave-12.22 — 10-loop adversarial audit fixes (2026-05-31)
 
 A 10-round adversarially-verified audit (128 sub-agents, every finding confirmed by 3 independent skeptics) surfaced 36 + 3 findings; ~33 fixed here across 9 disjoint areas. Backend 3,460/3,460 + frontend 864/864 green; lint + build clean. 3 P3 findings deliberately deferred with rationale (`docs/internal/plans/audit-2026-05-31-backlog.md`).

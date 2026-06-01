@@ -8,6 +8,11 @@ For internal cycle-by-cycle release notes, see `docs/release-log.md` (tracked) a
 
 ## [Unreleased]
 
+### Added (2026-05-31 — cross-school discovery, wave-12.23)
+
+- **Self-learner Explore (`/explore`).** A cross-school discovery page — topic chips, a "Trending this week" shelf, and Sheets / Notes / Study-groups shelves drawn from every school. Read-only, block-filtered, behind `flag_explore_tab` (fail-closed). Backend: `GET /api/explore/{sheets,trending,notes,study-groups,topics}`.
+- **Course aliasing — "Equivalent at other schools."** A curated, CIP-coded topic taxonomy (`CourseAlias` + `TopicCanonical`) maps equivalent courses across schools, so searching "intro programming" surfaces every school's version (Postgres `pg_trgm` fuzzy match), and the Sheets page shows equivalents when you filter to one course. Behind `flag_course_aliasing`. Backend: `GET /api/courses/topics`, `GET /api/courses/:id/equivalents`.
+
 ### Security (2026-05-31 — 10-loop adversarial audit fixes, wave-12.22)
 
 - **Private study-group content is now gated on _active_ membership.** Pending (un-approved) and banned members could previously read and post in private-group discussions/resources/sessions; a new `requireActiveGroupMember` guard closes it, and replies/upvotes to hidden (removed / pending-approval) posts are blocked.

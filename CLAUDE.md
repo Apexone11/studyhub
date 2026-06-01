@@ -533,6 +533,7 @@ Tables with migrations (safe to query):
 - StudyGroup trust & safety (moderation, mute, strikes, GroupReport, GroupAppeal, GroupAuditLog, GroupBlock) — migration `20260409000002_add_group_trust_and_safety` (rewritten 2026-05-04 with full `IF NOT EXISTS` / `DO $$ EXCEPTION WHEN duplicate_object` guards per CLAUDE.md A5 — closes Bug A "Failed to load groups").
 - Hub AI v2 + library weekly sync — migration `20260504000001_hub_ai_v2_and_library_sync`. Adds `AiAttachment`, `UserAiStorageQuota`, `AiGlobalSpendDay`, `AiUploadIdempotency`, `LibrarySyncState` tables + `AiMessage.attachments` + `AiUsageLog.{documentCount,tokensIn,tokensOut,documentTokens,costUsdCents}`.
 - Scholar v1 + v1.5 — migration `20260504000002_scholar_v15`. Adds `ScholarPaper`, `ScholarPaperSearchCache`, `ScholarAnnotation`, `ScholarDiscussionThread` + `ShelfBook.sourceType` / `paperId`.
+- Course aliasing (G2-4) — migration `20260531000001_course_aliases`. Adds `CourseAlias` + `TopicCanonical` (CIP-coded topic taxonomy) + the `pg_trgm` extension and a GIN trigram index on `TopicCanonical.displayName`. Powers cross-school search expansion + "Equivalent at other schools". (G2-3 Explore is read-only over existing tables — no new tables.)
 
 ## Internal Documentation Layout (added 2026-04-30)
 

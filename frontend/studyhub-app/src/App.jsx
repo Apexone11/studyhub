@@ -26,6 +26,7 @@ const DisclaimerPage = lazy(() => import('./pages/legal/DisclaimerPage'))
 const DataRequestPage = lazy(() => import('./pages/legal/DataRequestPage'))
 const FeedPage = lazy(() => import('./pages/feed/FeedPage'))
 const SheetsPage = lazy(() => import('./pages/sheets/SheetsPage'))
+const ExplorePage = lazy(() => import('./pages/explore/ExplorePage'))
 // Design Refresh v2 — Week 2 new pages
 const TeachMaterialsPage = lazy(() => import('./pages/teach/TeachMaterialsPage'))
 const DocsPage = lazy(() => import('./pages/docs/DocsPage').then((m) => ({ default: m.default })))
@@ -515,6 +516,17 @@ function AppRoutes() {
                           element={
                             <PrivateRoute>
                               <SheetsPage />
+                            </PrivateRoute>
+                          }
+                        />
+                        {/* G2-3 — cross-school discovery. Backend /api/explore/*
+                            is fail-closed behind flag_explore_tab and 503s when
+                            off, so the route renders unconditionally. */}
+                        <Route
+                          path="/explore"
+                          element={
+                            <PrivateRoute>
+                              <ExplorePage />
                             </PrivateRoute>
                           }
                         />
