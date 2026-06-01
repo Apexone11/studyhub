@@ -38,12 +38,10 @@ const mocks = vi.hoisted(() => {
         () => (_req, res, next) =>
           state.flagEnabled
             ? next()
-            : res
-                .status(503)
-                .json({
-                  error: 'This feature is temporarily unavailable.',
-                  code: 'SERVICE_UNAVAILABLE',
-                }),
+            : res.status(503).json({
+                error: 'This feature is temporarily unavailable.',
+                code: 'SERVICE_UNAVAILABLE',
+              }),
       ),
     },
     optionalAuth: vi.fn((req, _res, next) => {
@@ -241,11 +239,16 @@ describe('topic filtering', () => {
     expect(mocks.prisma.studySheet.findMany).not.toHaveBeenCalled()
   })
 
-  it('ignores an invalid topic tag (no courseAlias lookup, no course filter)', async () => {
-    await request(app).get('/sheets?topic=Bad Tag')
+  it('an invalid topic tag yields an EMPTY shelf (no leak of all content)', async () => {
+    // A present-but-invalid topic must NOT fall through to an unfiltered query
+    // (which would surface ALL cross-school sheets). topicCourseIds returns []
+    // for an invalid tag, so the shelf short-circuits to [] without touching
+    // courseAlias OR the sheet table.
+    const res = await request(app).get('/sheets?topic=Bad Tag')
+    expect(res.status).toBe(200)
+    expect(res.body.sheets).toEqual([])
     expect(mocks.prisma.courseAlias.findMany).not.toHaveBeenCalled()
-    const args = mocks.prisma.studySheet.findMany.mock.calls[0][0]
-    expect(args.where.courseId).toBeUndefined()
+    expect(mocks.prisma.studySheet.findMany).not.toHaveBeenCalled()
   })
 })
 

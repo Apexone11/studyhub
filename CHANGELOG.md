@@ -8,6 +8,11 @@ For internal cycle-by-cycle release notes, see `docs/release-log.md` (tracked) a
 
 ## [Unreleased]
 
+### Security (2026-05-31 — 2nd audit pass, wave-12.24)
+
+- **Study-group discussion replies now require active membership to edit/delete.** A banned or removed member previously kept the ability to edit or delete their own old replies in a private group (the active-membership gate covered the post handlers but had missed the reply handlers). Now both `updateReply` and `deleteReply` require active membership.
+- Explore hardening: an unrecognized `?topic=` returns an empty result instead of all cross-school content; the feature kill switch drops stale cached content when flipped off; cross-school search expansion no longer runs on the private "my sheets" path; the topic fuzzy-match query now uses the trigram index.
+
 ### Added (2026-05-31 — cross-school discovery, wave-12.23)
 
 - **Self-learner Explore (`/explore`).** A cross-school discovery page — topic chips, a "Trending this week" shelf, and Sheets / Notes / Study-groups shelves drawn from every school. Read-only, block-filtered, behind `flag_explore_tab` (fail-closed). Backend: `GET /api/explore/{sheets,trending,notes,study-groups,topics}`.

@@ -2,8 +2,10 @@
  * ExploreTopicChips — horizontal topic-filter row for the Explore page.
  *
  * The first chip ("All topics") clears the filter. Each topic chip toggles
- * the ?topic=<topicTag> query param. Selected state rides the Chip
- * primitive's `selected` prop (aria-pressed + solid tone background).
+ * the ?topic=<topicTag> query param. aria-pressed lives on the focusable
+ * <button> (so AT announces which filter is active); the nested Chip carries
+ * only the visual selected styling — we suppress its own aria-pressed so the
+ * state isn't announced twice on a non-focusable inner <span>.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import Chip from '../../components/ui/Chip/Chip'
 import { Skeleton } from '../../components/Skeleton'
@@ -36,8 +38,15 @@ export default function ExploreTopicChips({ topics, activeTopic, loading, onSele
         className="explore-page__chip-btn"
         onClick={() => onSelect('')}
         aria-label="Show all topics"
+        aria-pressed={!activeTopic}
       >
-        <Chip variant="pill" tone="neutral" size="sm" selected={!activeTopic}>
+        <Chip
+          variant="pill"
+          tone="neutral"
+          size="sm"
+          selected={!activeTopic}
+          aria-pressed={undefined}
+        >
           All topics
         </Chip>
       </button>
@@ -50,8 +59,15 @@ export default function ExploreTopicChips({ topics, activeTopic, loading, onSele
             className="explore-page__chip-btn"
             onClick={() => onSelect(topic.topicTag)}
             aria-label={`Filter by ${topic.displayName}`}
+            aria-pressed={isActive}
           >
-            <Chip variant="pill" tone="brand" size="sm" selected={isActive}>
+            <Chip
+              variant="pill"
+              tone="brand"
+              size="sm"
+              selected={isActive}
+              aria-pressed={undefined}
+            >
               {topic.displayName}
             </Chip>
           </button>

@@ -31,9 +31,13 @@ async function safeBlockedIds(viewerId) {
 }
 
 // Resolve an optional topicTag to the courseIds it spans (validated against the
-// alias allowlist). null topic => no course constraint.
+// alias allowlist). `null` is reserved for "no topic supplied" => no course
+// constraint. A topic that is present but invalid returns `[]` so callers'
+// `courseIds.length === 0 => return []` branch yields an EMPTY shelf rather
+// than leaking ALL cross-school content for an unrecognized tag.
 async function topicCourseIds(topic) {
-  if (!topic || !courseAliasing.isValidTag(topic)) return null
+  if (!topic) return null
+  if (!courseAliasing.isValidTag(topic)) return []
   const aliases = await prisma.courseAlias.findMany({
     where: { topicTag: topic },
     select: { courseId: true },

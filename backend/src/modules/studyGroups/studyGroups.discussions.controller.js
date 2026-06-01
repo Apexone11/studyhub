@@ -883,6 +883,16 @@ async function updateReply(req, res) {
       return res.status(400).json({ error: 'Invalid IDs.' })
     }
 
+    // Active-membership gate. A banned/removed member keeps their old reply
+    // rows, but must not be able to rewrite them in a private group after
+    // they've been kicked. requireGroupMember returns pending/invited/banned
+    // rows too — gate explicitly on `status === 'active'` (mirrors the
+    // updateDiscussion gate above).
+    const member = await requireGroupMember(groupId, req.user.userId)
+    if (!member || member.status !== 'active') {
+      return res.status(403).json({ error: 'You must be an active member of this group.' })
+    }
+
     const post = await prisma.groupDiscussionPost.findUnique({
       where: { id: postId },
     })
@@ -961,6 +971,16 @@ async function deleteReply(req, res) {
 
     if (groupId === null || postId === null || replyId === null) {
       return res.status(400).json({ error: 'Invalid IDs.' })
+    }
+
+    // Active-membership gate. A banned/removed member keeps their old reply
+    // rows, but must not be able to delete them in a private group after
+    // they've been kicked. requireGroupMember returns pending/invited/banned
+    // rows too — gate explicitly on `status === 'active'` (mirrors the
+    // deleteDiscussion gate above).
+    const member = await requireGroupMember(groupId, req.user.userId)
+    if (!member || member.status !== 'active') {
+      return res.status(403).json({ error: 'You must be an active member of this group.' })
     }
 
     const post = await prisma.groupDiscussionPost.findUnique({

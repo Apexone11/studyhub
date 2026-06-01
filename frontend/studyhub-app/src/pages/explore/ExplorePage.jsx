@@ -75,7 +75,7 @@ export default function ExplorePage() {
 
               {disabled ? (
                 <section className="sh-card sh-card--flat explore-page__shelf">
-                  <div className="explore-page__empty">
+                  <div className="explore-page__empty" role="status">
                     <p className="explore-page__empty-text">
                       Explore is not available right now. Check back soon.
                     </p>
@@ -89,6 +89,8 @@ export default function ExplorePage() {
                     kind="sheet"
                     items={trending.items}
                     loading={trending.loading}
+                    error={trending.error}
+                    onRetry={trending.refetch}
                     activeTopic={activeTopic}
                     onClearTopic={clearTopic}
                   />
@@ -98,6 +100,8 @@ export default function ExplorePage() {
                     kind="sheet"
                     items={sheets.items}
                     loading={sheets.loading}
+                    error={sheets.error}
+                    onRetry={sheets.refetch}
                     activeTopic={activeTopic}
                     onClearTopic={clearTopic}
                   />
@@ -107,6 +111,8 @@ export default function ExplorePage() {
                     kind="note"
                     items={notes.items}
                     loading={notes.loading}
+                    error={notes.error}
+                    onRetry={notes.refetch}
                     activeTopic={activeTopic}
                     onClearTopic={clearTopic}
                   />
@@ -116,6 +122,8 @@ export default function ExplorePage() {
                     kind="group"
                     items={groups.items}
                     loading={groups.loading}
+                    error={groups.error}
+                    onRetry={groups.refetch}
                     activeTopic={activeTopic}
                     onClearTopic={clearTopic}
                   />

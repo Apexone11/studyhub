@@ -350,6 +350,86 @@ describe('Discussions: replies', () => {
   })
 })
 
+describe('Discussions: reply edit/delete membership gate (P2 security)', () => {
+  beforeEach(() => {
+    mocks.prisma.groupDiscussionPost.findUnique.mockResolvedValue(basePost())
+    mocks.prisma.groupDiscussionReply.findUnique.mockResolvedValue({
+      id: 200,
+      postId: 10,
+      userId: 42, // caller authored the reply
+      content: 'old',
+      isAnswer: false,
+    })
+    mocks.prisma.groupDiscussionReply.update.mockImplementation(async ({ data }) => ({
+      id: 200,
+      postId: 10,
+      userId: 42,
+      content: data.content ?? 'old',
+      isAnswer: data.isAnswer ?? false,
+      author: { id: 42, username: 'caller', avatarUrl: null },
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    }))
+    mocks.prisma.groupDiscussionReply.delete.mockResolvedValue({ id: 200 })
+  })
+
+  it('banned member gets 403 on PATCH reply (cannot rewrite their old reply)', async () => {
+    mocks.prisma.studyGroupMember.findUnique.mockResolvedValue({
+      id: 9,
+      role: 'member',
+      status: 'banned',
+      userId: 42,
+      groupId: 1,
+    })
+    const res = await request(app).patch('/groups/1/discussions/10/replies/200').send({
+      content: 'rewritten by banned user',
+    })
+    expect(res.status).toBe(403)
+    expect(mocks.prisma.groupDiscussionReply.update).not.toHaveBeenCalled()
+  })
+
+  it('banned member gets 403 on DELETE reply', async () => {
+    mocks.prisma.studyGroupMember.findUnique.mockResolvedValue({
+      id: 9,
+      role: 'member',
+      status: 'banned',
+      userId: 42,
+      groupId: 1,
+    })
+    const res = await request(app).delete('/groups/1/discussions/10/replies/200')
+    expect(res.status).toBe(403)
+    expect(mocks.prisma.groupDiscussionReply.delete).not.toHaveBeenCalled()
+  })
+
+  it('active member can still edit their own reply', async () => {
+    mocks.prisma.studyGroupMember.findUnique.mockResolvedValue({
+      id: 9,
+      role: 'member',
+      status: 'active',
+      userId: 42,
+      groupId: 1,
+    })
+    const res = await request(app).patch('/groups/1/discussions/10/replies/200').send({
+      content: 'edited reply',
+    })
+    expect(res.status).toBe(200)
+    expect(res.body.content).toBe('edited reply')
+  })
+
+  it('active member can still delete their own reply', async () => {
+    mocks.prisma.studyGroupMember.findUnique.mockResolvedValue({
+      id: 9,
+      role: 'member',
+      status: 'active',
+      userId: 42,
+      groupId: 1,
+    })
+    const res = await request(app).delete('/groups/1/discussions/10/replies/200')
+    expect(res.status).toBe(204)
+    expect(mocks.prisma.groupDiscussionReply.delete).toHaveBeenCalled()
+  })
+})
+
 describe('Discussions: PATCH /:postId (edit window + permissions)', () => {
   beforeEach(() => {
     mocks.prisma.groupDiscussionPost.findUnique.mockResolvedValue(basePost({ userId: 42 }))

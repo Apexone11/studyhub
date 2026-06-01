@@ -141,13 +141,18 @@ router.get('/', optionalAuth, async (req, res) => {
       // the searched topic (e.g. "intro programming" -> CMSC131 + CS61A sheets).
       // No-op when flag_course_aliasing is off or the query matches no topic;
       // a school-scoped query (where.course.schoolId set) still constrains the
-      // result, so this only widens cross-school searches.
-      const expandedCourseIds = await courseAliasing.expandQueryToCourseIds(search, {
-        userId: req.user?.userId,
-        role: req.user?.role,
-      })
-      if (expandedCourseIds.length) {
-        where.OR.push({ courseId: { in: expandedCourseIds } })
+      // result, so this only widens cross-school searches. Skip the expansion
+      // on the `mine=1` (own-sheets) path entirely — it's scoped to the
+      // caller's own userId and can never widen results, so the extra
+      // alias/topic lookups would be wasted work.
+      if (!includeUnpublishedMine) {
+        const expandedCourseIds = await courseAliasing.expandQueryToCourseIds(search, {
+          userId: req.user?.userId,
+          role: req.user?.role,
+        })
+        if (expandedCourseIds.length) {
+          where.OR.push({ courseId: { in: expandedCourseIds } })
+        }
       }
     }
 
@@ -155,7 +160,9 @@ router.get('/', optionalAuth, async (req, res) => {
     const sortCandidate = typeof sort === 'string' && sort.trim() ? sort : orderByParam
     const sortField = allowedSort.includes(sortCandidate) ? sortCandidate : 'createdAt'
     const take = parseBoundedInt(limit, 20, 100)
-    const skip = Math.max(0, Number.parseInt(offset, 10) || 0)
+    // Cap the offset so a hostile/buggy client can't request a multi-million
+    // row skip and force Postgres into an unbounded scan-and-discard.
+    const skip = Math.min(Math.max(0, Number.parseInt(offset, 10) || 0), 5000)
 
     if (starred === '1') {
       if (!req.user) return res.status(401).json({ error: 'Login required.' })

@@ -28,6 +28,14 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.24 — 2nd 10-loop audit fixes (Explore/aliasing hardening) (2026-05-31)
+
+A second 10-round adversarial audit (98 sub-agents, 3-skeptic verification) over the wave-12.23 code confirmed 17 + 2 findings (no P0/P1; the batch-1 fixes all held). Fixed here. Touched files green in isolation; lint + build clean.
+
+- Security (P2): `updateReply` / `deleteReply` on the study-group discussion board were missing the active-membership gate that wave-12.22 added to the other discussion handlers — a banned/removed member could still edit or delete their old replies in a private group. Both now require active membership.
+- Explore hardening: an invalid `?topic=` now returns an empty shelf instead of silently showing all cross-school content; the kill switch drops stale cached shelves when flipped off mid-session; topic chips put `aria-pressed` on the button; loading/empty/error states are announced (`role="status"`/`aria-busy`) and errors render distinctly from "empty" (with retry) instead of being masked; the notes shelf dropped a dead `previewText` prop.
+- Aliasing/perf: cross-school search expansion no longer runs on the private `mine=1` path; `/sheets` offset is capped (deep-pagination guard); the pg_trgm query now uses the `%` operator so the GIN trigram index is actually used; the seed's cross-school demo fallback only aliases genuinely CS-like courses (no more misleading "equivalents").
+
 ### Wave-12.23 — Self-learner Explore (G2-3) + Course aliasing (G2-4) (2026-05-31)
 
 Two cross-school discovery features, research-upgraded (CIP taxonomy, pg_trgm, GitHub-Explore patterns), both behind fail-closed flags + seeded for the local demo. Backend 3,503/3,503 + frontend 873/873 green; lint + build clean.

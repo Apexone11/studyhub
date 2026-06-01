@@ -63,6 +63,9 @@ export default function CourseEquivalents({ courseId }) {
         aria-busy="true"
         style={{ display: 'flex', flexDirection: 'column', gap: 10 }}
       >
+        <div role="status" className="sr-only">
+          Loading equivalent courses…
+        </div>
         <Skeleton width="60%" height={14} />
         <Skeleton width="100%" height={12} />
         <Skeleton width="85%" height={12} />

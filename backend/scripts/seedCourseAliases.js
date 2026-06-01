@@ -186,13 +186,24 @@ async function seedCourseAliases(prisma) {
   // 3) Demo guarantee: ensure at least one topic spans >=2 schools so the
   //    "Equivalent at other schools" view + cross-school search demo render
   //    for beta_student1. If keyword matching didn't produce a cross-school
-  //    topic, alias the first course of each of the two most-populated schools
-  //    to 'cs-intro'.
+  //    topic, alias ONE genuinely-CS-intro course from each of two schools to
+  //    'cs-intro'. We must NOT alias arbitrary courses (e.g. a chemistry
+  //    course) to 'cs-intro' — that produces a misleading "Equivalent at other
+  //    schools" claim and pollutes cross-school search with false matches. If
+  //    no course in >=2 schools plausibly matches the 'cs-intro' keywords, we
+  //    skip the fallback entirely rather than fabricate a bad equivalence.
   const hasCrossSchool = [...topicSchools.values()].some((set) => set.size >= 2)
   if (!hasCrossSchool) {
+    const csIntro = TOPICS.find((t) => t.topicTag === 'cs-intro')
+    const csIntroHay = (course) =>
+      `${course.code} ${course.name} ${course.department || ''}`.toLowerCase()
+    const isCsIntro = (course) => csIntro.match.some((kw) => csIntroHay(course).includes(kw))
+
+    // First plausible cs-intro course per school (insertion order preserves the
+    // id-asc ordering from the findMany above).
     const bySchool = new Map()
     for (const c of courses) {
-      if (!bySchool.has(c.schoolId)) bySchool.set(c.schoolId, c)
+      if (isCsIntro(c) && !bySchool.has(c.schoolId)) bySchool.set(c.schoolId, c)
     }
     const reps = [...bySchool.values()].slice(0, 2)
     if (reps.length >= 2) {
@@ -206,7 +217,12 @@ async function seedCourseAliases(prisma) {
       }
       console.warn(
         `Course-alias seed: keyword matching found no cross-school topic; ` +
-          `aliased ${reps.length} courses across schools to 'cs-intro' for the demo.`,
+          `aliased ${reps.length} genuine cs-intro courses across schools to 'cs-intro' for the demo.`,
+      )
+    } else {
+      console.warn(
+        `Course-alias seed: no cross-school topic and fewer than 2 schools have a ` +
+          `plausible cs-intro course; skipped the demo fallback (no fabricated equivalence).`,
       )
     }
   }

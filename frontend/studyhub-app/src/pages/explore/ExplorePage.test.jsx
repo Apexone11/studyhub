@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { http, HttpResponse } from 'msw'
 import { MemoryRouter } from 'react-router-dom'
@@ -198,12 +198,94 @@ describe('ExplorePage', () => {
     expect(resetButtons.length).toBeGreaterThan(0)
     await user.click(resetButtons[0])
 
-    // After reset, the All-topics chip is the pressed one.
+    // After reset, the All-topics chip is the pressed one. aria-pressed lives
+    // on the focusable button, not the inner Chip span.
     await waitFor(() => {
-      const allChip = within(screen.getByRole('button', { name: 'Show all topics' })).getByText(
-        'All topics',
-      )
-      expect(allChip).toHaveAttribute('aria-pressed', 'true')
+      const allButton = screen.getByRole('button', { name: 'Show all topics' })
+      expect(allButton).toHaveAttribute('aria-pressed', 'true')
     })
+  })
+
+  it('reflects the active topic via aria-pressed on the topic button', async () => {
+    installHandlers()
+    const user = userEvent.setup()
+    renderPage()
+
+    const calcButton = await screen.findByRole('button', { name: 'Filter by Calculus' })
+    // Initially "All topics" is pressed and no topic button is.
+    expect(screen.getByRole('button', { name: 'Show all topics' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    )
+    expect(calcButton).toHaveAttribute('aria-pressed', 'false')
+
+    await user.click(calcButton)
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Filter by Calculus' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      )
+    })
+    expect(screen.getByRole('button', { name: 'Show all topics' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    )
+  })
+
+  it('shows the disabled panel when the trending endpoint 503s (flag off)', async () => {
+    server.use(
+      http.get(`${API}/api/courses/topics`, () => topicsResponse()),
+      http.get(`${API}/api/explore/trending`, () => new HttpResponse(null, { status: 503 })),
+      http.get(`${API}/api/explore/sheets`, () => new HttpResponse(null, { status: 503 })),
+      http.get(`${API}/api/explore/notes`, () => new HttpResponse(null, { status: 503 })),
+      http.get(`${API}/api/explore/study-groups`, () => new HttpResponse(null, { status: 503 })),
+    )
+    renderPage()
+
+    expect(
+      await screen.findByText('Explore is not available right now. Check back soon.'),
+    ).toBeInTheDocument()
+    // No shelf headings render when the surface is disabled.
+    expect(screen.queryByRole('heading', { name: /Trending this week/ })).not.toBeInTheDocument()
+  })
+
+  it('shows a per-shelf error affordance with a retry when one shelf fails', async () => {
+    let trendingCalls = 0
+    server.use(
+      http.get(`${API}/api/courses/topics`, () => topicsResponse()),
+      // Trending stays healthy so the surface is not treated as disabled.
+      http.get(`${API}/api/explore/trending`, ({ request }) => {
+        const topic = new URL(request.url).searchParams.get('topic') || ''
+        return shelfResponses(topic).trending
+      }),
+      // Sheets fails the first time, then succeeds on retry.
+      http.get(`${API}/api/explore/sheets`, ({ request }) => {
+        trendingCalls += 1
+        if (trendingCalls === 1) return new HttpResponse(null, { status: 500 })
+        const topic = new URL(request.url).searchParams.get('topic') || ''
+        return shelfResponses(topic).sheets
+      }),
+      http.get(`${API}/api/explore/notes`, ({ request }) => {
+        const topic = new URL(request.url).searchParams.get('topic') || ''
+        return shelfResponses(topic).notes
+      }),
+      http.get(`${API}/api/explore/study-groups`, ({ request }) => {
+        const topic = new URL(request.url).searchParams.get('topic') || ''
+        return shelfResponses(topic).groups
+      }),
+    )
+    const user = userEvent.setup()
+    renderPage()
+
+    // The failed sheets shelf shows the distinct error copy, not the empty copy.
+    expect(await screen.findByText("Couldn't load this section.")).toBeInTheDocument()
+
+    // Retry refetches and the shelf recovers.
+    await user.click(screen.getByRole('button', { name: 'Try again' }))
+    expect(await screen.findByRole('link', { name: /Explore Sheet/ })).toHaveAttribute(
+      'href',
+      '/sheets/21',
+    )
   })
 })

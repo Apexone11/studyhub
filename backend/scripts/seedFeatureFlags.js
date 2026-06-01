@@ -92,7 +92,7 @@ const SHIPPED_DESIGN_V2_FLAGS = [
   'flag_course_aliasing',
   // G2-3 Self-learner Explore — shipped 2026-05-31. Cross-school /explore
   // discovery (sheets/notes/groups), topic chips (shared TopicCanonical),
-  // "trending this week". Off => /api/explore/* returns 404 at the gate.
+  // "trending this week". Off => /api/explore/* returns 503 at the gate.
   'flag_explore_tab',
 ]
 

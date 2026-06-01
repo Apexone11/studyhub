@@ -58,15 +58,20 @@ export default function useExploreData(activeTopic = '') {
 
   const topics = useMemo(() => topicsState.data?.topics || [], [topicsState.data])
 
-  // The Explore surface is fail-closed: when flag_explore_tab is off every
-  // shelf 503s. We treat that as "feature disabled" rather than an error
+  // The Explore surface is fail-closed: when flag_explore_tab is flipped off
+  // every shelf 503s. We treat that as "feature disabled" rather than an error
   // banner, since it's an expected, founder-controlled state.
-  const disabled = useMemo(() => {
-    const states = [trendingState, sheetsState, notesState, groupsState]
-    const anyErrored = states.some((s) => s.error)
-    const anyData = states.some((s) => s.data)
-    return anyErrored && !anyData
-  }, [trendingState, sheetsState, notesState, groupsState])
+  //
+  // The gate is the trending endpoint's FRESH error signal — NOT "no data
+  // anywhere." useFetch keeps previously-fetched data painted across a
+  // revalidate (keepPreviousData), so a flag flipped off mid-session leaves
+  // stale shelf data in place; keying `disabled` off "no data" would let that
+  // killed content keep showing. A live error on trending means the surface is
+  // gone, so we disable regardless of any stale shelves still in memory.
+  const disabled = useMemo(
+    () => Boolean(trendingState.error) && !trendingState.loading,
+    [trendingState.error, trendingState.loading],
+  )
 
   return {
     topics,
@@ -75,21 +80,25 @@ export default function useExploreData(activeTopic = '') {
       items: trendingState.data?.sheets || [],
       loading: trendingState.loading,
       error: trendingState.error,
+      refetch: trendingState.refetch,
     },
     sheets: {
       items: sheetsState.data?.sheets || [],
       loading: sheetsState.loading,
       error: sheetsState.error,
+      refetch: sheetsState.refetch,
     },
     notes: {
       items: notesState.data?.notes || [],
       loading: notesState.loading,
       error: notesState.error,
+      refetch: notesState.refetch,
     },
     groups: {
       items: groupsState.data?.groups || [],
       loading: groupsState.loading,
       error: groupsState.error,
+      refetch: groupsState.refetch,
     },
     disabled,
   }

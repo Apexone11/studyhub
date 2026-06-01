@@ -63,12 +63,24 @@ async function resolveTopicTags(query) {
     if (exact) tags.add(exact.topicTag)
   }
 
-  // 2) fuzzy displayName match (pg_trgm), graceful fallback to ILIKE contains
+  // 2) fuzzy displayName match (pg_trgm), graceful fallback to ILIKE contains.
+  //
+  // The `%` operator is the index seek: it consults the GIN trigram index on
+  // "displayName" and returns rows whose similarity clears
+  // pg_trgm.similarity_threshold (default 0.3, which equals FUZZY_THRESHOLD).
+  // A bare `similarity(...) > 0.3` filter can NOT use the index — it computes
+  // the score for every row — so we anchor on `%` for the index seek and keep
+  // the explicit `similarity(...) > FUZZY_THRESHOLD` guard so the threshold
+  // stays pinned to our constant even if the DB default ever drifts.
+  // `similarity(...)` in ORDER BY is fine (only sorts the already-narrowed set).
+  // SET LOCAL won't survive outside a transaction in this autocommit $queryRaw
+  // context, so we pin the threshold via the explicit guard rather than a GUC.
   try {
     const rows = await prisma.$queryRaw`
       SELECT "topicTag"
       FROM "TopicCanonical"
-      WHERE similarity("displayName", ${raw}) > ${FUZZY_THRESHOLD}
+      WHERE "displayName" % ${raw}
+        AND similarity("displayName", ${raw}) > ${FUZZY_THRESHOLD}
       ORDER BY similarity("displayName", ${raw}) DESC
       LIMIT ${MAX_TOPICS_PER_QUERY}
     `
