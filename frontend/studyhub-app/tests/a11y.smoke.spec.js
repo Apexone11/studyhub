@@ -60,10 +60,22 @@ for (const page of PUBLIC_PAGES) {
       console.error(
         `[a11y:${page.name}] ${blocking.length} blocking violation(s):\n` +
           blocking
-            .map(
-              (v) =>
-                `  - ${v.id} (${v.impact}): ${v.help}\n    ${v.helpUrl}\n    ${v.nodes.length} node(s)`,
-            )
+            .map((v) => {
+              // Print the offending selector + the actual/required contrast
+              // colors per node. A bare rule name + count isn't actionable
+              // in CI logs — you can't fix a contrast bug you can't locate.
+              const nodes = v.nodes
+                .map((n) => {
+                  const data = n.any?.find((c) => c.id === v.id)?.data
+                  const contrast =
+                    data && data.fgColor
+                      ? ` [fg=${data.fgColor} bg=${data.bgColor} ratio=${data.contrastRatio} need=${data.expectedContrastRatio}]`
+                      : ''
+                  return `      ${n.target.join(' ')}${contrast}`
+                })
+                .join('\n')
+              return `  - ${v.id} (${v.impact}): ${v.help}\n    ${v.helpUrl}\n    ${v.nodes.length} node(s):\n${nodes}`
+            })
             .join('\n'),
       )
     }

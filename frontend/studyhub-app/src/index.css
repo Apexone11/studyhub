@@ -129,7 +129,10 @@
   --sh-text: #1a1a1a;
   --sh-heading: #111111;
   --sh-subtext: #5a5a5a;
-  --sh-muted: #8a8a8a;
+  /* #6b6b6b clears WCAG AA (4.5:1) on white, paper (#faf9f7), and warm
+     paper (#f6f5f2); the prior #8a8a8a was ~3.3:1 and failed the a11y gate
+     on every muted-text surface. */
+  --sh-muted: #6b6b6b;
 
   /* ── Brand ───────────────────────────────────────────────────────── */
   --sh-brand: #2563eb;
@@ -245,7 +248,9 @@
   --sh-footer-dark-bg: #0f172a;
   --sh-footer-dark-text: #ffffff;
   --sh-footer-dark-muted: rgba(255, 255, 255, 0.46);
-  --sh-footer-dark-copy: rgba(255, 255, 255, 0.25);
+  /* 0.62 alpha over the #0f172a footer composites to ~4.7:1; the prior 0.25
+     rendered ~2.2:1 and failed AA for the footer copyright line. */
+  --sh-footer-dark-copy: rgba(255, 255, 255, 0.62);
 
   /* ── Extended accent families ──────────────────────────────────── */
   --sh-neutral-soft-bg: #f1f5f9;
@@ -411,7 +416,7 @@
   --sh-nav-accent: #a0a0a0;
   --sh-nav-search-bg: #2a2a2a;
   --sh-nav-search-border: #3a3a3a;
-  --sh-nav-search-text: #6b6b6b;
+  --sh-nav-search-text: #a8a8a8;
   --sh-nav-tab-active: #2563eb;
   --sh-nav-badge-bg: #dc2626;
 
@@ -605,7 +610,7 @@
   --sh-nav-accent: #a0a0a0;
   --sh-nav-search-bg: #1c1c1c;
   --sh-nav-search-border: #2a2a2a;
-  --sh-nav-search-text: #6b6b6b;
+  --sh-nav-search-text: #a8a8a8;
   --sh-nav-tab-active: #60a5fa;
   --sh-nav-badge-bg: #dc2626;
 
@@ -2822,7 +2827,9 @@ textarea.sh-input {
 }
 
 .home-footer-logo-text span {
-  color: var(--sh-brand);
+  /* Brand blue (#2563eb) is only ~3.4:1 on the dark #0f172a footer; the
+     lighter brand-border blue clears AA while keeping the accent. */
+  color: var(--sh-brand-border);
 }
 
 .home-footer-links {
@@ -3134,7 +3141,9 @@ textarea.sh-input {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--sh-slate-400);
+  /* slate-400 (#94a3b8) is ~2.6:1 on white — fails AA. Muted (#6b6b6b)
+     reads as a kicker label and clears 4.5:1. */
+  color: var(--sh-muted);
   margin-bottom: 12px;
 }
 
@@ -3711,7 +3720,8 @@ textarea.sh-input {
   font-size: 10px;
   font-weight: 600;
   font-family: inherit;
-  color: #94a3b8;
+  /* #94a3b8 on #f1f5f9 is ~2.3:1; slate-600 clears AA for the shortcut hint. */
+  color: #475569;
   background: #f1f5f9;
   border: 1px solid #e2e8f0;
   border-radius: 5px;

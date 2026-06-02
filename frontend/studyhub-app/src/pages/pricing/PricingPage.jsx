@@ -1559,7 +1559,9 @@ const c = {
     top: 16,
     right: 16,
     background: 'var(--sh-brand-soft)',
-    color: 'var(--sh-brand)',
+    // brand (#2563eb) on brand-soft (#dbeafe) is 4.23:1 — just under AA;
+    // brand-hover (#1d4ed8) clears it.
+    color: 'var(--sh-brand-hover)',
     fontSize: 11,
     fontWeight: 700,
     padding: '4px 12px',
