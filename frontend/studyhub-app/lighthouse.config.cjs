@@ -4,6 +4,14 @@
 module.exports = {
   ci: {
     collect: {
+      // Serve the built app ourselves. The CI job only runs `vite build`, so
+      // without this the URL below hit a dead port and Lighthouse aborted with
+      // CHROME_INTERSTITIAL ("server is not responding"). `vite preview` serves
+      // dist/ on 4173 (preview.port in vite.config). The action runs from the
+      // repo root, hence the --prefix.
+      startServerCommand: 'npm --prefix frontend/studyhub-app run preview',
+      startServerReadyPattern: 'Local:',
+      startServerReadyTimeout: 30000,
       url: ['http://localhost:4173/'],
       numberOfRuns: 3,
       settings: {

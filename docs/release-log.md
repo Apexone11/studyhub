@@ -28,6 +28,11 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.27 — accessibility contrast fixes + green a11y/Lighthouse CI (2026-06-02)
+
+- Fixed WCAG 2.1 AA color-contrast failures across every public page (home, login, register, all legal pages, pricing, about, AI/Scholar/Library landings). Darkened the muted-text token and the keyboard-hint, legal-kicker, and footer-copy colors; lightened the brand wordmark on the dark nav/footer; switched the About roadmap headers and pricing "coming soon" tag to AA-passing color variants; underlined the in-text email link on the data-request page (links can't rely on color alone). All 13 a11y smoke pages now pass. The a11y test now logs the failing selector + colors so future regressions are diagnosable.
+- Fixed the Lighthouse `accessibility` Quality Gate, which had aborted with `CHROME_INTERSTITIAL_ERROR`: the job built the app but never served it, so Lighthouse hit a dead port. The config now starts `vite preview` itself before auditing.
+
 ### Wave-12.26 — profile photos survive redeploys (upload self-heal) (2026-06-02)
 
 - Fixed user avatars and cover images disappearing after every deploy. Avatars/covers are stored on the server's upload volume; when that volume isn't persistent (e.g. after a service migration) a redeploy wiped them while the database still referenced them. Boot-time self-heal now re-hydrates any missing files from the R2 backup on startup (`uploadVolumeRestore.js`), the first backup pass now runs minutes after boot instead of 24h later, and running on ephemeral storage in production now raises a loud error + Sentry alert instead of a silent log. Operator recovery steps documented in `RUNBOOK_DB_RESTORE.md`.
