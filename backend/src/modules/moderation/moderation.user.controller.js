@@ -267,9 +267,12 @@ router.post('/reports', reportLimiter, async (req, res) => {
         targetType === 'sheet'
           ? excerpt.length > 0 // published sheets always have content
           : targetType === 'note'
-            ? !!(
-                await prisma.note.findUnique({ where: { id: targetId }, select: { private: true } })
-              )?.private === false
+            ? // Public iff the note exists AND is not private. A missing note
+              // (null) yields undefined === false -> false (not public). The
+              // earlier `!!(...)?.private === false` form inverted that: a null
+              // note coerced to false === false -> true (wrongly "public").
+              (await prisma.note.findUnique({ where: { id: targetId }, select: { private: true } }))
+                ?.private === false
             : false
 
       const reportPriority = classifyReportPriority({

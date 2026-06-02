@@ -28,6 +28,11 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.28 — repair GDPR data export + moderation report priority (2026-06-02)
+
+- Fixed the "Download my data" (GDPR Art. 20 / CCPA) export, which was returning a 500 for every user: it queried Prisma models/fields that don't exist (`contribution`/`star`/`preferences` and several wrong column names). Corrected to the real schema. Each section now loads resiliently — a failure on one sub-query is logged (server-side) and the export still ships, flagged `partial` with the affected section names, instead of either 500-ing the whole download or silently presenting incomplete data as complete.
+- Fixed a moderation-report priority bug where a report targeting a since-deleted note was misclassified as targeting public content.
+
 ### Wave-12.27 — accessibility contrast fixes + green a11y/Lighthouse CI (2026-06-02)
 
 - Fixed WCAG 2.1 AA color-contrast failures across every public page (home, login, register, all legal pages, pricing, about, AI/Scholar/Library landings). Darkened the muted-text token and the keyboard-hint, legal-kicker, and footer-copy colors; lightened the brand wordmark on the dark nav/footer; switched the About roadmap headers and pricing "coming soon" tag to AA-passing color variants; underlined the in-text email link on the data-request page (links can't rely on color alone). All 13 a11y smoke pages now pass. The a11y test now logs the failing selector + colors so future regressions are diagnosable.
