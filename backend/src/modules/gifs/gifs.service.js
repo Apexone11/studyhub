@@ -16,6 +16,26 @@ const log = require('../../lib/logger')
 
 const GIPHY_BASE = 'https://api.giphy.com/v1/gifs'
 const GIPHY_TIMEOUT_MS = 5000
+// Cap the response body at 1 MB. The GIPHY API only returns JSON metadata;
+// anything larger is either a misconfigured upstream, a redirect to an
+// attacker-controlled host, or a cache-poisoning attempt. Bounding the read
+// prevents memory exhaustion (SSRF defense in depth alongside the manual
+// redirect re-validation below).
+const GIPHY_FETCH_MAX_BYTES = 1 * 1024 * 1024
+
+// Hosts we trust to issue the JSON API response. Distinct from
+// GIPHY_MEDIA_HOSTS (which guards the media URLs embedded in the response).
+const GIPHY_API_HOSTS = new Set(['api.giphy.com', 'media.giphy.com'])
+
+function isAllowedGiphyApiUrl(url) {
+  if (typeof url !== 'string' || !url) return false
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:' && GIPHY_API_HOSTS.has(parsed.hostname.toLowerCase())
+  } catch {
+    return false
+  }
+}
 
 function getGiphyKey() {
   // Read TENOR_API_KEY as a legacy fallback so a Railway env that still
@@ -106,13 +126,63 @@ async function fetchGiphy(path, params, { signal } = {}) {
   const timeout = setTimeout(() => controller.abort(), GIPHY_TIMEOUT_MS)
   if (signal) signal.addEventListener('abort', () => controller.abort(), { once: true })
   try {
-    const response = await fetch(url, { signal: controller.signal, redirect: 'follow' })
+    // SSRF defense: redirect:'manual' so we re-validate the host on any 3xx
+    // before issuing a follow-up fetch. Without this, an upstream redirect
+    // (or cache-poisoning attempt) could send us to an attacker-controlled
+    // host that our outbound network can reach.
+    let response = await fetch(url, { signal: controller.signal, redirect: 'manual' })
+    if (response.status >= 300 && response.status < 400) {
+      const location = response.headers.get('location') || ''
+      const nextUrl = (() => {
+        try {
+          return new URL(location, url).toString()
+        } catch {
+          return ''
+        }
+      })()
+      if (!isAllowedGiphyApiUrl(nextUrl)) {
+        const err = new Error('GIPHY redirected to an untrusted host.')
+        err.statusCode = 502
+        throw err
+      }
+      response = await fetch(nextUrl, { signal: controller.signal, redirect: 'manual' })
+    }
     if (!response.ok) {
       const err = new Error(`GIPHY responded ${response.status}.`)
       err.statusCode = response.status >= 500 ? 502 : 400
       throw err
     }
-    const data = await response.json()
+    // Read the body with a size cap. fetch().json() reads unbounded, which
+    // lets a redirected/poisoned response exhaust memory. Stream the body,
+    // abort once we cross GIPHY_FETCH_MAX_BYTES. Tests that mock fetch
+    // without a streaming body fall through to response.json() — they
+    // can't exceed the cap anyway because the mock controls the payload.
+    const reader = response.body?.getReader?.()
+    let data
+    if (reader) {
+      const chunks = []
+      let received = 0
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        received += value.byteLength
+        if (received > GIPHY_FETCH_MAX_BYTES) {
+          try {
+            await reader.cancel()
+          } catch {
+            // ignore — we're aborting anyway
+          }
+          const err = new Error('GIPHY response exceeded size cap.')
+          err.statusCode = 502
+          throw err
+        }
+        chunks.push(value)
+      }
+      const bodyText = Buffer.concat(chunks.map((c) => Buffer.from(c))).toString('utf8')
+      data = bodyText ? JSON.parse(bodyText) : null
+    } else {
+      data = await response.json()
+    }
     const results = Array.isArray(data?.data) ? data.data : []
     return results.map(normalizeMediaItem).filter(Boolean)
   } catch (error) {

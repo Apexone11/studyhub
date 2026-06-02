@@ -9,6 +9,7 @@ import { IconBook, IconSheets, IconStar } from '../../components/Icons'
 import StudyStatusChip from '../../components/StudyStatusChip'
 import UserAvatar from '../../components/UserAvatar'
 import { resolveImageUrl } from '../../lib/imageUrls'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 import { FONT, cardStyle, sectionHeadingStyle, pillStyle } from './profileConstants'
 
 const AVATAR_RETRY_DELAY_MS = 30000
@@ -715,9 +716,15 @@ export function EnrolledCoursesSection({ enrollments }) {
 
 /* ── Follow list modal ──────────────────────────────────────────────────── */
 export function FollowModal({ followModal, followList, followListLoading, onClose }) {
+  // Focus trap + Escape-to-close + scroll-lock. The ref is attached only
+  // while the modal is mounted (followModal truthy), matching the
+  // ConflictCompareModal / NoteVersionDiff pattern. Hooks must run before
+  // the early return, so trap with active gated on `followModal`.
+  const focusTrapRef = useFocusTrap({ active: Boolean(followModal), onClose })
   if (!followModal) return null
   return (
     <div
+      ref={focusTrapRef}
       onClick={onClose}
       style={{
         position: 'fixed',
@@ -732,6 +739,9 @@ export function FollowModal({ followModal, followList, followListLoading, onClos
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label={followModal === 'followers' ? 'Followers' : 'Following'}
         style={{
           background: 'var(--sh-surface)',
           borderRadius: 18,

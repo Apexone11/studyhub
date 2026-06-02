@@ -171,7 +171,10 @@ router.post('/:messageId/poll/vote', requireAuth, messagingWriteLimiter, async (
       return sendError(res, 400, 'Option ID required.', ERROR_CODES.BAD_REQUEST)
     }
 
-    const optionIdNum = parseInt(optionId, 10)
+    const optionIdNum = Number.parseInt(optionId, 10)
+    if (!Number.isInteger(optionIdNum) || optionIdNum < 1) {
+      return sendError(res, 400, 'Invalid option id.', ERROR_CODES.BAD_REQUEST)
+    }
 
     // Verify the user is a participant in the conversation
     const verified = await verifyMessageParticipant(req, res, messageId)

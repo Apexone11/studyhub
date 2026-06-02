@@ -178,7 +178,10 @@ const addPinnedSheet = async (req, res) => {
 
 // ── DELETE /api/users/me/pinned-sheets/:sheetId ──────────────
 const deletePinnedSheet = async (req, res) => {
-  const sheetId = Number(req.params.sheetId)
+  const sheetId = Number.parseInt(req.params.sheetId, 10)
+  if (!Number.isInteger(sheetId) || sheetId < 1) {
+    return sendError(res, 400, 'Invalid sheet ID.', ERROR_CODES.BAD_REQUEST)
+  }
   try {
     await prisma.userPinnedSheet.deleteMany({
       where: { userId: req.user.userId, sheetId },

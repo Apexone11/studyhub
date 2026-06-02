@@ -223,8 +223,19 @@ function createPrismaMock() {
     aiConversation: {
       deleteMany: createDeleteManyMock(),
     },
-    // Hub AI v2 + Scholar models — added to deleteUserAccount.js for
-    // GDPR Art. 17 erasure (L13-HIGH-1). Unmocked → TypeError on tx.X.
+  }
+
+  const prisma = {
+    subscription: {
+      findUnique: vi.fn(async () => ({
+        stripeSubscriptionId: 'sub_123',
+        status: 'active',
+      })),
+    },
+    // Hub AI v2 + Scholar models — maybe-missing tables. The R2-key read
+    // runs on `prisma` BEFORE the transaction; the explicit deletes run on
+    // `prisma` AFTER the transaction commits (their own try/catch). A
+    // rejection here must not abort the core erasure (L13-HIGH-1).
     aiAttachment: {
       findMany: vi.fn().mockResolvedValue([]),
       deleteMany: createDeleteManyMock(),
@@ -242,15 +253,6 @@ function createPrismaMock() {
       // Soft-deleted not hard-deleted — preserves the discussion thread
       // for other participants but blanks the author's contribution.
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
-    },
-  }
-
-  const prisma = {
-    subscription: {
-      findUnique: vi.fn(async () => ({
-        stripeSubscriptionId: 'sub_123',
-        status: 'active',
-      })),
     },
     $transaction: vi.fn(async (fn) => fn(tx)),
   }
@@ -352,5 +354,39 @@ describe('deleteUserAccount', () => {
       'https://cdn.studyhub.test/announcements/9/banner.jpg',
     )
     expect(mocks.r2Storage.deleteObject).toHaveBeenCalledWith('announcements/9/banner.jpg')
+  })
+
+  it('still completes the core erasure when an optional table query rejects', async () => {
+    // Hub AI v2 / Scholar tables may not exist in environments missing the
+    // migration. A rejection from one of those maybe-missing tables must NOT
+    // abort the whole GDPR deletion — those cleanups run OUTSIDE the
+    // transaction in their own try/catch, so the user row is already gone by
+    // the time they fail.
+    const { prisma, tx } = createPrismaMock()
+    const missingTableError = new Error('relation "ScholarAnnotation" does not exist')
+
+    // Optional tables are queried on `prisma` (pre/post-commit), NOT `tx`.
+    // Force the post-commit ScholarAnnotation erasure to reject.
+    prisma.scholarAnnotation.deleteMany = vi.fn().mockRejectedValue(missingTableError)
+
+    await expect(
+      deleteUserAccount(prisma, {
+        userId: 42,
+        username: 'test_user',
+        reason: 'privacy',
+        details: null,
+      }),
+    ).resolves.toBeUndefined()
+
+    // Core erasure inside the transaction still ran to completion.
+    expect(tx.user.delete).toHaveBeenCalledWith({ where: { id: 42 } })
+    expect(mocks.stripe.subscriptions.cancel).toHaveBeenCalledWith('sub_123')
+    // The rejecting optional cleanup was attempted and its error captured,
+    // not rethrown.
+    expect(prisma.scholarAnnotation.deleteMany).toHaveBeenCalledWith({ where: { userId: 42 } })
+    expect(mocks.sentry.captureError).toHaveBeenCalledWith(
+      missingTableError,
+      expect.objectContaining({ source: 'deleteUserAccountScholarAnnotation', userId: 42 }),
+    )
   })
 })

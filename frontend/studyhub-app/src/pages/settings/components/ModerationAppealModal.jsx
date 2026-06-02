@@ -1,8 +1,9 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * ModerationAppealModal.jsx — Appeal submission form modal
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { useFocusTrap } from '../../../lib/useFocusTrap'
 import { FONT } from '../settingsState'
 
 const APPEAL_CATEGORIES = [
@@ -42,18 +43,10 @@ export function AppealModal({ open, caseData, onClose, onSubmit }) {
     setModalState((prev) => ({ ...prev, ...updates }))
   }, [])
 
-  useEffect(() => {
-    if (!open) return
-    const handler = (e) => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', handler)
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', handler)
-      document.body.style.overflow = ''
-    }
-  }, [open, onClose])
+  // Focus trap + Escape-to-close + body scroll-lock. Replaces the bespoke
+  // document keydown listener + manual overflow toggle so Escape isn't
+  // double-handled and focus stays inside the dialog.
+  const focusTrapRef = useFocusTrap({ active: open, onClose })
 
   if (!open) return null
 
@@ -79,6 +72,7 @@ export function AppealModal({ open, caseData, onClose, onSubmit }) {
 
   return createPortal(
     <div
+      ref={focusTrapRef}
       style={{
         position: 'fixed',
         inset: 0,
@@ -93,6 +87,9 @@ export function AppealModal({ open, caseData, onClose, onSubmit }) {
       onClick={onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="appeal-modal-title"
         style={{
           background: 'var(--sh-surface)',
           borderRadius: 16,
@@ -113,7 +110,10 @@ export function AppealModal({ open, caseData, onClose, onSubmit }) {
             marginBottom: 16,
           }}
         >
-          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)' }}>
+          <h3
+            id="appeal-modal-title"
+            style={{ margin: 0, fontSize: 18, fontWeight: 800, color: 'var(--sh-heading)' }}
+          >
             Appeal Decision
           </h3>
           <button

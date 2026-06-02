@@ -245,7 +245,10 @@ export default function NotificationsPage() {
   const readCount = notifications.filter((n) => n.read).length
 
   return (
-    <PageShell nav={<Navbar />} sidebar={<AppSidebar />}>
+    <PageShell
+      nav={<Navbar crumbs={[{ label: 'Notifications', to: '/notifications' }]} />}
+      sidebar={<AppSidebar />}
+    >
       <div
         style={{
           background: 'var(--sh-surface)',

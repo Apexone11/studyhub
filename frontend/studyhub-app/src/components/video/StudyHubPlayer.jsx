@@ -1004,6 +1004,7 @@ export default function StudyHubPlayer({
             {/* Speed */}
             <div className="shp-menu-anchor">
               <button
+                type="button"
                 className="shp-btn shp-btn-text"
                 onClick={(e) => {
                   e.stopPropagation()
@@ -1012,15 +1013,27 @@ export default function StudyHubPlayer({
                   setShowCaptionMenu(false)
                 }}
                 aria-label="Playback speed"
+                aria-haspopup="menu"
+                aria-expanded={showSpeedMenu}
               >
                 {playbackSpeed}x
               </button>
               {showSpeedMenu && (
-                <div className="shp-popup-menu" onClick={(e) => e.stopPropagation()}>
+                // WCAG 2.1.1 (Keyboard): popup container exposes menu role; menu items are <button> so they are keyboard-reachable.
+                <div
+                  className="shp-popup-menu"
+                  role="menu"
+                  aria-label="Playback speed options"
+                  onClick={(e) => e.stopPropagation()}
+                >
                   <div className="shp-menu-title">Speed</div>
                   {SPEEDS.map((s) => (
                     <button
                       key={s}
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={s === playbackSpeed}
+                      aria-label={s === 1 ? 'Normal speed' : `${s} times speed`}
                       className={`shp-menu-item ${s === playbackSpeed ? 'shp-menu-active' : ''}`}
                       onClick={() => changeSpeed(s)}
                     >
@@ -1035,6 +1048,7 @@ export default function StudyHubPlayer({
             {availableQualities.length > 1 && (
               <div className="shp-menu-anchor">
                 <button
+                  type="button"
                   className="shp-btn shp-btn-text"
                   onClick={(e) => {
                     e.stopPropagation()
@@ -1043,15 +1057,27 @@ export default function StudyHubPlayer({
                     setShowCaptionMenu(false)
                   }}
                   aria-label="Video quality"
+                  aria-haspopup="menu"
+                  aria-expanded={showQualityMenu}
                 >
                   {activeQuality === 'auto' ? 'Auto' : activeQuality}
                 </button>
                 {showQualityMenu && (
-                  <div className="shp-popup-menu" onClick={(e) => e.stopPropagation()}>
+                  // WCAG 2.1.1 (Keyboard): popup container exposes menu role; menu items are <button> so they are keyboard-reachable.
+                  <div
+                    className="shp-popup-menu"
+                    role="menu"
+                    aria-label="Video quality options"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="shp-menu-title">Quality</div>
                     {availableQualities.map((q) => (
                       <button
                         key={q}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={q === activeQuality}
+                        aria-label={q === 'auto' ? 'Automatic quality' : `Quality ${q}`}
                         className={`shp-menu-item ${q === activeQuality ? 'shp-menu-active' : ''}`}
                         onClick={() => changeQuality(q)}
                       >
@@ -1067,6 +1093,7 @@ export default function StudyHubPlayer({
             {captions.length > 0 && (
               <div className="shp-menu-anchor">
                 <button
+                  type="button"
                   className="shp-btn"
                   onClick={(e) => {
                     e.stopPropagation()
@@ -1075,6 +1102,8 @@ export default function StudyHubPlayer({
                     setShowQualityMenu(false)
                   }}
                   aria-label="Captions"
+                  aria-haspopup="menu"
+                  aria-expanded={showCaptionMenu}
                   style={activeCaption !== 'off' ? { color: 'var(--sh-brand)' } : undefined}
                 >
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
@@ -1082,9 +1111,19 @@ export default function StudyHubPlayer({
                   </svg>
                 </button>
                 {showCaptionMenu && (
-                  <div className="shp-popup-menu" onClick={(e) => e.stopPropagation()}>
+                  // WCAG 2.1.1 (Keyboard): popup container exposes menu role; menu items are <button> so they are keyboard-reachable.
+                  <div
+                    className="shp-popup-menu"
+                    role="menu"
+                    aria-label="Caption language options"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <div className="shp-menu-title">Captions</div>
                     <button
+                      type="button"
+                      role="menuitemradio"
+                      aria-checked={activeCaption === 'off'}
+                      aria-label="Captions off"
                       className={`shp-menu-item ${activeCaption === 'off' ? 'shp-menu-active' : ''}`}
                       onClick={() => changeCaption('off')}
                     >
@@ -1093,6 +1132,10 @@ export default function StudyHubPlayer({
                     {captions.map((cap) => (
                       <button
                         key={cap.language}
+                        type="button"
+                        role="menuitemradio"
+                        aria-checked={activeCaption === cap.language}
+                        aria-label={`Captions: ${cap.label}`}
                         className={`shp-menu-item ${activeCaption === cap.language ? 'shp-menu-active' : ''}`}
                         onClick={() => changeCaption(cap.language)}
                       >

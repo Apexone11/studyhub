@@ -75,7 +75,10 @@ export default function PlaygroundPage() {
   usePageTitle('Playground')
 
   return (
-    <PageShell nav={<Navbar />} sidebar={<AppSidebar />}>
+    <PageShell
+      nav={<Navbar crumbs={[{ label: 'Playground', to: '/playground' }]} />}
+      sidebar={<AppSidebar />}
+    >
       {/* Hero */}
       <section className="playground-hero">
         <div className="playground-hero__watermark">

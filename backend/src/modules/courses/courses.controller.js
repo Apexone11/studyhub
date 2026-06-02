@@ -11,8 +11,47 @@ const {
   RECOMMENDATION_LIMIT,
   parseOptionalInteger,
 } = require('./courses.constants')
+const { parseRouteId } = require('../../core/http/validate')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
+const courseAliasing = require('../../lib/courseAliasing')
+const optionalAuth = require('../../core/auth/optionalAuth')
 
 const router = express.Router()
+
+// G2-4 — topic catalog for chips (shared with the Explore tab). Public read;
+// returns [] when flag_course_aliasing is off (fail-closed). MUST be declared
+// before any '/:id'-style route so 'topics' isn't captured as an id.
+router.get('/topics', optionalAuth, async (req, res) => {
+  try {
+    const topics = await courseAliasing.listTopics({
+      userId: req.user?.userId,
+      role: req.user?.role,
+    })
+    return res.json({ topics })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    return sendError(res, 500, 'Could not load topics.', ERROR_CODES.INTERNAL)
+  }
+})
+
+// G2-4 — "Equivalent at other schools" for a course. Public read; returns an
+// empty list when the flag is off or the course has no aliases.
+router.get('/:id/equivalents', optionalAuth, async (req, res) => {
+  const courseId = parseRouteId(req.params.id)
+  if (courseId === null) {
+    return sendError(res, 400, 'Invalid course id.', ERROR_CODES.BAD_REQUEST)
+  }
+  try {
+    const equivalents = await courseAliasing.getEquivalentCourses(courseId, {
+      userId: req.user?.userId,
+      role: req.user?.role,
+    })
+    return res.json({ equivalents })
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    return sendError(res, 500, 'Could not load equivalents.', ERROR_CODES.INTERNAL)
+  }
+})
 
 // Course recommendations based on overlapping enrollments.
 router.get('/recommendations', requireAuth, async (req, res) => {

@@ -14,12 +14,32 @@ function parseId(val) {
 }
 
 /**
- * Get membership record or null
+ * Get membership record or null.
+ *
+ * NOTE: this returns the row for ANY status (active / pending / invited /
+ * banned). Callers that gate a privileged read or write MUST check
+ * `member.status === 'active'` themselves — use requireActiveGroupMember
+ * for the common "must be an active member" gate so a pending or banned
+ * user cannot read/write a private group's sub-resources.
  */
 async function requireGroupMember(groupId, userId) {
   return prisma.studyGroupMember.findUnique({
     where: { groupId_userId: { groupId, userId } },
   })
+}
+
+/**
+ * Get membership record only when the caller is an ACTIVE member.
+ * Returns the row on hit, null when the user is not a member OR their
+ * membership is still pending/invited/banned. This is the gate the
+ * create/read sub-resource handlers use so an un-approved or banned
+ * user can't read discussions/resources/sessions or create posts in a
+ * private group.
+ */
+async function requireActiveGroupMember(groupId, userId) {
+  const member = await requireGroupMember(groupId, userId)
+  if (!member || member.status !== 'active') return null
+  return member
 }
 
 /**
@@ -257,9 +277,93 @@ async function formatGroup(group, currentUserId = null) {
   }
 }
 
+/**
+ * Synchronous list-path formatter. Produces the SAME shape as formatGroup()
+ * but takes pre-batched counts + the viewer's membership instead of issuing
+ * 8 queries per group. The list endpoint batches all counts/memberships in a
+ * handful of groupBy/findMany calls and maps in memory — turning the old
+ * ~8×N query fan-out into a constant ~7 queries per page.
+ *
+ * formatGroup() (async, single-group) is intentionally KEPT for
+ * get/create/update so their responses stay byte-identical.
+ *
+ * @param {object} group — StudyGroup row WITH `course` relation included.
+ * @param {object} batch
+ * @param {{active:number,pending:number,invited:number}} [batch.memberCounts]
+ * @param {number} [batch.resourceCount]
+ * @param {number} [batch.upcomingSessionCount]
+ * @param {number} [batch.discussionPostCount]
+ * @param {object|null} [batch.membership] — viewer's StudyGroupMember row or null
+ */
+function formatGroupFromBatch(group, batch = {}) {
+  const memberCounts = batch.memberCounts || { active: 0, pending: 0, invited: 0 }
+  const memberCount = memberCounts.active || 0
+  const pendingMemberCount = memberCounts.pending || 0
+  const invitedMemberCount = memberCounts.invited || 0
+  const resourceCount = batch.resourceCount || 0
+  const upcomingSessionCount = batch.upcomingSessionCount || 0
+  const discussionPostCount = batch.discussionPostCount || 0
+  const userMembership = batch.membership || null
+
+  const isMember = userMembership && userMembership.status === 'active'
+  const userRole = userMembership ? userMembership.role : null
+  const availableSeats = Math.max(0, (group.maxMembers || 0) - memberCount)
+
+  const course = group.course || null
+  const courseName = course?.name || null
+  const courseCode = course?.code || null
+  const schoolId = course?.school?.id || null
+  const schoolName = course?.school?.name || null
+  const schoolShort = course?.school?.short || null
+
+  return {
+    id: group.id,
+    name: group.name,
+    description: group.description,
+    avatarUrl: group.avatarUrl,
+    backgroundUrl: group.backgroundUrl ?? null,
+    backgroundCredit: group.backgroundCredit ?? null,
+    courseId: group.courseId,
+    courseName,
+    courseCode,
+    schoolId,
+    schoolName,
+    schoolShort,
+    privacy: group.privacy,
+    maxMembers: group.maxMembers,
+    createdById: group.createdById,
+    createdAt: group.createdAt,
+    updatedAt: group.updatedAt,
+    memberCount,
+    pendingMemberCount,
+    invitedMemberCount,
+    availableSeats,
+    resourceCount,
+    upcomingSessionCount,
+    discussionPostCount,
+    isMember: !!isMember,
+    userRole,
+    userMembership: userMembership
+      ? {
+          id: userMembership.id,
+          role: userMembership.role,
+          status: userMembership.status,
+          joinedAt: userMembership.joinedAt,
+        }
+      : null,
+    moderationStatus: group.moderationStatus ?? 'active',
+    warnedUntil: group.warnedUntil ?? null,
+    lockedAt: group.lockedAt ?? null,
+    deletedAt: group.deletedAt ?? null,
+    memberListPrivate: group.memberListPrivate ?? false,
+    requirePostApproval: group.requirePostApproval ?? false,
+  }
+}
+
 module.exports = {
   parseId,
   requireGroupMember,
+  requireActiveGroupMember,
   isGroupAdmin,
   isGroupAdminOrMod,
   isBlockedFromGroup,
@@ -270,4 +374,5 @@ module.exports = {
   validateTitle,
   validateResourceUrl,
   formatGroup,
+  formatGroupFromBatch,
 }

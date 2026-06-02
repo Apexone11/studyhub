@@ -326,6 +326,40 @@ describe('messaging.messages.deep — POST /conversations/:id/messages', () => {
     )
   })
 
+  it('rejects replyToId pointing at a message in a different conversation (cross-conversation leak)', async () => {
+    mockParticipant()
+    // Parent message lives in conversation 99 — the sender is only in conv 1.
+    mocks.prisma.message.findUnique.mockResolvedValue({ conversationId: 99 })
+    const res = await request(app)
+      .post('/conversations/1/messages')
+      .send({ content: 'sneaky reply', replyToId: 500 })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/invalid replytoid/i)
+    expect(mocks.prisma.message.create).not.toHaveBeenCalled()
+  })
+
+  it('rejects replyToId pointing at a non-existent parent message', async () => {
+    mockParticipant()
+    mocks.prisma.message.findUnique.mockResolvedValue(null)
+    const res = await request(app)
+      .post('/conversations/1/messages')
+      .send({ content: 'reply to ghost', replyToId: 12345 })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/invalid replytoid/i)
+    expect(mocks.prisma.message.create).not.toHaveBeenCalled()
+  })
+
+  it('accepts replyToId pointing at a message in the same conversation', async () => {
+    mockParticipant()
+    mocks.prisma.message.findUnique.mockResolvedValue({ conversationId: 1 })
+    mockMessageCreate({ id: 201, replyTo: { id: 50, content: 'parent', senderId: 7 } })
+    const res = await request(app)
+      .post('/conversations/1/messages')
+      .send({ content: 'valid reply', replyToId: 50 })
+    expect(res.status).toBe(201)
+    expect(mocks.prisma.message.create).toHaveBeenCalled()
+  })
+
   it('refuses to send DM when blocked by counterparty', async () => {
     mocks.prisma.conversationParticipant.findUnique.mockResolvedValue({
       userId: 42,

@@ -12,6 +12,7 @@ const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
+const originAllowlist = require('../../middleware/originAllowlist')
 const {
   reviewSubmitLimiter,
   reviewReadLimiter,
@@ -23,6 +24,9 @@ const { MAX_REVIEW_LENGTH, MIN_STARS, MAX_STARS } = require('./reviews.constants
 const { generateReviewReport, listReviewReports, getReviewReport } = require('./reviews.service')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — CSRF defense in depth on writes (short-circuits GET/HEAD/OPTIONS)
+router.use(originAllowlist())
 
 // ── POST / — Submit or update a review ──────────────────────────────────
 router.post('/', requireAuth, reviewSubmitLimiter, async (req, res) => {

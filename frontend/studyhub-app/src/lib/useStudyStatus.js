@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSession } from './session-context'
 import { API } from '../config'
+import { showToast } from './toast'
 
 const STORAGE_KEY = 'studyhub.continuity.studyStatus'
 
@@ -167,6 +168,9 @@ export function useStudyStatus(sheetId) {
     (status, sheet) => {
       if (!sheetId) return
       if (isAuthRef.current) {
+        // Snapshot the prior entry so a rejected write can be rolled back
+        // instead of leaving the optimistic status applied forever (A4).
+        const prevEntry = _serverStatuses[sheetId]
         // Optimistic update + fire request
         if (!status) {
           delete _serverStatuses[sheetId]
@@ -181,8 +185,17 @@ export function useStudyStatus(sheetId) {
         _serverStatuses = { ..._serverStatuses }
         notifyListeners()
         putStatus(sheetId, status).catch(() => {
-          // Revert on failure by re-fetching
+          // Roll back to the snapshot so the failed write doesn't stick.
+          if (prevEntry) _serverStatuses[sheetId] = prevEntry
+          else delete _serverStatuses[sheetId]
+          _serverStatuses = { ..._serverStatuses }
+          notifyListeners()
+          // Force a real re-fetch to reconcile against server truth — a
+          // bare loadFromServer() early-returns the memoized promise once
+          // _serverLoaded is true and never re-fetches (mirror refresh()).
+          _serverLoadPromise = null
           loadFromServer()
+          showToast('Could not update study status.', 'error')
         })
       } else {
         // Guest: localStorage only

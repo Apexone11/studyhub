@@ -28,6 +28,61 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.25 — green CI: raise backend test timeout for bcrypt-heavy cases (2026-06-02)
+
+- CI (StudyHub CI + Quality Gates) had been red on `local-main`/#385 because one security test (`recoveryCodes.unit.test.js` — hashes all 10 recovery codes at bcrypt cost 12 and verifies each) took ~5.05s and tripped vitest's 5000ms default. Raised the backend `testTimeout`/`hookTimeout` to 15s in `vitest.config.mjs` (still fails a genuinely-hung test fast). Full backend suite now green on CI (3,513 tests). This was the long-standing red-CI cause, not a regression from recent work.
+- Lighthouse CI (`accessibility` Quality Gate) was failing with "module is not defined in ES module scope" — `lighthouse.config.js` used CommonJS `module.exports` in a `"type": "module"` workspace. Renamed it to `lighthouse.config.cjs` and updated the workflow `configPath`. (The `playwright-smoke`/`playwright-a11y` E2E checks remain red on a pre-existing, multi-spec UI/test-drift issue unrelated to this work — tracked separately.)
+
+### Wave-12.24 — 2nd 10-loop audit fixes (Explore/aliasing hardening) (2026-05-31)
+
+A second 10-round adversarial audit (98 sub-agents, 3-skeptic verification) over the wave-12.23 code confirmed 17 + 2 findings (no P0/P1; the batch-1 fixes all held). Fixed here. Touched files green in isolation; lint + build clean.
+
+- Security (P2): `updateReply` / `deleteReply` on the study-group discussion board were missing the active-membership gate that wave-12.22 added to the other discussion handlers — a banned/removed member could still edit or delete their old replies in a private group. Both now require active membership.
+- Explore hardening: an invalid `?topic=` now returns an empty shelf instead of silently showing all cross-school content; the kill switch drops stale cached shelves when flipped off mid-session; topic chips put `aria-pressed` on the button; loading/empty/error states are announced (`role="status"`/`aria-busy`) and errors render distinctly from "empty" (with retry) instead of being masked; the notes shelf dropped a dead `previewText` prop.
+- Aliasing/perf: cross-school search expansion no longer runs on the private `mine=1` path; `/sheets` offset is capped (deep-pagination guard); the pg_trgm query now uses the `%` operator so the GIN trigram index is actually used; the seed's cross-school demo fallback only aliases genuinely CS-like courses (no more misleading "equivalents").
+
+### Wave-12.23 — Self-learner Explore (G2-3) + Course aliasing (G2-4) (2026-05-31)
+
+Two cross-school discovery features, research-upgraded (CIP taxonomy, pg_trgm, GitHub-Explore patterns), both behind fail-closed flags + seeded for the local demo. Backend 3,503/3,503 + frontend 873/873 green; lint + build clean.
+
+- **Course aliasing (G2-4).** New `CourseAlias` + `TopicCanonical` (CIP-coded) tables map many school-specific courses to one topic, so searching "intro programming" surfaces CMSC131 + CS61A + 6.0001 sheets together (Postgres `pg_trgm` fuzzy match, GIN-indexed). The Sheets browse page shows an "Equivalent at other schools" card when filtered to a single course. New endpoints `GET /api/courses/topics` + `GET /api/courses/:id/equivalents`; topic expansion wired into `/api/sheets` search. Curated ~15-topic seed (`seedCourseAliases.js`). Gated by `flag_course_aliasing` (search/equivalents fall back to literal matching when off).
+- **Self-learner Explore (G2-3).** New `/explore` page — a cross-school discovery surface with topic chips (shared `TopicCanonical` catalog), a "Trending this week" shelf, and Sheets / Notes / Study-groups shelves. Backend `/api/explore/{sheets,trending,notes,study-groups,topics}` is read-only, block-filtered, bounded (`parseBoundedInt`), and gated by `flag_explore_tab` (fail-closed 503). Sidebar "Explore" entry added.
+- Tests: `courseAliasing` (21), `courses.equivalents` (7), `explore.routes` (15) backend; `ExplorePage` (3) + `CourseEquivalents` (6) frontend. Both flags added to `SHIPPED_DESIGN_V2_FLAGS`; `seedCourseAliases` runs in the `seed:beta` chain; `ecosystem.md` updated with both modules + interconnections.
+
+### Wave-12.22 — 10-loop adversarial audit fixes (2026-05-31)
+
+A 10-round adversarially-verified audit (128 sub-agents, every finding confirmed by 3 independent skeptics) surfaced 36 + 3 findings; ~33 fixed here across 9 disjoint areas. Backend 3,460/3,460 + frontend 864/864 green; lint + build clean. 3 P3 findings deliberately deferred with rationale (`docs/internal/plans/audit-2026-05-31-backlog.md`).
+
+- Security: study-group sub-resources now gate on **active** membership (`requireActiveGroupMember`) — pending/banned users could previously read & post in private groups; replies/upvotes to hidden (removed/pending) discussion posts blocked. Message `replyToId` is validated to the same conversation — closes a cross-conversation message-content disclosure. Attachment-**preview** route now enforces the `allowDownloads` owner gate (A6) — a "downloads disabled" sheet previously leaked the full file via preview. `originAllowlist()` (A11) added to courses, study-status, plagiarism, hashtags write modules. WebAuthn `RP_ID`/`ORIGIN` fail-closed in production + promoted to `REQUIRED_IN_PRODUCTION` (A9). Socket cookie parser hardened against prototype-pollution keys; socket `conversationId` int-guarded.
+- Data-integrity: 2 migrations (`teacher-materials`, `AiSuggestion`) made idempotent (A5); `deleteUserAccount` optional-table cleanups moved out of the aborting `$transaction` (a missing table no longer fails the whole GDPR erasure); note tab-close autosave (`sendBeacon`, POST-only) now reaches the update handler via a POST alias instead of 404-ing and losing edits.
+- A4 optimistic-UI: study-status toggle, note reaction, video `downloadable` toggle, sheet-comment react, feed-comment react, ForYou follow/join now reconcile from the server response or roll back + toast on failure instead of silently sticking.
+- A12: strict integer guards on sheets.social comment react/delete/edit, materials body ids, deletePinnedSheet, study-status PUT (rejects negatives/decimals).
+- A11y: focus traps on SectionPicker, TopicPickerModal, ReportGroupModal; keyboard-accessible AnnouncementMedia thumbnails; TopicPicker search/custom inputs labelled.
+- Perf: discussion list uses `_count` instead of materializing every reply/upvote row; all-time leaderboard slices top-N before hydrating users + bounds the aggregate to a rolling 365-day window.
+
+### Wave-12.21 — bounded-plan completion batch + Codex P2 fix (2026-05-31)
+
+Cleared six bounded backlog plans from `docs/internal/plans/` plus the Codex PR-review P2. Backend (3,426/3,426) + frontend (854/854) suites green; lint + build clean.
+
+- Security (Codex P2 / A12): `PATCH /api/materials/:id/archive` and `DELETE /api/materials/assignments/:id` rejected partial-numeric ids only loosely — `Number.parseInt('12abc')` is `12`, so a malformed path acted on material 12. New strict `parseRouteId()` (digit-only, ≤ MAX_SAFE_INTEGER) returns 400 on any non-pure-integer id.
+- Security (P1-C, DoS): added `parseBoundedInt(value, fallback, max)` and migrated 4 uncapped list endpoints (`?limit=`) — sheets list (cap 100), sheet comments / feed list / feed reactions (cap 50). `parsePositiveInt` is now `@deprecated`. A `?limit=999999` no longer fetches unbounded rows.
+- Security (P1-D, NIST 800-63B / OWASP ASVS V2.1.1): `POST /api/auth/reset-password` now rejects a new password identical to the current one (`PASSWORD_UNCHANGED`) and all its raw `res.status().json()` envelopes were migrated to `sendError()`. Frontend surfaces the new code as an inline field error.
+- Security (P1-D, A8): `redactObject` now scrubs email / phone / IPv4 / SSN patterns out of free-text log string values (defense-in-depth on top of the existing key-name redaction).
+- Payments (L5): `idempotencyKey` added to all 11 state-changing Stripe SDK calls (checkout subscription/donation/gift/trial/student-discount, customer create, portal, subscription pause/resume/cancel/reactivate) — a retried call no longer risks a duplicate charge. Checkout creates log Stripe's `request_id` for dashboard correlation.
+- Observability (L5): the three route-level Anthropic calls (sheet generate, sheet edit, note summarize) now propagate our `x-request-id` so a pino log line cross-references the Anthropic dashboard.
+- Perf / cleanup (L2): `AbortController` + unmount cleanup added to 5 effect-driven fetch/timer sites (library data + reader, sheet-lab reads, note-persistence timers, admin user-search) so a stale request can't `setState` after unmount.
+- Perf (L1-2): the messages-unread badge polls once per session via a shared `UnreadProvider` context — the Navbar bell and mobile bottom-nav badge previously polled `/api/messages/unread-total` independently every 30s (2× the load).
+- Tests: new `core-http-validate`, materials partial-id rejection, auth same-as-current (3 cases), redact PII scrub (4 cases), `buildStripeIdempotencyKey`, `UnreadProvider`, `UserSearchInput` abort, plus updated payment/sheets deep-test call-arg expectations. Fixed a pre-existing `security.headers` test gap (missing `R2_BUCKET_UPLOAD_BACKUP` dummy after its wave-12.11 promotion to REQUIRED_IN_PRODUCTION).
+
+### Wave-12.20 — L4 a11y leftovers: 4 modal focus-traps + user-menu keyboard nav + 2 `<main>` landmarks (2026-05-31)
+
+WCAG 2.1 AA fixes from the wide L4 a11y audit. Touched-area unit suites green, 8 new tests added.
+
+- a11y (modals): focus-trap + Escape close + `role="dialog"`/`aria-modal` wired into 4 more dialogs via the shared `useFocusTrap` hook — `ProfileWidgets` FollowModal, `NoteVersionHistory` (slide-out panel), `ModerationAppealModal`, `AnnouncementMedia` lightbox.
+- a11y (menu, WCAG 2.1.1 / 4.1.2): `NavbarUserMenu` now implements the WAI-ARIA APG Menu keyboard contract — Arrow roving (wrapping), Home/End, Escape closes + restores trigger focus, ArrowDown opens + focuses item 1. Enter/Space still fire items natively.
+- a11y (landmarks, WCAG 2.4.1): `<main id="main-content">` on `UserProfilePage` + `id="main-content"` on LibraryPage's `<main>` so the App.jsx skip link lands.
+- Tests: `NavbarUserMenu.test.jsx` (5 cases) + 3 `FollowModal` a11y cases in `ProfileWidgets.test.jsx`.
+
 ### Wave-12.15 — Codex P1 + P2 fixes on wave-12.11 / 12.13 (2026-05-28)
 
 Two real findings from a Codex review pass on `3b09f25a`. Both verified against actual code by our own audit loop (CLAUDE.md A21) before fixing.

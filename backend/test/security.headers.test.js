@@ -150,6 +150,9 @@ describe('Security headers on API routes', () => {
     const prevFieldKey = process.env.FIELD_ENCRYPTION_KEY
     const prevProvenance = process.env.PROVENANCE_SECRET
     const prevR2Bucket = process.env.R2_BUCKET_AI_ATTACHMENTS
+    const prevR2BackupBucket = process.env.R2_BUCKET_UPLOAD_BACKUP
+    const prevWebauthnRpId = process.env.WEBAUTHN_RP_ID
+    const prevWebauthnOrigin = process.env.WEBAUTHN_ORIGIN
     const prevJwt = process.env.JWT_SECRET
     const prevDbUrl = process.env.DATABASE_URL
     process.env.NODE_ENV = 'production'
@@ -163,6 +166,17 @@ describe('Security headers on API routes', () => {
     process.env.FIELD_ENCRYPTION_KEY = 'a'.repeat(64)
     process.env.PROVENANCE_SECRET = 'b'.repeat(64)
     process.env.R2_BUCKET_AI_ATTACHMENTS = 'studyhub-ai-attachments-test'
+    // R2_BUCKET_UPLOAD_BACKUP was promoted to REQUIRED_IN_PRODUCTION in
+    // wave-12.11 but this test was never updated to set it — so the
+    // production-mode boot exited on a missing secret in any env whose
+    // .env lacks it. Provide a dummy like the others above.
+    process.env.R2_BUCKET_UPLOAD_BACKUP = 'studyhub-upload-backup-test'
+    // WEBAUTHN_RP_ID + WEBAUTHN_ORIGIN promoted to REQUIRED_IN_PRODUCTION
+    // (CLAUDE.md A9) — lib/webauthn/webauthnShared.js now throws at module
+    // load in production if either is unset, which would crash the boot
+    // before the HSTS header is ever set. Provide dummies like the others.
+    process.env.WEBAUTHN_RP_ID = 'localhost'
+    process.env.WEBAUTHN_ORIGIN = 'http://localhost:5173'
     if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
       process.env.JWT_SECRET = 'c'.repeat(32)
     }
@@ -188,6 +202,12 @@ describe('Security headers on API routes', () => {
       else process.env.PROVENANCE_SECRET = prevProvenance
       if (prevR2Bucket === undefined) delete process.env.R2_BUCKET_AI_ATTACHMENTS
       else process.env.R2_BUCKET_AI_ATTACHMENTS = prevR2Bucket
+      if (prevR2BackupBucket === undefined) delete process.env.R2_BUCKET_UPLOAD_BACKUP
+      else process.env.R2_BUCKET_UPLOAD_BACKUP = prevR2BackupBucket
+      if (prevWebauthnRpId === undefined) delete process.env.WEBAUTHN_RP_ID
+      else process.env.WEBAUTHN_RP_ID = prevWebauthnRpId
+      if (prevWebauthnOrigin === undefined) delete process.env.WEBAUTHN_ORIGIN
+      else process.env.WEBAUTHN_ORIGIN = prevWebauthnOrigin
       if (prevJwt === undefined) delete process.env.JWT_SECRET
       else process.env.JWT_SECRET = prevJwt
       if (prevDbUrl === undefined) delete process.env.DATABASE_URL

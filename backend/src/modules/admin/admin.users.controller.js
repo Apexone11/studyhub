@@ -13,6 +13,16 @@ const { DURATION_7D_MS } = require('../../lib/constants')
 
 const router = express.Router()
 
+// CSV-cell sanitizer — prefixes a leading single quote when the first
+// character is one Excel/Sheets/LibreOffice would interpret as a formula
+// (CWE-1236). The "...".replace(/"/g, '""') quoting already used below
+// protects CSV STRUCTURE but does NOT neutralize formulas because the
+// outer quotes are stripped by the spreadsheet before evaluation.
+function csvSafe(value) {
+  const s = String(value ?? '')
+  return /^[=+\-@\t\r]/.test(s) ? "'" + s : s
+}
+
 // ── GET /api/admin/stats ──────────────────────────────────────
 router.get('/stats', async (req, res) => {
   try {
@@ -528,14 +538,14 @@ router.get('/moderation/users/:userId/log/export', async (req, res) => {
 
       for (const row of batch) {
         const fields = [
-          row.createdAt.toISOString(),
-          row.action,
-          row.caseId ?? '',
-          row.contentType ?? '',
-          row.contentId ?? '',
-          `"${(row.reason || '').replace(/"/g, '""')}"`,
-          row.performedBy ?? 'system',
-          row.metadata ? `"${JSON.stringify(row.metadata).replace(/"/g, '""')}"` : '',
+          csvSafe(row.createdAt.toISOString()),
+          csvSafe(row.action),
+          csvSafe(row.caseId ?? ''),
+          csvSafe(row.contentType ?? ''),
+          csvSafe(row.contentId ?? ''),
+          `"${csvSafe(row.reason || '').replace(/"/g, '""')}"`,
+          csvSafe(row.performedBy ?? 'system'),
+          row.metadata ? `"${csvSafe(JSON.stringify(row.metadata)).replace(/"/g, '""')}"` : '',
         ]
         res.write(fields.join(',') + '\n')
       }

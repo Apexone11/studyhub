@@ -8,6 +8,7 @@ import anime from '../lib/animeCompat'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
 import MobileTopBar from '../components/MobileTopBar'
+import { useToast } from '../hooks/useToast'
 
 const PREFERS_REDUCED =
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -22,7 +23,12 @@ async function fetchSheet(id) {
 
 async function toggleStar(id, starred) {
   const method = starred ? 'DELETE' : 'POST'
-  await fetch(`${API}/api/sheets/${id}/star`, { method, credentials: 'include' })
+  const res = await fetch(`${API}/api/sheets/${id}/star`, { method, credentials: 'include' })
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data?.error || 'Could not update star.')
+  }
+  return data
 }
 
 /* ── Time formatting ───────────────────────────────────────────── */
@@ -42,6 +48,7 @@ export default function MobileSheetDetail() {
   const { sheetId } = useParams()
   const { user } = useSession()
   const navigate = useNavigate()
+  const toast = useToast()
 
   const [sheet, setSheet] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -90,13 +97,15 @@ export default function MobileSheetDetail() {
   const handleStar = useCallback(async () => {
     if (!user) return
     const prev = starred
-    setStarred(!prev)
+    const requested = !prev
     try {
-      await toggleStar(sheetId, prev)
-    } catch {
-      setStarred(prev)
+      const data = await toggleStar(sheetId, prev)
+      const persisted = typeof data?.starred === 'boolean' ? data.starred : requested
+      setStarred(persisted)
+    } catch (err) {
+      toast.show({ message: err?.message || 'Could not update star.', kind: 'error' })
     }
-  }, [sheetId, starred, user])
+  }, [sheetId, starred, user, toast])
 
   const handleFork = useCallback(() => {
     navigate(`/m/sheets/${sheetId}/fork`)

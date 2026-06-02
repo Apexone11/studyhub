@@ -2,6 +2,7 @@ const express = require('express')
 const crypto = require('node:crypto')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
+const originAllowlist = require('../../middleware/originAllowlist')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const {
@@ -12,6 +13,9 @@ const {
 const { readLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — CSRF defense in depth on writes (POST/DELETE manifest endpoints)
+router.use(originAllowlist())
 
 router.use(readLimiter)
 

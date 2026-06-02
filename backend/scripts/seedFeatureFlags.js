@@ -85,6 +85,15 @@ const SHIPPED_DESIGN_V2_FLAGS = [
   // L20-CRIT-2: setting this flag's row to `enabled: false` returns 503
   // on every /api/scholar/* request via the route guard.
   'flag_scholar_enabled',
+  // G2-4 Course aliasing — shipped 2026-05-31. Cross-school topic expansion
+  // in sheet search + "Equivalent at other schools" on course detail +
+  // /api/courses/topics catalog. Off => search/equivalents fall back to
+  // literal matching (fail-closed in lib/courseAliasing.js).
+  'flag_course_aliasing',
+  // G2-3 Self-learner Explore — shipped 2026-05-31. Cross-school /explore
+  // discovery (sheets/notes/groups), topic chips (shared TopicCanonical),
+  // "trending this week". Off => /api/explore/* returns 503 at the gate.
+  'flag_explore_tab',
 ]
 
 /**

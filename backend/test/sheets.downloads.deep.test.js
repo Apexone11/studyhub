@@ -211,3 +211,43 @@ describe('POST /api/sheets/:id/download (tracker)', () => {
     expect(res.status).toBe(403)
   })
 })
+
+describe('GET /api/sheets/:id/attachment/preview', () => {
+  function attachmentSheet(overrides = {}) {
+    return pubSheet({
+      attachmentUrl: '/uploads/notes.pdf',
+      attachmentName: 'notes.pdf',
+      attachmentType: 'application/pdf',
+      ...overrides,
+    })
+  }
+
+  it('403 when allowDownloads=false and viewer is NOT owner/admin (A6 — preview leak fix)', async () => {
+    mocks.state.user = { userId: 999, username: 'other', role: 'student' }
+    mocks.prisma.studySheet.findUnique.mockResolvedValueOnce(
+      attachmentSheet({ allowDownloads: false, userId: 1 }),
+    )
+    const res = await request(app).get('/api/sheets/10/attachment/preview')
+    expect(res.status).toBe(403)
+    expect(res.body.error).toMatch(/disabled/i)
+    // Full file must never be streamed when downloads are disabled.
+    expect(mocks.attachmentPreview.sendAttachmentPreview).not.toHaveBeenCalled()
+    expect(mocks.storage.resolveAttachmentPath).not.toHaveBeenCalled()
+  })
+
+  it('streams the preview when allowDownloads=false but viewer IS the owner', async () => {
+    mocks.prisma.studySheet.findUnique.mockResolvedValueOnce(
+      attachmentSheet({ allowDownloads: false, userId: 1 }),
+    )
+    mocks.storage.resolveAttachmentPath.mockReturnValueOnce('/tmp/notes.pdf')
+    const fs = require('node:fs')
+    const existsSpy = vi.spyOn(fs, 'existsSync').mockReturnValueOnce(true)
+    mocks.attachmentPreview.sendAttachmentPreview.mockImplementationOnce(({ res }) =>
+      res.status(200).end(),
+    )
+    const res = await request(app).get('/api/sheets/10/attachment/preview')
+    expect(res.status).toBe(200)
+    expect(mocks.attachmentPreview.sendAttachmentPreview).toHaveBeenCalled()
+    existsSpy.mockRestore()
+  })
+})

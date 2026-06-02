@@ -42,6 +42,15 @@ const ERROR_CODES = Object.freeze({
   ACCOUNT_RESTRICTED: 'ACCOUNT_RESTRICTED',
   SUPER_ADMIN_PROTECTED: 'SUPER_ADMIN_PROTECTED',
 
+  // ── Password policy ────────────────────────────────────────────────────
+  // Canonical value for the existing 'BREACHED_PASSWORD' literal already
+  // emitted by register / google / reset flows — kept identical so no
+  // client contract changes. PASSWORD_UNCHANGED is new: reset-password now
+  // rejects a new password identical to the current one (NIST 800-63B
+  // §5.1.1.2 + OWASP ASVS V2.1.1).
+  BREACHED_PASSWORD: 'BREACHED_PASSWORD',
+  PASSWORD_UNCHANGED: 'PASSWORD_UNCHANGED',
+
   // ── Notes hardening v2 ─────────────────────────────────────────────────
   NOTE_REVISION_CONFLICT: 'NOTE_REVISION_CONFLICT',
   NOTE_PAYLOAD_TOO_LARGE: 'NOTE_PAYLOAD_TOO_LARGE',

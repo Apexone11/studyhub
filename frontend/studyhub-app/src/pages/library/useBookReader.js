@@ -24,8 +24,10 @@ export default function useBookReader(volumeId) {
   useEffect(() => {
     if (!volumeId) {
       setLoading(false)
-      return
+      return undefined
     }
+
+    const controller = new AbortController()
 
     async function fetchData() {
       try {
@@ -36,6 +38,7 @@ export default function useBookReader(volumeId) {
         const bookResponse = await fetch(`${API}/api/library/books/${volumeId}`, {
           credentials: 'include',
           headers: authHeaders(),
+          signal: controller.signal,
         })
 
         if (!bookResponse.ok) {
@@ -44,6 +47,7 @@ export default function useBookReader(volumeId) {
         }
 
         const bookData = await bookResponse.json()
+        if (controller.signal.aborted) return
         setBook(bookData)
 
         // Fetch bookmarks
@@ -51,11 +55,12 @@ export default function useBookReader(volumeId) {
           const bookmarksResponse = await fetch(`${API}/api/library/bookmarks/${volumeId}`, {
             credentials: 'include',
             headers: authHeaders(),
+            signal: controller.signal,
           })
 
           if (bookmarksResponse.ok) {
             const bookmarksData = await bookmarksResponse.json()
-            setBookmarks(bookmarksData.bookmarks || [])
+            if (!controller.signal.aborted) setBookmarks(bookmarksData.bookmarks || [])
           }
         } catch {
           // Silent failure -- bookmarks are non-critical
@@ -66,25 +71,28 @@ export default function useBookReader(volumeId) {
           const progressResponse = await fetch(`${API}/api/library/reading-progress/${volumeId}`, {
             credentials: 'include',
             headers: authHeaders(),
+            signal: controller.signal,
           })
 
           if (progressResponse.ok) {
             const progressData = await progressResponse.json()
-            setProgress(progressData)
+            if (!controller.signal.aborted) setProgress(progressData)
           }
         } catch {
           // Silent failure -- progress is non-critical
         }
       } catch (err) {
+        if (err?.name === 'AbortError') return
         const msg = getApiErrorMessage(err)
         setError(msg)
         setBook(null)
       } finally {
-        setLoading(false)
+        if (!controller.signal.aborted) setLoading(false)
       }
     }
 
     fetchData()
+    return () => controller.abort()
   }, [volumeId])
 
   // Save progress with debounce

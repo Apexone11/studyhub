@@ -273,6 +273,22 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
       }
       safeReplyToId = parsed
     }
+
+    // The replyTo parent is included in the create response and broadcast to
+    // every participant (replyTo:{id,content,senderId} below). Without a
+    // same-conversation check, a participant could set replyToId to a message
+    // in a conversation they're NOT in and exfiltrate its content. Confirm the
+    // parent exists AND lives in this conversation before referencing it.
+    if (safeReplyToId !== null) {
+      const replyParent = await prisma.message.findUnique({
+        where: { id: safeReplyToId },
+        select: { conversationId: true },
+      })
+      if (!replyParent || replyParent.conversationId !== conversationId) {
+        return sendError(res, 400, 'Invalid replyToId.', ERROR_CODES.BAD_REQUEST)
+      }
+    }
+
     const message = await prisma.message.create({
       data: {
         conversationId,

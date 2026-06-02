@@ -5,6 +5,7 @@
  * ───────────────────────────────────────────────────────────── */
 import { useState, useRef, useEffect } from 'react'
 import UserAvatar from '../../../components/UserAvatar'
+import { SkeletonList } from '../../../components/Skeleton'
 import {
   getConversationDisplayName,
   getConversationAvatar,
@@ -853,8 +854,8 @@ export function ConversationList({
       </div>
 
       {loading ? (
-        <div style={{ padding: 24, textAlign: 'center', color: 'var(--sh-muted)', fontSize: 13 }}>
-          Loading conversations...
+        <div style={{ padding: '8px 12px' }}>
+          <SkeletonList count={6} />
         </div>
       ) : filtered.length === 0 ? (
         <div

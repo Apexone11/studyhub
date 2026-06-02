@@ -1,4 +1,7 @@
+import { createRequire } from 'node:module'
 import { describe, it, expect } from 'vitest'
+
+const require = createRequire(import.meta.url)
 
 const {
   base64urlEncode,
@@ -257,6 +260,78 @@ describe('webauthnShared.js', () => {
       const result = buildRsaDerPublicKey(n, e)
       expect(result[0]).toBe(0x30) // SEQUENCE tag
     })
+  })
+})
+
+describe('webauthnShared.js production fail-closed (CLAUDE.md A9)', () => {
+  const sharedPath = require.resolve('../src/lib/webauthn/webauthnShared.js')
+
+  function loadFresh() {
+    delete require.cache[sharedPath]
+    return require(sharedPath)
+  }
+
+  it('throws at module load in production when WEBAUTHN_RP_ID/ORIGIN are unset', () => {
+    const prevEnv = process.env.NODE_ENV
+    const prevRpId = process.env.WEBAUTHN_RP_ID
+    const prevOrigin = process.env.WEBAUTHN_ORIGIN
+    process.env.NODE_ENV = 'production'
+    delete process.env.WEBAUTHN_RP_ID
+    delete process.env.WEBAUTHN_ORIGIN
+    try {
+      expect(() => loadFresh()).toThrow(
+        /WEBAUTHN_RP_ID and WEBAUTHN_ORIGIN are required in production/,
+      )
+    } finally {
+      delete require.cache[sharedPath]
+      process.env.NODE_ENV = prevEnv
+      if (prevRpId === undefined) delete process.env.WEBAUTHN_RP_ID
+      else process.env.WEBAUTHN_RP_ID = prevRpId
+      if (prevOrigin === undefined) delete process.env.WEBAUTHN_ORIGIN
+      else process.env.WEBAUTHN_ORIGIN = prevOrigin
+    }
+  })
+
+  it('does NOT throw in production when both vars are set', () => {
+    const prevEnv = process.env.NODE_ENV
+    const prevRpId = process.env.WEBAUTHN_RP_ID
+    const prevOrigin = process.env.WEBAUTHN_ORIGIN
+    process.env.NODE_ENV = 'production'
+    process.env.WEBAUTHN_RP_ID = 'getstudyhub.org'
+    process.env.WEBAUTHN_ORIGIN = 'https://getstudyhub.org'
+    try {
+      const mod = loadFresh()
+      expect(mod.RP_ID).toBe('getstudyhub.org')
+      expect(mod.ORIGIN).toBe('https://getstudyhub.org')
+    } finally {
+      delete require.cache[sharedPath]
+      process.env.NODE_ENV = prevEnv
+      if (prevRpId === undefined) delete process.env.WEBAUTHN_RP_ID
+      else process.env.WEBAUTHN_RP_ID = prevRpId
+      if (prevOrigin === undefined) delete process.env.WEBAUTHN_ORIGIN
+      else process.env.WEBAUTHN_ORIGIN = prevOrigin
+    }
+  })
+
+  it('does NOT throw outside production even when both vars are unset (dev fallback)', () => {
+    const prevEnv = process.env.NODE_ENV
+    const prevRpId = process.env.WEBAUTHN_RP_ID
+    const prevOrigin = process.env.WEBAUTHN_ORIGIN
+    process.env.NODE_ENV = 'test'
+    delete process.env.WEBAUTHN_RP_ID
+    delete process.env.WEBAUTHN_ORIGIN
+    try {
+      const mod = loadFresh()
+      expect(mod.RP_ID).toBe('localhost')
+      expect(mod.ORIGIN).toBe('http://localhost:5173')
+    } finally {
+      delete require.cache[sharedPath]
+      process.env.NODE_ENV = prevEnv
+      if (prevRpId === undefined) delete process.env.WEBAUTHN_RP_ID
+      else process.env.WEBAUTHN_RP_ID = prevRpId
+      if (prevOrigin === undefined) delete process.env.WEBAUTHN_ORIGIN
+      else process.env.WEBAUTHN_ORIGIN = prevOrigin
+    }
   })
 })
 

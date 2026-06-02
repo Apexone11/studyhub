@@ -10,6 +10,7 @@
  */
 const express = require('express')
 const requireAuth = require('../../core/auth/requireAuth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
@@ -17,6 +18,10 @@ const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const plagiarismService = require('./plagiarism.service')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — CSRF defense-in-depth on writes (POST dispute/rescan). Short-circuits
+// GET/HEAD/OPTIONS, so applying at router.use is safe for this mixed read+write surface.
+router.use(originAllowlist())
 
 /**
  * GET /api/plagiarism/sheet/:id

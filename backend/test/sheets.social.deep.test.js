@@ -106,6 +106,11 @@ const mocks = vi.hoisted(() => {
         const n = Number.parseInt(v, 10)
         return Number.isInteger(n) && n > 0 ? n : fb
       }),
+      parseBoundedInt: vi.fn((v, fb, max) => {
+        const n = Number.parseInt(v, 10)
+        if (!Number.isInteger(n) || n <= 0) return Math.min(fb, max)
+        return Math.min(n, max)
+      }),
     },
   }
 })
@@ -459,6 +464,13 @@ describe('PATCH /api/sheets/:id/comments/:commentId', () => {
       .send({ content: 'x'.repeat(501) })
     expect(res.status).toBe(400)
   })
+
+  it('A12: 400 on non-integer commentId before findUnique', async () => {
+    const res = await request(app).patch('/api/sheets/10/comments/abc').send({ content: 'x' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/Invalid id/i)
+    expect(mocks.prisma.comment.findUnique).not.toHaveBeenCalled()
+  })
 })
 
 // ── DELETE /:id/comments/:commentId ───────────────────────────────
@@ -490,6 +502,29 @@ describe('DELETE /api/sheets/:id/comments/:commentId', () => {
     mocks.prisma.comment.findUnique.mockResolvedValueOnce(null)
     const res = await request(app).delete('/api/sheets/10/comments/9999')
     expect(res.status).toBe(404)
+  })
+
+  it('A12: 400 on non-integer commentId before findUnique', async () => {
+    const res = await request(app).delete('/api/sheets/10/comments/abc')
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/Invalid comment id/i)
+    expect(mocks.prisma.comment.findUnique).not.toHaveBeenCalled()
+  })
+})
+
+// ── POST /:id/comments/:commentId/react ───────────────────────────
+describe('POST /api/sheets/:id/comments/:commentId/react', () => {
+  it('A12: 400 on non-integer commentId before findUnique', async () => {
+    const res = await request(app).post('/api/sheets/10/comments/abc/react').send({ type: 'like' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/Invalid comment id/i)
+    expect(mocks.prisma.comment.findUnique).not.toHaveBeenCalled()
+  })
+
+  it('A12: 400 on commentId < 1', async () => {
+    const res = await request(app).post('/api/sheets/10/comments/0/react').send({ type: 'like' })
+    expect(res.status).toBe(400)
+    expect(res.body.error).toMatch(/Invalid comment id/i)
   })
 })
 

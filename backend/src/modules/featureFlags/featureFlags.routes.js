@@ -1,6 +1,7 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
 const requireAdmin = require('../../middleware/requireAdmin')
+const originAllowlist = require('../../middleware/originAllowlist')
 const optionalAuth = require('../../core/auth/optionalAuth')
 const prisma = require('../../lib/prisma')
 const { evaluateFlag } = require('../../lib/featureFlags')
@@ -9,6 +10,14 @@ const { captureError } = require('../../monitoring/sentry')
 const { adminLimiter, readLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
+
+// Defense-in-depth origin check on every flag write. Flag toggles are
+// platform-control state (they gate signup, payments, AI surfaces) so
+// the module re-runs the allowlist at its router boundary on top of the
+// global Origin check in index.js. GET/HEAD/OPTIONS short-circuit per
+// the originAllowlist middleware, so the public /evaluate/:name read
+// endpoint keeps working for anonymous /register viewers. CLAUDE.md A11.
+router.use(originAllowlist())
 
 // A13: bound the FeatureFlag.name + description String columns so admin
 // writes can't grow them unboundedly. `name` is the canonical lookup

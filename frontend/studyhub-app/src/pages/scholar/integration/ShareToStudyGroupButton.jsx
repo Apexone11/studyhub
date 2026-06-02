@@ -1,12 +1,14 @@
 /**
- * ShareToStudyGroupButton — share a Scholar paper into a study group as
- * a `scholar_paper` resource.
+ * ShareToStudyGroupButton — share a Scholar paper into a study group as a
+ * standard link resource pointing at the paper's in-app Scholar page.
  *
  * Click flow:
  *   1. Open a popover anchored to the trigger button. Fetch the user's
- *      joined groups via GET /api/study-groups?member=me.
- *   2. User picks a group → POST /api/study-groups/:id/resources with
- *      `{ kind:'scholar_paper', paperId, title }`.
+ *      joined groups via GET /api/study-groups?mine=true.
+ *   2. User picks a group → POST /api/study-groups/:id/resources with a
+ *      link resource `{ resourceType:'link', resourceUrl, title }`. The
+ *      group resources tab already renders link resources, so sharing a
+ *      paper needs no schema change.
  *   3. Toast "Shared to ${groupName}" and close the popover.
  *   4. Graceful fallback: if the groups list endpoint or the resources
  *      endpoint 404s, toast "Feature coming soon" and close.
@@ -111,7 +113,7 @@ export default function ShareToStudyGroupButton({ paper, children, className, st
   useEffect(() => {
     if (!open || groups !== null) return undefined
     let aborted = false
-    fetch(`${API}/api/study-groups?member=me`, { credentials: 'include' })
+    fetch(`${API}/api/study-groups?mine=true`, { credentials: 'include' })
       .then(async (res) => {
         if (res.status === 404) {
           if (!aborted) {
@@ -158,9 +160,14 @@ export default function ShareToStudyGroupButton({ paper, children, className, st
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          kind: 'scholar_paper',
-          paperId: paper.id,
           title: paper.title || 'Untitled paper',
+          resourceType: 'link',
+          // Absolute URL to the paper's in-app Scholar page so it passes the
+          // route's http(s) validateResourceUrl + link-safety check. The
+          // group resources tab renders link resources already — no schema
+          // change needed to share a paper.
+          resourceUrl: `${window.location.origin}/scholar/paper/${encodeURIComponent(paper.id)}`,
+          description: paper.venue || '',
         }),
       })
       if (res.status === 404) {

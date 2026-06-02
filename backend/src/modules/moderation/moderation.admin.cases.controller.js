@@ -630,26 +630,34 @@ router.get('/cases/:id/plagiarism', async (req, res) => {
 
     const matches = await findSimilarContent({ contentType, contentId, limit: 10 })
 
-    /* For each match, fetch a text preview for side-by-side */
-    const enrichedMatches = await Promise.all(
-      matches.map(async (m) => {
-        let preview = null
-        if (m.type === 'sheet') {
-          const s = await prisma.studySheet.findUnique({
-            where: { id: m.id },
-            select: { content: true },
+    /* Batch-fetch text previews for side-by-side (one query per content type) */
+    const matchSheetIds = matches.filter((m) => m.type === 'sheet').map((m) => m.id)
+    const matchNoteIds = matches.filter((m) => m.type === 'note').map((m) => m.id)
+    const [sheetRows, noteRows] = await Promise.all([
+      matchSheetIds.length
+        ? prisma.studySheet.findMany({
+            where: { id: { in: matchSheetIds } },
+            select: { id: true, content: true },
           })
-          preview = s?.content?.slice(0, 2000) || null
-        } else if (m.type === 'note') {
-          const n = await prisma.note.findUnique({
-            where: { id: m.id },
-            select: { content: true },
+        : [],
+      matchNoteIds.length
+        ? prisma.note.findMany({
+            where: { id: { in: matchNoteIds } },
+            select: { id: true, content: true },
           })
-          preview = n?.content?.slice(0, 2000) || null
-        }
-        return { ...m, textPreview: preview }
-      }),
-    )
+        : [],
+    ])
+    const sheetById = new Map(sheetRows.map((s) => [s.id, s]))
+    const noteById = new Map(noteRows.map((n) => [n.id, n]))
+    const enrichedMatches = matches.map((m) => {
+      let preview = null
+      if (m.type === 'sheet') {
+        preview = sheetById.get(m.id)?.content?.slice(0, 2000) || null
+      } else if (m.type === 'note') {
+        preview = noteById.get(m.id)?.content?.slice(0, 2000) || null
+      }
+      return { ...m, textPreview: preview }
+    })
 
     res.json({
       reported: {

@@ -1,6 +1,7 @@
 import { useMemo } from 'react'
 import { createPortal } from 'react-dom'
 import { diffWordsWithSpace } from 'diff'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 
 export default function ConflictCompareModal({
   yours,
@@ -14,9 +15,19 @@ export default function ConflictCompareModal({
     [current?.content, yours?.content],
   )
 
+  // Focus trap + Escape-to-close + scroll-lock. This modal is mounted only
+  // when a conflict exists (a high-stakes data-loss decision), so active:true.
+  const focusTrapRef = useFocusTrap({ active: true, onClose })
+
   return createPortal(
-    <div style={backdrop} onClick={onClose} data-testid="conflict-compare-modal">
-      <div style={modal} onClick={(e) => e.stopPropagation()}>
+    <div ref={focusTrapRef} style={backdrop} onClick={onClose} data-testid="conflict-compare-modal">
+      <div
+        style={modal}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Conflict - your changes vs. server"
+      >
         <header style={header}>
           <strong>Conflict - your changes vs. server</strong>
           <button type="button" onClick={onClose} style={closeBtn} aria-label="Close">

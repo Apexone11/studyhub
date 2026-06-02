@@ -388,6 +388,57 @@ describe('POST /reset-password', () => {
       include: { user: true },
     })
   })
+
+  // NIST 800-63B §5.1.1.2 + OWASP ASVS V2.1.1 — new password must differ
+  // from the current credential (2026-05-14 P1-D).
+  it('400 PASSWORD_UNCHANGED when the new password equals the current one', async () => {
+    const currentHash = await bcrypt.hash('NewPass123', 12)
+    mocks.prisma.passwordResetToken.findUnique.mockResolvedValueOnce({
+      userId: 1,
+      token: 'hash:good',
+      expiresAt: new Date(Date.now() + 60_000),
+      user: { id: 1, username: 'u', email: 'u@t.io', passwordHash: currentHash },
+    })
+    const res = await request(app)
+      .post('/reset-password')
+      .send({ token: 'good', newPassword: 'NewPass123' })
+    expect(res.status).toBe(400)
+    expect(res.body.code).toBe('PASSWORD_UNCHANGED')
+    expect(res.body.error).toMatch(/different from your current password/i)
+    // Must NOT rotate the hash or consume the token — the user should be
+    // able to retry with a genuinely new password using the same link.
+    expect(mocks.prisma.user.update).not.toHaveBeenCalled()
+    expect(mocks.prisma.passwordResetToken.delete).not.toHaveBeenCalled()
+  })
+
+  it('allows reset when the new password DIFFERS from the current one', async () => {
+    const currentHash = await bcrypt.hash('OldPass123', 12)
+    mocks.prisma.passwordResetToken.findUnique.mockResolvedValueOnce({
+      userId: 1,
+      token: 'hash:good',
+      expiresAt: new Date(Date.now() + 60_000),
+      user: { id: 1, username: 'u', email: 'u@t.io', passwordHash: currentHash },
+    })
+    const res = await request(app)
+      .post('/reset-password')
+      .send({ token: 'good', newPassword: 'NewPass123' })
+    expect(res.status).toBe(200)
+    expect(mocks.prisma.user.update).toHaveBeenCalled()
+  })
+
+  it('skips the same-as-current check for users with no passwordHash (Google-signup)', async () => {
+    mocks.prisma.passwordResetToken.findUnique.mockResolvedValueOnce({
+      userId: 1,
+      token: 'hash:good',
+      expiresAt: new Date(Date.now() + 60_000),
+      user: { id: 1, username: 'u', email: 'u@t.io', passwordHash: null },
+    })
+    const res = await request(app)
+      .post('/reset-password')
+      .send({ token: 'good', newPassword: 'NewPass123' })
+    expect(res.status).toBe(200)
+    expect(mocks.prisma.user.update).toHaveBeenCalled()
+  })
 })
 
 // ────────────────────────────────────────────────────────────────────────────

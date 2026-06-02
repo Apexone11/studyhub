@@ -63,6 +63,10 @@ const mocks = vi.hoisted(() => {
     rateLimiters: {
       libraryWriteLimiter: (_req, _res, next) => next(),
       libraryReadLimiter: (_req, _res, next) => next(),
+      // adminLimiter — added wave-12.19 when /admin/sync-catalog gained
+      // rate limiting; mock is a no-op so unit tests don't need the
+      // express-rate-limit machinery.
+      adminLimiter: (_req, _res, next) => next(),
     },
     blockFilter: {
       getBlockedUserIds: vi.fn().mockResolvedValue([]),

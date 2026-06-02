@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import UserAvatar from '../../components/UserAvatar'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 import { formatRelativeTime, getRoleLabel } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 
@@ -36,9 +37,14 @@ function ActionModal({
   confirmDanger,
   children,
 }) {
+  // Focus trap + Escape-to-close + scroll-lock. Auto-focuses the first
+  // focusable element inside the dialog (Cancel button) and restores
+  // focus on close.
+  const trapRef = useFocusTrap({ active: true, onClose: onCancel })
   return createPortal(
     <div style={styles.modalOverlay} onClick={onCancel}>
       <div
+        ref={trapRef}
         style={styles.modalContent}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -79,6 +85,61 @@ function ActionModal({
       </div>
     </div>,
     document.body,
+  )
+}
+
+/* ── Invite modal (extracted so focus-trap hook can mount with it) ─────── */
+function InviteModal({ onClose, onSubmit, formData, setFormData, error, submitting, titleId }) {
+  const trapRef = useFocusTrap({ active: true, onClose })
+  return (
+    <div style={styles.modalOverlay} onClick={onClose}>
+      <div
+        ref={trapRef}
+        style={styles.modalContent}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+      >
+        <h3 style={styles.sectionTitle} id={titleId}>
+          Invite Member
+        </h3>
+        {error && <div style={styles.error}>{error}</div>}
+        <form onSubmit={onSubmit}>
+          <div style={styles.formGroup}>
+            <label htmlFor="username" style={styles.label}>
+              Username
+            </label>
+            <input
+              id="username"
+              type="text"
+              style={styles.input}
+              value={formData.username}
+              onChange={(e) => setFormData({ username: e.target.value })}
+              placeholder="Enter username"
+            />
+          </div>
+
+          <div style={styles.formActions}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ ...styles.button, ...styles.buttonSecondary }}
+              aria-label="Close Invite Member dialog"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={submitting}
+              style={{ ...styles.button, ...styles.buttonPrimary }}
+            >
+              {submitting ? 'Inviting...' : 'Invite'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   )
 }
 
@@ -230,58 +291,19 @@ export function GroupMembersTab({
             </button>
           )}
         </div>
-        {createPortal(
-          inviteModalOpen && (
-            <div style={styles.modalOverlay} onClick={() => setInviteModalOpen(false)}>
-              <div
-                style={styles.modalContent}
-                onClick={(e) => e.stopPropagation()}
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="invite-member-title"
-              >
-                <h3 style={styles.sectionTitle} id="invite-member-title">
-                  Invite Member
-                </h3>
-                {error && <div style={styles.error}>{error}</div>}
-                <form onSubmit={handleSubmit}>
-                  <div style={styles.formGroup}>
-                    <label htmlFor="username" style={styles.label}>
-                      Username
-                    </label>
-                    <input
-                      id="username"
-                      type="text"
-                      style={styles.input}
-                      value={formData.username}
-                      onChange={(e) => setFormData({ username: e.target.value })}
-                      placeholder="Enter username"
-                    />
-                  </div>
-
-                  <div style={styles.formActions}>
-                    <button
-                      type="button"
-                      onClick={() => setInviteModalOpen(false)}
-                      style={{ ...styles.button, ...styles.buttonSecondary }}
-                      aria-label="Close Invite Member dialog"
-                    >
-                      Cancel
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={submitting}
-                      style={{ ...styles.button, ...styles.buttonPrimary }}
-                    >
-                      {submitting ? 'Inviting...' : 'Invite'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          ),
-          document.body,
-        )}
+        {inviteModalOpen &&
+          createPortal(
+            <InviteModal
+              onClose={() => setInviteModalOpen(false)}
+              onSubmit={handleSubmit}
+              formData={formData}
+              setFormData={setFormData}
+              error={error}
+              submitting={submitting}
+              titleId="invite-member-title"
+            />,
+            document.body,
+          )}
       </div>
     )
   }
@@ -719,58 +741,19 @@ export function GroupMembersTab({
       )}
 
       {/* Invite modal */}
-      {createPortal(
-        inviteModalOpen && (
-          <div style={styles.modalOverlay} onClick={() => setInviteModalOpen(false)}>
-            <div
-              style={styles.modalContent}
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-modal="true"
-              aria-labelledby="invite-member-title-2"
-            >
-              <h3 style={styles.sectionTitle} id="invite-member-title-2">
-                Invite Member
-              </h3>
-              {error && <div style={styles.error}>{error}</div>}
-              <form onSubmit={handleSubmit}>
-                <div style={styles.formGroup}>
-                  <label htmlFor="username" style={styles.label}>
-                    Username
-                  </label>
-                  <input
-                    id="username"
-                    type="text"
-                    style={styles.input}
-                    value={formData.username}
-                    onChange={(e) => setFormData({ username: e.target.value })}
-                    placeholder="Enter username"
-                  />
-                </div>
-
-                <div style={styles.formActions}>
-                  <button
-                    type="button"
-                    onClick={() => setInviteModalOpen(false)}
-                    style={{ ...styles.button, ...styles.buttonSecondary }}
-                    aria-label="Close Invite Member dialog"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    disabled={submitting}
-                    style={{ ...styles.button, ...styles.buttonPrimary }}
-                  >
-                    {submitting ? 'Inviting...' : 'Invite'}
-                  </button>
-                </div>
-              </form>
-            </div>
-          </div>
-        ),
-        document.body,
-      )}
+      {inviteModalOpen &&
+        createPortal(
+          <InviteModal
+            onClose={() => setInviteModalOpen(false)}
+            onSubmit={handleSubmit}
+            formData={formData}
+            setFormData={setFormData}
+            error={error}
+            submitting={submitting}
+            titleId="invite-member-title-2"
+          />,
+          document.body,
+        )}
     </div>
   )
 }

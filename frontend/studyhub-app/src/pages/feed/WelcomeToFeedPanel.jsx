@@ -25,28 +25,27 @@ export default function WelcomeToFeedPanel() {
     swr: 5 * 60 * 1000,
   })
   const [followingSet, setFollowingSet] = useState(() => new Set())
+  const [requestedSet, setRequestedSet] = useState(() => new Set())
 
   const handleFollow = useCallback(async (username) => {
-    setFollowingSet((prev) => new Set([...prev, username]))
     try {
       const res = await fetch(`${API}/api/users/${encodeURIComponent(username)}/follow`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       })
-      if (!res.ok) {
-        setFollowingSet((prev) => {
-          const next = new Set(prev)
-          next.delete(username)
-          return next
-        })
+      if (!res.ok) return
+      const data = await res.json().catch(() => ({}))
+      // Hydrate from server response — a private account returns
+      // { following: false, requested: true } (pending request), not
+      // { following: true }. Per A4, never assume 2xx means "now following".
+      if (data.following === true) {
+        setFollowingSet((prev) => new Set([...prev, username]))
+      } else if (data.requested === true) {
+        setRequestedSet((prev) => new Set([...prev, username]))
       }
     } catch {
-      setFollowingSet((prev) => {
-        const next = new Set(prev)
-        next.delete(username)
-        return next
-      })
+      // Network error — leave state unchanged so the user can retry.
     }
   }, [])
 
@@ -123,6 +122,7 @@ export default function WelcomeToFeedPanel() {
         >
           {suggestions.map((user) => {
             const isFollowed = followingSet.has(user.username)
+            const isRequested = requestedSet.has(user.username)
             const sharedCourses = typeof user.sharedCourses === 'number' ? user.sharedCourses : null
             const followerCount =
               typeof user.followerCount === 'number' ? user.followerCount : user._count?.followers
@@ -170,8 +170,8 @@ export default function WelcomeToFeedPanel() {
                 </Link>
                 <button
                   type="button"
-                  onClick={() => !isFollowed && handleFollow(user.username)}
-                  disabled={isFollowed}
+                  onClick={() => !isFollowed && !isRequested && handleFollow(user.username)}
+                  disabled={isFollowed || isRequested}
                   style={{
                     fontSize: 12,
                     fontWeight: 700,
@@ -180,13 +180,14 @@ export default function WelcomeToFeedPanel() {
                     border: 'none',
                     fontFamily: 'inherit',
                     flexShrink: 0,
-                    background: isFollowed ? 'var(--sh-soft)' : 'var(--sh-brand)',
-                    color: isFollowed ? 'var(--sh-muted)' : 'var(--sh-btn-primary-text)',
-                    cursor: isFollowed ? 'default' : 'pointer',
+                    background: isFollowed || isRequested ? 'var(--sh-soft)' : 'var(--sh-brand)',
+                    color:
+                      isFollowed || isRequested ? 'var(--sh-muted)' : 'var(--sh-btn-primary-text)',
+                    cursor: isFollowed || isRequested ? 'default' : 'pointer',
                     transition: 'background .15s',
                   }}
                 >
-                  {isFollowed ? 'Following' : 'Follow'}
+                  {isFollowed ? 'Following' : isRequested ? 'Requested' : 'Follow'}
                 </button>
               </li>
             )

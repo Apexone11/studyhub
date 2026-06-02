@@ -197,16 +197,29 @@ async function runPlagiarismScan(sheetId, content, authorId) {
       })
       .then((s) => s?.title || 'Untitled')
 
-    for (const match of matches.slice(0, 10)) {
+    const topMatches = matches.slice(0, 10)
+    const matchIds = topMatches
+      .filter(
+        (m) =>
+          m.similarityScore >= SIMILARITY_THRESHOLD && m.similarityScore < LIKELY_COPY_THRESHOLD,
+      )
+      .map((m) => m.matchedSheetId)
+    const matchedContentRows = matchIds.length
+      ? await prisma.studySheet.findMany({
+          where: { id: { in: matchIds } },
+          select: { id: true, content: true },
+        })
+      : []
+    const matchedContentById = new Map(matchedContentRows.map((s) => [s.id, s.content || '']))
+
+    for (const match of topMatches) {
       if (
         match.similarityScore >= SIMILARITY_THRESHOLD &&
         match.similarityScore < LIKELY_COPY_THRESHOLD
       ) {
         const aiResult = await analyzeWithAi(
           content,
-          await prisma.studySheet
-            .findUnique({ where: { id: match.matchedSheetId }, select: { content: true } })
-            .then((s) => s?.content || ''),
+          matchedContentById.get(match.matchedSheetId) || '',
           sheetTitle,
           match.matchedTitle,
         )

@@ -32,6 +32,7 @@ const {
   validateGroupName,
   validateDescription,
   formatGroup,
+  formatGroupFromBatch,
 } = require('./studyGroups.helpers')
 
 /**
@@ -100,11 +101,81 @@ async function listGroups(req, res) {
         orderBy: { updatedAt: 'desc' },
         skip: offsetNum,
         take: limitNum,
+        include: {
+          course: {
+            select: {
+              name: true,
+              code: true,
+              school: { select: { id: true, name: true, short: true } },
+            },
+          },
+        },
       }),
       prisma.studyGroup.count({ where }),
     ])
 
-    const formatted = await Promise.all(groups.map((g) => formatGroup(g, req.user.userId)))
+    // Batch every per-group aggregate into a handful of groupBy/findMany calls
+    // instead of formatGroup()'s 8-queries-per-group fan-out (was up to ~800
+    // queries for a 100-group page). formatGroupFromBatch() maps in memory and
+    // returns the same shape formatGroup() does.
+    const ids = groups.map((g) => g.id)
+    let formatted = []
+    if (ids.length > 0) {
+      const now = new Date()
+      const [memberRows, resourceRows, sessionRows, postRows, memberships] = await Promise.all([
+        prisma.studyGroupMember.groupBy({
+          by: ['groupId', 'status'],
+          where: { groupId: { in: ids } },
+          _count: { _all: true },
+        }),
+        prisma.groupResource.groupBy({
+          by: ['groupId'],
+          where: { groupId: { in: ids } },
+          _count: { _all: true },
+        }),
+        prisma.groupSession.groupBy({
+          by: ['groupId'],
+          where: {
+            groupId: { in: ids },
+            scheduledAt: { gte: now },
+            status: { in: ['upcoming', 'in_progress'] },
+          },
+          _count: { _all: true },
+        }),
+        prisma.groupDiscussionPost.groupBy({
+          by: ['groupId'],
+          where: { groupId: { in: ids } },
+          _count: { _all: true },
+        }),
+        prisma.studyGroupMember.findMany({
+          where: { groupId: { in: ids }, userId: req.user.userId },
+          select: { id: true, groupId: true, role: true, status: true, joinedAt: true },
+        }),
+      ])
+
+      const memberCountsByGroup = new Map()
+      for (const row of memberRows) {
+        const entry = memberCountsByGroup.get(row.groupId) || { active: 0, pending: 0, invited: 0 }
+        if (row.status === 'active') entry.active = row._count._all
+        else if (row.status === 'pending') entry.pending = row._count._all
+        else if (row.status === 'invited') entry.invited = row._count._all
+        memberCountsByGroup.set(row.groupId, entry)
+      }
+      const resourceCountByGroup = new Map(resourceRows.map((r) => [r.groupId, r._count._all]))
+      const sessionCountByGroup = new Map(sessionRows.map((r) => [r.groupId, r._count._all]))
+      const postCountByGroup = new Map(postRows.map((r) => [r.groupId, r._count._all]))
+      const membershipByGroup = new Map(memberships.map((m) => [m.groupId, m]))
+
+      formatted = groups.map((g) =>
+        formatGroupFromBatch(g, {
+          memberCounts: memberCountsByGroup.get(g.id),
+          resourceCount: resourceCountByGroup.get(g.id) || 0,
+          upcomingSessionCount: sessionCountByGroup.get(g.id) || 0,
+          discussionPostCount: postCountByGroup.get(g.id) || 0,
+          membership: membershipByGroup.get(g.id) || null,
+        }),
+      )
+    }
 
     res.json({ groups: formatted, total, limit: limitNum, offset: offsetNum })
   } catch (err) {

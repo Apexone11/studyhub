@@ -2,12 +2,14 @@ const express = require('express')
 const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
 const optionalAuth = require('../../core/auth/optionalAuth')
-const { parsePositiveInt } = require('../../core/http/validate')
+const { parseBoundedInt } = require('../../core/http/validate')
 const { SHEET_STATUS, AUTHOR_SELECT, leaderboardLimiter } = require('./sheets.constants')
 const { serializeSheet } = require('./sheets.serializer')
 const { buildSheetTextSearchClauses } = require('../../lib/sheetSearch')
 const { searchSheetsFTS } = require('../../lib/fullTextSearch')
+const courseAliasing = require('../../lib/courseAliasing')
 const { cache } = require('../../lib/cache')
+const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 /* RISK_TIER removed — sheet listings no longer filter by htmlRiskTier
  * (security enforcement is in the sheet viewer / HTML preview endpoints) */
 
@@ -105,8 +107,20 @@ router.get('/', optionalAuth, async (req, res) => {
       where.status = SHEET_STATUS.PUBLISHED
     }
 
-    if (courseId) where.courseId = Number.parseInt(courseId, 10)
-    if (schoolId) where.course = { schoolId: Number.parseInt(schoolId, 10) }
+    if (courseId !== undefined && courseId !== '') {
+      const parsedCourseId = Number.parseInt(courseId, 10)
+      if (!Number.isInteger(parsedCourseId) || parsedCourseId < 1) {
+        return sendError(res, 400, 'Invalid courseId.', ERROR_CODES.BAD_REQUEST)
+      }
+      where.courseId = parsedCourseId
+    }
+    if (schoolId !== undefined && schoolId !== '') {
+      const parsedSchoolId = Number.parseInt(schoolId, 10)
+      if (!Number.isInteger(parsedSchoolId) || parsedSchoolId < 1) {
+        return sendError(res, 400, 'Invalid schoolId.', ERROR_CODES.BAD_REQUEST)
+      }
+      where.course = { schoolId: parsedSchoolId }
+    }
 
     const formatCandidate = typeof format === 'string' ? format.trim().toLowerCase() : ''
     if (formatCandidate === 'html') {
@@ -123,13 +137,32 @@ router.get('/', optionalAuth, async (req, res) => {
     const sheetTextSearchClauses = buildSheetTextSearchClauses(search)
     if (sheetTextSearchClauses.length) {
       where.OR = sheetTextSearchClauses
+      // G2-4 — also surface sheets whose course is a cross-school equivalent of
+      // the searched topic (e.g. "intro programming" -> CMSC131 + CS61A sheets).
+      // No-op when flag_course_aliasing is off or the query matches no topic;
+      // a school-scoped query (where.course.schoolId set) still constrains the
+      // result, so this only widens cross-school searches. Skip the expansion
+      // on the `mine=1` (own-sheets) path entirely — it's scoped to the
+      // caller's own userId and can never widen results, so the extra
+      // alias/topic lookups would be wasted work.
+      if (!includeUnpublishedMine) {
+        const expandedCourseIds = await courseAliasing.expandQueryToCourseIds(search, {
+          userId: req.user?.userId,
+          role: req.user?.role,
+        })
+        if (expandedCourseIds.length) {
+          where.OR.push({ courseId: { in: expandedCourseIds } })
+        }
+      }
     }
 
     const allowedSort = ['createdAt', 'stars', 'downloads', 'forks', 'updatedAt', 'recommended']
     const sortCandidate = typeof sort === 'string' && sort.trim() ? sort : orderByParam
     const sortField = allowedSort.includes(sortCandidate) ? sortCandidate : 'createdAt'
-    const take = parsePositiveInt(limit, 20)
-    const skip = Math.max(0, Number.parseInt(offset, 10) || 0)
+    const take = parseBoundedInt(limit, 20, 100)
+    // Cap the offset so a hostile/buggy client can't request a multi-million
+    // row skip and force Postgres into an unbounded scan-and-discard.
+    const skip = Math.min(Math.max(0, Number.parseInt(offset, 10) || 0), 5000)
 
     if (starred === '1') {
       if (!req.user) return res.status(401).json({ error: 'Login required.' })

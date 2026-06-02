@@ -12,7 +12,7 @@
  */
 import { act, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('../../lib/prefetch', () => ({
   prefetchForRoute: vi.fn(),
@@ -32,18 +32,14 @@ vi.mock('../../lib/session-context', () => ({
   useSession: () => mockUseSession(),
 }))
 
-// Suppress the unread-total fetch — msw is configured to error on
-// unhandled requests. Returning a 404 here avoids the network entirely;
-// the component swallows non-OK responses.
-const originalFetch = globalThis.fetch
-beforeEach(() => {
-  globalThis.fetch = vi.fn().mockResolvedValue({
-    ok: true,
-    json: async () => ({ total: 0 }),
-  })
-})
+// The unread badge is now sourced from the shared UnreadContext rather than a
+// local fetch. Mock the hook so the nav renders with a deterministic count and
+// the component does no network at all.
+vi.mock('../../lib/unreadContext.js', () => ({
+  useUnread: () => ({ total: 0, refresh: vi.fn() }),
+}))
+
 afterEach(() => {
-  globalThis.fetch = originalFetch
   mockUseSession.mockReset()
   mockUseSession.mockImplementation(() => ({
     user: {

@@ -333,19 +333,15 @@ describe('POST / (create note)', () => {
     expect(createCall.data.courseId).toBe(7)
   })
 
-  it('invalid courseId string becomes null', async () => {
-    mocks.prisma.note.create.mockResolvedValue({
-      id: 7,
-      title: 't',
-      content: 'c',
-      private: true,
-      userId: 42,
-      courseId: null,
-      course: null,
-    })
-    await request(app).post('/').send({ title: 't', content: 'c', courseId: 'lol' })
-    const createCall = mocks.prisma.note.create.mock.calls[0][0]
-    expect(createCall.data.courseId).toBeNull()
+  it('invalid courseId string returns 400 (A12 — wave-12.19)', async () => {
+    // Pre-12.19 behaviour was silent nullification (Prisma would write
+    // null and the note would persist). The audit's A12 enforcement now
+    // rejects non-integer courseId at the handler boundary so callers
+    // get a clear envelope instead of guessing why the course link
+    // disappeared.
+    const res = await request(app).post('/').send({ title: 't', content: 'c', courseId: 'lol' })
+    expect(res.status).toBe(400)
+    expect(mocks.prisma.note.create).not.toHaveBeenCalled()
   })
 
   it('returns 401 when unauthenticated', async () => {

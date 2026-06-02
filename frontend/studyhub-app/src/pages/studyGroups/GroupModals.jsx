@@ -9,6 +9,7 @@ import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { resolveGroupImageUrl } from './studyGroupsHelpers'
 import CourseSelect from '../../components/CourseSelect'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 import { styles } from './studyGroupsStyles'
 
 async function uploadGroupImage(file) {
@@ -149,6 +150,11 @@ function CreateGroupModal({ open, onClose, onSubmit, courses, enrolledSchoolIds 
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const groupImage = useGroupImageUpload('')
+  const titleId = useId()
+  // Focus trap + Escape-to-close + scroll-lock. Hook runs every render
+  // (above the early return per rules-of-hooks); the trap only activates
+  // when active:open is true.
+  const trapRef = useFocusTrap({ active: open, onClose })
 
   if (!open) return null
 
@@ -180,12 +186,16 @@ function CreateGroupModal({ open, onClose, onSubmit, courses, enrolledSchoolIds 
   return (
     <div style={styles.modalOverlay} onClick={onClose}>
       <div
+        ref={trapRef}
         style={styles.modal}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
       >
-        <h2 style={styles.modalTitle}>Create a Study Group</h2>
+        <h2 id={titleId} style={styles.modalTitle}>
+          Create a Study Group
+        </h2>
 
         <form onSubmit={handleSubmit}>
           <div style={styles.formGroup}>
@@ -266,6 +276,8 @@ export function EditGroupModal({ open, group, onClose, onSubmit, courses, enroll
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState('')
   const groupImage = useGroupImageUpload(group?.avatarUrl || '')
+  const titleId = useId()
+  const trapRef = useFocusTrap({ active: open, onClose })
 
   if (!open) return null
 
@@ -298,12 +310,16 @@ export function EditGroupModal({ open, group, onClose, onSubmit, courses, enroll
   return (
     <div style={styles.modalOverlay} onClick={onClose}>
       <div
+        ref={trapRef}
         style={styles.modal}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
         aria-modal="true"
+        aria-labelledby={titleId}
       >
-        <h2 style={styles.modalTitle}>Edit Study Group</h2>
+        <h2 id={titleId} style={styles.modalTitle}>
+          Edit Study Group
+        </h2>
 
         <form onSubmit={handleSubmit}>
           <div style={styles.formGroup}>

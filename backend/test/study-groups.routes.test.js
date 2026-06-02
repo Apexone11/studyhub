@@ -27,6 +27,7 @@ const mocks = vi.hoisted(() => {
       delete: vi.fn(),
       deleteMany: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(async () => []),
     },
     studyGroupResource: {
       findUnique: vi.fn(),
@@ -43,6 +44,7 @@ const mocks = vi.hoisted(() => {
       update: vi.fn(),
       delete: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(async () => []),
     },
     groupSession: {
       findUnique: vi.fn(),
@@ -51,6 +53,7 @@ const mocks = vi.hoisted(() => {
       update: vi.fn(),
       delete: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(async () => []),
     },
     groupSessionRsvp: {
       findUnique: vi.fn(),
@@ -81,12 +84,20 @@ const mocks = vi.hoisted(() => {
       update: vi.fn(),
       delete: vi.fn(),
       count: vi.fn(),
+      groupBy: vi.fn(async () => []),
     },
     groupDiscussionReply: {
       findUnique: vi.fn(),
       findMany: vi.fn(),
       create: vi.fn(),
       update: vi.fn(),
+      delete: vi.fn(),
+      count: vi.fn(),
+    },
+    discussionUpvote: {
+      findUnique: vi.fn(),
+      findMany: vi.fn(async () => []),
+      create: vi.fn(),
       delete: vi.fn(),
       count: vi.fn(),
     },
@@ -894,6 +905,76 @@ describe('discussions', () => {
       expect(res.status).toBe(201)
       expect(res.body.title).toBe('Question about math')
       expect(res.body.type).toBe('question')
+    })
+  })
+
+  /* Active-membership gate (P1 security): a pending/invited/banned member
+   * must NOT be able to read or create discussions in a (private) group.
+   * requireGroupMember returns those rows too, so a bare existence check
+   * leaked private content — requireActiveGroupMember closes the gap. */
+  describe('active-membership gate', () => {
+    it('GET /:id/discussions 404s a pending member', async () => {
+      mocks.prisma.studyGroupMember.findUnique.mockResolvedValue({
+        groupId: 1,
+        userId: 42,
+        role: 'member',
+        status: 'pending',
+      })
+
+      const res = await request(app).get('/1/discussions')
+
+      expect(res.status).toBe(404)
+      expect(mocks.prisma.groupDiscussionPost.findMany).not.toHaveBeenCalled()
+    })
+
+    it('GET /:id/discussions 404s a banned member', async () => {
+      mocks.prisma.studyGroupMember.findUnique.mockResolvedValue({
+        groupId: 1,
+        userId: 42,
+        role: 'member',
+        status: 'banned',
+      })
+
+      const res = await request(app).get('/1/discussions')
+
+      expect(res.status).toBe(404)
+      expect(mocks.prisma.groupDiscussionPost.findMany).not.toHaveBeenCalled()
+    })
+
+    it('POST /:id/discussions 404s a pending member (no post created)', async () => {
+      mocks.prisma.studyGroupMember.findUnique.mockResolvedValue({
+        groupId: 1,
+        userId: 42,
+        role: 'member',
+        status: 'pending',
+      })
+
+      const res = await request(app).post('/1/discussions').send({
+        title: 'Sneaky pending post',
+        content: 'Should never persist',
+        type: 'question',
+      })
+
+      expect(res.status).toBe(404)
+      expect(mocks.prisma.groupDiscussionPost.create).not.toHaveBeenCalled()
+    })
+
+    it('POST /:id/discussions 404s a banned member (no post created)', async () => {
+      mocks.prisma.studyGroupMember.findUnique.mockResolvedValue({
+        groupId: 1,
+        userId: 42,
+        role: 'member',
+        status: 'banned',
+      })
+
+      const res = await request(app).post('/1/discussions').send({
+        title: 'Sneaky banned post',
+        content: 'Should never persist',
+        type: 'question',
+      })
+
+      expect(res.status).toBe(404)
+      expect(mocks.prisma.groupDiscussionPost.create).not.toHaveBeenCalled()
     })
   })
 

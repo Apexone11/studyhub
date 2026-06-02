@@ -333,6 +333,44 @@ describe('notes routes', () => {
     })
   })
 
+  describe('POST /:id (sendBeacon update alias)', () => {
+    // navigator.sendBeacon (tab-close autosave) can only POST, but the note
+    // update route was PATCH-only — the final unsaved edits 404'd and were
+    // lost. The POST alias must reach the identical updateNote handler.
+    it('routes POST /:id to updateNote and persists the edit', async () => {
+      mocks.prisma.note.findUnique.mockResolvedValue({
+        id: 1,
+        userId: 42,
+        title: 'Old Title',
+      })
+      mocks.prisma.note.update.mockResolvedValue({
+        id: 1,
+        title: 'Beacon Title',
+        content: 'Saved on tab close',
+        userId: 42,
+        course: null,
+      })
+
+      const response = await request(app)
+        .post('/1')
+        .send({ title: 'Beacon Title', content: 'Saved on tab close', trigger: 'beforeunload' })
+
+      expect(response.status).toBe(200)
+      // Same hardened envelope as PATCH — proves it hit updateNote.
+      expect(response.body).toMatchObject({ note: { title: 'Beacon Title' } })
+      expect(mocks.prisma.note.update).toHaveBeenCalled()
+    })
+
+    it('returns 404 via the POST alias when the note does not exist', async () => {
+      mocks.prisma.note.findUnique.mockResolvedValue(null)
+
+      const response = await request(app).post('/999').send({ title: 'Nope' })
+
+      expect(response.status).toBe(404)
+      expect(response.body).toMatchObject({ error: 'Note not found.' })
+    })
+  })
+
   describe('DELETE /:id', () => {
     it('deletes a note owned by the user', async () => {
       mocks.prisma.note.findUnique.mockResolvedValue({

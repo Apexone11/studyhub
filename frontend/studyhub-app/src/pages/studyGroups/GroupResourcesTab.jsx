@@ -5,6 +5,7 @@ import { formatRelativeTime, truncateText } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 import MediaComposer from './MediaComposer'
 import { AttachmentPreviewModal } from '../../components/AttachmentPreview'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 
 /**
  * Resources tab. Phase 4 additions:
@@ -314,6 +315,9 @@ function ResourceDetailModal({ resource, isAdminOrMod, userId, onDelete, onClose
   const isFile = resource.mediaUrl && !isImage && !isVideo
   const canDelete = isAdminOrMod || resource.userId === userId || resource.user?.id === userId
   const resourceType = resource.resourceType || resource.type || 'Link'
+  // Focus trap + Escape-to-close + scroll-lock. Modal is always mounted
+  // when this component renders, so active is unconditionally true.
+  const trapRef = useFocusTrap({ active: true, onClose })
 
   const handleDelete = () => {
     onDelete(resource.id)
@@ -323,6 +327,7 @@ function ResourceDetailModal({ resource, isAdminOrMod, userId, onDelete, onClose
   return createPortal(
     <div style={styles.modalOverlay} onClick={onClose}>
       <div
+        ref={trapRef}
         style={{ ...styles.modalContent, maxWidth: 640 }}
         onClick={(e) => e.stopPropagation()}
         role="dialog"
@@ -533,6 +538,9 @@ function AddResourceModal({ groupId, onAdd, onClose }) {
   const [attachments, setAttachments] = useState([])
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  // Focus trap + Escape-to-close + scroll-lock. Modal is always mounted
+  // when this component renders, so active is unconditionally true.
+  const trapRef = useFocusTrap({ active: true, onClose })
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -586,6 +594,7 @@ function AddResourceModal({ groupId, onAdd, onClose }) {
   return createPortal(
     <div style={styles.modalOverlay} onClick={onClose}>
       <div
+        ref={trapRef}
         style={styles.modalContent}
         onClick={(e) => e.stopPropagation()}
         role="dialog"

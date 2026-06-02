@@ -21,6 +21,7 @@ import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
 import { showToast } from '../../lib/toast'
 import { authHeaders } from '../shared/pageUtils'
+import ConfirmDialog from '../../components/ConfirmDialog'
 import BookCard from './components/BookCard'
 import useLibraryData from './useLibraryData'
 import autoAnimate from '@formkit/auto-animate'
@@ -55,6 +56,7 @@ export default function LibraryPage() {
   const [shelvesLoading, setShelvesLoading] = useState(false)
   const [showShelves, setShowShelves] = useState(false)
   const [shelfActionId, setShelfActionId] = useState(null)
+  const [pendingDeleteShelf, setPendingDeleteShelf] = useState(null)
 
   // Fetch user's shelves with books
   const loadShelves = useCallback(async () => {
@@ -115,14 +117,16 @@ export default function LibraryPage() {
     }
   }, [])
 
-  const deleteShelf = useCallback(async (shelfId, shelfName) => {
-    if (
-      typeof window !== 'undefined' &&
-      !window.confirm(`Delete "${shelfName}"? This removes the shelf and its saved books.`)
-    ) {
-      return
-    }
+  // Open-confirm is split from really-delete so the destructive action goes
+  // through the focus-trapped ConfirmDialog instead of a raw window.confirm.
+  const deleteShelf = useCallback((shelfId, shelfName) => {
+    setPendingDeleteShelf({ id: shelfId, name: shelfName })
+  }, [])
 
+  const confirmDeleteShelf = useCallback(async () => {
+    if (!pendingDeleteShelf) return
+    const shelfId = pendingDeleteShelf.id
+    setPendingDeleteShelf(null)
     setShelfActionId(shelfId)
     try {
       const res = await fetch(`${API}/api/library/shelves/${shelfId}`, {
@@ -143,7 +147,7 @@ export default function LibraryPage() {
     } finally {
       setShelfActionId(null)
     }
-  }, [])
+  }, [pendingDeleteShelf])
 
   // Scroll-to-reveal: when user scrolls to the very top, fade the gradient
   // and expand the hero so the Winslow Homer painting is fully visible.
@@ -253,6 +257,20 @@ export default function LibraryPage() {
   return (
     <>
       <Navbar crumbs={[{ label: 'Library', to: '/library' }]} />
+      <ConfirmDialog
+        open={pendingDeleteShelf !== null}
+        title="Delete shelf?"
+        message={
+          pendingDeleteShelf
+            ? `Delete "${pendingDeleteShelf.name}"? This removes the shelf and its saved books. This can't be undone.`
+            : ''
+        }
+        confirmLabel="Delete"
+        cancelLabel="Keep"
+        variant="danger"
+        onConfirm={confirmDeleteShelf}
+        onCancel={() => setPendingDeleteShelf(null)}
+      />
       <div className="library-page">
         {/* Hero Section */}
         <section
@@ -468,7 +486,7 @@ export default function LibraryPage() {
         )}
 
         {/* Main Content */}
-        <main className="library-main">
+        <main id="main-content" className="library-main">
           {/* Cache fallback notice */}
           {usingCache && !error && (
             <div className="library-notice">

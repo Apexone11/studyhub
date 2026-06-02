@@ -16,6 +16,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 
 const MAX_INSTRUCTIONS = 2000
 const MAX_TITLE = 200
@@ -99,6 +100,12 @@ export default function SectionPicker({
   const [result, setResult] = useState(null)
 
   const sheetIds = useMemo(() => (Array.isArray(sheets) ? sheets.map((s) => s.id) : []), [sheets])
+
+  // Focus trap + Escape-to-close + body scroll-lock. Hook runs every render
+  // (above the early return per rules-of-hooks); the trap only activates when
+  // active:open is true. Escape is suppressed mid-submit to match the overlay
+  // click guard below.
+  const trapRef = useFocusTrap({ active: open, onClose, escapeCloses: !submitting })
 
   const loadSections = useCallback(() => {
     setLoading(true)
@@ -211,7 +218,12 @@ export default function SectionPicker({
       style={styles.overlay}
       onClick={submitting ? undefined : onClose}
     >
-      <div onClick={(e) => e.stopPropagation()} className="sh-card" style={styles.card}>
+      <div
+        ref={trapRef}
+        onClick={(e) => e.stopPropagation()}
+        className="sh-card"
+        style={styles.card}
+      >
         <header style={styles.header}>
           <div style={{ minWidth: 0 }}>
             <div style={styles.eyebrow}>Step 1 of 1</div>

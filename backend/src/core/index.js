@@ -12,7 +12,13 @@ const requireAdmin = require('./auth/requireAdmin')
 const requireVerifiedEmail = require('./auth/requireVerifiedEmail')
 const { AppError, ERROR_CODES, sendError, handleRouteError } = require('./http/errors')
 const asyncHandler = require('./http/asyncHandler')
-const { parsePositiveInt, parseOptionalInteger, parsePage } = require('./http/validate')
+const {
+  parsePositiveInt,
+  parseBoundedInt,
+  parseRouteId,
+  parseOptionalInteger,
+  parsePage,
+} = require('./http/validate')
 
 module.exports = {
   prisma,
@@ -27,6 +33,8 @@ module.exports = {
   handleRouteError,
   asyncHandler,
   parsePositiveInt,
+  parseBoundedInt,
+  parseRouteId,
   parseOptionalInteger,
   parsePage,
 }

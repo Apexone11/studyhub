@@ -15,6 +15,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { useStudyStatusBatch } from '../../lib/useStudyStatus'
 import { useDesignV2Flags } from '../../lib/designV2Flags'
 import { SkeletonSheetGrid } from '../../components/Skeleton'
+import CourseEquivalents from '../../components/CourseEquivalents'
 import SheetListRow from './SheetListItem'
 import SheetGridCard from './SheetGridCard'
 import SheetsFilters from './SheetsFilters'
@@ -112,6 +113,11 @@ export default function SheetsPage() {
                   </Link>
                 </div>
               </section>
+
+              {/* G2-4 — cross-school equivalents surface only when the user has
+                  narrowed to a single course. Self-hides (renders null) when
+                  flag_course_aliasing is off or the course has no aliases. */}
+              {courseId ? <CourseEquivalents courseId={courseId} /> : null}
 
               <SheetsFilters
                 search={search}

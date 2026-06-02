@@ -337,6 +337,17 @@ export function useNotePersistence(noteId) {
     }
   }, [noteId, flush])
 
+  // Clear pending save timers on unmount. Without this a stale debounce can
+  // fire after navigation and flush a wrong-revision save, surfacing as a
+  // spurious 409 conflict toast on the next note.
+  useEffect(
+    () => () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current)
+      if (safetyTimer.current) clearTimeout(safetyTimer.current)
+    },
+    [],
+  )
+
   return useMemo(
     () => ({
       state,

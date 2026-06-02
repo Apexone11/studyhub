@@ -12,6 +12,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { API } from '../../config'
+import { useFocusTrap } from '../../lib/useFocusTrap'
 
 const HASHTAG_REGEX = /^[a-z0-9_]{1,40}$/
 
@@ -57,15 +58,10 @@ export default function TopicPickerModal({ open, onClose, followedNames, onFollo
     }
   }, [open])
 
-  useEffect(() => {
-    if (!open) return undefined
-    function onKey(e) {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', onKey)
-    closeRef.current?.focus()
-    return () => document.removeEventListener('keydown', onKey)
-  }, [open, onClose])
+  // Focus trap + Escape-to-close + body scroll-lock. Replaces the bespoke
+  // document keydown listener + manual closeRef focus so Escape isn't
+  // double-handled and focus stays inside the dialog.
+  const trapRef = useFocusTrap({ active: open, onClose, initialFocusRef: closeRef })
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -132,6 +128,7 @@ export default function TopicPickerModal({ open, onClose, followedNames, onFollo
       }}
     >
       <div
+        ref={trapRef}
         role="dialog"
         aria-modal="true"
         aria-label="Pick topics"
@@ -187,6 +184,7 @@ export default function TopicPickerModal({ open, onClose, followedNames, onFollo
         <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--sh-border)' }}>
           <input
             type="search"
+            aria-label="Search topics"
             placeholder="Search topics…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
@@ -200,7 +198,6 @@ export default function TopicPickerModal({ open, onClose, followedNames, onFollo
               fontSize: 13,
               fontFamily: 'inherit',
             }}
-            autoFocus
           />
           {catalog.categories.length > 0 ? (
             <div
@@ -307,6 +304,7 @@ export default function TopicPickerModal({ open, onClose, followedNames, onFollo
         >
           <span style={{ fontSize: 12, fontWeight: 700, color: 'var(--sh-muted)' }}>Custom:</span>
           <input
+            aria-label="Custom topic name"
             value={customDraft}
             onChange={(e) => {
               setCustomDraft(e.target.value)

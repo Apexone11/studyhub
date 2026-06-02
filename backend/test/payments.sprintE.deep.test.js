@@ -276,6 +276,7 @@ describe('POST /api/payments/subscription/pause', () => {
           resumes_at: expect.any(Number),
         }),
       }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) }),
     )
   })
 
@@ -402,6 +403,7 @@ describe('POST /api/payments/subscription/resume', () => {
     expect(mocks.stripeSubscriptions.update).toHaveBeenCalledWith(
       'sub_real_2',
       expect.objectContaining({ pause_collection: '' }),
+      expect.objectContaining({ idempotencyKey: expect.any(String) }),
     )
   })
 

@@ -8,13 +8,12 @@
 // exists for less-frequent destinations (Settings, Profile, Library, …)
 // and renders as a corner "More" icon on phone viewports.
 
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useSession } from '../../lib/session-context'
 import { useResponsiveAppLayout } from '../../lib/ui'
 import { IconFeed, IconSheets, IconNotes, IconMessages, IconSpark } from '../Icons'
-import { API } from '../../config'
-import { authHeaders } from '../../pages/shared/pageUtils'
+import { useUnread } from '../../lib/unreadContext.js'
 import { prefetchForRoute } from '../../lib/prefetch'
 
 // 5 primary destinations — locked to match the founder spec. Order from
@@ -54,7 +53,9 @@ export default function MobileBottomNav() {
   const { user } = useSession()
   const { pathname } = useLocation()
   const layout = useResponsiveAppLayout()
-  const [unreadMessages, setUnreadMessages] = useState(0)
+  // Unread badge — single shared poller in UnreadContext (mirrors the Navbar
+  // bell). Pre-2026-05-14 this component had its own 30s poller. Decision #L1-2.
+  const { total: unreadMessages } = useUnread()
 
   // Body padding sync. We don't always render — when we DO render, push
   // a CSS variable so any descendant grid using `padding-bottom:
@@ -70,33 +71,6 @@ export default function MobileBottomNav() {
       document.documentElement.style.removeProperty('--sh-bottom-nav-height')
     }
   }, [user, layout.isPhone, pathname])
-
-  // Unread messages badge — mirrors the Navbar fetch. Polls every 30s
-  // while the nav is mounted. Silently no-ops on auth/network failure.
-  useEffect(() => {
-    if (!user || !layout.isPhone) return undefined
-    let cancelled = false
-    async function fetchCount() {
-      try {
-        const res = await fetch(`${API}/api/messages/unread-total`, {
-          credentials: 'include',
-          headers: authHeaders(),
-        })
-        if (res.ok && !cancelled) {
-          const data = await res.json()
-          setUnreadMessages(Number(data?.total) || 0)
-        }
-      } catch {
-        /* silent — same pattern as Navbar */
-      }
-    }
-    fetchCount()
-    const interval = setInterval(fetchCount, 30000)
-    return () => {
-      cancelled = true
-      clearInterval(interval)
-    }
-  }, [user, layout.isPhone])
 
   // Render gate. Authenticated phone users only, and never on /ai or
   // auth/onboarding/native paths.

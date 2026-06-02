@@ -8,6 +8,50 @@ For internal cycle-by-cycle release notes, see `docs/release-log.md` (tracked) a
 
 ## [Unreleased]
 
+### Security (2026-05-31 — 2nd audit pass, wave-12.24)
+
+- **Study-group discussion replies now require active membership to edit/delete.** A banned or removed member previously kept the ability to edit or delete their own old replies in a private group (the active-membership gate covered the post handlers but had missed the reply handlers). Now both `updateReply` and `deleteReply` require active membership.
+- Explore hardening: an unrecognized `?topic=` returns an empty result instead of all cross-school content; the feature kill switch drops stale cached content when flipped off; cross-school search expansion no longer runs on the private "my sheets" path; the topic fuzzy-match query now uses the trigram index.
+
+### Added (2026-05-31 — cross-school discovery, wave-12.23)
+
+- **Self-learner Explore (`/explore`).** A cross-school discovery page — topic chips, a "Trending this week" shelf, and Sheets / Notes / Study-groups shelves drawn from every school. Read-only, block-filtered, behind `flag_explore_tab` (fail-closed). Backend: `GET /api/explore/{sheets,trending,notes,study-groups,topics}`.
+- **Course aliasing — "Equivalent at other schools."** A curated, CIP-coded topic taxonomy (`CourseAlias` + `TopicCanonical`) maps equivalent courses across schools, so searching "intro programming" surfaces every school's version (Postgres `pg_trgm` fuzzy match), and the Sheets page shows equivalents when you filter to one course. Behind `flag_course_aliasing`. Backend: `GET /api/courses/topics`, `GET /api/courses/:id/equivalents`.
+
+### Security (2026-05-31 — 10-loop adversarial audit fixes, wave-12.22)
+
+- **Private study-group content is now gated on _active_ membership.** Pending (un-approved) and banned members could previously read and post in private-group discussions/resources/sessions; a new `requireActiveGroupMember` guard closes it, and replies/upvotes to hidden (removed / pending-approval) posts are blocked.
+- **Cross-conversation message-content leak closed.** `replyToId` on a new message is now verified to belong to the same conversation, so a participant can no longer pull a stranger's private message content into their own thread.
+- **"Downloads disabled" is enforced on the attachment-preview path (A6).** The preview route streamed the full original file regardless of `allowDownloads`; it now applies the same owner-or-allowed gate as the download routes.
+- **WebAuthn fails closed in production (A9).** `WEBAUTHN_RP_ID`/`WEBAUTHN_ORIGIN` no longer fall back to localhost in prod (which silently broke admin passkey auth); both are now `REQUIRED_IN_PRODUCTION`.
+- **CSRF `originAllowlist()` (A11)** added to the courses, study-status, plagiarism, and hashtags write modules. Socket cookie parser hardened against prototype-pollution keys; socket `conversationId` integer-validated.
+
+### Fixed (2026-05-31 — 10-loop audit)
+
+- **GDPR account deletion no longer aborts** when an optional table is absent — those cleanups moved out of the all-or-nothing transaction.
+- **Note edits made right before closing the tab are saved** — the `sendBeacon` autosave (POST-only) now reaches the update handler instead of 404-ing.
+- **Two migrations made idempotent** (teacher-materials, AiSuggestion) so a partial `migrate deploy` can be safely retried (A5).
+- **Optimistic-UI now reconciles with the server** on study-status, note/sheet/feed reactions, video downloadable toggle, and follow/join — a rejected write rolls back and toasts instead of silently sticking (A4).
+- **A12 integer guards** on sheet-comment react/delete/edit, materials body ids, pinned-sheet delete, study-status PUT.
+- **A11y:** focus traps on the section-picker, topic-picker, and report-group modals; keyboard-accessible announcement image thumbnails; labelled topic-picker inputs.
+- **Perf:** discussion lists count via `_count` instead of loading every reply/upvote row; the all-time leaderboard hydrates only the top-N and bounds its aggregate to a rolling year.
+
+### Security (2026-05-31 — bounded-plan completion batch, wave-12.21)
+
+- **Strict route-id parsing closes the partial-numeric hole.** New `parseRouteId()` (`core/http/validate.js`) rejects ids that `Number.parseInt` would accept partially (`"12abc" → 12`). Applied to `PATCH /api/materials/:id/archive` and `DELETE /api/materials/assignments/:id` (Codex PR-review P2). Digit-only, capped at `MAX_SAFE_INTEGER`.
+- **List-endpoint DoS cap.** New `parseBoundedInt(value, fallback, max)` silently clamps `?limit=` on 4 endpoints (sheets list 100; sheet-comments, feed list, feed reactions 50) — a `?limit=999999` no longer fetches unbounded rows. `parsePositiveInt` deprecated.
+- **Password-reset rejects same-as-current** (NIST 800-63B §5.1.1.2, OWASP ASVS V2.1.1). `POST /api/auth/reset-password` 400s with `PASSWORD_UNCHANGED` when the new password equals the current bcrypt hash; all its raw error envelopes migrated to `sendError()`.
+- **PII value-scrubbing in `redactObject`** (A8 defense-in-depth). Email / phone / IPv4 / SSN patterns are masked inside free-text log string values, not just known sensitive keys.
+- **Stripe idempotency keys** on all 11 state-changing SDK calls (checkout, customer, portal, subscription pause/resume/cancel/reactivate) — a retried call returns the cached response instead of double-charging. Checkout logs Stripe's `request_id`.
+- **`x-request-id` propagation** to the route-level Anthropic calls (sheet generate/edit, note summarize) for log↔dashboard correlation.
+
+### Fixed (2026-05-31)
+
+- **`security.headers` HSTS test** failed in any env whose `.env` lacked `R2_BUCKET_UPLOAD_BACKUP` (promoted to `REQUIRED_IN_PRODUCTION` in wave-12.11 but never added to the test's dummy-secret setup). Added the dummy.
+- **Stale debounce / in-flight fetch after unmount.** `AbortController` + unmount timer-cleanup on 5 effect-driven sites (library data + reader, sheet-lab reads, note-persistence timers, admin user-search) — no more `setState` after navigation.
+- **Duplicate unread-count polling.** Navbar bell + mobile bottom-nav badge now share one `UnreadProvider` poll instead of two independent 30s pollers.
+- **A11y:** focus-trap + Escape + `role="dialog"`/`aria-modal` on 4 more modals (FollowModal, NoteVersionHistory, ModerationAppealModal, AnnouncementMedia lightbox); WAI-ARIA menu keyboard nav on `NavbarUserMenu`; `<main id="main-content">` landmarks on UserProfile + Library so the skip link lands.
+
 ### Added (2026-05-01 rev 2)
 
 - **Settings → Security → Recovery codes UI.** `RecoveryCodesSection.jsx` mounted in the existing SecurityTab. Generates 10 single-use codes via `POST /api/settings/2fa/recovery-codes/regenerate`, displays them in a forced-acknowledgement modal (Escape + backdrop disabled until the user confirms they've saved them), Copy + Download `.txt` actions. Section silently doesn't render if `flag_2fa_recovery_codes` is off (status endpoint 404).

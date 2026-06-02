@@ -5,7 +5,7 @@ const { createNotification } = require('../../lib/notify')
 const { notifyMentionedUsers } = require('../../lib/mentions')
 const { assertOwnerOrAdmin } = require('../../lib/accessControl')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
-const { parsePositiveInt } = require('../../core/http/validate')
+const { parseBoundedInt } = require('../../core/http/validate')
 const { reactLimiter, commentLimiter, feedWriteLimiter } = require('./feed.constants')
 const { reactionSummary } = require('./feed.service')
 const { getInitialModerationStatus } = require('../../lib/trustGate')
@@ -22,7 +22,7 @@ router.get('/posts/:id/comments', async (req, res) => {
   req._timingStart = Date.now()
   const postId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(postId)) return res.status(400).json({ error: 'Invalid post id.' })
-  const limit = parsePositiveInt(req.query.limit, 20)
+  const limit = parseBoundedInt(req.query.limit, 20, 50)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
   const sort = req.query.sort || 'newest' // 'newest', 'oldest', 'top'
 
@@ -305,6 +305,9 @@ router.post(
   commentReactLimiter,
   async (req, res) => {
     const commentId = Number.parseInt(req.params.commentId, 10)
+    if (!Number.isInteger(commentId) || commentId < 1) {
+      return sendError(res, 400, 'Invalid comment id.', ERROR_CODES.BAD_REQUEST)
+    }
     const { userId } = req.user
     const { type } = req.body || {}
 

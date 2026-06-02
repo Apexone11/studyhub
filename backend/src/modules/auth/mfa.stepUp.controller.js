@@ -38,7 +38,9 @@ const originAllowlist = require('../../middleware/originAllowlist')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { captureError } = require('../../monitoring/sentry')
 const { settingsTwoFaLimiter } = require('../../lib/rateLimiters')
+const { signAuthToken, setAuthCookie } = require('../../lib/authTokens')
 const { createChallenge, verifyChallenge } = require('./loginChallenge.service')
+const { generateJti } = require('./session.service')
 const { consumeRecoveryCode } = require('../../lib/auth/recoveryCodes')
 
 const router = express.Router()
@@ -215,20 +217,40 @@ router.post(
 async function refreshSessionMfa(req, res, { method }) {
   try {
     const now = new Date()
+    // Wave-12.19 — session-fixation defense on elevation. Rotate the
+    // session JTI in lockstep with stamping mfaVerifiedAt so a stolen
+    // pre-elevation JWT cannot ride the 15-minute requireRecentMfa
+    // window. Same pattern as rotating the session on login.
+    const newJti = generateJti()
     // updateMany so a missing row (revoked session, race) returns
-    // count=0 rather than throwing — frontend gets a clear 401.
+    // count=0 rather than throwing — frontend gets a clear 401. We
+    // also gate on the old jti so a concurrent rotation can't double-
+    // rotate the row.
     const updated = await prisma.session.updateMany({
       where: { jti: req.sessionJti, revokedAt: null },
-      data: { mfaVerifiedAt: now },
+      data: { jti: newJti, mfaVerifiedAt: now },
     })
     if (updated.count !== 1) {
       return sendError(res, 401, 'Session not found or revoked.', ERROR_CODES.AUTH_EXPIRED)
     }
+    // Re-sign the JWT with the fresh jti and replace the auth cookie.
+    // Old JWTs carrying req.sessionJti now reference a non-existent
+    // row and will fail validateSession on the next request.
+    const user = await prisma.user.findUnique({
+      where: { id: req.user.userId },
+      select: { id: true, role: true },
+    })
+    if (!user) {
+      return sendError(res, 404, 'User not found.', ERROR_CODES.NOT_FOUND)
+    }
+    const token = signAuthToken(user, { jti: newJti })
+    setAuthCookie(res, token)
     log.info(
       {
         event: 'auth.mfa.step_up_verified',
         userId: req.user.userId,
         method,
+        jtiRotated: true,
       },
       'MFA step-up verified',
     )

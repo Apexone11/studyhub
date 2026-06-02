@@ -16,8 +16,10 @@
 
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
+const { parseRouteId, parseOptionalInteger } = require('../../core/http/validate')
 const materialsService = require('./materials.service')
 const { isTeacherAccount } = require('../sections/sections.constants')
 const {
@@ -28,6 +30,10 @@ const {
 } = require('./materials.constants')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — CSRF defense-in-depth on writes. Short-circuits GET/HEAD/OPTIONS,
+// so applying at router.use is safe for this mixed read+write surface.
+router.use(originAllowlist())
 
 function requireTeacher(req, res, next) {
   if (!isTeacherAccount(req.user)) {
@@ -75,10 +81,25 @@ router.post('/', writeLimiter, requireAuth, requireTeacher, async (req, res) => 
   if (!title) {
     return sendError(res, 400, 'Material title is required.', ERROR_CODES.VALIDATION)
   }
-  const sheetId = req.body?.sheetId != null ? Number(req.body.sheetId) : null
-  const noteId = req.body?.noteId != null ? Number(req.body.noteId) : null
+  // CLAUDE.md A12 — bare Number() yields NaN for non-numeric input, and `NaN != null`
+  // is true, so the garbage value reached Prisma and produced a 500. parseOptionalInteger
+  // returns null for absent OR non-integer input; a present-but-invalid field is a 400.
+  const sheetIdRaw = req.body?.sheetId
+  const noteIdRaw = req.body?.noteId
+  const weekRaw = req.body?.week
+  const sheetId = parseOptionalInteger(sheetIdRaw)
+  if (sheetIdRaw != null && sheetIdRaw !== '' && sheetId === null) {
+    return sendError(res, 400, 'sheetId must be an integer.', ERROR_CODES.BAD_REQUEST)
+  }
+  const noteId = parseOptionalInteger(noteIdRaw)
+  if (noteIdRaw != null && noteIdRaw !== '' && noteId === null) {
+    return sendError(res, 400, 'noteId must be an integer.', ERROR_CODES.BAD_REQUEST)
+  }
+  const week = parseOptionalInteger(weekRaw)
+  if (weekRaw != null && weekRaw !== '' && week === null) {
+    return sendError(res, 400, 'week must be an integer.', ERROR_CODES.BAD_REQUEST)
+  }
   const instructions = clean(req.body?.instructions || '', MAX_MATERIAL_INSTRUCTIONS_LENGTH)
-  const week = req.body?.week != null ? Number(req.body.week) : null
 
   try {
     const material = await materialsService.createMaterial({
@@ -99,8 +120,15 @@ router.post('/', writeLimiter, requireAuth, requireTeacher, async (req, res) => 
 
 // PATCH /api/materials/:id/archive  —  teacher: archive a material (soft delete).
 router.patch('/:id/archive', writeLimiter, requireAuth, requireTeacher, async (req, res) => {
+  // Strict whole-string parse: Number.parseInt('12abc') === 12 would archive
+  // material 12 from a malformed path. parseRouteId rejects partial-numeric
+  // ids (CLAUDE.md A12). null === invalid.
+  const id = parseRouteId(req.params.id)
+  if (id === null) {
+    return sendError(res, 400, 'Invalid material id.', ERROR_CODES.BAD_REQUEST)
+  }
   try {
-    const material = await materialsService.archiveMaterial(req.params.id, req.user.userId)
+    const material = await materialsService.archiveMaterial(id, req.user.userId)
     return res.json({ material })
   } catch (err) {
     if (err.code === 'NOT_FOUND') return sendError(res, 404, err.message, ERROR_CODES.NOT_FOUND)
@@ -152,14 +180,19 @@ router.post('/assign', writeLimiter, requireAuth, requireTeacher, async (req, re
     })
     return res.status(201).json(result)
   } catch (err) {
+    if (err.code === 'VALIDATION') return sendError(res, 400, err.message, ERROR_CODES.VALIDATION)
     return sendError(res, 500, err.message || 'Bulk assign failed.', ERROR_CODES.INTERNAL)
   }
 })
 
 // DELETE /api/materials/assignments/:id  —  teacher: remove an assignment.
 router.delete('/assignments/:id', writeLimiter, requireAuth, requireTeacher, async (req, res) => {
+  const id = parseRouteId(req.params.id)
+  if (id === null) {
+    return sendError(res, 400, 'Invalid assignment id.', ERROR_CODES.BAD_REQUEST)
+  }
   try {
-    const result = await materialsService.deleteAssignment(req.params.id, req.user.userId)
+    const result = await materialsService.deleteAssignment(id, req.user.userId)
     return res.json(result)
   } catch (err) {
     if (err.code === 'FORBIDDEN') return sendError(res, 403, err.message, ERROR_CODES.FORBIDDEN)

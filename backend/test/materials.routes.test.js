@@ -145,6 +145,17 @@ describe('materials routes', () => {
       expect(res.body.code).toBe('VALIDATION')
     })
 
+    // CLAUDE.md A12 — bare Number('abc') === NaN passed the `!= null` check and
+    // reached Prisma, producing a 500. parseOptionalInteger 400s instead.
+    it('rejects a non-numeric sheetId with 400 (not a Prisma 500)', async () => {
+      const res = await request(app).post('/').send({ title: 'bad id', sheetId: 'abc' })
+
+      expect(res.status).toBe(400)
+      expect(res.body.code).toBe('BAD_REQUEST')
+      expect(mocks.prisma.studySheet.findUnique).not.toHaveBeenCalled()
+      expect(mocks.prisma.material.create).not.toHaveBeenCalled()
+    })
+
     it('rejects wrapping a sheet owned by another teacher', async () => {
       mocks.prisma.studySheet.findUnique.mockResolvedValue({ id: 10, userId: 999 })
 
@@ -253,6 +264,22 @@ describe('materials routes', () => {
       expect(res.status).toBe(400)
       expect(res.body.code).toBe('VALIDATION')
     })
+
+    // CLAUDE.md A12 — a non-integer id in the array would coerce to NaN via
+    // .map(Number) and feed the Prisma `in` clause, producing a 500.
+    it('rejects a non-integer id inside materialIds with 400 (not a Prisma 500)', async () => {
+      const res = await request(app)
+        .post('/assign')
+        .send({
+          materialIds: [10, 'abc'],
+          sectionIds: [20],
+        })
+
+      expect(res.status).toBe(400)
+      expect(res.body.code).toBe('VALIDATION')
+      expect(mocks.prisma.material.findMany).not.toHaveBeenCalled()
+      expect(mocks.prisma.materialAssignment.createMany).not.toHaveBeenCalled()
+    })
   })
 
   /* -------------------- GET /mine (student) -------------------- */
@@ -314,8 +341,40 @@ describe('materials routes', () => {
     })
   })
 
+  /* -------------------- PATCH /:id/archive -------------------- */
+  describe('PATCH /:id/archive', () => {
+    // Codex P2 (2026-05-14): Number.parseInt('12abc') === 12 would have
+    // archived material 12 from a malformed path. parseRouteId rejects it.
+    it('rejects a partial-numeric material id (e.g. 12abc) with 400', async () => {
+      const res = await request(app).patch('/12abc/archive')
+
+      expect(res.status).toBe(400)
+      expect(res.body.code).toBe('BAD_REQUEST')
+      expect(mocks.prisma.material.findUnique).not.toHaveBeenCalled()
+      expect(mocks.prisma.material.update).not.toHaveBeenCalled()
+    })
+
+    it('archives a material the teacher owns', async () => {
+      mocks.prisma.material.findUnique.mockResolvedValue({ id: 12, teacherId: 77 })
+      mocks.prisma.material.update.mockResolvedValue({ id: 12, archived: true })
+
+      const res = await request(app).patch('/12/archive')
+
+      expect(res.status).toBe(200)
+      expect(res.body.material).toMatchObject({ id: 12, archived: true })
+    })
+  })
+
   /* -------------------- DELETE /assignments/:id -------------------- */
   describe('DELETE /assignments/:id', () => {
+    it('rejects a partial-numeric assignment id (e.g. 55abc) with 400', async () => {
+      const res = await request(app).delete('/assignments/55abc')
+
+      expect(res.status).toBe(400)
+      expect(res.body.code).toBe('BAD_REQUEST')
+      expect(mocks.prisma.materialAssignment.findUnique).not.toHaveBeenCalled()
+    })
+
     it('blocks deleting an assignment owned by another teacher', async () => {
       mocks.prisma.materialAssignment.findUnique.mockResolvedValue({
         id: 55,

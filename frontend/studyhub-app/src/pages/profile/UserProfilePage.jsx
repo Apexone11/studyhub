@@ -545,7 +545,7 @@ export default function UserProfilePage() {
   const profileCoverImageUrl = resolveImageUrl(profile?.coverImageUrl)
 
   return (
-    <div style={pageWrapStyle}>
+    <main id="main-content" style={pageWrapStyle}>
       <Navbar crumbs={[{ label: profile.username, to: `/users/${username}` }]} hideTabs />
 
       <div style={containerStyle}>
@@ -1339,7 +1339,7 @@ export default function UserProfilePage() {
           onClose={() => setReportOpen(false)}
         />
       )}
-    </div>
+    </main>
   )
 }
 

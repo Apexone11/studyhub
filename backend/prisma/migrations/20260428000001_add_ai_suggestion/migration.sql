@@ -10,8 +10,13 @@
 -- variant if we add a separate listing endpoint later.
 -- ON DELETE CASCADE keeps the table self-cleaning when a user is
 -- removed.
+--
+-- Every statement is guarded with IF NOT EXISTS so `prisma migrate
+-- deploy` is safe to retry on partial failure and is a no-op on an
+-- already-migrated DB (CLAUDE.md A5). The inline FK is created as part
+-- of the guarded CREATE TABLE, so it needs no separate guard.
 
-CREATE TABLE "AiSuggestion" (
+CREATE TABLE IF NOT EXISTS "AiSuggestion" (
   "id"          SERIAL        PRIMARY KEY,
   "userId"      INTEGER       NOT NULL,
   "text"        VARCHAR(280)  NOT NULL,
@@ -24,8 +29,8 @@ CREATE TABLE "AiSuggestion" (
     ON DELETE CASCADE ON UPDATE CASCADE
 );
 
-CREATE INDEX "AiSuggestion_userId_generatedAt_idx"
+CREATE INDEX IF NOT EXISTS "AiSuggestion_userId_generatedAt_idx"
   ON "AiSuggestion"("userId", "generatedAt");
 
-CREATE INDEX "AiSuggestion_userId_dismissedAt_idx"
+CREATE INDEX IF NOT EXISTS "AiSuggestion_userId_dismissedAt_idx"
   ON "AiSuggestion"("userId", "dismissedAt");

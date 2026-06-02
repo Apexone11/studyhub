@@ -19,6 +19,18 @@ const BOOK_DESCRIPTION_TRANSFORM = sanitizeHtml.simpleTransform(
   true,
 )
 
+// Cap upstream response bodies at 5 MB. Google Books volume / search payloads
+// run ~50-200 KB in practice; anything dramatically larger is either an open
+// redirect to a hostile origin or a misconfigured proxy. Reading without a
+// ceiling lets a hostile upstream OOM the Node process.
+const LIBRARY_FETCH_MAX_BYTES = 5 * 1024 * 1024
+
+// Google Books volumeId format: alphanumeric + hyphens + underscores, 12 chars
+// in practice but documented as variable-length. Bound at 6-32 to reject
+// attacker-controlled path segments (e.g. `../../../`, `?key=leak`) before
+// the value is interpolated into the googleapis.com URL.
+const VOLUME_ID_PATTERN = /^[A-Za-z0-9_-]{6,32}$/
+
 function sanitizeBookDescription(description) {
   if (!description || typeof description !== 'string') return null
 
@@ -57,11 +69,75 @@ function createHttpStatusError(message, statusCode) {
   return error
 }
 
-/** Fetch with a timeout. Rejects if the response takes longer than `ms`. */
+/**
+ * Fetch with a timeout. Rejects if the response takes longer than `ms`.
+ *
+ * Hardening: `redirect: 'manual'` so a hostile / misconfigured upstream cannot
+ * bounce us to an attacker-controlled origin (SSRF amplification). A
+ * Content-Length header above LIBRARY_FETCH_MAX_BYTES short-circuits before
+ * we read the body, and the streaming reader aborts if the actual byte count
+ * crosses the cap (some upstreams omit Content-Length).
+ *
+ * The returned object preserves the surface callers use (`ok`, `status`,
+ * `json()`), so existing call sites do not need to change.
+ */
 function fetchWithTimeout(url, ms = 10000) {
   const controller = new AbortController()
   const timer = setTimeout(() => controller.abort(), ms)
-  return fetch(url, { signal: controller.signal }).finally(() => clearTimeout(timer))
+  return fetch(url, { signal: controller.signal, redirect: 'manual' })
+    .then(async (response) => {
+      // Test mocks may omit `headers` entirely — guard before reading.
+      const declared = response.headers?.get ? Number(response.headers.get('content-length')) : NaN
+      if (Number.isFinite(declared) && declared > LIBRARY_FETCH_MAX_BYTES) {
+        try {
+          controller.abort()
+        } catch {
+          /* already aborted */
+        }
+        throw createHttpStatusError(`Library upstream response too large: ${declared} bytes`, 502)
+      }
+
+      const reader = response.body && response.body.getReader ? response.body.getReader() : null
+      if (!reader) {
+        // Fallback for environments without a streaming body (tests / mocks).
+        return response
+      }
+
+      const chunks = []
+      let received = 0
+      while (true) {
+        const { value, done } = await reader.read()
+        if (done) break
+        if (value) {
+          received += value.byteLength
+          if (received > LIBRARY_FETCH_MAX_BYTES) {
+            try {
+              controller.abort()
+            } catch {
+              /* already aborted */
+            }
+            throw createHttpStatusError(
+              `Library upstream response exceeded ${LIBRARY_FETCH_MAX_BYTES} bytes`,
+              502,
+            )
+          }
+          chunks.push(value)
+        }
+      }
+
+      const buffer = Buffer.concat(
+        chunks.map((c) => Buffer.from(c)),
+        received,
+      )
+      return {
+        ok: response.ok,
+        status: response.status,
+        headers: response.headers,
+        json: async () => JSON.parse(buffer.toString('utf8')),
+        text: async () => buffer.toString('utf8'),
+      }
+    })
+    .finally(() => clearTimeout(timer))
 }
 
 /** Fetch with one automatic retry on network/timeout failure. */
@@ -389,6 +465,13 @@ async function searchBooks(query, page = 1, filters = {}) {
  * @returns {Promise<object|null>} Book details or null on error
  */
 async function getBookDetail(volumeId) {
+  // Reject attacker-controlled path segments before they reach googleapis.com.
+  // Google Books volumeIds are alphanumeric + `-` + `_`, 6-32 chars; anything
+  // else (slashes, dots, query chars) is either a bug or a probe.
+  if (typeof volumeId !== 'string' || !VOLUME_ID_PATTERN.test(volumeId)) {
+    return null
+  }
+
   const cacheKey = `book:${volumeId}`
   const cached = cache.get(cacheKey)
   if (cached) return cached
@@ -399,7 +482,7 @@ async function getBookDetail(volumeId) {
       params.append('key', GOOGLE_BOOKS_API_KEY)
     }
 
-    const url = `${GOOGLE_BOOKS_BASE}/volumes/${volumeId}?${params.toString()}`
+    const url = `${GOOGLE_BOOKS_BASE}/volumes/${encodeURIComponent(volumeId)}?${params.toString()}`
     const response = await fetchWithRetry(url)
 
     if (!response.ok) {

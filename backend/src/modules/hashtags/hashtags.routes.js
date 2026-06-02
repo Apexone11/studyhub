@@ -1,10 +1,15 @@
 const express = require('express')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const { cacheControl } = require('../../lib/cacheControl')
 const controller = require('./hashtags.controller')
 
 const router = express.Router()
+
+// CLAUDE.md A11 — CSRF defense-in-depth on writes (POST /follow, DELETE /:name/follow).
+// Short-circuits GET/HEAD/OPTIONS, so router.use is safe for this mixed surface.
+router.use(originAllowlist())
 
 router.get('/me', requireAuth, readLimiter, controller.listMyFollows)
 // Catalog is public-readable (it's curated content, not user data) so the

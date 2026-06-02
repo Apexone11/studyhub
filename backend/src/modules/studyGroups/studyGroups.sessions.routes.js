@@ -17,7 +17,7 @@ const prisma = require('../../lib/prisma')
 const { readLimiter, writeLimiter } = require('../../lib/rateLimiters')
 const {
   parseId,
-  requireGroupMember,
+  requireActiveGroupMember,
   isGroupAdminOrMod,
   validateTitle,
   validateDescription,
@@ -41,8 +41,9 @@ router.get('/', readLimiter, requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid group ID.' })
     }
 
-    // Check membership
-    const member = await requireGroupMember(groupId, req.user.userId)
+    // Active-membership gate — a pending/invited/banned member must not be
+    // able to read a private group's scheduled sessions.
+    const member = await requireActiveGroupMember(groupId, req.user.userId)
     if (!member) {
       return res.status(404).json({ error: 'Not a member.' })
     }
@@ -316,6 +317,51 @@ router.patch('/:sessionId', writeLimiter, requireAuth, async (req, res) => {
       data: updates,
     })
 
+    // Notify RSVP'd (going/maybe) members when a session is cancelled or
+    // moved — they opted in, and the create-session path already notifies, so
+    // a cancel/reschedule should too. Gated on an ACTUAL change so a
+    // title/description-only edit doesn't spam. Fire-and-forget like POST.
+    const becameCancelled = updates.status === 'cancelled' && session.status !== 'cancelled'
+    const timeChanged =
+      updates.scheduledAt !== undefined &&
+      new Date(updates.scheduledAt).getTime() !== new Date(session.scheduledAt).getTime()
+    if (becameCancelled || timeChanged) {
+      try {
+        const groupData = await prisma.studyGroup.findUnique({
+          where: { id: groupId },
+          select: { name: true },
+        })
+        const rsvps = await prisma.groupSessionRsvp.findMany({
+          where: {
+            sessionId,
+            status: { in: ['going', 'maybe'] },
+            userId: { not: req.user.userId },
+          },
+          select: { userId: true },
+        })
+        if (rsvps.length > 0 && groupData) {
+          const message = becameCancelled
+            ? `${req.user.username} cancelled "${updated.title}" in ${groupData.name}`
+            : `${req.user.username} rescheduled "${updated.title}" in ${groupData.name}`
+          await createNotifications(
+            prisma,
+            rsvps.map((r) => ({
+              userId: r.userId,
+              type: 'group_session',
+              message,
+              actorId: req.user.userId,
+              linkPath: `/study-groups/${groupId}`,
+            })),
+          )
+        }
+      } catch (notifErr) {
+        log.warn(
+          { event: 'studyGroups.sessions.update_notify_failed', err: notifErr.message },
+          'Failed to create session update notifications',
+        )
+      }
+    }
+
     res.json({
       id: updated.id,
       groupId: updated.groupId,
@@ -386,8 +432,9 @@ router.post('/:sessionId/rsvp', writeLimiter, requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Invalid IDs.' })
     }
 
-    // Check membership
-    const member = await requireGroupMember(groupId, req.user.userId)
+    // Active-membership gate — a pending/invited/banned member must not be
+    // able to RSVP to a private group's sessions.
+    const member = await requireActiveGroupMember(groupId, req.user.userId)
     if (!member) {
       return res.status(404).json({ error: 'Not a member.' })
     }

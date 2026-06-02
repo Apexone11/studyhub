@@ -202,14 +202,27 @@ async function sendWithResend(mailOptions) {
     payload.reply_to = replyTo
   }
 
-  const response = await fetch(`${resendConfig.baseUrl}/emails`, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${resendConfig.apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(payload),
-  })
+  let response
+  try {
+    response = await fetch(`${resendConfig.baseUrl}/emails`, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${resendConfig.apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+      // 8s SLA budget so a slow Resend upstream cannot stall signup /
+      // verification flows; caller can fall back to nodemailer / log.
+      signal: AbortSignal.timeout(8000),
+    })
+  } catch (error) {
+    if (error?.name === 'TimeoutError' || error?.name === 'AbortError') {
+      const timeoutError = new Error('Resend API request timed out after 8000ms')
+      timeoutError.code = 'EMAIL_RESEND_TIMEOUT'
+      throw timeoutError
+    }
+    throw error
+  }
 
   const responsePayload = await parseJsonSafely(response)
   if (!response.ok) {

@@ -2765,9 +2765,9 @@ textarea.sh-input {
     scroll-behavior: auto;
   }
 
-  *,
-  *::before,
-  *::after {
+  *:not([data-motion='keep']),
+  *:not([data-motion='keep'])::before,
+  *:not([data-motion='keep'])::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
@@ -4095,9 +4095,9 @@ html[data-focus-ring='off'] *:focus-visible {
    transform on the page. Triggered by Accessibility settings or the OS
    preference (prefers-reduced-motion: reduce) at the @media level
    elsewhere in this stylesheet. */
-html[data-reduced-motion='on'] *,
-html[data-reduced-motion='on'] *::before,
-html[data-reduced-motion='on'] *::after {
+html[data-reduced-motion='on'] *:not([data-motion='keep']),
+html[data-reduced-motion='on'] *:not([data-motion='keep'])::before,
+html[data-reduced-motion='on'] *:not([data-motion='keep'])::after {
   animation-duration: 0.01ms !important;
   animation-iteration-count: 1 !important;
   transition-duration: 0.01ms !important;
@@ -4753,11 +4753,11 @@ html[data-reduced-motion='on'] *::after {
   animation: sh-spin 0.7s linear infinite;
 }
 
-@media (prefers-reduced-motion: reduce) {
-  .sh-submit-spinner {
-    animation: none;
-  }
-}
+/* Intentionally NO reduced-motion override here: SubmitSpinner carries
+   data-motion="keep" and is exempt from the global reduced-motion blocks.
+   A frozen spinner reads as "hung"; WCAG 2.3.3 allows motion that conveys
+   essential state (loading in progress). Re-adding `animation: none` here
+   would silently defeat that opt-out. */
 
 input[aria-invalid='true'],
 select[aria-invalid='true'],

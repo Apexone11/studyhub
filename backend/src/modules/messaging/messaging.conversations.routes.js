@@ -80,6 +80,32 @@ async function attachUnreadCount(cp, userId) {
 }
 
 /**
+ * Batch-compute unread counts for many ConversationParticipant records.
+ * Each cp has its own lastReadAt so a single groupBy with a uniform
+ * threshold is incorrect; run the counts concurrently in a single
+ * Promise.all round-trip (settled-style — one bad query cannot zero out
+ * the others). Mutates each cp in place with _unreadCount.
+ */
+async function attachUnreadCounts(cps, userId) {
+  const results = await Promise.allSettled(
+    cps.map((cp) => {
+      const lastReadAt = cp.lastReadAt || new Date(0)
+      return prisma.message.count({
+        where: {
+          conversationId: cp.conversation.id,
+          createdAt: { gt: lastReadAt },
+          senderId: { not: userId },
+          deletedAt: null,
+        },
+      })
+    }),
+  )
+  results.forEach((r, i) => {
+    cps[i]._unreadCount = r.status === 'fulfilled' ? r.value : 0
+  })
+}
+
+/**
  * GET /conversations
  * List user's active conversations (excludes pending, declined, and archived)
  */
@@ -110,10 +136,10 @@ router.get('/', requireAuth, async (req, res) => {
       take: limitNum,
     })
 
-    // Compute unread counts per conversation
-    for (const cp of conversations) {
-      await attachUnreadCount(cp, req.user.userId)
-    }
+    // Compute unread counts per conversation in parallel — each is an
+    // independent count query; the prior serial await loop was an N+1
+    // latency drag (one round-trip per conversation, up to 100).
+    await attachUnreadCounts(conversations, req.user.userId)
 
     // Filter out conversations with blocked users and format response
     const result = conversations
@@ -146,6 +172,16 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
 
     if (!Array.isArray(participantIds) || participantIds.length === 0) {
       return sendError(res, 400, 'Participants required.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    if (participantIds.length > 50) {
+      return sendError(res, 400, 'Too many participants.', ERROR_CODES.BAD_REQUEST)
+    }
+
+    for (const participantId of participantIds) {
+      if (!Number.isInteger(participantId) || participantId < 1) {
+        return sendError(res, 400, 'Invalid participant ID.', ERROR_CODES.BAD_REQUEST)
+      }
     }
 
     if (type !== 'dm' && type !== 'group') {
@@ -274,8 +310,8 @@ router.post('/', requireAuth, messagingWriteLimiter, async (req, res) => {
  */
 router.get('/:id', requireAuth, async (req, res) => {
   try {
-    const conversationId = parseInt(req.params.id, 10)
-    if (isNaN(conversationId)) {
+    const conversationId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(conversationId) || conversationId < 1) {
       return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
     }
 
@@ -319,7 +355,10 @@ router.get('/:id', requireAuth, async (req, res) => {
  */
 router.patch('/:id', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const conversationId = parseInt(req.params.id, 10)
+    const conversationId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(conversationId) || conversationId < 1) {
+      return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
+    }
     const { name, avatarUrl, muted, archived } = req.body
 
     // Verify user is a participant (admin for group updates)
@@ -350,10 +389,34 @@ router.patch('/:id', requireAuth, messagingWriteLimiter, async (req, res) => {
         return sendError(res, 403, 'Admin access required.', ERROR_CODES.FORBIDDEN)
       }
 
+      let trimmedName
+      if (name !== undefined) {
+        if (typeof name !== 'string') {
+          return sendError(res, 400, 'Invalid name.', ERROR_CODES.BAD_REQUEST)
+        }
+        trimmedName = name.trim()
+        if (trimmedName.length < 1 || trimmedName.length > 100) {
+          return sendError(res, 400, 'Invalid name.', ERROR_CODES.BAD_REQUEST)
+        }
+      }
+
+      if (avatarUrl !== undefined) {
+        if (typeof avatarUrl !== 'string' || avatarUrl.length > 500) {
+          return sendError(res, 400, 'Invalid avatar URL.', ERROR_CODES.BAD_REQUEST)
+        }
+        if (
+          !avatarUrl.startsWith('http://') &&
+          !avatarUrl.startsWith('https://') &&
+          !avatarUrl.startsWith('/')
+        ) {
+          return sendError(res, 400, 'Invalid avatar URL.', ERROR_CODES.BAD_REQUEST)
+        }
+      }
+
       await prisma.conversation.update({
         where: { id: conversationId },
         data: {
-          ...(name !== undefined && { name }),
+          ...(name !== undefined && { name: trimmedName }),
           ...(avatarUrl !== undefined && { avatarUrl }),
           updatedAt: new Date(),
         },
@@ -402,7 +465,10 @@ router.patch('/:id', requireAuth, messagingWriteLimiter, async (req, res) => {
  */
 router.delete('/:id', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const conversationId = parseInt(req.params.id, 10)
+    const conversationId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(conversationId) || conversationId < 1) {
+      return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
+    }
 
     const participant = await prisma.conversationParticipant.findUnique({
       where: {
@@ -457,8 +523,8 @@ router.delete('/:id', requireAuth, messagingWriteLimiter, async (req, res) => {
  */
 router.post('/:id/read', requireAuth, async (req, res) => {
   try {
-    const conversationId = parseInt(req.params.id, 10)
-    if (isNaN(conversationId)) {
+    const conversationId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(conversationId) || conversationId < 1) {
       return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
     }
 
@@ -500,8 +566,8 @@ router.post('/:id/read', requireAuth, async (req, res) => {
  */
 router.post('/:id/mute', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const conversationId = parseInt(req.params.id, 10)
-    if (isNaN(conversationId)) {
+    const conversationId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(conversationId) || conversationId < 1) {
       return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
     }
 
@@ -541,8 +607,8 @@ router.post('/:id/mute', requireAuth, messagingWriteLimiter, async (req, res) =>
  */
 router.post('/:id/unmute', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const conversationId = parseInt(req.params.id, 10)
-    if (isNaN(conversationId)) {
+    const conversationId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(conversationId) || conversationId < 1) {
       return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
     }
 
@@ -584,8 +650,8 @@ router.post('/:id/unmute', requireAuth, messagingWriteLimiter, async (req, res) 
  */
 router.post('/:id/archive', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const conversationId = parseInt(req.params.id, 10)
-    if (isNaN(conversationId)) {
+    const conversationId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(conversationId) || conversationId < 1) {
       return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
     }
 
@@ -625,8 +691,8 @@ router.post('/:id/archive', requireAuth, messagingWriteLimiter, async (req, res)
  */
 router.post('/:id/unarchive', requireAuth, messagingWriteLimiter, async (req, res) => {
   try {
-    const conversationId = parseInt(req.params.id, 10)
-    if (isNaN(conversationId)) {
+    const conversationId = Number.parseInt(req.params.id, 10)
+    if (!Number.isInteger(conversationId) || conversationId < 1) {
       return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
     }
 
@@ -665,3 +731,4 @@ module.exports = router
 // Export shared utilities for use in the main messaging router
 module.exports.conversationInclude = conversationInclude
 module.exports.attachUnreadCount = attachUnreadCount
+module.exports.attachUnreadCounts = attachUnreadCounts

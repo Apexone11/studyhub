@@ -84,6 +84,7 @@ const studyStatusRoutes = require('./modules/studyStatus')
 const onboardingRoutes = require('./modules/onboarding')
 const referralRoutes = require('./modules/referrals')
 const hashtagsRoutes = require('./modules/hashtags')
+const exploreRoutes = require('./modules/explore')
 const sectionsRoutes = require('./modules/sections')
 const materialsRoutes = require('./modules/materials')
 const creatorAuditRoutes = require('./modules/creatorAudit')
@@ -734,6 +735,9 @@ app.use('/api/onboarding', onboardingRoutes)
 // Referral system (invite, track, resolve, rewards).
 app.use('/api/referrals', referralRoutes)
 app.use('/api/hashtags', hashtagsRoutes)
+
+// Explore tab (G2-3) — cross-school discovery, flag_explore_tab fail-closed.
+app.use('/api/explore', exploreRoutes)
 
 // Sections + Materials (Week 3 of v2 design refresh — teacher section-aware publishing).
 // Frontend is gated by `design_v2_teach_sections`; server-side endpoints stay available

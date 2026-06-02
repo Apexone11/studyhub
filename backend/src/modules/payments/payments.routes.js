@@ -831,9 +831,15 @@ router.post(
       }
 
       const stripe = service.getStripe()
-      const updated = await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-        cancel_at_period_end: true,
-      })
+      const updated = await stripe.subscriptions.update(
+        sub.stripeSubscriptionId,
+        {
+          cancel_at_period_end: true,
+        },
+        {
+          idempotencyKey: service.buildStripeIdempotencyKey('subscription.cancel', req.user.userId),
+        },
+      )
 
       await prisma.subscription.update({
         where: { userId: req.user.userId },
@@ -892,9 +898,18 @@ router.post(
       }
 
       const stripe = service.getStripe()
-      await stripe.subscriptions.update(sub.stripeSubscriptionId, {
-        cancel_at_period_end: false,
-      })
+      await stripe.subscriptions.update(
+        sub.stripeSubscriptionId,
+        {
+          cancel_at_period_end: false,
+        },
+        {
+          idempotencyKey: service.buildStripeIdempotencyKey(
+            'subscription.reactivate',
+            req.user.userId,
+          ),
+        },
+      )
 
       await prisma.subscription.update({
         where: { userId: req.user.userId },

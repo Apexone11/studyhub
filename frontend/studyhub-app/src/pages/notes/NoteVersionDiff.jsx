@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { API } from '../../config.js'
+import { useFocusTrap } from '../../lib/useFocusTrap.js'
 import { authHeaders } from '../shared/pageUtils.js'
 
 export default function NoteVersionDiff({
@@ -13,6 +14,7 @@ export default function NoteVersionDiff({
   const [mode, setMode] = useState('inline')
   const key = `${noteId}|${versionId}|${against}`
   const [state, setState] = useState({ key, loading: true, data: null, error: null })
+  const trapRef = useFocusTrap({ active: true, onClose })
 
   useEffect(() => {
     let cancelled = false
@@ -43,8 +45,20 @@ export default function NoteVersionDiff({
   const error = state.key === key ? state.error : null
 
   return createPortal(
-    <div style={backdropStyle} onClick={onClose} data-testid="note-version-diff">
-      <div style={modalStyle} onClick={(e) => e.stopPropagation()}>
+    <div
+      style={backdropStyle}
+      onClick={onClose}
+      data-testid="note-version-diff"
+      role="presentation"
+    >
+      <div
+        ref={trapRef}
+        style={modalStyle}
+        onClick={(e) => e.stopPropagation()}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Note version diff"
+      >
         <header style={headerStyle}>
           <strong>Diff</strong>
           <div style={{ display: 'flex', gap: 8 }}>

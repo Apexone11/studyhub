@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
+import { showToast } from '../../lib/toast'
 import ReportModal from '../../components/ReportModal'
 import ModerationBanner from '../../components/ModerationBanner'
 import PendingReviewBanner from '../../components/PendingReviewBanner'
@@ -186,15 +187,23 @@ export default function NoteViewerPage() {
     setStarred(!wasStarred)
     setStarCount((prev) => (prev ?? stars) + (wasStarred ? -1 : 1))
 
+    const revert = () => {
+      setStarred(wasStarred)
+      setStarCount((prev) => (prev ?? stars) + (wasStarred ? 1 : -1))
+    }
     try {
-      await fetch(`${API}/api/notes/${note.id}/star`, {
+      const res = await fetch(`${API}/api/notes/${note.id}/star`, {
         method: wasStarred ? 'DELETE' : 'POST',
         headers: authHeaders(),
         credentials: 'include',
       })
+      if (!res.ok) {
+        revert()
+        showToast('Could not update star.', 'error')
+      }
     } catch {
-      setStarred(wasStarred)
-      setStarCount((prev) => (prev ?? stars) + (wasStarred ? 1 : -1))
+      revert()
+      showToast('Could not update star.', 'error')
     }
   }, [user, note, isStarred, stars])
 
@@ -212,6 +221,12 @@ export default function NoteViewerPage() {
 
       setReactionState({ likes: newLikes, dislikes: newDislikes, userReaction: newType })
 
+      // Snapshot the pre-click state so a rejected write can roll back
+      // instead of leaving the optimistic reaction applied (A4).
+      const revert = () => {
+        setReactionState({ likes, dislikes, userReaction: oldType })
+        showToast('Could not update reaction.', 'error')
+      }
       try {
         const res = await fetch(`${API}/api/notes/${note.id}/react`, {
           method: 'POST',
@@ -226,9 +241,11 @@ export default function NoteViewerPage() {
             dislikes: data.reactionCounts.dislike,
             userReaction: data.userReaction,
           })
+        } else {
+          revert()
         }
       } catch {
-        setReactionState({ likes, dislikes, userReaction: oldType })
+        revert()
       }
     },
     [user, note, userReaction, likes, dislikes],

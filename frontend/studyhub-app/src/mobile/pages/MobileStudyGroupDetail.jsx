@@ -7,6 +7,7 @@ import anime from '../lib/animeCompat'
 import { API } from '../../config'
 import { resolveImageUrl } from '../../lib/imageUrls'
 import MobileTopBar from '../components/MobileTopBar'
+import { useToast } from '../hooks/useToast'
 
 const PREFERS_REDUCED =
   typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
@@ -24,8 +25,11 @@ async function joinGroup(id) {
     method: 'POST',
     credentials: 'include',
   })
-  if (!res.ok) throw new Error('Could not join')
-  return res.json()
+  const data = await res.json().catch(() => ({}))
+  if (!res.ok) {
+    throw new Error(data?.error || 'Could not join')
+  }
+  return data
 }
 
 /* ── Stat pill ─────────────────────────────────────────────────── */
@@ -43,6 +47,7 @@ function StatPill({ label, value }) {
 
 export default function MobileStudyGroupDetail() {
   const { groupId } = useParams()
+  const toast = useToast()
   const [group, setGroup] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -84,16 +89,36 @@ export default function MobileStudyGroupDetail() {
     if (joining) return
     setJoining(true)
     try {
-      await joinGroup(groupId)
-      setGroup((prev) =>
-        prev ? { ...prev, isMember: true, memberCount: (prev.memberCount || 0) + 1 } : prev,
-      )
-    } catch {
-      // ignore
+      const data = await joinGroup(groupId)
+      // CLAUDE.md A4 — hydrate UI from the server-persisted membership,
+      // not from an assumed toggle. Private groups return status='pending'
+      // (no member-count bump); public groups return status='active'.
+      // Prefer server-returned memberCount when available; fall back to
+      // current + 1 only when the join was active.
+      const becameActive = data?.status === 'active'
+      setGroup((prev) => {
+        if (!prev) return prev
+        const serverMemberCount = typeof data?.memberCount === 'number' ? data.memberCount : null
+        const nextMemberCount = becameActive
+          ? (serverMemberCount ?? (prev.memberCount || 0) + 1)
+          : (serverMemberCount ?? prev.memberCount)
+        return {
+          ...prev,
+          isMember: becameActive,
+          userRole: data?.role || prev.userRole,
+          memberCount: nextMemberCount,
+        }
+      })
+      toast.show({
+        message: data?.status === 'pending' ? 'Join request sent' : 'Joined group',
+        kind: 'success',
+      })
+    } catch (err) {
+      toast.show({ message: err?.message || 'Could not join group.', kind: 'error' })
     } finally {
       setJoining(false)
     }
-  }, [groupId, joining])
+  }, [groupId, joining, toast])
 
   if (loading) {
     return (

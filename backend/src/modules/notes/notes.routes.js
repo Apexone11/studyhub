@@ -78,6 +78,22 @@ router.patch(
   notesController.updateNote,
 )
 
+// ── POST /api/notes/:id ── beacon-only alias for the PATCH update ─────────
+// navigator.sendBeacon (the tab-close autosave in useNotePersistence.js) can
+// only issue POST, so the final unsaved edits 404'd against the PATCH-only
+// route and were lost. This alias reaches the identical updateNote handler
+// with the same middleware chain (auth + per-user patch limiter +
+// verified-email gate + originAllowlist from router.use above) so the
+// concurrency/revision logic PATCH relies on is preserved. Auth is NOT
+// weakened — every guard on the PATCH route is mirrored here.
+router.post(
+  '/:id',
+  requireAuth,
+  notesPatchLimiter,
+  requireVerifiedEmail,
+  notesController.updateNote,
+)
+
 // ── POST /api/notes/:id/chunks ── Chunked autosave append ──────
 router.post(
   '/:id/chunks',

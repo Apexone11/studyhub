@@ -1,10 +1,15 @@
 const { Router } = require('express')
 const requireAuth = require('../../middleware/auth')
+const originAllowlist = require('../../middleware/originAllowlist')
 const { sendError, ERROR_CODES } = require('../../middleware/errorEnvelope')
 const { studyStatusReadLimiter, studyStatusWriteLimiter } = require('../../lib/rateLimiters')
 const service = require('./studyStatus.service')
 
 const router = Router()
+
+// CLAUDE.md A11 — CSRF defense-in-depth on writes (PUT /:sheetId, POST /sync).
+// Short-circuits GET/HEAD/OPTIONS, so router.use is safe for this mixed surface.
+router.use(originAllowlist())
 
 // GET /api/study-status — all statuses for the authenticated user
 router.get('/', requireAuth, studyStatusReadLimiter, async (req, res) => {
@@ -37,8 +42,8 @@ router.get('/batch', requireAuth, studyStatusReadLimiter, async (req, res) => {
 // PUT /api/study-status/:sheetId — set or clear a status
 router.put('/:sheetId', requireAuth, studyStatusWriteLimiter, async (req, res) => {
   try {
-    const sheetId = Number(req.params.sheetId)
-    if (!sheetId || isNaN(sheetId)) {
+    const sheetId = Number.parseInt(req.params.sheetId, 10)
+    if (!Number.isInteger(sheetId) || sheetId < 1) {
       return sendError(res, 400, 'Invalid sheet ID.', ERROR_CODES.BAD_REQUEST)
     }
     const { status } = req.body

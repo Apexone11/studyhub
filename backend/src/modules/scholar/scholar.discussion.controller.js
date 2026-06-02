@@ -21,6 +21,7 @@ const { getBlockedUserIds } = require('../../lib/social/blockFilter')
 const { CANONICAL_ID_RE } = require('./scholar.constants')
 
 const BODY_MAX_LENGTH = 4000
+const VISIBILITY_ALLOWLIST = new Set(['school', 'global'])
 
 function _stripText(raw) {
   if (typeof raw !== 'string') return ''
@@ -171,15 +172,30 @@ async function createDiscussion(req, res) {
       }
       const parent = await prisma.scholarDiscussionThread.findUnique({
         where: { id: pid },
-        select: { id: true, paperId: true },
+        select: { id: true, paperId: true, deletedAt: true },
       })
       if (!parent || parent.paperId !== paperId) {
         return sendError(res, 404, 'Parent thread not found.', ERROR_CODES.NOT_FOUND)
       }
+      if (parent.deletedAt) {
+        return sendError(res, 410, 'Parent thread has been deleted.', ERROR_CODES.NOT_FOUND)
+      }
       resolvedParentId = parent.id
     }
 
+    const requestedVisibility =
+      typeof req.body?.visibility === 'string' && VISIBILITY_ALLOWLIST.has(req.body.visibility)
+        ? req.body.visibility
+        : 'school'
     const viewerSchoolId = await _resolveViewerSchoolId(req.user.userId)
+    if (requestedVisibility === 'school' && !viewerSchoolId) {
+      return sendError(
+        res,
+        400,
+        'School visibility requires an active school enrollment.',
+        ERROR_CODES.VALIDATION,
+      )
+    }
 
     // Ensure the paper row exists (FK).
     try {
@@ -205,7 +221,7 @@ async function createDiscussion(req, res) {
     const row = await prisma.scholarDiscussionThread.create({
       data: {
         paperId,
-        schoolId: viewerSchoolId || null,
+        schoolId: requestedVisibility === 'school' ? viewerSchoolId : null,
         authorId: req.user.userId,
         body: cleanBody,
         parentId: resolvedParentId,

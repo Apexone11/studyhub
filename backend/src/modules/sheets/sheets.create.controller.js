@@ -51,6 +51,10 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
   if (!title?.trim()) return sendError(res, 400, 'Title is required.', ERROR_CODES.BAD_REQUEST)
   if (!content?.trim()) return sendError(res, 400, 'Content is required.', ERROR_CODES.BAD_REQUEST)
   if (!courseId) return sendError(res, 400, 'Course is required.', ERROR_CODES.BAD_REQUEST)
+  const parsedCourseId = Number.parseInt(courseId, 10)
+  if (!Number.isInteger(parsedCourseId) || parsedCourseId < 1) {
+    return sendError(res, 400, 'Invalid course id.', ERROR_CODES.BAD_REQUEST)
+  }
 
   try {
     /* Check upload quota based on user tier (free/donor/pro) */
@@ -159,7 +163,7 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
           htmlScanFields?.htmlRiskTier === RISK_TIER.QUARANTINED
             ? SHEET_STATUS.QUARANTINED
             : nextStatus,
-        courseId: Number.parseInt(courseId, 10),
+        courseId: parsedCourseId,
         userId: req.user.userId,
         forkOf: validatedForkOf,
         allowDownloads: resolvedAllowDownloads,

@@ -9,6 +9,7 @@ const { isModerationEnabled, scanContent } = require('../../lib/moderation/moder
 const { updateFingerprint } = require('../../lib/plagiarismService')
 const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { captureError } = require('../../monitoring/sentry')
+const log = require('../../lib/logger')
 const prisma = require('../../lib/prisma')
 const { normalizeCommentGifAttachments } = require('../../lib/commentGifAttachments')
 const {
@@ -292,6 +293,14 @@ async function createNote(req, res) {
       ERROR_CODES.BAD_REQUEST,
     )
 
+  let courseIdInt = null
+  if (courseId !== undefined && courseId !== null && courseId !== '') {
+    courseIdInt = Number.parseInt(courseId, 10)
+    if (!Number.isInteger(courseIdInt) || courseIdInt < 1) {
+      return sendError(res, 400, 'Invalid courseId.', ERROR_CODES.BAD_REQUEST)
+    }
+  }
+
   try {
     const moderationStatus = priv === false ? getInitialModerationStatus(req.user) : 'clean' // Private notes don't need moderation hold
     const note = await prisma.note.create({
@@ -299,7 +308,7 @@ async function createNote(req, res) {
         title: trimmedTitle,
         content: contentStr,
         userId: req.user.userId,
-        courseId: courseId ? parseInt(courseId, 10) || null : null,
+        courseId: courseIdInt,
         private: priv !== false,
         moderationStatus,
       },
@@ -1298,7 +1307,7 @@ async function starNote(req, res) {
   try {
     const note = await prisma.note.findUnique({
       where: { id: noteId },
-      select: { id: true, private: true, userId: true },
+      select: { id: true, private: true, userId: true, title: true },
     })
     if (!note) return sendError(res, 404, 'Note not found.', ERROR_CODES.NOT_FOUND)
     if (!canReadNote(note, req.user))
@@ -1310,6 +1319,32 @@ async function starNote(req, res) {
     if (existing) return res.json({ starred: true })
 
     await prisma.noteStar.create({ data: { userId: req.user.userId, noteId } })
+
+    // Notify the note owner — mirrors the sheet-star fan-out in
+    // sheets.social.controller. The explicit self-check matches the
+    // comment-notify precedent above (createNotification also self-guards);
+    // placed after the create + `existing` early-return so a re-star can't
+    // double-notify. Wrapped in try/catch so a transient notify failure
+    // (DB blip, schema drift, fan-out dedup race) doesn't 500 the star
+    // request — the noteStar row is already persisted, so failing the
+    // request would leave the UI showing un-starred while the DB is starred.
+    if (note.userId !== req.user.userId) {
+      try {
+        await createNotification(prisma, {
+          userId: note.userId,
+          type: 'star',
+          message: `${req.user.username} starred your note "${note.title || 'note'}".`,
+          actorId: req.user.userId,
+          linkPath: `/notes/${noteId}`,
+        })
+      } catch (notifyErr) {
+        log.warn(
+          { event: 'notes.star_notify_failed', noteId, err: notifyErr?.message },
+          'Failed to notify note owner of star',
+        )
+      }
+    }
+
     res.json({ starred: true })
   } catch (err) {
     captureError(err, { route: req.originalUrl, method: req.method })

@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen } from '@testing-library/react'
+import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { ProfileAvatar } from './ProfileWidgets'
+import { FollowModal, ProfileAvatar } from './ProfileWidgets'
 
 describe('ProfileAvatar', () => {
   beforeEach(() => {
@@ -59,5 +60,37 @@ describe('ProfileAvatar', () => {
       'src',
       'https://cdn.example.com/new.png',
     )
+  })
+})
+
+describe('FollowModal accessibility', () => {
+  function renderFollowModal(props = {}) {
+    return render(
+      <MemoryRouter>
+        <FollowModal
+          followModal="followers"
+          followList={[{ id: 1, username: 'alice', role: 'student' }]}
+          followListLoading={false}
+          onClose={vi.fn()}
+          {...props}
+        />
+      </MemoryRouter>,
+    )
+  }
+
+  it('exposes an accessible dialog with aria-modal while open', () => {
+    renderFollowModal()
+    const dialog = screen.getByRole('dialog', { name: 'Followers' })
+    expect(dialog).toHaveAttribute('aria-modal', 'true')
+  })
+
+  it('labels the dialog "Following" when viewing the following list', () => {
+    renderFollowModal({ followModal: 'following' })
+    expect(screen.getByRole('dialog', { name: 'Following' })).toBeInTheDocument()
+  })
+
+  it('renders nothing when followModal is falsy', () => {
+    renderFollowModal({ followModal: null })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 })

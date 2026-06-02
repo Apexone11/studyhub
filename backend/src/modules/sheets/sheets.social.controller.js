@@ -1,9 +1,10 @@
 const express = require('express')
 const prisma = require('../../core/db/prisma')
 const { captureError } = require('../../core/monitoring/sentry')
+const log = require('../../lib/logger')
 const requireAuth = require('../../core/auth/requireAuth')
 const requireVerifiedEmail = require('../../core/auth/requireVerifiedEmail')
-const { parsePositiveInt } = require('../../core/http/validate')
+const { parseBoundedInt } = require('../../core/http/validate')
 const { assertOwnerOrAdmin, sendForbidden } = require('../../lib/accessControl')
 const { createNotification } = require('../../lib/notify')
 const { notifyMentionedUsers } = require('../../lib/mentions')
@@ -76,14 +77,25 @@ router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
     })
 
     if (createdStar) {
-      await createNotification(prisma, {
-        userId: visibility.userId,
-        type: 'star',
-        message: `${req.user.username} starred your sheet "${visibility.title || 'sheet'}".`,
-        actorId: userId,
-        sheetId,
-        linkPath: `/sheets/${sheetId}`,
-      })
+      // Wrapped in try/catch so a transient notify failure doesn't 500
+      // the star request — the starredSheet row is already persisted and
+      // stars-count already incremented, so failing here would leave the
+      // UI un-starred while the DB shows starred (Sourcery audit 2026-05-28).
+      try {
+        await createNotification(prisma, {
+          userId: visibility.userId,
+          type: 'star',
+          message: `${req.user.username} starred your sheet "${visibility.title || 'sheet'}".`,
+          actorId: userId,
+          sheetId,
+          linkPath: `/sheets/${sheetId}`,
+        })
+      } catch (notifyErr) {
+        log.warn(
+          { event: 'sheets.star_notify_failed', sheetId, err: notifyErr?.message },
+          'Failed to notify sheet owner of star',
+        )
+      }
       // Achievements V2 — emit STAR_RECEIVED for the sheet's author. Only on
       // newly-created stars, not on the un-star (delete) branch, so toggling
       // doesn't double-count.
@@ -106,7 +118,7 @@ router.get('/:id/comments', async (req, res) => {
   req._timingStart = Date.now()
   const sheetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(sheetId)) return res.status(400).json({ error: 'Invalid sheet id.' })
-  const limit = parsePositiveInt(req.query.limit, 20)
+  const limit = parseBoundedInt(req.query.limit, 20, 50)
   const offset = Math.max(0, Number.parseInt(req.query.offset, 10) || 0)
   const sort = req.query.sort || 'newest' // 'newest', 'oldest', 'top'
 
@@ -389,6 +401,9 @@ router.post(
   commentReactLimiter,
   async (req, res) => {
     const commentId = Number.parseInt(req.params.commentId, 10)
+    if (!Number.isInteger(commentId) || commentId < 1) {
+      return sendError(res, 400, 'Invalid comment id.', ERROR_CODES.BAD_REQUEST)
+    }
     const { userId } = req.user
     const { type } = req.body || {}
 
@@ -454,6 +469,9 @@ router.post(
 
 router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (req, res) => {
   const commentId = Number.parseInt(req.params.commentId, 10)
+  if (!Number.isInteger(commentId) || commentId < 1) {
+    return sendError(res, 400, 'Invalid comment id.', ERROR_CODES.BAD_REQUEST)
+  }
 
   try {
     const comment = await prisma.comment.findUnique({ where: { id: commentId } })
@@ -481,8 +499,16 @@ router.delete('/:id/comments/:commentId', requireAuth, commentLimiter, async (re
 // ── PATCH /:id/comments/:commentId ── edit comment content
 router.patch('/:id/comments/:commentId', requireAuth, commentLimiter, async (req, res) => {
   try {
-    const sheetId = Number(req.params.id)
-    const commentId = Number(req.params.commentId)
+    const sheetId = Number.parseInt(req.params.id, 10)
+    const commentId = Number.parseInt(req.params.commentId, 10)
+    if (
+      !Number.isInteger(sheetId) ||
+      sheetId < 1 ||
+      !Number.isInteger(commentId) ||
+      commentId < 1
+    ) {
+      return sendError(res, 400, 'Invalid id.', ERROR_CODES.BAD_REQUEST)
+    }
     const { content } = req.body
 
     if (!content || typeof content !== 'string' || content.trim().length === 0) {

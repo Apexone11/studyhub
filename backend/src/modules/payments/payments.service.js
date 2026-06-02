@@ -1,6 +1,7 @@
 /**
  * payments.service.js — Stripe SDK interactions and DB operations for payments.
  */
+const crypto = require('node:crypto')
 const Stripe = require('stripe')
 const prisma = require('../../lib/prisma')
 const log = require('../../lib/logger')
@@ -50,6 +51,29 @@ function getStripe() {
   return _stripe
 }
 
+/**
+ * Build an idempotency key for a state-changing Stripe call. Computed once
+ * per call site so the Stripe SDK reuses the SAME key on its internal
+ * network retries — a retried `checkout.sessions.create` returns the cached
+ * session instead of creating a duplicate (double-charge guard). Sister fix
+ * to the webhook idempotency from wave-11. 2026-05-14 L5-1.
+ *
+ * The timestamp + random suffix make the key unique across distinct
+ * user-initiated requests (a user legitimately starting checkout twice is a
+ * new key → a new session, by design).
+ */
+function buildStripeIdempotencyKey(action, userId, extra = '') {
+  const rand = crypto.randomBytes(6).toString('hex')
+  return `sh-${action}-${userId || 'anon'}-${Date.now()}-${rand}${extra ? `-${extra}` : ''}`
+}
+
+// Pull the per-call Stripe request id off a response for log correlation
+// (Stripe records its own request_id; logging it lets us cross-reference the
+// Stripe dashboard from our pino logs). Safe on any Stripe response object.
+function stripeRequestId(stripeResponse) {
+  return stripeResponse?.lastResponse?.requestId || null
+}
+
 // ── Stripe Customer ──────────────────────────────────────────────────────
 
 /**
@@ -75,13 +99,16 @@ async function getOrCreateCustomer(user) {
   }
 
   // Create new Stripe customer
-  const customer = await stripe.customers.create({
-    email: user.email || undefined,
-    metadata: {
-      studyhub_user_id: String(user.id),
-      studyhub_username: user.username,
+  const customer = await stripe.customers.create(
+    {
+      email: user.email || undefined,
+      metadata: {
+        studyhub_user_id: String(user.id),
+        studyhub_username: user.username,
+      },
     },
-  })
+    { idempotencyKey: buildStripeIdempotencyKey('customer.create', user.id) },
+  )
 
   return customer.id
 }
@@ -105,29 +132,45 @@ async function createSubscriptionCheckout(user, plan, successUrl, cancelUrl) {
 
   const customerId = await getOrCreateCustomer(user)
 
-  return stripe.checkout.sessions.create({
-    customer: customerId,
-    mode: 'subscription',
-    payment_method_types: ['card'],
-    line_items: [
-      {
-        price: planDef.stripePriceId,
-        quantity: 1,
-      },
-    ],
-    success_url: successUrl,
-    cancel_url: cancelUrl,
-    metadata: {
-      studyhub_user_id: String(user.id),
-      plan,
-    },
-    subscription_data: {
+  const session = await stripe.checkout.sessions.create(
+    {
+      customer: customerId,
+      mode: 'subscription',
+      payment_method_types: ['card'],
+      line_items: [
+        {
+          price: planDef.stripePriceId,
+          quantity: 1,
+        },
+      ],
+      success_url: successUrl,
+      cancel_url: cancelUrl,
       metadata: {
         studyhub_user_id: String(user.id),
         plan,
       },
+      subscription_data: {
+        metadata: {
+          studyhub_user_id: String(user.id),
+          plan,
+        },
+      },
     },
-  })
+    { idempotencyKey: buildStripeIdempotencyKey('checkout.subscription', user.id, plan) },
+  )
+
+  log.info(
+    {
+      event: 'stripe.checkout_created',
+      kind: 'subscription',
+      userId: user.id,
+      plan,
+      stripeRequestId: stripeRequestId(session),
+    },
+    'Stripe subscription checkout session created',
+  )
+
+  return session
 }
 
 /**
@@ -181,7 +224,20 @@ async function createDonationCheckout({
     sessionParams.customer = customerId
   }
 
-  const session = await stripe.checkout.sessions.create(sessionParams)
+  const session = await stripe.checkout.sessions.create(sessionParams, {
+    idempotencyKey: buildStripeIdempotencyKey('checkout.donation', user?.id, String(amountCents)),
+  })
+
+  log.info(
+    {
+      event: 'stripe.checkout_created',
+      kind: 'donation',
+      userId: user?.id || null,
+      amountCents,
+      stripeRequestId: stripeRequestId(session),
+    },
+    'Stripe donation checkout session created',
+  )
 
   // Record pending donation
   await prisma.donation.create({
@@ -215,10 +271,13 @@ async function createPortalSession(user, returnUrl) {
     throw new Error('No active subscription found')
   }
 
-  return stripe.billingPortal.sessions.create({
-    customer: sub.stripeCustomerId,
-    return_url: returnUrl,
-  })
+  return stripe.billingPortal.sessions.create(
+    {
+      customer: sub.stripeCustomerId,
+      return_url: returnUrl,
+    },
+    { idempotencyKey: buildStripeIdempotencyKey('portal.create', user.id) },
+  )
 }
 
 // ── Webhook Handlers ─────────────────────────────────────────────────────
@@ -952,6 +1011,7 @@ async function getRevenueAnalytics() {
 
 module.exports = {
   getStripe,
+  buildStripeIdempotencyKey,
   getOrCreateCustomer,
   createSubscriptionCheckout,
   createDonationCheckout,

@@ -102,11 +102,6 @@ const DEFAULTS = {
   upcomingExams: false,
   aiCard: false,
   sheetsGrid: false,
-  teachMaterials: false,
-  docsPublic: false,
-  groupsPolish: false,
-  roleChecklist: false,
-  weeklyFocus: false,
   teachSections: false,
   creatorAudit: false,
   loading: true,
@@ -122,45 +117,21 @@ export function useDesignV2Flags() {
       fetchFlag(FLAG_NAMES.upcomingExams),
       fetchFlag(FLAG_NAMES.aiCard),
       fetchFlag(FLAG_NAMES.sheetsGrid),
-      fetchFlag(FLAG_NAMES.teachMaterials),
-      fetchFlag(FLAG_NAMES.docsPublic),
-      fetchFlag(FLAG_NAMES.groupsPolish),
-      fetchFlag(FLAG_NAMES.roleChecklist),
-      fetchFlag(FLAG_NAMES.weeklyFocus),
       fetchFlag(FLAG_NAMES.teachSections),
       fetchFlag(FLAG_NAMES.creatorAudit),
     ])
-      .then(
-        ([
+      .then(([phase1Dashboard, upcomingExams, aiCard, sheetsGrid, teachSections, creatorAudit]) => {
+        if (cancelled) return
+        setFlags({
           phase1Dashboard,
           upcomingExams,
           aiCard,
           sheetsGrid,
-          teachMaterials,
-          docsPublic,
-          groupsPolish,
-          roleChecklist,
-          weeklyFocus,
           teachSections,
           creatorAudit,
-        ]) => {
-          if (cancelled) return
-          setFlags({
-            phase1Dashboard,
-            upcomingExams,
-            aiCard,
-            sheetsGrid,
-            teachMaterials,
-            docsPublic,
-            groupsPolish,
-            roleChecklist,
-            weeklyFocus,
-            teachSections,
-            creatorAudit,
-            loading: false,
-          })
-        },
-      )
+          loading: false,
+        })
+      })
       .catch(() => {
         if (!cancelled) setFlags({ ...DEFAULTS, loading: false })
       })

@@ -25,6 +25,25 @@ const RECOMMENDED = [
       'Resend webhook signing key (svix). Without it the strict-mode handler 503s on every webhook; ' +
       'with it the handler verifies signatures and stores delivery + suppression events. Added 2026-05-14.',
   },
+  {
+    key: 'RESEND_API_KEY',
+    description:
+      'Resend API key for outbound email delivery (lib/email/emailTransport.js). ' +
+      'Missing in dev = email falls back to jsonTransport/SMTP; missing in prod = ' +
+      'verification, reset, and admin notification mail silently no-ops.',
+  },
+  {
+    key: 'EMAIL_USER',
+    description:
+      'SMTP username for the fallback nodemailer transport (lib/email/emailTransport.js). ' +
+      'Only used when EMAIL_TRANSPORT is not resend; pair with EMAIL_PASS.',
+  },
+  {
+    key: 'EMAIL_PASS',
+    description:
+      'SMTP password / app-password for the fallback nodemailer transport ' +
+      '(lib/email/emailTransport.js). Pair with EMAIL_USER.',
+  },
   { key: 'SENTRY_DSN', description: 'Error monitoring' },
   // FRONTEND_URL was previously listed here as RECOMMENDED only — promoted
   // to REQUIRED_IN_PRODUCTION (line ~87) wave-11 2026-05-14 so missing
@@ -142,6 +161,22 @@ const REQUIRED_IN_PRODUCTION = [
       'Railway volume corruption permanently loses every user-uploaded photo. Recovery ' +
       'procedure: scripts/restoreVolumeFromR2.js + RUNBOOK_DB_RESTORE.md.',
   },
+  {
+    // WebAuthn relying-party ID. Without it lib/webauthn/webauthnShared.js
+    // falls back to "localhost", which makes every passkey verify fail in
+    // prod (rpIdHash mismatch). Promoted to REQUIRED_IN_PRODUCTION alongside
+    // the prod-throw added in webauthnShared.js.
+    key: 'WEBAUTHN_RP_ID',
+    description:
+      'WebAuthn relying-party ID (e.g. getstudyhub.org). Required for admin passkey auth.',
+  },
+  {
+    // WebAuthn origin. Without it the localhost fallback makes
+    // clientDataJSON.origin mismatch and every passkey verify fails.
+    key: 'WEBAUTHN_ORIGIN',
+    description:
+      'WebAuthn origin URL (e.g. https://getstudyhub.org). Required for admin passkey auth.',
+  },
 ]
 
 const OPTIONAL = [
@@ -172,8 +207,10 @@ const OPTIONAL = [
   { key: 'STRIPE_PRICE_ID_PRO', description: 'Stripe Pro monthly price ID' },
   { key: 'STRIPE_PRICE_ID_PRO_YEARLY', description: 'Stripe Pro yearly price ID' },
   { key: 'STRIPE_PRICE_ID_DONATION', description: 'Stripe donation price ID (legacy)' },
-  { key: 'WEBAUTHN_RP_ID', description: 'WebAuthn relying-party ID' },
-  { key: 'WEBAUTHN_ORIGIN', description: 'WebAuthn origin URL' },
+  // WEBAUTHN_RP_ID + WEBAUTHN_ORIGIN promoted to REQUIRED_IN_PRODUCTION
+  // (top of this file) — a missing value falls back to localhost and
+  // silently breaks admin passkey auth in prod (lib/webauthn/webauthnShared.js
+  // now throws at boot to match).
   { key: 'GOOGLE_BOOKS_API_KEY', description: 'Google Books API key' },
   { key: 'CSP_REPORT_URI', description: 'CSP violation reporting endpoint' },
   {

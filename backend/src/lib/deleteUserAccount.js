@@ -78,9 +78,25 @@ async function cleanupAnnouncementImage(imageUrl, context = {}) {
 async function deleteUserAccount(prisma, { userId, username, reason = null, details = null }) {
   await cancelStripeSubscriptionIfNeeded(prisma, userId)
 
-  // Collected inside the transaction; drained AFTER the tx commits so the
-  // R2 round-trip never holds a Postgres row lock.
+  // Collected BEFORE the transaction commits (the AiAttachment FK is
+  // onDelete: Cascade, so tx.user.delete would wipe the rows out from
+  // under us). Read in its own try/catch because the Hub AI v2 table may
+  // not exist yet in environments missing the migration — a missing table
+  // must degrade gracefully, not abort the whole GDPR deletion. Drained
+  // AFTER the tx commits so the R2 round-trip never holds a row lock.
   let aiAttachmentR2Keys = []
+  try {
+    const userAiAttachments = await prisma.aiAttachment.findMany({
+      where: { userId },
+      select: { r2Key: true },
+    })
+    aiAttachmentR2Keys = userAiAttachments.map((a) => a.r2Key).filter(Boolean)
+  } catch (error) {
+    captureError(error, {
+      source: 'deleteUserAccountLoadAiAttachments',
+      userId,
+    })
+  }
 
   const deletedAssetRefs = await prisma.$transaction(async (tx) => {
     const userRecord = await tx.user.findUnique({
@@ -357,29 +373,17 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
     await tx.notification.deleteMany({ where: { userId } })
 
     // ── Hub AI cleanup (messages cascade from conversations, but explicit for safety) ──
-    // L13-HIGH-1: GDPR Art. 17 erasure now covers Hub AI v2 + Scholar tables.
-    // R2 attachment objects are added to the cleanup queue so they get
-    // hard-deleted alongside the row. The sweeper would eventually drain
-    // them but explicit erasure on account deletion is a regulatory must.
-    const userAiAttachments = await tx.aiAttachment
-      .findMany({ where: { userId }, select: { r2Key: true } })
-      .catch(() => [])
-    aiAttachmentR2Keys = userAiAttachments.map((a) => a.r2Key).filter(Boolean)
-    await tx.aiAttachment.deleteMany({ where: { userId } }).catch(() => {})
-    await tx.aiUploadIdempotency.deleteMany({ where: { userId } }).catch(() => {})
-    await tx.userAiStorageQuota.deleteMany({ where: { userId } }).catch(() => {})
+    // L13-HIGH-1: GDPR Art. 17 erasure covers the Hub AI v1 tables here.
+    // The maybe-missing-table Hub AI v2 + Scholar cleanups (AiAttachment,
+    // AiUploadIdempotency, UserAiStorageQuota, ScholarAnnotation,
+    // ScholarDiscussionThread) run in their own try/catch blocks AFTER this
+    // transaction commits. A `.catch()` inside a Postgres transaction does
+    // NOT un-abort it: once one statement errors the whole tx is aborted
+    // (25P02), so the next un-caught statement throws and the entire GDPR
+    // deletion fails — exactly when the .catch was meant to save it.
     await tx.aiMessage.deleteMany({ where: { userId } })
     await tx.aiUsageLog.deleteMany({ where: { userId } })
     await tx.aiConversation.deleteMany({ where: { userId } })
-
-    // ── Scholar cleanup (annotations are owner data; threads soft-delete) ──
-    await tx.scholarAnnotation.deleteMany({ where: { userId } }).catch(() => {})
-    await tx.scholarDiscussionThread
-      .updateMany({
-        where: { authorId: userId },
-        data: { deletedAt: new Date(), body: '' },
-      })
-      .catch(() => {})
 
     await tx.studySheet.deleteMany({ where: { userId } })
     await tx.user.delete({ where: { id: userId } })
@@ -398,6 +402,45 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
       videos: userVideos,
     }
   })
+
+  // ── Maybe-missing-table Hub AI v2 + Scholar erasure (post-commit) ──
+  // L13-HIGH-1: GDPR Art. 17 erasure for tables that may not exist yet in
+  // environments missing the Hub AI v2 / Scholar migrations. These run
+  // OUTSIDE the transaction so a missing table degrades gracefully — a
+  // failed query in here cannot abort the core deletion, which has already
+  // committed. The userId FK is onDelete: Cascade on the rows that have a
+  // relation, so most rows are already gone; the explicit deletes are
+  // belt-and-suspenders and idempotent (deleteMany on an empty set is a
+  // no-op). AiUploadIdempotency has no FK to User, so its rows survive the
+  // cascade and the explicit delete is the only thing that erases them.
+  try {
+    await prisma.aiAttachment.deleteMany({ where: { userId } })
+  } catch (error) {
+    captureError(error, { source: 'deleteUserAccountAiAttachment', userId })
+  }
+  try {
+    await prisma.aiUploadIdempotency.deleteMany({ where: { userId } })
+  } catch (error) {
+    captureError(error, { source: 'deleteUserAccountAiUploadIdempotency', userId })
+  }
+  try {
+    await prisma.userAiStorageQuota.deleteMany({ where: { userId } })
+  } catch (error) {
+    captureError(error, { source: 'deleteUserAccountUserAiStorageQuota', userId })
+  }
+  try {
+    await prisma.scholarAnnotation.deleteMany({ where: { userId } })
+  } catch (error) {
+    captureError(error, { source: 'deleteUserAccountScholarAnnotation', userId })
+  }
+  try {
+    await prisma.scholarDiscussionThread.updateMany({
+      where: { authorId: userId },
+      data: { deletedAt: new Date(), body: '' },
+    })
+  } catch (error) {
+    captureError(error, { source: 'deleteUserAccountScholarDiscussionThread', userId })
+  }
 
   const cleanupTasks = [
     ...deletedAssetRefs.attachmentUrls.map((attachmentUrl) =>
