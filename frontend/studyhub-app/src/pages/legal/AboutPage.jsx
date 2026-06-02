@@ -77,10 +77,13 @@ const GOAL_TONES = {
   },
 }
 
+// Use the darker `-text` token variants: the base success (#16a34a) and
+// warning (#d97706) are only ~3.2:1 on white and fail AA as heading text.
+// The -text variants clear 4.5:1 while staying green/amber.
 const ROADMAP_TONES = {
-  current: 'var(--sh-success)',
-  next: 'var(--sh-warning)',
-  future: 'var(--sh-info)',
+  current: 'var(--sh-success-text)',
+  next: 'var(--sh-warning-text)',
+  future: 'var(--sh-info-text)',
 }
 
 export default function AboutPage() {
@@ -302,7 +305,12 @@ export default function AboutPage() {
           <div style={s.stepsRow}>
             {HOW_STEPS.map((step, i) => (
               <div key={i} style={s.stepCard}>
-                <div style={s.stepNum}>{step.step}</div>
+                {/* Decorative large step numeral — the step's meaning is in
+                    the title/desc below. Faint by design (low contrast), so
+                    hide it from the a11y tree rather than darken it. */}
+                <div style={s.stepNum} aria-hidden="true">
+                  {step.step}
+                </div>
                 <h3 style={s.stepTitle}>{step.title}</h3>
                 <p style={s.stepDesc}>{step.desc}</p>
               </div>
@@ -607,7 +615,9 @@ const s = {
     padding: '32px 24px',
     textAlign: 'center',
   },
-  stepNum: { fontSize: 40, fontWeight: 'bold', color: 'var(--sh-border)', marginBottom: 16 },
+  // Muted (not border-grey): the faint #e5e2dd was ~1.2:1 on paper and failed
+  // even the 3:1 large-text bar. Muted clears it and the numerals stay subtle.
+  stepNum: { fontSize: 40, fontWeight: 'bold', color: 'var(--sh-muted)', marginBottom: 16 },
   stepTitle: { fontSize: 18, fontWeight: 'bold', color: 'var(--sh-heading)', margin: '0 0 12px' },
   stepDesc: { fontSize: 14, color: 'var(--sh-muted)', margin: 0, lineHeight: 1.7 },
   roadmapGrid: {

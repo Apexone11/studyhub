@@ -139,7 +139,9 @@ function DataRequestPage() {
           You can also email us directly at{' '}
           <a
             href={`mailto:${LEGAL_EMAILS.privacy}`}
-            style={{ color: 'var(--sh-brand)', textDecoration: 'none' }}
+            // Underlined: a link inside a text block can't rely on color alone
+            // to be distinguishable (WCAG 1.4.1 / axe link-in-text-block).
+            style={{ color: 'var(--sh-brand)', textDecoration: 'underline' }}
           >
             {LEGAL_EMAILS.privacy}
           </a>

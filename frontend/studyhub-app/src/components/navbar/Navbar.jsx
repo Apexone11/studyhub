@@ -164,7 +164,9 @@ export default function Navbar({
               <LogoMark size={28} />
             )}
             <span style={wordmarkStyle}>
-              Study<span style={{ color: 'var(--sh-nav-tab-active)' }}>Hub</span>
+              {/* Brand blue (#2563eb) is only ~3.4:1 on the dark #1a1a1a nav;
+                  the lighter brand-border blue clears AA for the wordmark. */}
+              Study<span style={{ color: 'var(--sh-brand-border)' }}>Hub</span>
             </span>
           </Link>
 
