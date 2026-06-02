@@ -110,21 +110,26 @@ router.get('/export', exportDataLimiter, async (req, res) => {
         orderBy: { createdAt: 'desc' },
       }),
 
+      // Core current-schema data below is NOT `.catch`-masked. A runtime
+      // failure here must fail the whole export (outer catch → 500 + retry)
+      // rather than return a 200 that silently drops records: an incomplete
+      // GDPR Art. 20 / CCPA export presented as complete misleads the user
+      // about what data we hold. Only the AI/Scholar tables further down stay
+      // `.catch`-tolerant — those are documented schema-drift exceptions.
+
       // Contribute-back proposals the user made (model: SheetContribution).
-      prisma.sheetContribution
-        .findMany({
-          where: { proposerId: userId },
-          select: {
-            id: true,
-            targetSheetId: true,
-            forkSheetId: true,
-            status: true,
-            message: true,
-            createdAt: true,
-          },
-          orderBy: { createdAt: 'desc' },
-        })
-        .catch(() => []),
+      prisma.sheetContribution.findMany({
+        where: { proposerId: userId },
+        select: {
+          id: true,
+          targetSheetId: true,
+          forkSheetId: true,
+          status: true,
+          message: true,
+          createdAt: true,
+        },
+        orderBy: { createdAt: 'desc' },
+      }),
 
       // Course enrollments (Enrollment has no timestamp column).
       prisma.enrollment.findMany({
@@ -138,65 +143,55 @@ router.get('/export', exportDataLimiter, async (req, res) => {
       }),
 
       // Starred sheets (StarredSheet has no createdAt).
-      prisma.starredSheet
-        .findMany({
-          where: { userId: userId },
-          select: {
-            sheetId: true,
-          },
-        })
-        .catch(() => []),
+      prisma.starredSheet.findMany({
+        where: { userId: userId },
+        select: {
+          sheetId: true,
+        },
+      }),
 
       // Starred notes
-      prisma.noteStar
-        .findMany({
-          where: { userId: userId },
-          select: {
-            noteId: true,
-            createdAt: true,
-          },
-        })
-        .catch(() => []),
+      prisma.noteStar.findMany({
+        where: { userId: userId },
+        select: {
+          noteId: true,
+          createdAt: true,
+        },
+      }),
 
       // Preferences (model: UserPreferences).
-      prisma.userPreferences
-        .findUnique({
-          where: { userId: userId },
-          select: {
-            theme: true,
-            profileVisibility: true,
-            emailDigest: true,
-            inAppNotifications: true,
-          },
-        })
-        .catch(() => null),
+      prisma.userPreferences.findUnique({
+        where: { userId: userId },
+        select: {
+          theme: true,
+          profileVisibility: true,
+          emailDigest: true,
+          inAppNotifications: true,
+        },
+      }),
 
       // Conversations (DM participation, no message content for privacy)
-      prisma.conversationParticipant
-        .findMany({
-          where: { userId: userId },
-          select: {
-            conversationId: true,
-            joinedAt: true,
-            lastReadAt: true,
-          },
-        })
-        .catch(() => []),
+      prisma.conversationParticipant.findMany({
+        where: { userId: userId },
+        select: {
+          conversationId: true,
+          joinedAt: true,
+          lastReadAt: true,
+        },
+      }),
 
       // Study group memberships
-      prisma.studyGroupMember
-        .findMany({
-          where: { userId: userId },
-          select: {
-            groupId: true,
-            role: true,
-            joinedAt: true,
-            group: {
-              select: { name: true },
-            },
+      prisma.studyGroupMember.findMany({
+        where: { userId: userId },
+        select: {
+          groupId: true,
+          role: true,
+          joinedAt: true,
+          group: {
+            select: { name: true },
           },
-        })
-        .catch(() => []),
+        },
+      }),
 
       // L13-HIGH-2: Hub AI v2 + Scholar — GDPR Art. 15 / Art. 20 portability.
       // Each block is `.catch(() => [])` so a missing table or schema-drift
