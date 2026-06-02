@@ -31,6 +31,7 @@ internal log into this file when they describe user-visible behavior.
 ### Wave-12.25 — green CI: raise backend test timeout for bcrypt-heavy cases (2026-06-02)
 
 - CI (StudyHub CI + Quality Gates) had been red on `local-main`/#385 because one security test (`recoveryCodes.unit.test.js` — hashes all 10 recovery codes at bcrypt cost 12 and verifies each) took ~5.05s and tripped vitest's 5000ms default. Raised the backend `testTimeout`/`hookTimeout` to 15s in `vitest.config.mjs` (still fails a genuinely-hung test fast). Full backend suite now green on CI (3,513 tests). This was the long-standing red-CI cause, not a regression from recent work.
+- Lighthouse CI (`accessibility` Quality Gate) was failing with "module is not defined in ES module scope" — `lighthouse.config.js` used CommonJS `module.exports` in a `"type": "module"` workspace. Renamed it to `lighthouse.config.cjs` and updated the workflow `configPath`. (The `playwright-smoke`/`playwright-a11y` E2E checks remain red on a pre-existing, multi-spec UI/test-drift issue unrelated to this work — tracked separately.)
 
 ### Wave-12.24 — 2nd 10-loop audit fixes (Explore/aliasing hardening) (2026-05-31)
 

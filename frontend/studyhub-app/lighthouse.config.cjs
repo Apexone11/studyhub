@@ -1,4 +1,6 @@
-/* global module */
+// Lighthouse CI config. Named .cjs (not .js) because this workspace's
+// package.json sets "type": "module", which would otherwise treat a .js file
+// as ESM and reject the CommonJS module.exports below.
 module.exports = {
   ci: {
     collect: {
