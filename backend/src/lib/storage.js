@@ -77,7 +77,23 @@ function validateUploadStorage() {
         ? 'ephemeral-opt-in'
         : 'default-local'
 
-  log.info({ uploadsDir: UPLOADS_DIR, storageMode }, 'Upload storage ready')
+  // Ephemeral storage in production is the canonical cause of "every deploy
+  // wipes user photos": files land on the container's disk, which a redeploy
+  // discards, while DB rows still point at /uploads/... Surface it loudly —
+  // log.info is invisible in Sentry, so a misconfigured backup service would
+  // otherwise lose photos silently on every deploy. captureError makes it a
+  // standing alert until a persistent volume is attached.
+  if (process.env.NODE_ENV === 'production' && storageMode === 'ephemeral-opt-in') {
+    const warning =
+      'Uploads are on EPHEMERAL storage in production (ALLOW_EPHEMERAL_UPLOADS=true). ' +
+      'Every redeploy will wipe avatars/covers/attachments. Attach a persistent Railway ' +
+      'volume mounted at /data (or set UPLOADS_DIR to a mounted path) and unset ' +
+      'ALLOW_EPHEMERAL_UPLOADS. Recover lost files with scripts/restoreVolumeFromR2.js.'
+    log.error({ event: 'storage.ephemeral_in_production', uploadsDir: UPLOADS_DIR }, warning)
+    captureError(new Error(warning), { event: 'storage.ephemeral_in_production' })
+  } else {
+    log.info({ uploadsDir: UPLOADS_DIR, storageMode }, 'Upload storage ready')
+  }
 }
 
 function buildUploadUrl(kind, fileName) {

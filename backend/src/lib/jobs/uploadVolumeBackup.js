@@ -202,7 +202,7 @@ function startUploadVolumeBackup({ uploadsDir }) {
     'upload-volume backup scheduled',
   )
 
-  const handle = setInterval(() => {
+  const runPass = () => {
     // Lazy-require to avoid a boot-time require cycle through the
     // job runner.
     const { runWithHeartbeat } = require('./heartbeat')
@@ -211,7 +211,20 @@ function startUploadVolumeBackup({ uploadsDir }) {
       () => runBackupPass({ uploadsDir, bucket, rateLimitPerSec }),
       { slaMs: intervalMs / 2 },
     )
-  }, intervalMs)
+  }
+
+  // First pass shortly after boot rather than a full interval later. A
+  // short-lived container (frequent redeploys) could otherwise be torn
+  // down before its first nightly pass ever fired, so a freshly-uploaded
+  // photo would never reach R2 and would be lost on the next deploy.
+  // Default 2 min: long enough for boot to settle (and for the boot
+  // restore to finish first), short enough to bound the loss window.
+  const firstPassDelayMs =
+    Number.parseInt(process.env.UPLOAD_BACKUP_FIRST_PASS_DELAY_MS, 10) || 2 * 60 * 1000
+  const firstPass = setTimeout(runPass, firstPassDelayMs)
+  firstPass.unref()
+
+  const handle = setInterval(runPass, intervalMs)
   handle.unref()
   return handle
 }

@@ -414,11 +414,18 @@ describe('storage.validateUploadStorage', () => {
     expect(() => s.validateUploadStorage()).toThrow(/UPLOADS_DIR must point to persistent storage/)
   })
 
-  it('allows production with ALLOW_EPHEMERAL_UPLOADS=true and records ephemeral-opt-in mode', () => {
+  it('allows production with ALLOW_EPHEMERAL_UPLOADS=true but alerts loudly (error + Sentry)', () => {
     const s = loadStorage({ NODE_ENV: 'production', ALLOW_EPHEMERAL_UPLOADS: 'true' })
     expect(() => s.validateUploadStorage()).not.toThrow()
-    expect(mocks.logger.info).toHaveBeenCalledTimes(1)
-    expect(mocks.logger.info.mock.calls[0][0]).toMatchObject({ storageMode: 'ephemeral-opt-in' })
+    // Ephemeral storage in prod is the exact cause of "every deploy wipes
+    // photos" — it must surface as an error + Sentry alert, not a quiet
+    // info line that the operator never sees.
+    expect(mocks.logger.error).toHaveBeenCalledTimes(1)
+    expect(mocks.logger.error.mock.calls[0][0]).toMatchObject({
+      event: 'storage.ephemeral_in_production',
+    })
+    expect(mocks.sentry.captureError).toHaveBeenCalledTimes(1)
+    expect(mocks.logger.info).not.toHaveBeenCalled()
   })
 
   it('propagates fs.mkdirSync errors (e.g., permission denied) to the caller', () => {

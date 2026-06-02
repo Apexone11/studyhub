@@ -28,6 +28,10 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.26 — profile photos survive redeploys (upload self-heal) (2026-06-02)
+
+- Fixed user avatars and cover images disappearing after every deploy. Avatars/covers are stored on the server's upload volume; when that volume isn't persistent (e.g. after a service migration) a redeploy wiped them while the database still referenced them. Boot-time self-heal now re-hydrates any missing files from the R2 backup on startup (`uploadVolumeRestore.js`), the first backup pass now runs minutes after boot instead of 24h later, and running on ephemeral storage in production now raises a loud error + Sentry alert instead of a silent log. Operator recovery steps documented in `RUNBOOK_DB_RESTORE.md`.
+
 ### Wave-12.25 — green CI: raise backend test timeout for bcrypt-heavy cases (2026-06-02)
 
 - CI (StudyHub CI + Quality Gates) had been red on `local-main`/#385 because one security test (`recoveryCodes.unit.test.js` — hashes all 10 recovery codes at bcrypt cost 12 and verifies each) took ~5.05s and tripped vitest's 5000ms default. Raised the backend `testTimeout`/`hookTimeout` to 15s in `vitest.config.mjs` (still fails a genuinely-hung test fast). Full backend suite now green on CI (3,513 tests). This was the long-standing red-CI cause, not a regression from recent work.
