@@ -232,6 +232,19 @@ const OPTIONAL = [
       'Cap on upload-backup mirror rate (objects/sec). Default 10. Lower if you ' +
       'see Railway egress spikes during the nightly pass.',
   },
+  {
+    key: 'UPLOAD_BACKUP_FIRST_PASS_DELAY_MS',
+    description:
+      'Delay before the first upload-backup pass after boot. Default 120000 (2 min). ' +
+      'Bounds how long a new photo sits only on local disk before reaching R2.',
+  },
+  {
+    key: 'UPLOAD_RESTORE_ON_BOOT',
+    description:
+      'Boot-time self-heal: re-hydrate missing avatar/cover/attachment files from the R2 ' +
+      'mirror on startup (skip-if-exists). Default ON in production, OFF in dev. ' +
+      '"false" disables, "true" forces on.',
+  },
 ]
 
 function validateSecrets() {

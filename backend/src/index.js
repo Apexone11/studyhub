@@ -905,6 +905,19 @@ async function startServer() {
     // RUNBOOK_DB_RESTORE.md "Upload Volume Recovery" section.
     const { startUploadVolumeBackup } = require('./lib/jobs/uploadVolumeBackup')
     const { UPLOADS_DIR } = require('./lib/storage')
+
+    // Self-heal: pull any missing avatar/cover/attachment files back from
+    // the R2 mirror on boot (skip-if-exists, non-blocking). When uploads
+    // sit on a non-persistent volume — a detached/remounted Railway volume
+    // or an ephemeral rebuild — a redeploy wipes the directory while the DB
+    // rows still point at /uploads/..., breaking every image platform-wide.
+    // Re-hydrating from R2 each boot makes that recoverable automatically
+    // instead of needing a manual restoreVolumeFromR2.js run. Runs BEFORE
+    // the backup is scheduled so a fresh container restores first, then
+    // mirrors. A healthy persistent volume pays only the R2 LIST cost.
+    const { restoreOnBoot } = require('./lib/jobs/uploadVolumeRestore')
+    restoreOnBoot({ uploadsDir: UPLOADS_DIR })
+
     startUploadVolumeBackup({ uploadsDir: UPLOADS_DIR })
 
     log.info({ port: PORT }, `Server running on http://localhost:${PORT}`)
