@@ -17,11 +17,14 @@ const mocks = vi.hoisted(() => {
     studySheet: { findMany: vi.fn() },
     note: { findMany: vi.fn() },
     feedPost: { findMany: vi.fn() },
-    contribution: { findMany: vi.fn() },
+    // Real model names (the controller previously called non-existent
+    // prisma.contribution / prisma.star / prisma.preferences, which 500'd
+    // the live export; this mock now mirrors the actual Prisma client).
+    sheetContribution: { findMany: vi.fn() },
     enrollment: { findMany: vi.fn() },
-    star: { findMany: vi.fn() },
+    starredSheet: { findMany: vi.fn() },
     noteStar: { findMany: vi.fn() },
-    preferences: { findUnique: vi.fn() },
+    userPreferences: { findUnique: vi.fn() },
     conversationParticipant: { findMany: vi.fn() },
     studyGroupMember: { findMany: vi.fn() },
     // Models the export controller added after this test was written
@@ -117,11 +120,11 @@ describe('GET /export', () => {
     ])
     mocks.prisma.note.findMany.mockResolvedValue([])
     mocks.prisma.feedPost.findMany.mockResolvedValue([])
-    mocks.prisma.contribution.findMany.mockResolvedValue([])
+    mocks.prisma.sheetContribution.findMany.mockResolvedValue([])
     mocks.prisma.enrollment.findMany.mockResolvedValue([])
-    mocks.prisma.star.findMany.mockResolvedValue([])
+    mocks.prisma.starredSheet.findMany.mockResolvedValue([])
     mocks.prisma.noteStar.findMany.mockResolvedValue([])
-    mocks.prisma.preferences.findUnique.mockResolvedValue({ theme: 'dark' })
+    mocks.prisma.userPreferences.findUnique.mockResolvedValue({ theme: 'dark' })
     mocks.prisma.conversationParticipant.findMany.mockResolvedValue([])
     mocks.prisma.studyGroupMember.findMany.mockResolvedValue([])
 
@@ -142,11 +145,11 @@ describe('GET /export', () => {
     mocks.prisma.studySheet.findMany.mockResolvedValue([])
     mocks.prisma.note.findMany.mockResolvedValue([])
     mocks.prisma.feedPost.findMany.mockResolvedValue([])
-    mocks.prisma.contribution.findMany.mockResolvedValue([])
+    mocks.prisma.sheetContribution.findMany.mockResolvedValue([])
     mocks.prisma.enrollment.findMany.mockResolvedValue([])
-    mocks.prisma.star.findMany.mockResolvedValue([])
+    mocks.prisma.starredSheet.findMany.mockResolvedValue([])
     mocks.prisma.noteStar.findMany.mockResolvedValue([])
-    mocks.prisma.preferences.findUnique.mockResolvedValue(null)
+    mocks.prisma.userPreferences.findUnique.mockResolvedValue(null)
     mocks.prisma.conversationParticipant.findMany.mockResolvedValue([])
     mocks.prisma.studyGroupMember.findMany.mockResolvedValue([])
 
@@ -167,11 +170,49 @@ describe('GET /export', () => {
     expect(data).toHaveProperty('studyGroups')
   })
 
-  it('returns 500 on database error', async () => {
+  it('degrades gracefully when a section fails: 200 + partial flag, not 500', async () => {
+    // A single failing sub-query must not deny the user the rest of their
+    // data (resilient) but the export must declare itself partial (honest)
+    // and the failure must be logged server-side (observable).
     mocks.prisma.user.findUnique.mockRejectedValue(new Error('DB error'))
+    mocks.prisma.studySheet.findMany.mockResolvedValue([{ id: 1, title: 'Kept' }])
+    mocks.prisma.note.findMany.mockResolvedValue([])
+    mocks.prisma.feedPost.findMany.mockResolvedValue([])
+    mocks.prisma.sheetContribution.findMany.mockResolvedValue([])
+    mocks.prisma.enrollment.findMany.mockResolvedValue([])
+    mocks.prisma.starredSheet.findMany.mockResolvedValue([])
+    mocks.prisma.noteStar.findMany.mockResolvedValue([])
+    mocks.prisma.userPreferences.findUnique.mockResolvedValue(null)
+    mocks.prisma.conversationParticipant.findMany.mockResolvedValue([])
+    mocks.prisma.studyGroupMember.findMany.mockResolvedValue([])
 
     const res = await request(app).get('/export')
-    expect(res.status).toBe(500)
-    expect(res.body.error).toMatch(/export/i)
+
+    expect(res.status).toBe(200)
+    expect(res.body.partial).toBe(true)
+    expect(res.body.incompleteSections).toContain('profile')
+    expect(res.body.user).toBeNull()
+    // The sections that succeeded are still present.
+    expect(res.body.sheets).toHaveLength(1)
+  })
+
+  it('marks a complete export as not partial', async () => {
+    mocks.prisma.user.findUnique.mockResolvedValue(mockProfile)
+    mocks.prisma.studySheet.findMany.mockResolvedValue([])
+    mocks.prisma.note.findMany.mockResolvedValue([])
+    mocks.prisma.feedPost.findMany.mockResolvedValue([])
+    mocks.prisma.sheetContribution.findMany.mockResolvedValue([])
+    mocks.prisma.enrollment.findMany.mockResolvedValue([])
+    mocks.prisma.starredSheet.findMany.mockResolvedValue([])
+    mocks.prisma.noteStar.findMany.mockResolvedValue([])
+    mocks.prisma.userPreferences.findUnique.mockResolvedValue(null)
+    mocks.prisma.conversationParticipant.findMany.mockResolvedValue([])
+    mocks.prisma.studyGroupMember.findMany.mockResolvedValue([])
+
+    const res = await request(app).get('/export')
+
+    expect(res.status).toBe(200)
+    expect(res.body.partial).toBe(false)
+    expect(res.body.incompleteSections).toBeUndefined()
   })
 })
