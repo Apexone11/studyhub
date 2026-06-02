@@ -3,7 +3,7 @@
  *
  * Mobile-viewport E2E flows for messaging, native share, and pull-to-
  * refresh.
- * Loop M26 (2026-05-13) — scenarios 7, 8, 9 from the brief:
+ * Scenarios 7, 8, 9 from the brief:
  *   7. Send a DM on mobile (list → thread → type → send → render)
  *   8. Mobile share via Web Share API (navigator.share mocked)
  *   9. Mobile pull-to-refresh on /feed

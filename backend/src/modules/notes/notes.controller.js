@@ -69,8 +69,6 @@ function parseNoteTags(tagsValue) {
 // noteStars, noteReactions, noteHighlights, materials) are also in
 // the list — they're present in the response only when the Prisma
 // query `include` loaded them, undefined otherwise.
-//
-// Wave-12.11 (closes the MED finding from the wave-12.10 audit pass).
 const PUBLIC_NOTE_FIELDS = [
   'id',
   'title',
@@ -88,7 +86,7 @@ const PUBLIC_NOTE_FIELDS = [
   // path — useNotePersistence.js reads `srv.revision` and uses it as
   // `baseRevision` on the next autosave. Dropping it from the
   // response meant ANY note with revision >= 1 saved as 0 on next
-  // edit, triggering a spurious 409 conflict (Codex P1 on wave-12.11).
+  // edit, triggering a spurious 409 conflict.
   'revision',
   'createdAt',
   'updatedAt',
@@ -340,10 +338,10 @@ async function createNote(req, res) {
       /* best effort */
     }
 
-    // First-creation funnel event (Loop 5 finding F2). Count *after*
-    // the insert above is the authoritative "is this the user's
-    // first note" check. Surfaces a `firstCreation` flag on the
-    // response so the frontend can route into a celebration toast.
+    // First-creation funnel event. Counting *after* the insert above
+    // is the authoritative "is this the user's first note" check.
+    // Surfaces a `firstCreation` flag on the response so the frontend
+    // can route into a celebration toast.
     let firstCreation = false
     try {
       const noteCount = await prisma.note.count({

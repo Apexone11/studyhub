@@ -1,5 +1,5 @@
 /**
- * AiSheetReport.integ.test.jsx — Loop V4 frontend integration test for the
+ * AiSheetReport.integ.test.jsx — frontend integration test for the
  * full AI sheet permission flow.
  *
  * Scenario (single render, single user, two paths exercised):

@@ -1,5 +1,5 @@
 /**
- * AiNoteAssistant.test.jsx — Loop T8 coverage for the note-viewer AI card.
+ * AiNoteAssistant.test.jsx — coverage for the note-viewer AI card.
  *
  * Verifies the three-mode flow (Summarize / Flashcards / Ask), input
  * validation, error rendering, and the result reset on mode switch.

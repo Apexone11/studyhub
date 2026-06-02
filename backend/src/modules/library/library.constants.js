@@ -15,9 +15,9 @@ const CACHE_TTL = {
 
 const DEFAULT_PAGE_SIZE = 20 // Google Books max per request is 40
 const MAX_SHELVES_PER_USER = 20
-// MAX_BOOKMARKS_PER_USER_FREE removed 2026-05-03 — bookmark limit now comes
-// from PLANS.<plan>.libraryBookmarks via getPlanConfig() so the constant
-// can never drift from the pricing page or the gate.
+// The bookmark limit lives in PLANS.<plan>.libraryBookmarks (read via
+// getPlanConfig()), not a local constant, so it can never drift from the
+// pricing page or the gate.
 
 // Google Books category mappings (for subject filter chips)
 const CATEGORIES = [

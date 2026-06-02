@@ -1,8 +1,6 @@
 /**
  * Discovery Controller — trending sheets, recommended content, course-based discovery.
  *
- * Track B3: Discovery Engine — Cycle B: Social & Discovery.
- *
  * Endpoints:
  *   GET /trending — Trending sheets (weighted score: stars + views + comments + recency)
  *   GET /recommended — Personalized recommendations based on enrolled courses (auth required)
@@ -262,8 +260,7 @@ router.get('/for-you', discoveryLimiter, optionalAuth, async (req, res) => {
     // Get followed user IDs FIRST so we can exclude them from the
     // People You May Know suggestions. Earlier code built
     // `excludeUserIds` before this fetch, so users you already followed
-    // kept showing up in "People You May Know" — exactly the bug
-    // reported on 2026-05-13.
+    // kept showing up in "People You May Know".
     let followedUserIds = []
     try {
       const follows = await prisma.userFollow.findMany({

@@ -53,7 +53,7 @@ export default function BookCard({ book, progress }) {
           </div>
         )}
 
-        {/* Format-availability badges (Library Phase A, wave-12.2).
+        {/* Format-availability badges.
             Up to 3 stacked badges at the bottom-right of the cover so
             users can see at a glance which books are PDF / EPUB / fully
             public-domain. No emoji per CLAUDE.md UI-chrome rule. */}

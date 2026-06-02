@@ -1,5 +1,5 @@
 /**
- * ai-edit-permission-flow.integ.test.js — Loop V4 deep permission-flow test.
+ * ai-edit-permission-flow.integ.test.js — deep permission-flow test.
  *
  * Scenario (full user click → DB write):
  *   1. Owner posts an instruction to /api/ai/sheets/:id/propose-edit. The AI

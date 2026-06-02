@@ -38,7 +38,7 @@ export function useMessagingData(socket, currentUserId) {
   const [typingUsers, setTypingUsers] = useState(new Map())
   const typingTimerRef = useRef(null)
 
-  // Wave-12.12 — Data Saver consumer. Typing-indicator events fire on
+  // Data Saver consumer. Typing-indicator events fire on
   // every keystroke (typing:start) + an auto-stop timer (typing:stop).
   // On a metered connection this is dozens of round-trips per typed
   // message + a server-pushed broadcast to every other participant.
@@ -49,7 +49,7 @@ export function useMessagingData(socket, currentUserId) {
   const dataSaver = useDataSaver({ serverMode: sessionUser?.preferences?.dataSaverMode })
   // Holds the AbortController for the in-flight loadMessages() call so
   // a fast conversation switch can cancel the prior fetch and avoid
-  // applying stale messages to the wrong thread. Wave-11 P1-2.
+  // applying stale messages to the wrong thread.
   const loadMessagesAbortRef = useRef(null)
   // Ref tracks activeConversation.id so socket handlers always see the latest value
   // (avoids stale closure bug where incoming messages increment unread on the active conversation)
@@ -224,7 +224,6 @@ export function useMessagingData(socket, currentUserId) {
    * wrong thread visible. Now every load aborts the prior in-flight
    * request before issuing a new one — the AbortController ref lives
    * outside the callback so successive calls cancel each other.
-   * Wave-11 frontend bug hunt P1-2 fix.
    */
   const loadMessages = useCallback(async (conversationId, beforeMessageId = null) => {
     if (loadMessagesAbortRef.current) {
@@ -652,9 +651,8 @@ export function useMessagingData(socket, currentUserId) {
   /* ── Typing indicator helpers ────────────────────────────────────────── */
   const emitTypingStart = useCallback(() => {
     if (!socket || !activeConversation) return
-    // Wave-12.12 — skip the per-keystroke broadcast on data-saver.
-    // Sending messages still works; receivers just won't see the
-    // "Alex is typing..." chip.
+    // Skip the per-keystroke broadcast on data-saver. Sending messages
+    // still works; receivers just won't see the "Alex is typing..." chip.
     if (dataSaver.enabled) return
     socket.emit(SOCKET_EVENTS.TYPING_START, { conversationId: activeConversation.id })
 

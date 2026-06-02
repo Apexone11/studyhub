@@ -24,7 +24,7 @@
  *  - PDF iframe sandbox = "allow-scripts allow-popups allow-forms"
  *    (NEVER `allow-same-origin` per CLAUDE.md A14).
  *  - All `target="_blank"` carry rel="noopener noreferrer" (A15).
- *  - paperId validated against PAPER_ID_REGEX before any fetch (L3-LOW-5).
+ *  - paperId validated against PAPER_ID_REGEX before any fetch.
  *
  * AI integration: "Generate study sheet" is a quota-spending action and
  * goes through `useAiPermission()` before firing.
@@ -354,10 +354,9 @@ export default function ScholarPaperPage() {
       ? similarData.reason || null
       : null
 
-  // The real backend endpoint is `GET /api/scholar/annotations?paperId=...`
-  // (scholar.routes.js line 206) — NOT `/paper/:id/annotations`. Wave-5
-  // reconciliation fix: agents S4 + S8 assumed REST-nested paths; the
-  // real route nests `paperId` as a query param.
+  // The backend endpoint is `GET /api/scholar/annotations?paperId=...`
+  // (scholar.routes.js) — NOT a REST-nested `/paper/:id/annotations`.
+  // The route nests `paperId` as a query param.
   const annotationsUrl =
     validId && activeTab === 'annotations'
       ? `/api/scholar/annotations?paperId=${encodeURIComponent(validId)}`
@@ -584,8 +583,7 @@ export default function ScholarPaperPage() {
       }
       // Stream the SSE body and look for the new sheet id via the
       // shared parseSseForSheetId helper. Returns null on no-body /
-      // no-match — handled below by handing off to /ai. Sourcery bot
-      // review 2026-05-13 flagged the prior duplicated inline parser.
+      // no-match — handled below by handing off to /ai.
       const newSheetId = await parseSseForSheetId(aiRes).catch(() => null)
       if (newSheetId) {
         navigate(`/sheets/${newSheetId}/lab`)
@@ -602,7 +600,7 @@ export default function ScholarPaperPage() {
     }
   }, [validId, isGenerating, requestPermission, paper, navigate])
 
-  // Keyboard shortcuts (wave-7 wiring 2026-05-13): `?` opens help,
+  // Keyboard shortcuts: `?` opens help,
   // `s` saves, `a` jumps to Annotations, `c` opens the cite modal,
   // `g` triggers generate-sheet, `Escape` closes overlays. Hook is
   // no-op when the user is typing in an input (built into the hook).

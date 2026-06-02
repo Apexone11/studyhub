@@ -312,7 +312,7 @@ function DiscussionPostItem({
                 onClick={(e) => {
                   // Stop propagation so the parent card's onToggleExpanded
                   // doesn't fire — clicking Pin should not also collapse
-                  // or expand the thread (Copilot review #5, 2026-05-03).
+                  // or expand the thread.
                   e.stopPropagation()
                   onTogglePin(post.id, !post.pinned)
                 }}
@@ -476,10 +476,10 @@ export function GroupDiscussionsTab({
   // click (`?tab=discussions&post=42`) lands the user with that thread
   // already expanded on first render. Subsequent toggles work normally.
   const [expandedPostId, setExpandedPostId] = useState(() => initialFocusedPostId)
-  // Re-apply the focus when the prop changes (parent updates it on
-  // same-route notification clicks per Copilot review #1, 2026-05-03).
-  // Without this the thread the second notification refers to never
-  // auto-expands because lazy-init only fires once.
+  // Re-apply the focus when the prop changes (the parent updates it on
+  // same-route notification clicks). Without this the thread the second
+  // notification refers to never auto-expands because lazy-init only
+  // fires once.
   useEffect(() => {
     if (initialFocusedPostId && initialFocusedPostId !== expandedPostId) {
       queueMicrotask(() => setExpandedPostId(initialFocusedPostId))
@@ -605,7 +605,6 @@ export function GroupDiscussionsTab({
 
   // Don't flash "No Discussions Yet" while the initial fetch is in
   // flight — wait for `loading=false` before deciding the list is empty.
-  // (Copilot 2026-05-03 finding.)
   if (loading) {
     return (
       <div style={styles.tabContainer}>

@@ -99,7 +99,7 @@ const adminLimiter = rateLimit({
 
 /**
  * Admin announcement create + edit — 5 broadcasts per admin per 24h.
- * Wave-11 (2026-05-14) G1-1. Required by feature-expansion security
+ * G1-1. Required by feature-expansion security
  * addendum §2 HIGH. Prevents a compromised admin account from spamming
  * the entire platform's notification bell. Keyed on `req.user.userId`
  * per CLAUDE.md A7; the 'anon' fallback never fires because the routes
@@ -116,7 +116,7 @@ const adminAnnouncementLimiter = rateLimit({
 
 /**
  * Note highlight create — 20 highlights per reviewer per note per 24h.
- * Wave-11 (2026-05-14) G1-3. Required by feature-expansion security
+ * G1-3. Required by feature-expansion security
  * addendum §4 HIGH. Keyed on the reviewer+note pair so a heavy reviewer
  * on one note can't quench review activity on another. The `noteId`
  * comes from the URL params; falls back to 'unknown-note' if missing
@@ -135,7 +135,7 @@ const noteHighlightLimiter = rateLimit({
 
 /**
  * Discovery enumeration limiters — 30 reads per 15min on the
- * school catalog + course catalog endpoints. Wave-11 (2026-05-14) G1-6.
+ * school catalog + course catalog endpoints. G1-6.
  * Required by feature-expansion security addendum §1 HIGH. Defends
  * against scraper enumeration of the school+course taxonomy.
  *
@@ -144,9 +144,9 @@ const noteHighlightLimiter = rateLimit({
  * rejects raw `req.ip` at boot with ERR_ERL_KEY_GEN_IPV6 because it
  * doesn't IPv6-normalize. CLAUDE.md A7 forbids this pattern.
  *
- * Hotfix 2026-05-15: drop the custom keyGenerator entirely. Default
- * IP-based keying handles IPv6 normalization correctly. We lose the
- * "disc-schools-" namespace prefix but the limit still works correctly.
+ * Drop the custom keyGenerator entirely. Default IP-based keying handles
+ * IPv6 normalization correctly. We lose the "disc-schools-" namespace
+ * prefix but the limit still works correctly.
  */
 const discoverySchoolsLimiter = rateLimit({
   windowMs: WINDOW_15_MIN,
@@ -678,7 +678,7 @@ const notesDiffLimiter = rateLimit({
 
 /**
  * Note highlight writes (POST / DELETE on /:noteId/highlights) — 30
- * requests per minute per user. Note Review v1 (2026-05-12). Keyed on
+ * requests per minute per user. Keyed on
  * user id so a noisy classroom IP doesn't starve other writers; auth
  * middleware always runs first so `req.user?.userId` is present
  * (CLAUDE.md A7).

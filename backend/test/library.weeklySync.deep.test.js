@@ -1,11 +1,11 @@
 /**
- * library.weeklySync.deep.test.js — corpus-sync deep coverage (Loop T7).
+ * library.weeklySync.deep.test.js — corpus-sync deep coverage.
  *
  * Targets the rules documented in CLAUDE.md "Library — weekly corpus sync"
  * and master plan §3.3:
  *   - `LIBRARY_SYNC_ENABLED=false` → no-op (kill switch).
  *   - Iterates queries seeded by `scripts/seedLibrarySyncQueries.js`.
- *   - CRLF stripped from polite-pool User-Agent contact email (Loop L2-MED-4).
+ *   - CRLF stripped from polite-pool User-Agent contact email (header-injection guard).
  *   - Rate-limit etiquette: Allowlist passed to safeFetch is
  *     `['www.googleapis.com']` so SSRF is impossible.
  *   - Daily fetch cap enforced (DAILY_FETCH_CAP=80).
@@ -182,7 +182,7 @@ describe('logs structured events on completion', () => {
   })
 })
 
-// ── 4) CRLF stripped from LIBRARY_SYNC_CONTACT_EMAIL (Loop L2-MED-4) ──────
+// ── 4) CRLF stripped from LIBRARY_SYNC_CONTACT_EMAIL ──────
 describe('polite-pool User-Agent header', () => {
   it('emits the contact email in the User-Agent', async () => {
     process.env.LIBRARY_SYNC_CONTACT_EMAIL = 'ops@studyhub.example'

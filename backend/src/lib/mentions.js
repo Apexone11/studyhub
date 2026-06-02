@@ -27,7 +27,7 @@ async function notifyMentionedUsers(
     // Optional allowlist — when provided, only mentions of users in
     // this set are notified. Used by the study-group discussion path
     // so an `@username` in a private group can't ping a user who
-    // isn't a member of that group (Codex P2 finding 2026-05-03).
+    // isn't a member of that group.
     restrictToUserIds = null,
   },
 ) {

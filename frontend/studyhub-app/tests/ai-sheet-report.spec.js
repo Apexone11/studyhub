@@ -1,5 +1,5 @@
 /**
- * ai-sheet-report.spec.js — Hub AI bubble sheet-aware report card (loop T9).
+ * ai-sheet-report.spec.js — Hub AI bubble sheet-aware report card.
  *
  * Covers:
  *   1. Logged-in user navigates to /sheets/:id, opens the AI bubble, and sees

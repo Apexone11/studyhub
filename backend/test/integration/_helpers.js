@@ -13,7 +13,7 @@
  * controllers, real serializers, and real middleware without booting Prisma,
  * Stripe, or Anthropic.
  *
- * Loop T10 — Integration tests for full user flows (2026-05-12).
+ * Integration tests for full user flows.
  */
 const Module = require('node:module')
 

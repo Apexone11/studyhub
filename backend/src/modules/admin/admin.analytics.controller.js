@@ -178,17 +178,13 @@ router.get('/analytics/ai', async (req, res) => {
 // ── GET /api/admin/ai/cache-stats ─────────────────────────────
 // Daily Anthropic prompt-cache telemetry. Returns one row per UTC day
 // for the last `days` (default 7, capped at 90) with the cache-hit
-// fraction derived from AiGlobalSpendDay. Closes Research Loop 1 gap
-// #2 — until 2026-05-12 the cache counters were structured-logged but
-// never aggregated, so we couldn't answer "what fraction of input
-// tokens this week came from cache?" without writing a one-off query.
+// fraction derived from AiGlobalSpendDay.
 //
 // Cache-hit fraction formula: cacheRead / (tokensIn + cacheRead).
 // Anthropic's `input_tokens` field excludes cache-served tokens by
 // design — adding them back gives the true total input volume. A 60%+
 // hit rate on Sonnet 4 cuts daily spend ~50%; anything <50% suggests
-// a recent system-prompt edit invalidated the cache (master plan
-// L1-CRIT-2 / Research Loop 1 §1 background).
+// a recent system-prompt edit invalidated the cache.
 router.get('/ai/cache-stats', async (req, res) => {
   const rawDays = Number.parseInt(req.query.days, 10)
   const days = Number.isInteger(rawDays) && rawDays >= 1 && rawDays <= 90 ? rawDays : 7

@@ -183,12 +183,11 @@ function normalizeVolume(item) {
     viewability: accessInfo.viewability || 'NO_PAGES',
     embeddable: accessInfo.embeddable || false,
     webReaderLink: accessInfo.webReaderLink || null,
-    // Library Phase A (wave-12.2 2026-05-16) — surface the format
-    // availability signals Google Books returns so card badges can
-    // tell users at a glance which books actually have a PDF / EPUB /
-    // full public-domain text. Only the `downloadLink` is present for
-    // public-domain works; for copyrighted works `pdfAvailable: true`
-    // means a preview-only PDF (not a download).
+    // Surface the format-availability signals Google Books returns so card
+    // badges can tell users at a glance which books actually have a PDF /
+    // EPUB / full public-domain text. Only the `downloadLink` is present for
+    // public-domain works; for copyrighted works `pdfAvailable: true` means
+    // a preview-only PDF (not a download).
     pdfAvailable: Boolean(pdf.isAvailable),
     pdfDownloadLink: pdf.downloadLink || null,
     epubAvailable: Boolean(epub.isAvailable),
@@ -262,14 +261,13 @@ function recordEmptyPageHit(query, filters, page) {
   // Google partial-index window, so the first hit only TENTATIVELY records
   // a cap. The second hit confirms the cap.
   //
-  // Naive "same lastReachable twice" never fires during forward pagination
-  // because clicking page 11 then page 12 produces lastReachable=10 then
-  // lastReachable=11 — different values (Copilot review, 2026-05-03).
-  // Fix: confirm whenever a tentative entry already exists for this query,
-  // even if at a different boundary. Two separate empty pages > 1 are
-  // strong evidence the cap is real, and the smaller of the two is the
-  // honest answer (Google may serve up to N items but not page N+1, so the
-  // earlier empty page wins).
+  // A naive "same lastReachable twice" check never fires during forward
+  // pagination because clicking page 11 then page 12 produces lastReachable=10
+  // then lastReachable=11 — different values. So confirm whenever a tentative
+  // entry already exists for this query, even at a different boundary. Two
+  // separate empty pages > 1 are strong evidence the cap is real, and the
+  // smaller of the two is the honest answer (Google may serve up to N items
+  // but not page N+1, so the earlier empty page wins).
   if (existing) {
     const cap = Math.min(existing.lastReachable, lastReachable)
     if (!existing.confirmed) {
@@ -423,7 +421,6 @@ async function searchBooks(query, page = 1, filters = {}) {
       // can be smaller than `page - 1` (e.g. page 11 empty + page 12
       // empty confirms cap = 10, not 11). Read the memo back so the
       // frontend bounces to the page we actually know is non-empty.
-      // (Copilot review 2026-05-03.)
       const memoCap = getLastReachablePage(query, filters)
       const effectiveCap = confirmed && memoCap !== null ? memoCap : page - 1
       // Surface endOfResults to the client only when confirmed (2 strikes).

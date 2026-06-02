@@ -262,9 +262,8 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
     }
 
     // CLAUDE.md A12 — never trust untyped numeric input. A non-integer
-    // `replyToId` here was coerced to NaN by parseInt and silently sent
-    // to Prisma, which could match unintended rows on PG int casting.
-    // Fixed wave-11 2026-05-14.
+    // `replyToId` coerced to NaN by parseInt and silently sent to Prisma
+    // could match unintended rows on PG int casting.
     let safeReplyToId = null
     if (replyToId !== undefined && replyToId !== null && replyToId !== '') {
       const parsed = Number.parseInt(replyToId, 10)
@@ -374,13 +373,11 @@ router.post('/conversations/:id/messages', requireAuth, messagingWriteLimiter, a
       captureError(err, { source: 'socketio-message-send' })
     }
 
-    // @mentions in a DM or group chat must ping the mentioned user. Without
-    // this, `@username` in a conversation does literally nothing — silent
-    // miss (loop-4 finding F2, 2026-05-11). Restrict to conversation
-    // participants so a private group DM can't ping a non-participant
-    // (mirrors the group-discussion membership boundary). Block-filter is
-    // defense-in-depth (CLAUDE.md A6) on top of createNotification's own
-    // write-time block check.
+    // @mentions in a DM or group chat must ping the mentioned user. Restrict
+    // to conversation participants so a private group DM can't ping a
+    // non-participant (mirrors the group-discussion membership boundary).
+    // Block-filter is defense-in-depth (CLAUDE.md A6) on top of
+    // createNotification's own write-time block check.
     if (cleanContent) {
       try {
         const participantRows = await prisma.conversationParticipant.findMany({
@@ -515,11 +512,10 @@ router.patch('/:messageId', requireAuth, messagingWriteLimiter, async (req, res)
     }
 
     // Fire mention notifications for users newly mentioned in the edit. The
-    // original content might already contain `@sarah`; we should NOT re-ping
+    // original content might already contain `@sarah`; we must NOT re-ping
     // her on every typo fix. Diff the mention sets and only notify usernames
-    // that were not present in the pre-edit body (loop-4 finding F2,
-    // 2026-05-11). Restricted to conversation participants and block-filtered
-    // for defense-in-depth (CLAUDE.md A6).
+    // that were not present in the pre-edit body. Restricted to conversation
+    // participants and block-filtered for defense-in-depth (CLAUDE.md A6).
     try {
       const previousMentions = new Set(extractMentionUsernames(message.content || ''))
       const currentMentions = extractMentionUsernames(cleanContent)

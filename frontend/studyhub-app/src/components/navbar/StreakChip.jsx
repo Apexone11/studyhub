@@ -1,5 +1,5 @@
 /**
- * StreakChip — compact streak indicator for the navbar (Bucket C2).
+ * StreakChip — compact streak indicator for the navbar.
  *
  * Reads GET /api/users/me/streak via useFetch (SWR 5min) so it's cheap
  * to mount on every authenticated page. Renders nothing when:

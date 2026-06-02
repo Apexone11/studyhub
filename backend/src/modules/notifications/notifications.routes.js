@@ -29,7 +29,7 @@ function serializeNotification(notif) {
   return { ...notif, message: stripDedupMarker(notif.message) }
 }
 
-// Notification types that benefit from actor bundling (loop-A5, 2026-05-12).
+// Notification types that benefit from actor bundling.
 // Same set as `lib/notify.js#FAN_OUT_DEDUP_TYPES` — low-signal social events
 // where "Alice and 4 others starred your sheet" reads better than five
 // separate rows. Critical/essential types (mention, reply, contribution,
@@ -37,10 +37,9 @@ function serializeNotification(notif) {
 // carries unique context the recipient must see verbatim.
 const GROUPABLE_TYPES = new Set(['star', 'fork', 'follow', 'follow_request'])
 
-// Window over which distinct actors are bundled into a single row. Matches
-// the 24h horizon called out in the F7 finding. Older notifications of the
-// same type/target render as separate groups so the inbox doesn't merge a
-// star from last month with one from today.
+// Window over which distinct actors are bundled into a single row. Older
+// notifications of the same type/target render as separate groups so the
+// inbox doesn't merge a star from last month with one from today.
 const GROUP_WINDOW_MS = 24 * 60 * 60 * 1000
 
 // Max distinct actors surfaced in the `actors` array. The remaining count
@@ -155,7 +154,7 @@ async function computeUnreadGroupCount(userId) {
 // can't burn through 200 mark-all-read calls per minute.
 router.use(requireAuth)
 
-// Filter categories exposed to the inbox dropdown (research-loop-4 F12).
+// Filter categories exposed to the inbox dropdown.
 // Maps a short query-param value → the underlying `Notification.type`
 // strings the backend persists. Anything not listed here is rejected so
 // the dropdown's tab strip can't be coerced into an arbitrary `where`
@@ -189,8 +188,7 @@ const TYPE_FILTER_KEYS = new Set(Object.keys(TYPE_FILTERS))
 // 15s private cache + 30s SWR absorbs the sidebar bell's natural double-
 // mount on SPA route changes without serving stale read receipts. The
 // list is per-user; `cacheControl` adds `Vary: Cookie, Authorization` so
-// a cached response can never leak to a different session. Research-loop
-// -3 P2 #14.
+// a cached response can never leak to a different session.
 router.get('/', readLimiter, cacheControl(15, { staleWhileRevalidate: 30 }), async (req, res) => {
   // Clamp limit to [1, 50] and offset to >=0 per CLAUDE.md A12. Without
   // this a negative offset reached Prisma's skip clause and threw, and a
@@ -200,7 +198,7 @@ router.get('/', readLimiter, cacheControl(15, { staleWhileRevalidate: 30 }), asy
   const limit = Number.isInteger(rawLimit) && rawLimit > 0 ? Math.min(rawLimit, 50) : 20
   const offset = Number.isInteger(rawOffset) && rawOffset > 0 ? rawOffset : 0
 
-  // F12 inbox filters. `type` restricts to one of the curated buckets
+  // Inbox filters. `type` restricts to one of the curated buckets
   // (mention / reply / social / study_group / moderation). `onlyUnread`
   // skips the read rows so power users with 200 unread notifications can
   // surface the 3 mentions without paging the whole inbox. Both are

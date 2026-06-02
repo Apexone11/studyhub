@@ -11,8 +11,6 @@
  *  3. AiBubble redirects to /ai on phone — the floating bubble doesn't
  *     open an inline popover at phone widths (founder §24.8 decision),
  *     it navigates the full page to /ai. Asserts the URL changes.
- *
- * Loop M21.
  */
 import { expect, test, devices } from '@playwright/test'
 import { mockAuthenticatedApp } from '../helpers/mockStudyHubApi'

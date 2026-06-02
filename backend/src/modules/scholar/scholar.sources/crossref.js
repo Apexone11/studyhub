@@ -14,10 +14,10 @@ const { HOSTS, ADAPTER_SOFT_TIMEOUT_MS } = require('../scholar.constants')
 const SOURCE = 'crossref'
 const HOST = HOSTS.crossref
 
-// Copilot fix: don't ship a personal email as the default fallback.
-// The role address is operator-controlled and lives in `support@`. If
-// the env var is set we always prefer that. Set CROSSREF_USER_AGENT in
-// Railway for prod; the fallback is only for local dev / CI.
+// Use an operator-controlled role address (`support@`), never a personal
+// email, as the polite-pool fallback. If CROSSREF_USER_AGENT is set we
+// always prefer it; set it in Railway for prod. The fallback here is only
+// for local dev / CI.
 const DEFAULT_UA = 'StudyHub/2.2 (mailto:support@getstudyhub.org)'
 
 function _ua() {

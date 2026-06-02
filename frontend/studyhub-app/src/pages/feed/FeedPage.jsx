@@ -137,7 +137,7 @@ export default function FeedPage() {
     el.style.boxShadow = '0 0 0 3px var(--sh-info-border)'
     // Track the timer ID so a fast nav (or a back-to-back targetPostId
     // change) can clear the prior timer before it fires on an element
-    // that may no longer exist. Wave-11 frontend bug hunt P1-5 fix.
+    // that may no longer exist.
     const t = setTimeout(() => {
       el.style.boxShadow = ''
     }, 2000)

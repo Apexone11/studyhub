@@ -2,7 +2,7 @@
  * SaverModeInitializer — invisible mount-once component that activates
  * the Data Saver + Battery Saver hooks at the app root.
  *
- * Wave-12.11. Mounted from App.jsx inside the authenticated tree (the
+ * Mounted from App.jsx inside the authenticated tree (the
  * preferences load only resolves once the user is signed in). The
  * hooks themselves are responsible for:
  *   - useBatterySaver: writes `data-battery-saver="on"` on <body>

@@ -1,8 +1,5 @@
 /**
  * sections.constants.js — shared limits and helpers for the sections module.
- *
- * Week 3 of Design Refresh v2. See
- * docs/internal/design-refresh-v2-week2-to-week5-execution.md.
  */
 
 const crypto = require('crypto')

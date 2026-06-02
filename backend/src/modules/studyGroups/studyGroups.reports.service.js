@@ -1,5 +1,5 @@
 /**
- * studyGroups.reports.service.js — Phase 5 trust & safety core.
+ * studyGroups.reports.service.js — Trust & safety core.
  *
  * Responsibilities:
  *   - Report creation with one-per-user-per-group enforcement at the

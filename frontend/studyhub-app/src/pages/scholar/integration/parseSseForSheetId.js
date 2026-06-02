@@ -22,8 +22,7 @@
  *    so the user can review whatever the model produced."
  *
  * Extracted to a shared helper so ScholarPaperPage's handleGenerateSheet
- * doesn't re-inline the SSE parsing logic. Sourcery bot review 2026-05-13
- * flagged the prior duplication.
+ * doesn't re-inline the SSE parsing logic.
  *
  * @param {Response} response — the fetch Response from /api/ai/messages.
  * @returns {Promise<string | null>} — the new sheet id, or null.

@@ -1,5 +1,5 @@
 /**
- * smoke.2026-05-12.spec.js — Broad cycle smoke pass (loop T9, 2026-05-12).
+ * smoke.2026-05-12.spec.js — Broad cycle smoke pass.
  *
  * Eight scenarios covering the canonical public surfaces of the StudyHub web
  * app. Every test mocks `/api/auth/me` to 401 so the public guards on these

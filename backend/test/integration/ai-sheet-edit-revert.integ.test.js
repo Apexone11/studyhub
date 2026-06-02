@@ -1,5 +1,5 @@
 /**
- * ai-sheet-edit-revert.integ.test.js — Loop T10 deep integration test.
+ * ai-sheet-edit-revert.integ.test.js — deep integration test.
  *
  * Scenario:
  *   1. User owns a sheet.
@@ -238,7 +238,7 @@ const PROPOSED_CONTENT =
 describe('Integration: AI sheet analyze → propose-edit → apply-edit → revert', () => {
   // Both .skip's added 2026-05-22: apply-edit returns 500 instead of 200,
   // and non-JSON analyze returns 200 instead of 502. Root cause is the
-  // wave-12 ai.service.js spend-ceiling + plan-resolution path now reads
+  // ai.service.js spend-ceiling + plan-resolution path now reads
   // mocks that this test's vi.hoisted setup doesn't fully populate (the
   // `getUserPlan` + `reserveSpend` mocks expect a richer shape than what's
   // wired here). The individual handlers are exercised by ai.routes.test.js

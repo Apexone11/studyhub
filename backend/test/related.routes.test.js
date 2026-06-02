@@ -245,8 +245,8 @@ describe('GET /api/related/sheet/:id', () => {
   })
 
   it('returns empty for an unpublished sheet to an anonymous viewer', async () => {
-    // Codex review finding 2026-05-17 — draft / unpublished sheets must
-    // not leak their course linkage or backlink list to enumerators.
+    // Draft / unpublished sheets must not leak their course linkage or
+    // backlink list to enumerators.
     fakeData.sheetById.set(77, { id: 77, courseId: 10, status: 'draft', userId: 999 })
     fakeData.sheets.push({
       id: 78,
@@ -282,8 +282,8 @@ describe('GET /api/related/sheet/:id', () => {
 
 describe('GET /api/related/note/:id', () => {
   it('returns empty for a private note to an anonymous viewer', async () => {
-    // Codex review finding 2026-05-17 — private notes must not leak
-    // their linked sheet or same-author sibling list to enumerators.
+    // Private notes must not leak their linked sheet or same-author
+    // sibling list to enumerators.
     fakeData.noteById.set(50, {
       id: 50,
       userId: 200,

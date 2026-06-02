@@ -1,14 +1,14 @@
 /**
  * feed.list.deep.test.js — comprehensive coverage of GET / (feed listing).
  *
- * Focus areas (Loop T7):
+ * Focus areas:
  *   - Sort allowlist (`?sort=`) ranked vs recent (CLAUDE.md A13)
  *   - Pagination with offset + limit clamps
  *   - Candidate window scales with offset (RANKED_BASE_CANDIDATES / MAX)
  *   - Block/Mute filter wrapped in try-catch (CLAUDE.md Pitfall #6)
  *   - Pinned announcements stay on top
  *   - Empty feed graceful (no 500 when all sections return [])
- *   - Search length cap (200) — Loop 2 hardening
+ *   - Search length cap (200)
  *   - Follow-weighted ranking via userContext
  *   - School-scoped default (no public-feed leak)
  *   - Private notes never leak (where.private = false enforced)
@@ -317,7 +317,7 @@ describe('GET / — empty feed', () => {
   })
 })
 
-// ── 7) Search query length cap (Loop 2 hardening) ─────────────────────────
+// ── 7) Search query length cap ─────────────────────────
 describe('GET / — search constraints', () => {
   it('trims & propagates the search term to each section where clause', async () => {
     await request(app).get('/').query({ search: '  algorithms  ' })

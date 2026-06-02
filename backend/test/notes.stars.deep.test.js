@@ -1,5 +1,5 @@
 /**
- * notes.stars.deep.test.js — Loop T3 (2026-05-12)
+ * notes.stars.deep.test.js
  *
  * Route coverage for note star endpoints:
  *   POST   /:id/star  — idempotent star

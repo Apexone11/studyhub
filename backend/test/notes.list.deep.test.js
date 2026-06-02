@@ -1,5 +1,5 @@
 /**
- * notes.list.deep.test.js — Loop T3 (2026-05-12)
+ * notes.list.deep.test.js
  *
  * GET /api/notes — list / search / filter coverage.
  *

@@ -608,9 +608,9 @@ router.get('/', async (req, res) => {
       // Non-fatal: badges degrade gracefully
     }
 
-    // Wave-12.12 — Data Saver lite mode. When the user opts in (or
-    // their browser sends Save-Data, or they pass ?lite=1), strip the
-    // bandwidth-heavy fields from the response:
+    // Data Saver lite mode. When the user opts in (or their browser
+    // sends Save-Data, or they pass ?lite=1), strip the bandwidth-heavy
+    // fields from the response:
     //   - `media[]` arrays carry image + video URLs + thumbnail sets.
     //   - `coverImageUrl` on author objects.
     //   - `posterUrl` / `thumbnailUrl` on video sub-objects.

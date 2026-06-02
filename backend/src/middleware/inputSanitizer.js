@@ -1,5 +1,5 @@
 /**
- * inputSanitizer.js — Phase 5 request-level input sanitization.
+ * inputSanitizer.js — request-level input sanitization.
  *
  * Runs BEFORE route handlers on every request with a JSON body. Rejects
  * payloads that contain:

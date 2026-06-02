@@ -148,15 +148,13 @@ async function submitDataRequest(req, res) {
     })
   }
 
-  // Audit log carries the row ID + non-PII metadata only. The original
-  // 2026-04-30 implementation logged requesterName + requesterEmail +
-  // requesterIp at warn level, which would have replicated PII across
-  // log aggregation and backups. The DB row holds the raw PII; access
-  // is gated by Postgres permissions and the admin-only triage route.
-  // Hashed-email-prefix for correlation across log lines without
-  // surfacing the address (8 hex chars of SHA-256 of the lower-cased
-  // email — enough to spot duplicate submissions, not enough to
-  // identify a person).
+  // Audit log carries the row ID + non-PII metadata only (CLAUDE.md A8).
+  // Never log requesterName / requesterEmail / requesterIp — that would
+  // replicate PII across log aggregation and backups. The DB row holds the
+  // raw PII; access is gated by Postgres permissions and the admin-only
+  // triage route. The hashed email prefix correlates log lines without
+  // surfacing the address (8 hex chars of SHA-256 of the lower-cased email —
+  // enough to spot duplicate submissions, not enough to identify a person).
   let emailHashPrefix = null
   try {
     emailHashPrefix = require('node:crypto')

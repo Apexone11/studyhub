@@ -249,7 +249,7 @@ async function submitHtmlDraftForReview(prisma, { sheetId, user }) {
   // the AI-first model the founder approved 2026-05-03 — admins should
   // see "special cases" only, not the full Tier 2 firehose. The
   // sendHighRiskSheetAlert + admin notification fan-out lives in
-  // sheetReviewer.service.js's escalation branch (Copilot review #4).
+  // sheetReviewer.service.js's escalation branch.
 
   // Tier 3 — notify the AUTHOR that their sheet was auto-rejected with the
   // reason so they can fix it and resubmit. CLAUDE.md ESSENTIAL list

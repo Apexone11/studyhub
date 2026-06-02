@@ -6,8 +6,8 @@
  * request (the polite-pool contract); without `PUBMED_EMAIL` set we
  * skip outbound traffic entirely.
  *
- * Full implementation lands in Week 5 Day 4. This stub preserves the
- * search-fan-out contract `{ source, results: [], throttled: false }`.
+ * The stub preserves the search-fan-out contract
+ * `{ source, results: [], throttled: false }`.
  */
 
 const log = require('../../../lib/logger')
@@ -22,7 +22,7 @@ function _isEnabled() {
 async function search(_q, _filters) {
   try {
     if (!_isEnabled()) return { source: SOURCE, results: [], throttled: false }
-    // TODO(week5-day4): ESearch + ESummary fan-out via safeFetch.
+    // Deferred to v1.5: ESearch + ESummary fan-out via safeFetch.
     return { source: SOURCE, results: [], throttled: false }
   } catch (err) {
     log.warn(

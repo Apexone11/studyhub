@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * migrate-to-send-error.js — one-shot codemod for Day 3 of the tech-debt week.
+ * migrate-to-send-error.js — one-shot codemod.
  *
  * Rewrites `res.status(XXX).json({ error: '...' })` → `sendError(res, XXX, '...', ERROR_CODES.Y)`
  * and inserts the `sendError` import if absent. Supports:

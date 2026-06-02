@@ -33,9 +33,8 @@ const ERROR_CODES = Object.freeze({
 
   // ── Quotas ─────────────────────────────────────────────────────────────
   QUOTA_EXCEEDED: 'QUOTA_EXCEEDED',
-  // FORBIDDEN is declared once at the top of this object (HTTP-mapped 403);
-  // the parallel scholar/ai work re-referenced it here. Removed to satisfy
-  // no-dupe-keys lint while preserving the canonical mapping.
+  // FORBIDDEN (HTTP-mapped 403) is declared once at the top of this object;
+  // quota/scholar/ai routes reuse that canonical code rather than redeclaring it.
 
   // ── Account state ──────────────────────────────────────────────────────
   EMAIL_NOT_VERIFIED: 'EMAIL_NOT_VERIFIED',

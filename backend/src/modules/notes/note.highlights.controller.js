@@ -192,14 +192,13 @@ async function createHighlight(req, res) {
       return sendError(res, 403, 'You cannot highlight a private note.', ERROR_CODES.FORBIDDEN)
     }
 
-    // Block-filter on CREATE (wave-11 G1-2). Pre-this-wave, the
-    // controller only filtered blocked users out of the LIST response —
-    // a blocked reviewer could still write highlights that the owner
-    // never saw. Now a blocked reviewer is rejected at write time too.
-    // Wrapped in try/catch with fail-open per CLAUDE.md A6: if the
-    // block tables are unavailable, allow the write rather than 503
-    // every highlight create. The list-side filter still removes them
-    // from the owner's view.
+    // Block-filter on CREATE. Filtering blocked users only out of the
+    // LIST response is insufficient — a blocked reviewer could still
+    // write highlights the owner never saw. Reject blocked reviewers at
+    // write time too. Wrapped in try/catch with fail-open per CLAUDE.md
+    // A6: if the block tables are unavailable, allow the write rather
+    // than 503 every highlight create. The list-side filter still
+    // removes them from the owner's view.
     if (!isOwner) {
       try {
         const blocked = await isBlockedEitherWay(prisma, req.user.userId, note.userId)

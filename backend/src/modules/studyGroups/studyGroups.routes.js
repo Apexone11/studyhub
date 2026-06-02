@@ -129,7 +129,7 @@ router.delete('/:id/members/:userId', writeLimiter, requireAuth, removeMember)
  */
 router.post('/:id/invite', writeLimiter, requireAuth, inviteUser)
 
-// ===== PHASE 5: GROUP BLOCKS =====
+// ===== GROUP BLOCKS =====
 
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
@@ -265,7 +265,7 @@ router.get('/:id/blocks', readLimiter, requireAuth, async (req, res) => {
   }
 })
 
-// ===== PHASE 5 B.2: GROUP MUTES =====
+// ===== GROUP MUTES =====
 
 /**
  * POST /api/study-groups/:id/mute/:userId
@@ -372,7 +372,7 @@ router.delete('/:id/mute/:userId', writeLimiter, requireAuth, async (req, res) =
   }
 })
 
-// ===== PHASE 5 C.3: GROUP AUDIT LOG =====
+// ===== GROUP AUDIT LOG =====
 
 /**
  * GET /api/study-groups/:id/audit-log
@@ -433,7 +433,7 @@ router.use('/:id/resources', resourcesRouter)
 router.use('/:id/sessions', sessionsRouter)
 router.use('/:id/discussions', discussionsRouter)
 router.use('/:id/activity', activityRouter)
-// Phase 5: /report, /appeal, /my-report all handled by the reports sub-router
+// /report, /appeal, /my-report all handled by the reports sub-router
 router.use('/:id', reportsRouter)
 
 module.exports = router

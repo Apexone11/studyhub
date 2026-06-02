@@ -20,8 +20,7 @@ router.use(updateController)
 /* DELETE /:id — delete a sheet */
 router.delete('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
   // CLAUDE.md A12 — parse + integer-validate before any DB call. A NaN
-  // here was previously coerced inside Prisma in surprising ways.
-  // Fixed wave-11 2026-05-14.
+  // here can be coerced inside Prisma in surprising ways.
   const sheetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(sheetId) || sheetId < 1) {
     return res.status(400).json({ error: 'Invalid sheet id.' })

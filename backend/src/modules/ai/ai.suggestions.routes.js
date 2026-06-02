@@ -1,5 +1,5 @@
 /**
- * ai.suggestions.routes.js — Phase 3 endpoints under /api/ai.
+ * ai.suggestions.routes.js — inline-suggestion endpoints under /api/ai.
  *
  * Mounted by ai/index.js so the existing /api/ai prefix is reused
  * (no new top-level mount). Keeps the suggestion endpoints separate

@@ -1,5 +1,5 @@
 /**
- * plagiarism.routes.js — Phase 4 user-facing plagiarism endpoints.
+ * plagiarism.routes.js — User-facing plagiarism endpoints.
  *
  * Mounted at /api/plagiarism in index.js.
  *

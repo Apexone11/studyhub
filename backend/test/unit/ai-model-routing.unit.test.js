@@ -1,8 +1,7 @@
 /**
  * ai-model-routing.unit.test.js
  *
- * Pure unit coverage for the cost-aware model router introduced in
- * loop A6 (2026-05-12) per research loop 1 gap #9. The router classifies
+ * Pure unit coverage for the cost-aware model router. The router classifies
  * the user's message into `sheet | simple | complex` and maps the
  * classification onto a concrete Anthropic model id.
  *

@@ -708,7 +708,7 @@ app.use('/api/library', libraryRoutes)
 // Scholar v1 endpoints under /api/scholar (master plan §18).
 app.use('/api/scholar', scholarRoutes)
 
-// Related-work strips on detail pages (wave-12.3 ecosystem Track 5).
+// Related-work strips on detail pages (ecosystem Track 5).
 // Public read-only — surfaces sibling sheets / linked notes / cross-
 // surface references for sheets, notes, papers, and library books.
 app.use('/api/related', relatedRoutes)
@@ -898,8 +898,8 @@ async function startServer() {
       ).unref()
     }, msUntilNextFour).unref()
 
-    // Wave-12.11 — daily mirror of /data/uploads to R2 so user-
-    // uploaded photos survive a Railway volume crash. No-ops
+    // Daily mirror of /data/uploads to R2 so user-uploaded photos
+    // survive a Railway volume crash. No-ops
     // gracefully when R2_BUCKET_UPLOAD_BACKUP is unset. Recovery
     // procedure documented in docs/internal/security/
     // RUNBOOK_DB_RESTORE.md "Upload Volume Recovery" section.

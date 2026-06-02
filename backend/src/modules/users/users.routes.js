@@ -20,7 +20,7 @@ router.use((req, res, next) => {
 // Defense-in-depth origin check on every write under /api/users. The
 // global Origin check is the floor; this re-runs at the module
 // boundary per CLAUDE.md A11. Safe methods short-circuit so this is
-// safe at router.use. Added 2026-05-14.
+// safe at router.use.
 router.use(originAllowlist())
 
 const followLimiter = usersFollowLimiter
@@ -31,7 +31,7 @@ router.get('/me/activity', requireAuth, usersController.getMyActivity)
 // ── GET /api/users/:username/activity (public) ───────────────
 router.get('/:username/activity', optionalAuth, usersController.getActivityByUsername)
 
-// V1 badges routes removed 2026-05-01 — replaced by /api/achievements/*.
+// V1 badges routes intentionally absent — replaced by /api/achievements/*.
 // See users.controller.js for the migration note.
 
 // ── GET /api/users/me/pinned-sheets ──────────────────────────

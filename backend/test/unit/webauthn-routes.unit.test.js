@@ -49,7 +49,7 @@ const mocks = vi.hoisted(() => {
       next()
     }),
     authService: {
-      // wave-12.15 — passkey verify now delegates to the canonical
+      // passkey verify delegates to the canonical
       // login helper so a real Session row is created with the JWT
       // carrying a `jti`. Mock returns the authenticated-user payload
       // shape that the helper produces (id, username, role, csrfToken,
@@ -329,13 +329,13 @@ describe('POST /api/webauthn/authenticate/verify', () => {
       message: expect.stringMatching(/successful/i),
       user: { id: 1, username: 'admin_user', role: 'admin' },
     })
-    // wave-12.11 — verify also stamps lastUsedAt for admin-portal visibility.
+    // verify also stamps lastUsedAt for admin-portal visibility.
     expect(mocks.prisma.webAuthnCredential.update).toHaveBeenCalledWith({
       where: { id: 10 },
       data: { counter: 5, lastUsedAt: expect.any(Date) },
     })
-    // wave-12.15 — must go through issueAuthenticatedSession (creates a
-    // real Session row + JWT with `jti`) so the wave-12.11 fail-closed
+    // Must go through issueAuthenticatedSession (creates a
+    // real Session row + JWT with `jti`) so the fail-closed
     // requireRecentMfa middleware doesn't lock passkey-authed admins out
     // of step-up-gated routes. mfaVerified:true stamps Session.mfaVerifiedAt
     // because passkey is an AAL2 factor per NIST 800-63B.
@@ -366,7 +366,7 @@ describe('POST /api/webauthn/authenticate/verify', () => {
 
     expect(res.status).toBe(401)
     expect(mocks.prisma.webAuthnCredential.update).not.toHaveBeenCalled()
-    // wave-12.15 — failed auth must NOT create a session; the new
+    // Failed auth must NOT create a session; the
     // issueAuthenticatedSession path stays unreached on counter/replay.
     expect(mocks.authService.issueAuthenticatedSession).not.toHaveBeenCalled()
   })

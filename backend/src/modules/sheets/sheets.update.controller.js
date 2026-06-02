@@ -352,7 +352,7 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
       })
     }
 
-    /* Phase 4: comprehensive plagiarism scan with multi-window SimHash + n-gram (fire-and-forget) */
+    /* Comprehensive plagiarism scan with multi-window SimHash + n-gram (fire-and-forget) */
     if (typeof content === 'string') void runPlagiarismScan(sheetId, content, req.user.userId)
 
     /* Auto-generate provenance manifest if one does not exist yet (fire-and-forget) */

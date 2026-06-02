@@ -110,7 +110,7 @@ router.post('/:postId/replies/:replyId/upvote', writeLimiter, requireAuth, upvot
 
 /**
  * PATCH /:id/discussions/:postId/approve
- * Phase 5 B.5: approve a pending-approval post (admin/mod only).
+ * Approve a pending-approval post (admin/mod only).
  */
 router.patch('/:postId/approve', writeLimiter, requireAuth, async (req, res) => {
   try {
@@ -143,8 +143,8 @@ router.patch('/:postId/approve', writeLimiter, requireAuth, async (req, res) => 
     })
 
     // Now that the post is public, fire the fan-out + mention notifications
-    // that the create handler suppressed for pending posts (Copilot review
-    // #3 + #4, 2026-05-03 — moderation gate must hold until approval).
+    // that the create handler suppressed for pending posts — the moderation
+    // gate must hold until approval.
     try {
       const groupData = await prisma.studyGroup.findUnique({
         where: { id: groupId },
@@ -212,7 +212,7 @@ router.patch('/:postId/approve', writeLimiter, requireAuth, async (req, res) => 
           actorId: req.user.userId,
           // Deep-link to Discussions tab + the specific post so the
           // notification click lands on the actual content the user is
-          // being notified about (Copilot finding 2026-05-03).
+          // being notified about.
           linkPath: `/study-groups/${groupId}?tab=discussions&post=${postId}`,
         })
       } catch {
@@ -229,8 +229,7 @@ router.patch('/:postId/approve', writeLimiter, requireAuth, async (req, res) => 
 
 /**
  * PATCH /:id/discussions/:postId/reject
- * Phase 5 B.5: reject a pending-approval post (admin/mod only).
- * Marks the post as 'removed'.
+ * Reject a pending-approval post (admin/mod only). Marks the post as 'removed'.
  */
 router.patch('/:postId/reject', writeLimiter, requireAuth, async (req, res) => {
   try {
@@ -278,8 +277,8 @@ router.patch('/:postId/reject', writeLimiter, requireAuth, async (req, res) => {
           actorId: req.user.userId,
           // Drop the post= deep link — the rejected thread is hidden from
           // the author by listDiscussions/getDiscussion, so a deep link
-          // would 404 (Copilot review #2, 2026-05-03). Land them on the
-          // discussions tab so they can post a corrected version.
+          // would 404. Land them on the discussions tab so they can post
+          // a corrected version.
           linkPath: `/study-groups/${groupId}?tab=discussions`,
         })
       } catch {

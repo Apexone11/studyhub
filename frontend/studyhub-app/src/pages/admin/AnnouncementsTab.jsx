@@ -34,8 +34,8 @@ export default function AnnouncementsTab({
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef(null)
   // Mirror state into a ref so the unmount cleanup below revokes the
-  // CURRENT image previews, not the initial empty array. Wave-11
-  // audit L2-1 fix (createObjectURL leak on unmount).
+  // CURRENT image previews, not the initial empty array (avoids a
+  // createObjectURL leak on unmount).
   const imagesRef = useRef(images)
   useEffect(() => {
     imagesRef.current = images

@@ -27,7 +27,6 @@ router.use(feedReadLimiter)
 // Defense-in-depth origin check on every authed feed write (posts,
 // comments, reactions). Safe methods short-circuit so the public
 // leaderboard / trending mounts above are unaffected. CLAUDE.md A11.
-// Added 2026-05-14.
 router.use(originAllowlist())
 
 router.use(listController)

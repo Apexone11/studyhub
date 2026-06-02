@@ -121,8 +121,8 @@ function originAllowlist({ rebuildPerRequest = false } = {}) {
     // payments.checkout.deep.test.js) continue to be enforced, so the
     // CSRF tests stay meaningful. Production behavior is unchanged —
     // production always sees an Origin header from the SPA. This
-    // narrow shim lets the 6 new router.use(originAllowlist()) mounts
-    // added wave-10 / wave-11 not break the existing test surface.
+    // narrow shim lets the router.use(originAllowlist()) mounts not
+    // break the existing test surface.
     if (process.env.NODE_ENV === 'test' && !rawOrigin) {
       return next()
     }

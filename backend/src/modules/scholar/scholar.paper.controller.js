@@ -11,9 +11,9 @@ const { CANONICAL_ID_RE } = require('./scholar.constants')
 
 function _validateCanonicalId(raw) {
   if (typeof raw !== 'string' || !raw) return null
-  // Copilot fix: decodeURIComponent throws URIError on malformed
-  // percent-encoding (e.g. `%E0%A4`). Catch and treat as invalid id so
-  // the route surfaces 400 BAD_REQUEST rather than a 500.
+  // decodeURIComponent throws URIError on malformed percent-encoding
+  // (e.g. `%E0%A4`). Catch and treat as invalid id so the route surfaces
+  // 400 BAD_REQUEST rather than a 500.
   let decoded
   try {
     decoded = decodeURIComponent(raw)
@@ -43,12 +43,12 @@ async function getPaper(req, res) {
     }
     const paper = await service.getPaperDetail(id)
     if (!paper) return sendError(res, 404, 'Paper not found.', ERROR_CODES.NOT_FOUND)
-    // Loop S11 fix #1: lazily attach a signed PDF URL so the frontend's
-    // in-app reader (sandboxed iframe at ScholarPaperPage.jsx) can mount
-    // without a second round-trip. Only fired when the paper is OA AND
-    // we have a cached R2 key — otherwise the field stays null and the
-    // "Open PDF" button hides. Wrapped in try/catch so a transient R2
-    // signature failure never breaks the main paper fetch (CLAUDE.md A4).
+    // Lazily attach a signed PDF URL so the frontend's in-app reader
+    // (sandboxed iframe at ScholarPaperPage.jsx) can mount without a second
+    // round-trip. Only fired when the paper is OA AND we have a cached R2 key
+    // — otherwise the field stays null and the "Open PDF" button hides.
+    // Wrapped in try/catch so a transient R2 signature failure never breaks
+    // the main paper fetch (CLAUDE.md A4).
     if (paper.openAccess && paper.pdfCachedKey) {
       try {
         const signed = await service.getSignedPdfUrl(id)
@@ -110,10 +110,8 @@ async function getReferences(req, res) {
  * itself. Bounded to a 50-row candidate window to keep this lightweight
  * — the page renders only ~20 results.
  *
- * Wave-5 fix (2026-05-13): the Similar tab was rendering a raw Express
- * "Cannot GET /api/scholar/paper/:id/similar" 404 because the route +
- * controller had never been added. Frontend already gracefully maps
- * `data.similar`, `data.results`, or array root to the results list.
+ * The frontend gracefully maps `data.similar`, `data.results`, or an array
+ * root to the results list.
  */
 async function getSimilar(req, res) {
   try {
@@ -186,7 +184,7 @@ async function getSimilar(req, res) {
     // working tabs. We tag the response with `reason: 'internal_error'`
     // so the frontend (and our metrics) can distinguish a genuine
     // "no similar papers" result from a backend failure without
-    // changing the UX shape. Sourcery bot review 2026-05-13.
+    // changing the UX shape.
     return res.json({ similar: [], reason: 'internal_error' })
   }
 }

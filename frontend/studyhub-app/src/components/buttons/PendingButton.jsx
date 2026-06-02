@@ -3,8 +3,8 @@
  *
  * Wraps a native <button> so callers don't have to wire spinner + disabled
  * + aria-busy + double-click-prevention by hand on every async action.
- * Pair with `useAsyncAction` (planned, Bucket B1) for full ergonomics, or
- * call directly with a `pending` prop driven by local useState.
+ * Pair with `useAsyncAction` for full ergonomics, or call directly with
+ * a `pending` prop driven by local useState.
  *
  *   <PendingButton pending={saving} onClick={handleSave}>Save</PendingButton>
  *   <PendingButton pending={saving} pendingLabel="Saving…" onClick={...}>Save</PendingButton>

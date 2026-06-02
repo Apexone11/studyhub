@@ -1,6 +1,5 @@
 /**
  * messaging.conversations.deep.test.js — deep coverage for conversation CRUD.
- * Loop T4 (2026-05-12).
  *
  * Pins:
  *   - A13 type allowlist ('dm' | 'group')

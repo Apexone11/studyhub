@@ -1,6 +1,6 @@
 /**
  * payments.webhook.deep.test.js — deep coverage of Stripe webhook
- * delivery + the 5 supported event handlers. Loop T6 (2026-05-12).
+ * delivery + the 5 supported event handlers.
  *
  * Pins:
  *   - constructEvent invoked with raw Buffer body (signature verification)

@@ -1,6 +1,5 @@
 /**
  * messaging.reactions.deep.test.js — deep coverage for the reactions router.
- * Loop T4 (2026-05-12).
  *
  * Pins:
  *   - POST /:messageId/reactions creates upserted reaction

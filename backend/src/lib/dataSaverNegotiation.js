@@ -1,7 +1,7 @@
 /**
  * dataSaverNegotiation.js — server-side data-saver detection.
  *
- * Wave-12.11. Pairs with the frontend `useDataSaver` hook.
+ * Pairs with the frontend `useDataSaver` hook.
  *
  * Returns true when the current request should receive a lighter
  * response (smaller image variants, no thumbnail array, no SSE

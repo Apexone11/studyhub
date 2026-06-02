@@ -6,7 +6,7 @@
  * a modal that POSTs here to refresh `Session.mfaVerifiedAt`, then
  * retries the original request.
  *
- * Two endpoints (wave-12.11):
+ * Two endpoints:
  *
  *   POST /api/auth/mfa/step-up/start
  *     Authenticated. Creates a fresh email-OTP challenge row (reusing
@@ -217,10 +217,10 @@ router.post(
 async function refreshSessionMfa(req, res, { method }) {
   try {
     const now = new Date()
-    // Wave-12.19 — session-fixation defense on elevation. Rotate the
-    // session JTI in lockstep with stamping mfaVerifiedAt so a stolen
-    // pre-elevation JWT cannot ride the 15-minute requireRecentMfa
-    // window. Same pattern as rotating the session on login.
+    // Session-fixation defense on elevation. Rotate the session JTI in
+    // lockstep with stamping mfaVerifiedAt so a stolen pre-elevation JWT
+    // cannot ride the 15-minute requireRecentMfa window. Same pattern as
+    // rotating the session on login.
     const newJti = generateJti()
     // updateMany so a missing row (revoked session, race) returns
     // count=0 rather than throwing — frontend gets a clear 401. We

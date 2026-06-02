@@ -57,8 +57,8 @@ router.get('/', requireAuth, readLimiter, notesController.listNotes)
 router.post('/', requireAuth, mutateLimiter, requireVerifiedEmail, notesController.createNote)
 
 // ── POST /api/notes/import ─ Drag-and-drop file → AI-titled Note ─
-// 2026-05-14 — v1 supports plain-text + markdown. PDF/DOCX gated on
-// the AI attachments parser stack (planned follow-up).
+// v1 supports plain-text + markdown. PDF/DOCX gated on the AI
+// attachments parser stack (planned follow-up).
 router.post(
   '/import',
   requireAuth,
@@ -69,7 +69,7 @@ router.post(
   importNoteHandler,
 )
 
-// ── PATCH /api/notes/:id ────────────────────────────────────────────��──────────────────────────────��
+// ── PATCH /api/notes/:id ────────────────────────────────────────
 router.patch(
   '/:id',
   requireAuth,
@@ -220,7 +220,7 @@ router.delete(
 )
 
 // ═══════════════════════════════════════════════════════════════════════════
-// Note Highlights (Note Review v1 — Phase 9, 2026-05-12)
+// Note Highlights (Note Review v1)
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ── GET /api/notes/:noteId/highlights ────────────────────────────────────
@@ -232,7 +232,7 @@ router.get(
 )
 
 // ── POST /api/notes/:noteId/highlights ───────────────────────────────────
-// Per-pair daily cap (G1-3) stacked on top of the per-user write limiter.
+// Per-pair daily cap stacked on top of the per-user write limiter.
 // noteHighlightLimiter is keyed on the (reviewerId, noteId) pair so a
 // single reviewer can't drown a single note in 20+ highlights/day, but
 // they can still review across multiple notes at a healthy cadence.

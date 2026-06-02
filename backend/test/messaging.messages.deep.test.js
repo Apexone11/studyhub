@@ -1,11 +1,11 @@
 /**
  * messaging.messages.deep.test.js — deep coverage for POST/PATCH/DELETE on
- * the messages router. Loop T4 (2026-05-12). Mounts the real router with the
+ * the messages router. Mounts the real router with the
  * Module._load patching pattern used by auth.deep.test.js / messaging.routes.test.js.
  *
  * Pins:
  *   - Message type allowlist (A13 enforcement: text|image|gif|system)
- *   - replyToId cross-conversation leak prevention (Loop 2 finding)
+ *   - replyToId cross-conversation leak prevention
  *   - 15-min edit window
  *   - Soft-delete via deletedAt
  *   - A12 numeric-id validation on :id

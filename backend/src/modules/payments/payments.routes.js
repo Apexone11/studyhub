@@ -251,7 +251,7 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
   // increment Donation totals. Per-replica in-memory LRU is enough for
   // the single-Railway-replica deploy; if we ever scale horizontally
   // this needs to move to a DB-backed table (e.g. `StripeWebhookEvent`
-  // with a unique index on event.id). Fixed wave-11 2026-05-14.
+  // with a unique index on event.id).
   if (event.id && stripeEventSeen(event.id)) {
     log.info({ eventId: event.id, type: event.type }, 'Stripe webhook duplicate — skipping')
     return res.json({ received: true, handled: false, duplicate: true })
@@ -286,9 +286,8 @@ router.post('/webhook', paymentWebhookLimiter, async (req, res) => {
     }
   } catch (error) {
     captureError(error, { context: 'stripe.webhook', eventType: event.type })
-    // CLAUDE.md A16 — pino-only. Duplicate `console.error` removed
-    // 2026-05-14; structured log + Sentry capture already carry the
-    // full context.
+    // CLAUDE.md A16 — pino-only. The structured log + Sentry capture
+    // already carry the full context.
     log.error({ err: error, eventType: event.type }, 'Error processing Stripe webhook')
     // Return 500 so Stripe retries the webhook (up to ~3 days)
     return sendError(res, 500, 'Webhook handler failed', ERROR_CODES.INTERNAL, {
@@ -482,11 +481,11 @@ router.post(
   requireAuth,
   requireAdmin,
   requireTrustedOrigin,
-  // Step-up MFA (wave-12.12) — this can write to every active
-  // subscription's plan + Stripe-customer-id field. A compromised
-  // admin session looping this could silently downgrade real
-  // subscriptions or rewrite billing metadata in bulk. Step-up
-  // prevents a stolen session from auto-replaying.
+  // Step-up MFA — this can write to every active subscription's plan +
+  // Stripe-customer-id field. A compromised admin session looping this
+  // could silently downgrade real subscriptions or rewrite billing
+  // metadata in bulk. Step-up prevents a stolen session from
+  // auto-replaying.
   requireRecentMfa(),
   async (_req, res) => {
     try {
@@ -926,7 +925,7 @@ router.post(
   },
 )
 
-// ── Sprint E: Pro-level features (referral, gift, trial, pause, student) ──
+// ── Pro-level features (referral, gift, trial, pause, student) ──
 const sprintERoutes = require('./sprintE.routes')
 router.use('/', sprintERoutes)
 

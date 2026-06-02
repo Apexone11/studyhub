@@ -1,7 +1,7 @@
 /**
  * mfaStepUpContext.js — frontend half of the step-up MFA contract.
  *
- * Wave-12.11. Pairs with backend/src/middleware/requireRecentMfa.js.
+ * Pairs with backend/src/middleware/requireRecentMfa.js.
  *
  * Flow:
  *   1. An admin-sensitive request returns 403 with

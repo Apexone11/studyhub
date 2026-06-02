@@ -219,7 +219,7 @@ export default function GroupDetailView({ groupId }) {
   // data is already cached.
   //
   // No `members.length === 0` short-circuit: it leaks stale data
-  // across groups (Copilot review 2026-05-03). When the user switches
+  // across groups. When the user switches
   // from Group A to Group B with the Discussions tab active, A's
   // `members` array would still be non-empty and the prefetch would
   // skip B's load. The loader is cheap and the discussions tab is
@@ -234,7 +234,7 @@ export default function GroupDetailView({ groupId }) {
   // this, opening Discussions before ever visiting Overview leaves
   // the activity card on "No activity yet." even though there's
   // plenty of data — `activities` is just unfetched. Same stale-data
-  // fix as the members prefetch above (Copilot review 2026-05-03).
+  // fix as the members prefetch above.
   useEffect(() => {
     if (activeTab === 'discussions' && activeGroup?.isMember) {
       loadActivity(groupId)

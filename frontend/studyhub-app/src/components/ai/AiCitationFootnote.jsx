@@ -31,7 +31,7 @@ export default function AiCitationFootnote({ index, citation, onOpen }) {
       </button>
       <span
         id={describedBy}
-        // Copilot fix: visually hidden but kept in the accessibility tree
+        // Visually hidden but kept in the accessibility tree
         // so aria-describedby actually announces. `display: none` would
         // remove the element from the AT entirely.
         style={{

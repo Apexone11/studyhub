@@ -413,7 +413,7 @@ export default function ScholarSearchPage() {
   const [drawerOpen, setDrawerOpen] = useState(false)
   const drawerTriggerRef = useRef(null)
 
-  // ── Keyboard shortcuts (wave-7 wiring 2026-05-13) ──────────────────
+  // ── Keyboard shortcuts ──────────────────────────────────────────────
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   useScholarShortcuts({
     onOpenShortcuts: () => setShortcutsOpen(true),

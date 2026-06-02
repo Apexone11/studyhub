@@ -18,20 +18,18 @@ const { cache } = require('../lib/cache')
  */
 function responseCache(keyFn, ttlMs = 60000) {
   return (req, res, next) => {
-    // Skip caching for non-GET requests
     if (req.method !== 'GET') {
       return next()
     }
 
     const key = typeof keyFn === 'function' ? keyFn(req) : keyFn
 
-    // Check cache first
     const cached = cache.get(key)
     if (cached) {
       return res.json(cached)
     }
 
-    // Intercept res.json to cache the response
+    // Wrap res.json so the first successful response populates the cache.
     const originalJson = res.json.bind(res)
     res.json = (body) => {
       cache.set(key, body, ttlMs)

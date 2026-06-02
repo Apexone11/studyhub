@@ -1,9 +1,9 @@
 /**
  * uploadVolumeBackup.js — daily mirror of /data/uploads to R2.
  *
- * Wave-12.11 — closes the gap documented in RUNBOOK_DB_RESTORE.md
- * "What's NOT backed up: Uploaded files (avatars, attachments, school
- * logos)". A Railway volume is a single point of failure: if the
+ * Closes the gap documented in RUNBOOK_DB_RESTORE.md "What's NOT
+ * backed up: Uploaded files (avatars, attachments, school logos)".
+ * A Railway volume is a single point of failure: if the
  * disk corrupts or the instance is rebuilt, every user-uploaded image
  * is gone forever and the DB row points at a 404.
  *
@@ -86,9 +86,8 @@ function fileToKey(uploadsDir, filePath) {
  * Streams the file rather than buffering it: video uploads can be
  * hundreds of MB, and `fs.readFileSync` would force the whole file
  * into Node's heap. AWS SDK v3 supports a ReadStream Body — the
- * underlying http client consumes it incrementally. Caught by the
- * wave-12.11 audit pass as an OOM risk on Railway hobby tiers
- * (default 512 MB).
+ * underlying http client consumes it incrementally. Buffering would
+ * be an OOM risk on Railway hobby tiers (default 512 MB).
  */
 async function mirrorFile(uploadsDir, filePath, bucketOverride) {
   const key = fileToKey(uploadsDir, filePath)

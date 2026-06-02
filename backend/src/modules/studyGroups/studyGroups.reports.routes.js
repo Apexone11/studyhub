@@ -1,5 +1,5 @@
 /**
- * studyGroups.reports.routes.js — Phase 5 report + appeal endpoints.
+ * studyGroups.reports.routes.js — Report + appeal endpoints.
  *
  * Mounted under /api/study-groups so route shapes are:
  *   POST   /api/study-groups/:id/report

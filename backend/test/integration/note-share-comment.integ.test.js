@@ -1,5 +1,5 @@
 /**
- * note-share-comment.integ.test.js — Loop T10 deep integration test.
+ * note-share-comment.integ.test.js — deep integration test.
  *
  * Scenario:
  *   1. User A creates a private note (visibility flag flipped via the

@@ -264,7 +264,7 @@ export default function SubscriptionTab() {
     // 3s interval starts an `await fetchSubscriptionData()` that can
     // resolve after the user has navigated away — without this guard
     // setSub / setHistory fire on an unmounted component and React
-    // logs a memory-leak warning. Wave-11 frontend bug hunt P1-6 fix.
+    // logs a memory-leak warning.
     let cancelled = false
     let attempts = 0
     const MAX_ATTEMPTS = 10

@@ -2,7 +2,7 @@
  * mobile-onboarding-and-sheets.spec.js
  *
  * Mobile-viewport E2E flows for the new-user funnel and sheet creation.
- * Loop M26 (2026-05-13) — scenarios 1, 2, 3, 4 from the brief:
+ * Scenarios 1, 2, 3, 4 from the brief:
  *   1. Sign up + onboarding on mobile → land on /feed
  *   2. Create first sheet on mobile from /feed → upload → publish
  *   3. Browse + view a sheet (from /sheets card → viewer → star)

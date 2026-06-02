@@ -3,7 +3,7 @@
  *
  * Mobile-viewport E2E flows for the mobile chrome (bottom nav, keyboard
  * handling, desktop-only banner).
- * Loop M26 (2026-05-13) — scenarios 10, 11, 12 from the brief:
+ * Scenarios 10, 11, 12 from the brief:
  *  10. Mobile bottom-nav navigation (Feed, Sheets, Notes, Messages, AI)
  *  11. Mobile keyboard handling (visualViewport mock + composer visible)
  *  12. Desktop-only banner dismissal (localStorage persists across reload)

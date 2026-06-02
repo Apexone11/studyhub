@@ -5,7 +5,7 @@
  * POST/PATCH/DELETE /:id/discussions/:postId/replies[/:replyId],
  * PATCH /:postId/resolve, POST upvote.
  * Covers: type enum (A13), title/content caps, parent thread anchoring,
- * mentions fan-out (Loop A3), block-filter on listing, edit window /
+ * mentions fan-out, block-filter on listing, edit window /
  * permission, A12, soft-delete, author-or-mod gates.
  */
 import Module, { createRequire } from 'node:module'

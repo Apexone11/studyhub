@@ -6,7 +6,7 @@
  *   - GET /popular (popular courses ranked by published-sheet count)
  *   - GET /schools/suggest (suggest school by .edu email domain)
  *   - GET /recommendations (popular fallback + collaborative)
- *   - POST /request (RequestedCourse atomic increment; Loop 4 fix)
+ *   - POST /request (RequestedCourse atomic increment)
  *   - GET /requested (admin-only)
  *
  * Plus CLAUDE.md A12 schoolId validation and graceful degradation on

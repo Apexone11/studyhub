@@ -4,8 +4,6 @@
  * Mounted in App.jsx inside the authenticated tree. Exposes
  * `requestStepUp(details)` via the useMfaStepUp() hook. See
  * `mfaStepUpContext.js` docblock for the full flow.
- *
- * Wave-12.11.
  */
 import { useCallback, useMemo, useState } from 'react'
 import { MfaStepUpContextRaw } from './mfaStepUpContext'

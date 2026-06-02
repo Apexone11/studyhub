@@ -1,8 +1,6 @@
 /**
  * requireRecentMfa — step-up MFA middleware.
  *
- * Closes the L2.14 deferred admin-MFA step-up plan (wave-12.11).
- *
  * What it does:
  *   Reads the current session row (by JTI) and checks whether
  *   `mfaVerifiedAt` is within `withinMs` of the current time.
@@ -61,10 +59,10 @@ function requireRecentMfa({ withinMs = DEFAULT_WINDOW_MS } = {}) {
       return sendError(res, 401, 'Login required.', ERROR_CODES.UNAUTHORIZED)
     }
 
-    // EMERGENCY_DISABLE_ADMIN_MFA bypasses step-up too. Same sealed-
-    // glass-break as the login flow (wave-12.8) — if the founder is
-    // locked out without 2FA they need a way through. Loud log so the
-    // override is visible in Sentry.
+    // EMERGENCY_DISABLE_ADMIN_MFA bypasses step-up too. Same sealed
+    // glass-break as the login flow — if the founder is locked out
+    // without 2FA they need a way through. Loud log so the override
+    // is visible in Sentry.
     const emergencyOverrideRaw = process.env.EMERGENCY_DISABLE_ADMIN_MFA
     const emergencyOverride =
       typeof emergencyOverrideRaw === 'string' &&

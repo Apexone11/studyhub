@@ -56,7 +56,7 @@ export function useAdminData() {
       let response = await doFetch()
       let data = await readJsonSafely(response, {})
 
-      // Step-up MFA handshake (wave-12.11): a 403 with
+      // Step-up MFA handshake: a 403 with
       // `code: 'MFA_STEP_UP_REQUIRED'` means the route is gated by
       // `requireRecentMfa` and the current session hasn't completed
       // a 2FA factor recently enough. Prompt the user, then retry.
@@ -231,13 +231,11 @@ export function useAdminData() {
     await Promise.all([loadPagedData('users', usersState.page), loadOverview()])
   }
 
-  // Wave-12.12 — these were previously raw `fetch()` calls inside
-  // UsersTab.jsx, which bypassed apiJson's step-up MFA interceptor.
-  // After wave-12.12 applied requireRecentMfa() to both routes, an
-  // admin with a stale session would have hit a silent 403 with no
-  // step-up prompt + no UX feedback. Routing through apiJson fixes
-  // both: the modal fires, the request retries, and any non-MFA
-  // error surfaces via the apiJson throw path.
+  // These route through apiJson rather than raw fetch so the step-up
+  // MFA interceptor runs. Both routes require requireRecentMfa(), so an
+  // admin with a stale session would otherwise hit a silent 403 with no
+  // step-up prompt and no UX feedback. apiJson fires the modal, retries
+  // the request, and surfaces any non-MFA error via its throw path.
   async function patchTrustLevel(userId, trustLevel) {
     await apiJson(`/api/admin/users/${userId}/trust-level`, {
       method: 'PATCH',

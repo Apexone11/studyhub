@@ -169,9 +169,9 @@ router.get('/users/search', async (req, res) => {
 })
 
 // ── PATCH /api/admin/users/:id/role ──────────────────────────
-// Step-up MFA (wave-12.12) — granting / revoking admin role is the
-// single most consequential admin action. A compromised admin session
-// MUST not be able to silently promote a co-conspirator to admin.
+// Step-up MFA — granting / revoking admin role is the single most
+// consequential admin action. A compromised admin session MUST not be
+// able to silently promote a co-conspirator to admin.
 router.patch('/users/:id/role', requireRecentMfa(), async (req, res) => {
   const { role } = req.body || {}
   if (!['admin', 'student'].includes(role)) {
@@ -208,9 +208,9 @@ router.patch('/users/:id/role', requireRecentMfa(), async (req, res) => {
 })
 
 // ── PATCH /api/admin/users/:id/trust-level ──────────────────
-// Step-up MFA (wave-12.12) — trust level affects rate-limit
-// allowances + content visibility. Promoting a sock-puppet to
-// "trusted" then using it for abuse is a documented attack pattern.
+// Step-up MFA — trust level affects rate-limit allowances + content
+// visibility. Promoting a sock-puppet to "trusted" then using it for
+// abuse is a documented attack pattern.
 router.patch('/users/:id/trust-level', requireRecentMfa(), async (req, res) => {
   const { trustLevel } = req.body || {}
   if (!['new', 'trusted', 'restricted'].includes(trustLevel)) {
@@ -260,12 +260,11 @@ router.patch('/users/:id/trust-level', requireRecentMfa(), async (req, res) => {
 // Toggle the per-user `mfaRequired` flag. Behind `flag_admin_mfa_required`
 // the login flow blocks the session cookie until the user completes 2FA
 // setup — flipping this to true on a regular admin forces them through
-// the gate. Behavior shipped 2026-04-30 in auth.login.controller.js.
+// the gate (enforced in auth.login.controller.js).
 //
-// Step-up MFA (wave-12.12) — flipping this OFF on a target admin
-// account undoes the protection wave-12.8 added. Step-up required so
-// a compromised admin session can't silently disable MFA enforcement
-// on the founder seat or another admin.
+// Step-up MFA — flipping this OFF on a target admin account undoes the
+// enforcement. Step-up required so a compromised admin session can't
+// silently disable MFA enforcement on the founder seat or another admin.
 router.patch('/users/:id/mfa', requireRecentMfa(), async (req, res) => {
   const targetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(targetId) || targetId < 1) {
@@ -379,10 +378,10 @@ router.get('/badges', async (req, res) => {
 })
 
 // ── DELETE /api/admin/users/:id ──────────────────────────────
-// Step-up MFA gate (wave-12.11) — admin must have completed a 2FA
-// factor within the last 15 minutes to delete a user. Frontend
-// interceptor catches the 403 + MFA_STEP_UP_REQUIRED code and opens
-// the step-up modal before retrying.
+// Step-up MFA gate — admin must have completed a 2FA factor within the
+// last 15 minutes to delete a user. Frontend interceptor catches the
+// 403 + MFA_STEP_UP_REQUIRED code and opens the step-up modal before
+// retrying.
 router.delete('/users/:id', requireRecentMfa(), async (req, res) => {
   const targetId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(targetId) || targetId < 1) {

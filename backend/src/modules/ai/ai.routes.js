@@ -432,7 +432,7 @@ router.post(
 )
 
 // POST /api/ai/save-to-notes
-// L15-HIGH-1: persists an AI message as a private note for the current user.
+// Persists an AI message as a private note for the current user.
 // Frontend AiSaveToNotesButton.jsx posts here.
 router.post('/save-to-notes', requireAuth, requireTrustedOrigin, writeLimiter, async (req, res) => {
   try {

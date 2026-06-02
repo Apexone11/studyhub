@@ -10,7 +10,7 @@ const { writeLimiter } = require('../../lib/rateLimiters')
 // CSRF defense-in-depth — every write under both routers must carry a
 // trusted Origin / Referer (CLAUDE.md A11). originAllowlist() short-
 // circuits GET/HEAD/OPTIONS so attaching it at the router level is
-// safe for read endpoints too. Parity with admin.routes.js wave-11.
+// safe for read endpoints too. Mirrors admin.routes.js.
 const requireTrustedOrigin = originAllowlist()
 
 const adminRouter = express.Router()

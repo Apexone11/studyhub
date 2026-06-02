@@ -19,7 +19,7 @@
  * Escape + focus restoration all work per the W3C ARIA Authoring
  * Practices §3.9 modal pattern.
  *
- * Wave-12.11. Pairs with backend/src/modules/auth/mfa.stepUp.controller.js.
+ * Pairs with backend/src/modules/auth/mfa.stepUp.controller.js.
  */
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'

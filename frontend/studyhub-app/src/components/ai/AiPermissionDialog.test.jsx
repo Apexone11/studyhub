@@ -1,5 +1,5 @@
 /**
- * AiPermissionDialog.test.jsx — Loop U20 coverage for the universal AI
+ * AiPermissionDialog.test.jsx — coverage for the universal AI
  * permission gate dialog.
  *
  * Verifies:

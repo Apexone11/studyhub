@@ -1146,7 +1146,7 @@ export function LogoMark({ size = 24 }) {
 //
 // Keyframes + .sh-animated-logo class selectors live in index.css so
 // every mount of this component reuses one set of style rules instead
-// of injecting a duplicate <style> tag (audit Loop 18 finding I1).
+// of injecting a duplicate <style> tag on every mount.
 // prefers-reduced-motion is handled in the same CSS block.
 export function AnimatedLogoMark({ size = 64 }) {
   return (
@@ -1483,7 +1483,7 @@ export function IconMonitor({ size, ...p }) {
   )
 }
 
-// Bolt — Data & Battery saver tab (wave-12.11)
+// Bolt — Data & Battery saver tab
 export function IconBolt({ size, ...p }) {
   return (
     <Svg size={size} {...p}>

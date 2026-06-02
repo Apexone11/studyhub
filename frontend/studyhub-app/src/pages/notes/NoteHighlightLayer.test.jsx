@@ -1,5 +1,5 @@
 /**
- * NoteHighlightLayer.test.jsx — Loop T8 coverage for the Note Review v1
+ * NoteHighlightLayer.test.jsx — coverage for the Note Review v1
  * highlight UI.
  *
  * The layer:

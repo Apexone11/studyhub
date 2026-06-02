@@ -166,9 +166,8 @@ describe('Security headers on API routes', () => {
     process.env.FIELD_ENCRYPTION_KEY = 'a'.repeat(64)
     process.env.PROVENANCE_SECRET = 'b'.repeat(64)
     process.env.R2_BUCKET_AI_ATTACHMENTS = 'studyhub-ai-attachments-test'
-    // R2_BUCKET_UPLOAD_BACKUP was promoted to REQUIRED_IN_PRODUCTION in
-    // wave-12.11 but this test was never updated to set it — so the
-    // production-mode boot exited on a missing secret in any env whose
+    // R2_BUCKET_UPLOAD_BACKUP is REQUIRED_IN_PRODUCTION, so the
+    // production-mode boot exits on a missing secret in any env whose
     // .env lacks it. Provide a dummy like the others above.
     process.env.R2_BUCKET_UPLOAD_BACKUP = 'studyhub-upload-backup-test'
     // WEBAUTHN_RP_ID + WEBAUTHN_ORIGIN promoted to REQUIRED_IN_PRODUCTION

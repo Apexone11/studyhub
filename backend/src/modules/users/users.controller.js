@@ -102,15 +102,15 @@ const getActivityByUsername = async (req, res) => {
   }
 }
 
-// V1 badges endpoints removed 2026-05-01. Both `GET /api/users/me/badges`
+// V1 badges endpoints intentionally absent. `GET /api/users/me/badges`
 // and `GET /api/users/:username/badges` returned the legacy coin-format
 // payload that BadgeDisplay.jsx consumed. After the BadgeDisplay →
 // PinnedBadgesCard migration, every frontend consumer reads from
 // `/api/achievements/users/:username` (catalog state) or
 // `/api/achievements/users/:username/pinned` (the 6 featured hexagons)
 // instead. The legacy endpoints also referenced a `iconUrl` Badge column
-// that no longer exists in v2 — keeping them around would just throw on
-// any caller that reached them. Removed cleanly.
+// that no longer exists in v2 — re-adding them would throw on any caller
+// that reached them.
 
 // ── GET /api/users/me/pinned-sheets ──────────────────────────
 const getMyPinnedSheets = async (req, res) => {
@@ -1717,10 +1717,10 @@ async function getOnboardingState(req, res) {
       groupMembershipCount,
       teacherVerified,
       publishedMaterialCount,
-      // Live counters — wired 2026-04-23 per tech-debt handoff §14.
-      // SectionEnrollment + Section (teacher) + GroupSessionRsvp come from
-      // the main Prisma query above; wrapped in `safe()` for graceful
-      // degradation if any table is unreachable.
+      // Live counters: SectionEnrollment + Section (teacher) +
+      // GroupSessionRsvp come from the main Prisma query above; each is
+      // wrapped in `safe()` for graceful degradation if a table is
+      // unreachable.
       sectionCount,
       scheduledSessionCount,
       problemQueuePostCount,

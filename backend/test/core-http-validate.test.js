@@ -57,7 +57,7 @@ describe('parseRouteId', () => {
   })
 
   it('REJECTS partial-numeric ids that Number.parseInt would accept', () => {
-    // The Codex P2 finding: Number.parseInt('12abc',10) === 12.
+    // Number.parseInt('12abc', 10) === 12, so a plain parse would wrongly accept it.
     expect(parseRouteId('12abc')).toBeNull()
     expect(parseRouteId('007abc')).toBeNull()
     expect(parseRouteId('1 ')).toBeNull()
