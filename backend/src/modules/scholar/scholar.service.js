@@ -46,8 +46,8 @@ const ADAPTERS = {
 }
 
 // L1-CRIT-2: STATIC publisher allowlist for OA-PDF caching. Hoisted to
-// module scope (Loop-7-HIGH-2) so future maintainers can find it next to
-// other constants and we don't allocate a new array per call.
+// module scope so future maintainers can find it next to other constants
+// and we don't allocate a new array per call.
 const SCHOLAR_PDF_HOST_ALLOWLIST = Object.freeze([
   'arxiv.org',
   'export.arxiv.org',
@@ -558,8 +558,8 @@ function _serializePaper(row) {
     openAlexId: row.openAlexId,
     pubmedId: row.pubmedId,
     license: row.license,
-    // Loop S11 fix #1: surface OA flag + license type for the frontend
-    // "Open PDF" gate. The frontend reads `paper.openAccess` and
+    // Surface OA flag + license type for the frontend "Open PDF" gate.
+    // The frontend reads `paper.openAccess` and
     // `paper.licenseType` to decide whether to render the in-app reader.
     // `licenseType` is a normalized alias of `license` so client code
     // doesn't have to learn two field names — it's "open_access" when
@@ -665,8 +665,8 @@ async function getOrCachePaperPdf(canonicalId, paper) {
 
   const maxBytes = Number(process.env.SCHOLAR_PDF_MAX_BYTES_PER_PAPER) || 10 * 1024 * 1024
 
-  // L1-CRIT-2 + Loop-7-HIGH-2: SCHOLAR_PDF_HOST_ALLOWLIST is hoisted to
-  // module scope above. Never derived from upstream metadata.
+  // L1-CRIT-2: SCHOLAR_PDF_HOST_ALLOWLIST is hoisted to module scope above.
+  // Never derived from upstream metadata.
   let pdfHost = ''
   try {
     pdfHost = new URL(paper.pdfExternalUrl).hostname.toLowerCase()

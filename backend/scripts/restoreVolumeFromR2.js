@@ -1,7 +1,7 @@
 /**
  * restoreVolumeFromR2.js — disaster-recovery for /data/uploads.
  *
- * Wave-12.11. Pairs with backend/src/lib/jobs/uploadVolumeBackup.js.
+ * Pairs with backend/src/lib/jobs/uploadVolumeBackup.js.
  *
  * When to run: the Railway volume is gone, corrupted, or replaced. The
  * DB rows still point at /uploads/... paths; without restoring the

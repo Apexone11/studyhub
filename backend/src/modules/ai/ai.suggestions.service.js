@@ -1,5 +1,5 @@
 /**
- * ai.suggestions.service.js — Phase 3 of v2 design refresh.
+ * ai.suggestions.service.js — inline study-coach suggestions.
  *
  * Generates the inline study-coach suggestion shown in the
  * AiSuggestionCard on UserProfilePage Overview. One short, actionable

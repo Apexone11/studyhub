@@ -15,8 +15,6 @@
  * If MobileBottomNav isn't shipped yet, these tests fail with
  * "expected locator to be visible" — the selector is the canonical
  * `data-testid` baked into the component.
- *
- * Loop M21.
  */
 import { expect, test, devices } from '@playwright/test'
 import { mockAuthenticatedApp } from '../helpers/mockStudyHubApi'

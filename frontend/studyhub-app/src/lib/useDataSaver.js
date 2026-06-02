@@ -1,7 +1,7 @@
 /**
  * useDataSaver — React hook returning the effective data-saver state.
  *
- * Wave-12.11. Pairs with backend/src/lib/dataSaverNegotiation.js.
+ * Pairs with backend/src/lib/dataSaverNegotiation.js.
  *
  * Resolution order:
  *   1. User preference `UserPreferences.dataSaverMode` (loaded via

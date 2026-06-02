@@ -178,23 +178,22 @@ router.post('/authenticate/verify', webauthnLimiter, async (req, res) => {
 
     // Update counter + lastUsedAt. lastUsedAt is the audit signal the
     // admin portal renders so the founder can spot a passkey that
-    // hasn't been used in months and retire it (wave-12.11).
+    // hasn't been used in months and retire it.
     await prisma.webAuthnCredential.update({
       where: { id: storedCredential.id },
       data: { counter: result.newCounter, lastUsedAt: new Date() },
     })
 
     // Issue session via the canonical login helper — mirrors
-    // login.challenge.controller + login.recovery.controller. The previous
-    // hand-rolled `signAuthToken + setAuthCookie` path bypassed Session
-    // row creation, so the JWT carried no `jti` and requireAuth left
-    // `req.sessionJti` undefined. With the wave-12.11 fail-closed
-    // `requireRecentMfa` middleware, every passkey-authed admin then hit
+    // login.challenge.controller + login.recovery.controller. A hand-rolled
+    // `signAuthToken + setAuthCookie` path would bypass Session row creation,
+    // so the JWT would carry no `jti` and requireAuth would leave
+    // `req.sessionJti` undefined. With the fail-closed `requireRecentMfa`
+    // middleware, a passkey-authed admin would then hit
     // `MFA_STEP_UP_REQUIRED { reason: 'no_session' }` on PATCH role /
     // trust-level / mfa, DELETE user, and the Stripe sync route, and the
-    // step-up /verify endpoint 401'd because there was no session row to
-    // refresh — admins were locked out of every gated route via passkey
-    // login (wave-12.15 fix from a Codex P1 finding).
+    // step-up /verify endpoint would 401 because there'd be no session row
+    // to refresh — locking admins out of every gated route via passkey login.
     //
     // Passkey is an explicit AAL2 factor per NIST 800-63B ("something you
     // have"), so passing `mfaVerified: true` stamps `Session.mfaVerifiedAt`

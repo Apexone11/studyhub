@@ -182,13 +182,11 @@ async function handleSchoolStep(userId, payload, updateData) {
   // Don't create an Enrollment row here. Enrollment is course-level
   // (userId + courseId only — no schoolId column; see schema.prisma).
   // School membership is currently derived from the user's enrolled
-  // courses via course.school. The previous attempt at
+  // courses via course.school. A prior
   // `prisma.enrollment.create({ data: { userId, schoolId } })` silently
   // failed on every step 2 submission and only logged a warning. Step 3
   // (handleCoursesStep) creates the actual Enrollment rows that pin the
   // user to courses, which transitively pin them to a school.
-  // The dedicated UserSchoolEnrollment table belongs to the Phase R1
-  // dual-enrollment cleanup (Task #64) and is not in scope here.
 
   updateData.schoolSelected = true
   updateData.currentStep = 3
@@ -388,7 +386,7 @@ async function executeFirstAction(userId, actionType, actionPayload) {
           title: actionPayload.title,
           content: actionPayload.content,
           userId,
-          visibility: 'private',
+          private: true,
         },
       })
       break

@@ -210,11 +210,11 @@ async function lookupIdempotency({ key, userId }) {
   return prisma.aiAttachment.findUnique({ where: { id: row.attachmentId } })
 }
 
-// Codex P1 fix: idempotent + safe across users. Replaces the prior bare
-// upsert which could rewire an existing row to a different user's
-// attachment when keys collide. lookupIdempotency treats foreign-user
-// key reuse as a miss; this helper ensures the underlying row's
-// userId/attachmentId pointer never drifts to a foreign owner.
+// Idempotent + safe across users. A bare upsert would rewire an existing
+// row to a different user's attachment when keys collide. lookupIdempotency
+// treats foreign-user key reuse as a miss; this helper ensures the
+// underlying row's userId/attachmentId pointer never drifts to a foreign
+// owner.
 async function persistIdempotencyScoped({ key, userId, attachmentId }) {
   if (!key) return
   const existing = await prisma.aiUploadIdempotency.findUnique({ where: { key } })
@@ -452,9 +452,9 @@ async function uploadAttachment({
       },
     })
 
-    // 9. Idempotency record + audit log. Codex P1 fix: use the scoped
-    // helper so a same-key collision from a different user can never
-    // overwrite the original owner's pointer.
+    // 9. Idempotency record + audit log. Use the scoped helper so a
+    // same-key collision from a different user can never overwrite the
+    // original owner's pointer.
     if (idempotencyKey) {
       await persistIdempotencyScoped({
         key: idempotencyKey,

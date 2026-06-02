@@ -30,9 +30,9 @@ function getWeekStartDate() {
  * Returns current streak, longest streak, last active date, and whether today is active
  *
  * Prefers the denormalized `UserStreak` row (O(1), maintained by the
- * 2026-05-12 streak service + daily sweeper at 04:00 UTC). Falls back to
- * scanning `UserDailyActivity` for the legacy path so users created
- * before the streak table was seeded still see a number.
+ * streak service + daily sweeper at 04:00 UTC). Falls back to scanning
+ * `UserDailyActivity` for the legacy path so users created before the
+ * streak table was seeded still see a number.
  *
  * @param {PrismaClient} prisma
  * @param {number} userId

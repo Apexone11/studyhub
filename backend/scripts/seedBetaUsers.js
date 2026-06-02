@@ -163,10 +163,9 @@ async function seedFeedFixture(studentUserId) {
  * /users/beta_student1?tab=overview renders a happy-path card out of
  * the box — no curl, no Prisma Studio, no manual setup.
  *
- * Codifies the "every feature must ship with seed data" rule added to
- * CLAUDE.md §Working-Agreement #11 during the Day 3 smoke-test
- * regression. See docs/internal/audits/2026-04-24-day3-polish-and-
- * ship-handoff.md.
+ * Codifies the "every feature must ship with seed data" rule from
+ * CLAUDE.md §Working-Agreement #11. See
+ * docs/internal/audits/2026-04-24-day3-polish-and-ship-handoff.md.
  *
  * Idempotent: uses a stable (userId, title) de-dupe so re-running
  * `npm run seed:beta` doesn't pile up duplicate rows.
@@ -301,7 +300,7 @@ async function seedAiSuggestions(studentUsers) {
 }
 
 /**
- * Seed published study sheets for the Sheets Grid view (Phase 4 Day 3).
+ * Seed published study sheets for the Sheets Grid view (Phase 4).
  *
  * /sheets must show beta_student1 a meaningful state out of the box —
  * 6+ sheets across 3 courses, all with non-null previewText so the Grid

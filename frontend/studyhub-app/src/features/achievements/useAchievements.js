@@ -5,9 +5,9 @@
  * header. With the split-origin deploy
  * (`getstudyhub.org → api.getstudyhub.org`) any non-simple request
  * triggers a CORS preflight; sending a Content-Type on a body-less GET
- * doubled the round-trip cost on every catalog/gallery/stats fetch
- * (Copilot review 2026-05-01). POSTs / DELETEs that carry JSON bodies
- * still set Content-Type explicitly via `jsonHeaders()`.
+ * doubled the round-trip cost on every catalog/gallery/stats fetch.
+ * POSTs / DELETEs that carry JSON bodies still set Content-Type
+ * explicitly via `jsonHeaders()`.
  *
  * Cookies carry the session — `credentials: 'include'` is the only
  * thing every request actually needs.

@@ -1,5 +1,5 @@
 /**
- * subscription-lifecycle.integ.test.js — Loop T10 deep integration test.
+ * subscription-lifecycle.integ.test.js — deep integration test.
  *
  * Scenario:
  *   1. Free user starts at plan='free' with AI quota 30/day.

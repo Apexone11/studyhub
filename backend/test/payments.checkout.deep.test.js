@@ -1,6 +1,6 @@
 /**
  * payments.checkout.deep.test.js — deep coverage for subscription + donation
- * checkout endpoints. Loop T6 (2026-05-12).
+ * checkout endpoints.
  *
  * Pins:
  *   - POST /checkout/subscription contract (valid plan → Stripe URL)

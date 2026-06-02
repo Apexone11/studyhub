@@ -59,7 +59,7 @@ async function isGroupAdminOrMod(groupId, userId) {
 }
 
 /**
- * Phase 5: check if a member is currently muted. Returns true/false.
+ * Check if a member is currently muted. Returns true/false.
  * A mute is active when `mutedUntil` is non-null and in the future.
  * Graceful degradation: returns false on any error.
  */
@@ -78,9 +78,9 @@ async function isMutedInGroup(groupId, userId) {
 }
 
 /**
- * Phase 5: check if a user is blocked from a group. Returns the block
- * row on hit, null on miss. Graceful-degradation: returns null on any
- * DB error so a missing table never 500s the request.
+ * Check if a user is blocked from a group. Returns the block row on hit,
+ * null on miss. Graceful-degradation: returns null on any DB error so a
+ * missing table never 500s the request.
  */
 async function isBlockedFromGroup(groupId, userId) {
   if (!groupId || !userId) return null
@@ -236,7 +236,7 @@ async function formatGroup(group, currentUserId = null) {
     name: group.name,
     description: group.description,
     avatarUrl: group.avatarUrl,
-    // Phase 4 header banner
+    // Header banner
     backgroundUrl: group.backgroundUrl ?? null,
     backgroundCredit: group.backgroundCredit ?? null,
     courseId: group.courseId,
@@ -267,7 +267,7 @@ async function formatGroup(group, currentUserId = null) {
           joinedAt: userMembership.joinedAt,
         }
       : null,
-    // Phase 5 trust & safety surface
+    // Trust & safety surface
     moderationStatus: group.moderationStatus ?? 'active',
     warnedUntil: group.warnedUntil ?? null,
     lockedAt: group.lockedAt ?? null,

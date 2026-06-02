@@ -45,9 +45,9 @@ async function listDiscussions(req, res) {
     const limitNum = Math.min(parseInt(limit, 10) || 50, 100)
     const offsetNum = Math.max(parseInt(offset, 10) || 0, 0)
 
-    // Phase 5 B.5: non-mods only see 'published' posts. Mods see
-    // everything (including pending_approval and removed) so they can
-    // approve/reject and audit. Authors also see their own pending posts.
+    // Non-mods only see 'published' posts. Mods see everything (including
+    // pending_approval and removed) so they can approve/reject and audit.
+    // Authors also see their own pending posts.
     const canModerate = member && (member.role === 'admin' || member.role === 'moderator')
     const statusFilter = canModerate
       ? {} // mods see all statuses
@@ -138,7 +138,7 @@ async function createDiscussion(req, res) {
       return res.status(404).json({ error: 'Not a member.' })
     }
 
-    // Phase 5: muted users cannot create discussion posts.
+    // Muted users cannot create discussion posts.
     if (await isMutedInGroup(groupId, req.user.userId)) {
       return res
         .status(403)
@@ -176,8 +176,8 @@ async function createDiscussion(req, res) {
       }
     }
 
-    // Phase 4: optional attachments array. Each attachment must be an
-    // object that came from POST /resources/upload — only the internal
+    // Optional attachments array. Each attachment must be an object that
+    // came from POST /resources/upload — only the internal
     // /uploads/group-media/... url is allowed through so arbitrary URLs
     // cannot be injected via this field. Capped at 4 per post.
     let validatedAttachments = null
@@ -194,9 +194,8 @@ async function createDiscussion(req, res) {
         if (!raw || typeof raw !== 'object') {
           return res.status(400).json({ error: 'Each attachment must be an object.' })
         }
-        // Hardened path check (Loop B 2026-05-03 finding HIGH #4):
-        // a bare `startsWith('/uploads/group-media/')` admits
-        // protocol-relative URLs like `//evil.com/uploads/group-media/x`
+        // Hardened path check: a bare `startsWith('/uploads/group-media/')`
+        // admits protocol-relative URLs like `//evil.com/uploads/group-media/x`
         // (the leading `/` matches but `//` reroutes the browser to a
         // different host), URL-encoded prefixes that decode after the
         // check, and `..` traversal sequences. Reject anything that
@@ -228,9 +227,9 @@ async function createDiscussion(req, res) {
       validatedAttachments = normalized
     }
 
-    // Phase 5 B.5: if the group has post-approval enabled and the
-    // caller is not a mod, new posts enter 'pending_approval' status.
-    // Admins/mods bypass the queue — they ARE the moderators.
+    // If the group has post-approval enabled and the caller is not a mod,
+    // new posts enter 'pending_approval' status. Admins/mods bypass the
+    // queue — they ARE the moderators.
     let postStatus = 'published'
     try {
       const groupRow = await prisma.studyGroup.findUnique({
@@ -282,9 +281,8 @@ async function createDiscussion(req, res) {
       // pending_approval threads are hidden from non-moderators by
       // listDiscussions/getDiscussion, so notifying every member with the
       // post title + a deep link would leak content the moderation gate
-      // is supposed to hide (Copilot review #3 + #4, 2026-05-03). Once
-      // a moderator approves the post, the approve handler is responsible
-      // for firing the appropriate notification.
+      // is supposed to hide. Once a moderator approves the post, the
+      // approve handler is responsible for firing the notification.
       const isPublic = postStatus === 'published'
 
       if (isPublic && members.length > 0 && groupData) {
@@ -296,7 +294,7 @@ async function createDiscussion(req, res) {
             message: `${req.user.username} posted in ${groupData.name}: ${validTitle}`,
             actorId: req.user.userId,
             // Deep-link straight to the discussion thread the user is
-            // being notified about (Copilot finding 2026-05-03).
+            // being notified about.
             linkPath: `/study-groups/${groupId}?tab=discussions&post=${post.id}`,
           })),
         )
@@ -306,11 +304,10 @@ async function createDiscussion(req, res) {
       // a mention is a personal call-out and deserves its own row in
       // the recipient's bell with a distinct type so the frontend can
       // style it differently. Restrict to active group members so an
-      // @username from a private group cannot ping a non-member
-      // (Codex P2 finding 2026-05-03 — group membership IS the
-      // privacy boundary for mention pings). Also gated by isPublic
-      // so a non-moderator can't bypass the moderation queue by
-      // @-mentioning specific people (Copilot review #4, 2026-05-03).
+      // @username from a private group cannot ping a non-member —
+      // group membership IS the privacy boundary for mention pings.
+      // Also gated by isPublic so a non-moderator can't bypass the
+      // moderation queue by @-mentioning specific people.
       if (isPublic) {
         // Block-filter as defense in depth (CLAUDE.md A6) on top of the
         // write-time block check inside createNotification. If A blocked B,
@@ -412,9 +409,9 @@ async function getDiscussion(req, res) {
       return res.status(404).json({ error: 'Post not found.' })
     }
 
-    // Phase 5: enforce the same visibility model as listDiscussions.
-    // Non-mods cannot fetch pending_approval or removed posts unless
-    // they are the author of the pending post.
+    // Enforce the same visibility model as listDiscussions. Non-mods
+    // cannot fetch pending_approval or removed posts unless they are the
+    // author of the pending post.
     const canModerate = member && (member.role === 'admin' || member.role === 'moderator')
     if (!canModerate) {
       const isAuthor = post.userId === req.user.userId
@@ -473,13 +470,11 @@ async function updateDiscussion(req, res) {
     }
 
     // Active-membership gate. createDiscussion + createReply already
-    // require this; the edit / delete / resolve paths previously
-    // skipped it, which let a removed user PATCH their own old post
-    // after they'd been kicked from the group. Mirror the create-side
-    // gate so post edits respect membership.
-    // requireGroupMember returns pending/invited/banned rows too — gate
-    // explicitly on `status === 'active'` so a banned user can't slip
-    // through to mutate their old posts (Copilot 2026-05-03 finding).
+    // require this; the edit / delete / resolve paths must too, or a
+    // removed user could PATCH their own old post after being kicked
+    // from the group. requireGroupMember returns pending/invited/banned
+    // rows too — gate explicitly on `status === 'active'` so a banned
+    // user can't slip through to mutate their old posts.
     const member = await requireGroupMember(groupId, req.user.userId)
     if (!member || member.status !== 'active') {
       return res.status(403).json({ error: 'You must be an active member of this group.' })
@@ -494,14 +489,13 @@ async function updateDiscussion(req, res) {
     }
 
     // Check permission. Editing the post body / title is restricted to
-    // the author or an admin. Pinning is a moderator-tier action.
-    // Codex P1 + Copilot 2026-05-03 finding: the previous gate
-    // `if (!isAuthor && !isAdmin) return 403` ran BEFORE the pinned-
-    // only branch, so a non-author moderator clicking "Pin" hit 403
-    // and the new `pinned && isModOrAdmin` branch was unreachable.
-    // Fix: detect a pin-only body (no title / no content changes) and
-    // use `isModOrAdmin` for that specific shape; everything else
-    // still requires author-or-admin.
+    // the author or an admin. Pinning is a moderator-tier action. The
+    // ordering matters: a single `if (!isAuthor && !isAdmin) return 403`
+    // before the pin branch would make a non-author moderator's "Pin"
+    // hit 403 and leave the `pinned && isModOrAdmin` branch unreachable.
+    // So detect a pin-only body (no title / no content changes) and use
+    // `isModOrAdmin` for that specific shape; everything else still
+    // requires author-or-admin.
     const isAdmin = await isGroupAdmin(groupId, req.user.userId)
     const isModOrAdmin = await isGroupAdminOrMod(groupId, req.user.userId)
     const { title, content, pinned } = req.body
@@ -583,8 +577,7 @@ async function updateDiscussion(req, res) {
 
     // Match the listDiscussions serializer shape exactly so the hook can
     // replace the local post wholesale without losing the moderation
-    // badges (`status`), the user's upvote state, or the reply count
-    // — Copilot finding 2026-05-03.
+    // badges (`status`), the user's upvote state, or the reply count.
     res.json({
       id: updated.id,
       groupId: updated.groupId,
@@ -624,10 +617,9 @@ async function deleteDiscussion(req, res) {
       return res.status(400).json({ error: 'Invalid IDs.' })
     }
 
-    // Active-membership gate (Loop B 2026-05-03 finding MED #7).
-    // requireGroupMember returns pending/invited/banned rows too — gate
-    // explicitly on `status === 'active'` so a banned user can't slip
-    // through to mutate their old posts (Copilot 2026-05-03 finding).
+    // Active-membership gate. requireGroupMember returns pending/invited/
+    // banned rows too — gate explicitly on `status === 'active'` so a
+    // banned user can't slip through to mutate their old posts.
     const member = await requireGroupMember(groupId, req.user.userId)
     if (!member || member.status !== 'active') {
       return res.status(403).json({ error: 'You must be an active member of this group.' })
@@ -648,10 +640,10 @@ async function deleteDiscussion(req, res) {
       return res.status(403).json({ error: 'Not authorized.' })
     }
 
-    // Phase 5 C.1: when a MOD removes someone else's post (not their own),
-    // soft-delete it, increment the author's strike counter, and auto-ban
-    // them if they've hit 2+ strikes within 30 days. Authors deleting their
-    // own posts still hard-delete normally and incur no strikes.
+    // When a MOD removes someone else's post (not their own), soft-delete
+    // it, increment the author's strike counter, and auto-ban them if
+    // they've hit 2+ strikes within 30 days. Authors deleting their own
+    // posts still hard-delete normally and incur no strikes.
     if (isModOrAdmin && !isAuthor) {
       // Soft-delete: mark as removed instead of hard-deleting.
       await prisma.groupDiscussionPost.update({
@@ -826,9 +818,9 @@ async function createReply(req, res) {
           linkPath: `/study-groups/${groupId}?tab=discussions&post=${post.id}`,
         })
       }
-      // Same membership-restricted mention pipeline as createDiscussion
-      // (Codex P2 finding 2026-05-03). A private-group reply with
-      // `@username` must not ping a user who isn't in the group.
+      // Same membership-restricted mention pipeline as createDiscussion.
+      // A private-group reply with `@username` must not ping a user who
+      // isn't in the group.
       const replyMembers = await prisma.studyGroupMember.findMany({
         where: { groupId, status: 'active' },
         select: { userId: true },
@@ -887,7 +879,7 @@ async function updateReply(req, res) {
     // rows, but must not be able to rewrite them in a private group after
     // they've been kicked. requireGroupMember returns pending/invited/banned
     // rows too — gate explicitly on `status === 'active'` (mirrors the
-    // updateDiscussion gate above).
+    // updateDiscussion gate).
     const member = await requireGroupMember(groupId, req.user.userId)
     if (!member || member.status !== 'active') {
       return res.status(403).json({ error: 'You must be an active member of this group.' })
@@ -977,7 +969,7 @@ async function deleteReply(req, res) {
     // rows, but must not be able to delete them in a private group after
     // they've been kicked. requireGroupMember returns pending/invited/banned
     // rows too — gate explicitly on `status === 'active'` (mirrors the
-    // deleteDiscussion gate above).
+    // deleteDiscussion gate).
     const member = await requireGroupMember(groupId, req.user.userId)
     if (!member || member.status !== 'active') {
       return res.status(403).json({ error: 'You must be an active member of this group.' })
@@ -1029,10 +1021,9 @@ async function resolveDiscussion(req, res) {
       return res.status(400).json({ error: 'Invalid IDs.' })
     }
 
-    // Active-membership gate (Loop B 2026-05-03 finding MED #7).
-    // requireGroupMember returns pending/invited/banned rows too — gate
-    // explicitly on `status === 'active'` so a banned user can't slip
-    // through to mutate their old posts (Copilot 2026-05-03 finding).
+    // Active-membership gate. requireGroupMember returns pending/invited/
+    // banned rows too — gate explicitly on `status === 'active'` so a
+    // banned user can't slip through to mutate their old posts.
     const member = await requireGroupMember(groupId, req.user.userId)
     if (!member || member.status !== 'active') {
       return res.status(403).json({ error: 'You must be an active member of this group.' })
@@ -1074,7 +1065,7 @@ async function resolveDiscussion(req, res) {
     // Match the listDiscussions serializer shape exactly. Without
     // status / upvoteCount / userHasUpvoted the hook's local-state
     // replacement strips the moderation badges and vote counter from
-    // the resolved question card (Copilot finding 2026-05-03).
+    // the resolved question card.
     res.json({
       id: updated.id,
       groupId: updated.groupId,

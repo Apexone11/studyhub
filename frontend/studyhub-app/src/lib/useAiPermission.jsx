@@ -38,9 +38,7 @@ export function AiPermissionProvider({ children, Dialog }) {
 
   const requestPermission = useCallback((payload) => {
     return new Promise((resolve) => {
-      // Concurrent-request guard (Sourcery + Codex finding, restored
-      // by Loop V4 — the implementation was lost from a prior cycle
-      // while the test stayed in tree). If a previous request is still
+      // Concurrent-request guard: if a previous request is still
       // awaiting a decision when a new one comes in, auto-reject the
       // old one so its caller resolves (with `false`) instead of
       // hanging forever. A permission dialog is a singleton — the user

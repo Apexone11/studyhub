@@ -7,8 +7,8 @@ const log = require('../../lib/logger')
 const { distanceKm } = require('../../lib/geo/haversine')
 const { schoolsLimiter, POPULAR_COURSES_LIMIT } = require('./courses.constants')
 // Stricter per-USER cap (30/15min) layered on top of the existing
-// per-IP cap (120/15min). Wave-11 G1-6 — defends against authenticated
-// scraper enumeration of the school + course taxonomy.
+// per-IP cap (120/15min). Defends against authenticated scraper
+// enumeration of the school + course taxonomy.
 // Feature-expansion security addendum §1 HIGH requirement.
 const { discoverySchoolsLimiter, discoveryCoursesLimiter } = require('../../lib/rateLimiters')
 

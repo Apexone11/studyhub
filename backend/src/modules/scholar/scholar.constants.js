@@ -3,7 +3,7 @@
  *
  * Source-of-truth for adapter hostnames, canonical paper-id regex,
  * citation styles, and dedupe rules. See master plan §18.4 + §18.5 +
- * §18.8 and the Loop 3 (security) findings (L3-MED-4 + L3-CRIT-2).
+ * §18.8 and security findings L3-MED-4 + L3-CRIT-2.
  */
 
 // ── Hostname allowlist for safeFetch ─────────────────────────────────────
@@ -162,7 +162,7 @@ function slugifyTopic(raw) {
 // Per-adapter soft timeout in the fan-out (master plan §18.5).
 const ADAPTER_SOFT_TIMEOUT_MS = 3_000
 
-// Search cache TTL (Loop 5 CRIT-3) — 1 hour per (q, filter, source) tuple.
+// Search cache TTL — 1 hour per (q, filter, source) tuple.
 const SEARCH_CACHE_TTL_MS = 60 * 60 * 1000
 
 // Paper-detail cache freshness window. Popular papers refresh daily; the
@@ -262,7 +262,7 @@ function sanitizeFilename(raw) {
   return replaced.replace(/^[._]+|[._]+$/g, '') || 'paper'
 }
 
-// ── Topic feed (Week 5) ─────────────────────────────────────────────────
+// ── Topic feed ──────────────────────────────────────────────────────────
 
 const TOPIC_SORT_ALLOWLIST = new Set(['trending', 'recent', 'mostCited'])
 const TOPIC_DEFAULT_LIMIT = 20

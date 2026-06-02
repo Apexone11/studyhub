@@ -1,5 +1,5 @@
 /**
- * print-button.spec.js — Sheet / note print button contract (loop T9).
+ * print-button.spec.js — Sheet / note print button contract.
  *
  * Single scenario: clicking the print button on a sheet detail page invokes
  * `window.print()`. The print() call would block on a real run, so we stub

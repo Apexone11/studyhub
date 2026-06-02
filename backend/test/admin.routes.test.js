@@ -114,7 +114,7 @@ fakeOriginAllowlistFactory.normalizeOrigin = (v) => v
 fakeOriginAllowlistFactory.buildTrustedOrigins = () => new Set()
 
 // requireRecentMfa is applied to a growing set of privileged routes
-// (wave-12.12 — role grant, mfa toggle, trust-level, delete user).
+// (role grant, mfa toggle, trust-level, delete user).
 // These tests assert admin-route correctness, not the step-up gate
 // itself (that has its own dedicated unit test). Mock the factory
 // to a pass-through so the existing assertions don't need to be

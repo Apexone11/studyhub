@@ -205,13 +205,13 @@ async function getAuthenticatedUser(userId) {
           starredSheets: true,
         },
       },
-      // Wave-12.12 P2 fix — the SaverModeInitializer needs these on
-      // every authenticated page-load, BEFORE the usePreferences()
-      // fetch fires on the Settings page. Without them in the
-      // session payload, useDataSaver / useBatterySaver fall back
-      // to localStorage + the platform signal, and the user's saved
-      // server-side preference never takes effect across browsers.
-      // Slim select (two columns) so the session payload stays small.
+      // The SaverModeInitializer needs these on every authenticated
+      // page-load, BEFORE the usePreferences() fetch fires on the
+      // Settings page. Without them in the session payload,
+      // useDataSaver / useBatterySaver fall back to localStorage + the
+      // platform signal, and the user's saved server-side preference
+      // never takes effect across browsers. Slim select (two columns)
+      // so the session payload stays small.
       preferences: {
         select: {
           dataSaverMode: true,
@@ -242,12 +242,11 @@ function buildAuthenticatedUserPayload(user, extraFields = {}) {
           stars: user._count.starredSheets || 0,
         }
       : undefined,
-    // Wave-12.12 P2 fix — surface just the saver-mode fields so
-    // useDataSaver / useBatterySaver can read them at app-root mount
-    // time. Other preferences still load via usePreferences() on the
-    // Settings page. Null-safe: a fresh user with no UserPreferences
-    // row yet falls back to 'auto' on both, matching the schema
-    // default.
+    // Surface just the saver-mode fields so useDataSaver /
+    // useBatterySaver can read them at app-root mount time. Other
+    // preferences still load via usePreferences() on the Settings page.
+    // Null-safe: a fresh user with no UserPreferences row yet falls
+    // back to 'auto' on both, matching the schema default.
     preferences: user.preferences
       ? {
           dataSaverMode: user.preferences.dataSaverMode || 'auto',
@@ -427,7 +426,7 @@ async function issueAuthenticatedSession(res, userId, req, preComputed = null, o
       // mfaVerified: true so the new session's `mfaVerifiedAt` column
       // is stamped at creation — requireRecentMfa then permits
       // admin-sensitive routes for the next 15 minutes without an
-      // additional step-up prompt (wave-12.11).
+      // additional step-up prompt.
       mfaVerified: Boolean(options.mfaVerified),
     })
     jti = sessionResult.jti

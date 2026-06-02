@@ -1,7 +1,7 @@
 /**
- * notes.highlights.deep.test.js — Loop T3 (2026-05-12)
+ * notes.highlights.deep.test.js
  *
- * Route-level tests for the NoteHighlight feature added by Loop A1
+ * Route-level tests for the NoteHighlight feature
  * (Note Review v1 — Phase 9). The surface lives at
  *   GET    /api/notes/:noteId/highlights
  *   POST   /api/notes/:noteId/highlights

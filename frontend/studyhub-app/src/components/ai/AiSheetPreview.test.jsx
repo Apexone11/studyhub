@@ -1,5 +1,5 @@
 /**
- * AiSheetPreview.test.jsx — Loop T8 coverage for the AI-generated HTML
+ * AiSheetPreview.test.jsx — coverage for the AI-generated HTML
  * preview surface.
  *
  * Two layers under test:

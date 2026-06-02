@@ -51,9 +51,9 @@ function validate(schema) {
       // `req.query = result.query` assignment silently no-ops in strict
       // mode — the original string-typed `?limit=3` survives and Prisma
       // crashes with "Argument `take`: Expected Int, provided String."
-      // (Production incident, exams /upcoming + sheets /leaderboard,
-      // 2026-05-01.) Mutate keys in place so the coerced values stick
-      // for both Express 4 and Express 5.
+      // (Production incident on exams /upcoming + sheets /leaderboard.)
+      // Mutate keys in place so the coerced values stick for both
+      // Express 4 and Express 5.
       if (result.body) {
         if (req.body && typeof req.body === 'object') {
           for (const key of Object.keys(req.body)) delete req.body[key]

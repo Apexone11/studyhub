@@ -1,7 +1,6 @@
 /**
  * RelatedWorkStrip — single reusable strip for the "Related work" UX
- * on every detail page (sheets, notes, papers, books). Wave-12.3
- * ecosystem Track 5.
+ * on every detail page (sheets, notes, papers, books).
  *
  * Props:
  *   - type    — 'sheet' | 'note' | 'paper' | 'book'

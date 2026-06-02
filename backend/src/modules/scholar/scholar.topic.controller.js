@@ -11,7 +11,7 @@
  * follower counts and per-school stats.
  *
  * Cache: results are cached via `cacheControl({ maxAge: 60 })` at the
- * route layer (loop-5 MED-5).
+ * route layer.
  */
 
 const log = require('../../lib/logger')
@@ -24,9 +24,8 @@ const {
   TOPIC_MAX_LIMIT,
 } = require('./scholar.constants')
 
-// scholar.constants.js (Week 4) does not yet export TOPIC_*. Provide
-// safe fallbacks in case those are not yet added so this module loads
-// regardless of the parallel Week 4 PR's merge order.
+// Fall back to safe defaults if scholar.constants.js does not export the
+// TOPIC_* values, so this module loads even when those constants are absent.
 const SAFE_TOPIC_DEFAULT_LIMIT = TOPIC_DEFAULT_LIMIT || 20
 const SAFE_TOPIC_MAX_LIMIT = TOPIC_MAX_LIMIT || 50
 const SAFE_TOPIC_SORT_ALLOWLIST =
@@ -124,13 +123,13 @@ async function getTopicFeed(req, res) {
           ? [{ citationCount: 'desc' }]
           : [{ citationCount: 'desc' }, { publishedAt: 'desc' }] // trending
 
-    // Codex P2 + Copilot fix: previously `skip: offset` was applied to the
-    // unfiltered DB result, so paginating non-zero offsets returned an
-    // unrelated (often empty) window of slug-filtered rows. The slug
-    // filter is JS-side because `topicsJson` is a JSONB column without
-    // a slug index; we fetch a wider window, filter, then paginate the
-    // FILTERED set in JS. `take` scales with `offset + limit` so deep
-    // pagination still has data; capped to keep memory bounded.
+    // The slug filter is JS-side because `topicsJson` is a JSONB column
+    // without a slug index. Pagination must be applied to the FILTERED set,
+    // not the raw DB result — otherwise a non-zero `offset` slices into an
+    // unrelated (often empty) window of slug-matched rows. We fetch a wider
+    // window, filter, then paginate in JS. `take` scales with
+    // `offset + limit` so deep pagination still has data; capped to keep
+    // memory bounded.
     const candidateWindow = Math.min(Math.max((offset + limit) * 4, 50), 500)
     const candidates = await prisma.scholarPaper.findMany({
       where: {
@@ -220,7 +219,7 @@ async function getStats(_req, res) {
   }
 }
 
-// ── Discover feed (Wave-5 reconciliation, 2026-05-13) ───────────────────
+// ── Discover feed ───────────────────────────────────────────────────────
 //
 // The Scholar landing hub (ScholarPage.jsx) calls
 // `/api/scholar/discover?scope=&limit=` to populate "Recent at your school"

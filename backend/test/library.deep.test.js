@@ -6,8 +6,8 @@
  * is exercised directly; the service is mocked at the module boundary so
  * tests never reach out to Google.
  *
- * Coverage focus (Loop T7):
- *   - Google Books search w/ sort/language/category allowlists (Loop 2 hardening)
+ * Coverage focus:
+ *   - Google Books search w/ sort/language/category allowlists
  *   - Volume detail
  *   - Shelf CRUD (BookShelf)
  *   - Bookmark CRUD with cfi/label/pageSnippet length caps

@@ -1,5 +1,5 @@
 /**
- * messages.mobile.smoke.spec.js — Mobile (<768px) smoke for Loop M6.
+ * messages.mobile.smoke.spec.js — Mobile (<768px) smoke.
  *
  * Covers the single-pane mobile messaging UX:
  *   1. /messages on a 375x812 viewport shows the conversation list

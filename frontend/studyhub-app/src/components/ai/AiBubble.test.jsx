@@ -1,5 +1,5 @@
 /**
- * AiBubble.test.jsx — Loop T8 coverage for the floating Hub AI bubble.
+ * AiBubble.test.jsx — coverage for the floating Hub AI bubble.
  *
  * Verifies:
  *   - The FAB renders on app routes.

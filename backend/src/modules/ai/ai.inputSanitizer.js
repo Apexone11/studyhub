@@ -1,5 +1,5 @@
 /**
- * ai.inputSanitizer.js — Phase 5 prompt injection defense for Hub AI.
+ * ai.inputSanitizer.js — prompt injection defense for Hub AI.
  *
  * Scans user messages BEFORE they reach the Claude API and flags
  * common prompt-injection patterns. This is defense-in-depth:

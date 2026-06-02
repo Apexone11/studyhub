@@ -638,7 +638,7 @@ router.post(
         return sendError(res, 403, 'Only the sheet owner can apply edits.', ERROR_CODES.FORBIDDEN)
       }
 
-      // ── HTML scan pipeline (Codex P1 fix) ──────────────────────────
+      // ── HTML scan pipeline ─────────────────────────────────────────
       // If the sheet is HTML format, the AI-proposed content MUST go
       // through the same validation + risk-tier classifier that the
       // regular sheets.update.controller uses. Without this, the AI
@@ -678,7 +678,7 @@ router.post(
         }
       }
 
-      // ── Single-transaction write (Codex P2 fix) ────────────────────
+      // ── Single-transaction write ───────────────────────────────────
       // Compose all three dependent writes inside one `$transaction` so
       // a transient DB error mid-flight can't leave the sheet body
       // updated while one of the surrounding SheetCommit rows is

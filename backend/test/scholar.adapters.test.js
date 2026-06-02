@@ -136,9 +136,8 @@ describe('scholar/sources/arxiv._parseEntry', () => {
 
   it('parses old-format arXiv IDs (pre-2007 category/YYMMNNN)', () => {
     // Pre-2007 arXiv IDs were category-prefixed instead of date-prefixed.
-    // Before the fix, these were silently dropped by the post-2007-only
-    // regex — ~30 years of physics / math / CS literature became
-    // unreachable. Loop S11 (2026-05-13) caught it.
+    // A post-2007-only regex silently drops these, making ~30 years of
+    // physics / math / CS literature unreachable.
     const entry = `
       <entry>
         <id>http://arxiv.org/abs/hep-th/9711200</id>

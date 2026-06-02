@@ -1,7 +1,7 @@
 /**
- * AI module barrel — composes the chat routes (existing) with the
- * Phase 3 suggestion routes onto a single Express router so the
- * top-level mount in src/index.js stays one line: `app.use('/api/ai', ...)`.
+ * AI module barrel — composes the chat routes with the suggestion,
+ * attachment, sheet, and note sub-routers onto a single Express router so
+ * the top-level mount in src/index.js stays one line: `app.use('/api/ai', ...)`.
  */
 const express = require('express')
 const aiRoutes = require('./ai.routes')

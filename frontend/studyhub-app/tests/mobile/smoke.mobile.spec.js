@@ -2,7 +2,7 @@
  * smoke.mobile.spec.js — phone-viewport smoke coverage of the 8 highest-
  * traffic flows.
  *
- * Loop M21 — every test here is tagged `@mobile @smoke` so it can run
+ * Every test here is tagged `@mobile @smoke` so it can run
  * inside the standard `npm run test:e2e:smoke` lane while the dedicated
  * mobile config (`playwright.mobile.config.js`) pins the viewport to
  * 390×844 with a real iPhone UA + `isMobile/hasTouch`.

@@ -100,7 +100,7 @@ export function useFeedData({ user, search }) {
   const [deletingPostIds, setDeletingPostIds] = useState({})
   const timing = usePageTiming('feed')
 
-  // Wave-12.12 — Data Saver consumer. When enabled, the feed fetch
+  // Data Saver consumer. When enabled, the feed fetch
   // sends `?lite=1` so the backend strips media arrays + cover
   // images. The session pref is the source of truth; the hook also
   // honors navigator.connection.saveData fallback. Backend honors the
@@ -114,7 +114,7 @@ export function useFeedData({ user, search }) {
       const apply = startTransition || ((fn) => fn())
       const params = new URLSearchParams({ limit: '24' })
       if (search) params.set('search', search)
-      // Wave-12.12 — flag the lite path. Safari doesn't send the
+      // Flag the lite path. Safari doesn't send the
       // Save-Data header so the query param is the only way the
       // backend learns about the user's pref on the request path
       // until requireAuth is extended to hydrate the row.

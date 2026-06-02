@@ -80,7 +80,7 @@ router.post('/:id/star', requireAuth, reactLimiter, async (req, res) => {
       // Wrapped in try/catch so a transient notify failure doesn't 500
       // the star request — the starredSheet row is already persisted and
       // stars-count already incremented, so failing here would leave the
-      // UI un-starred while the DB shows starred (Sourcery audit 2026-05-28).
+      // UI un-starred while the DB shows starred.
       try {
         await createNotification(prisma, {
           userId: visibility.userId,

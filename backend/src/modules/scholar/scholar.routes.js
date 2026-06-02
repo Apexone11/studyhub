@@ -16,7 +16,7 @@
  *   POST   /ai/summarize
  *   POST   /ai/generate-sheet
  *
- * v1.5 endpoints (Week 5):
+ * v1.5 endpoints:
  *   GET    /annotations?paperId=
  *   POST   /annotations
  *   PATCH  /annotations/:id
@@ -189,7 +189,7 @@ router.post('/ai/generate-sheet', requireTrustedOrigin, scholarAiSheetLimiter, a
   }
 })
 
-// ── Stats (Week 5) ──────────────────────────────────────────────────────
+// ── Stats ───────────────────────────────────────────────────────────────
 // Lightweight platform stats for the /scholar landing hero strip.
 // Cached for 5 minutes (sw 1 hour). The page degrades gracefully
 // when stats are 0 — no flicker, no error UI.
@@ -200,7 +200,7 @@ router.get(
   topicController.getStats,
 )
 
-// ── Topic feed (Week 5) ─────────────────────────────────────────────────
+// ── Topic feed ──────────────────────────────────────────────────────────
 router.get(
   '/topic/:slug',
   scholarReadLimiter,
@@ -208,7 +208,7 @@ router.get(
   topicController.getTopicFeed,
 )
 
-// ── Discover feed (2026-05-13) ──────────────────────────────────────────
+// ── Discover feed ───────────────────────────────────────────────────────
 // Powers the /scholar landing hub "Recent at your school" + "Trending in
 // the network" sections. Without this the hub renders empty in
 // production. scope=trending|recent|school.
@@ -219,7 +219,7 @@ router.get(
   topicController.discoverPapers,
 )
 
-// ── Annotations (Week 5, v1.5) ──────────────────────────────────────────
+// ── Annotations (v1.5) ──────────────────────────────────────────────────
 router.get('/annotations', scholarReadLimiter, annotationController.listAnnotations)
 router.post(
   '/annotations',
@@ -240,7 +240,7 @@ router.delete(
   annotationController.deleteAnnotation,
 )
 
-// ── Discussions (Week 5, v1.5) ──────────────────────────────────────────
+// ── Discussions (v1.5) ──────────────────────────────────────────────────
 router.get('/paper/:id/discussions', scholarReadLimiter, discussionController.listDiscussions)
 router.post(
   '/paper/:id/discussions',

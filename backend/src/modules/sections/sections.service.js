@@ -2,8 +2,8 @@
  * sections.service.js — business logic for teacher-owned sections and
  * student enrollment.
  *
- * Week 3 of Design Refresh v2. Every external call to this service must
- * go through sections.routes.js so auth + rate limits are applied first.
+ * Every external call to this service must go through sections.routes.js
+ * so auth + rate limits are applied first.
  *
  * Design notes:
  * - joinCode uniqueness is enforced at the DB level (`@unique`), but on
@@ -11,9 +11,9 @@
  *   MAX_JOIN_CODE_RETRIES times.
  * - Every read path filters out archived sections by default; archive
  *   is a recovery mechanism, not a trash bin.
- * - All prisma calls that depend on tables landing in the Week 3
- *   migration are wrapped so the endpoints still resolve in preview
- *   envs where the migration hasn't run yet.
+ * - All prisma calls that depend on the Section/SectionEnrollment tables
+ *   are wrapped so the endpoints still resolve in preview envs where the
+ *   migration hasn't run yet.
  */
 
 const prisma = require('../../lib/prisma')

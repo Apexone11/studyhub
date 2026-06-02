@@ -2,7 +2,7 @@
  * mobile-ai-flows.spec.js
  *
  * Mobile-viewport E2E flows for the Hub AI surfaces.
- * Loop M26 (2026-05-13) — scenarios 5 and 6 from the brief:
+ * Scenarios 5 and 6 from the brief:
  *   5. AI bubble flow on mobile — tap bubble → redirects to /ai → ask →
  *      receive response → return to /sheets
  *   6. AI Edit-with-AI on mobile (permission gate full-screen modal)

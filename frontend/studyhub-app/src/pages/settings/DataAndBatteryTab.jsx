@@ -1,7 +1,7 @@
 /**
  * DataAndBatteryTab.jsx — Settings tab for Data Saver + Battery Saver.
  *
- * Wave-12.11. Pairs with backend dataSaverNegotiation.js + the
+ * Pairs with backend dataSaverNegotiation.js + the
  * useDataSaver / useBatterySaver hooks. Single tab covers both
  * because the users who need one typically want the other — global
  * cellular users on older devices.
@@ -122,9 +122,9 @@ export default function DataAndBatteryTab() {
         onClick={async () => {
           const ok = await save(
             ['dataSaverMode', 'batterySaverMode'],
-            'Data &amp; battery preferences saved.',
+            'Data & battery preferences saved.',
           )
-          // Wave-12.12 P2 fix — push the new values into the
+          // Push the new values into the
           // useDataSaver / useBatterySaver hook caches so the change
           // takes effect immediately on the current page without a
           // reload. Without this the user saves "on", but the global

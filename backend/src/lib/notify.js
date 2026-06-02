@@ -47,8 +47,8 @@ const ESSENTIAL_NOTIFICATION_TYPES = new Set([
   'moderation',
   'payment_failed',
   'subscription_canceled',
-  // 2026-05-03: user-initiated cancel — durable record so user can prove
-  // they canceled even if Stripe's period-end webhook fires weeks later.
+  // User-initiated cancel — durable record so user can prove they canceled
+  // even if Stripe's period-end webhook fires weeks later.
   'subscription_will_cancel',
   // Quota-hit notifications are essential — silent 403s let users believe
   // the app was broken instead of seeing the upgrade path.
@@ -91,10 +91,9 @@ const OPTIONAL_EMAIL_PREFERENCE_BY_TYPE = Object.freeze({
   group_invite: 'emailStudyGroups',
   group_session: 'emailStudyGroups',
   group_post: 'emailStudyGroups',
-  // 2026-05-03 — new group discussion types from the Study Groups
-  // redesign + notification audit. Pin / reply use the same opt-out
-  // hook as the rest of the group surface; approve/reject/removed are
-  // essential per the set above and don't read this map.
+  // Group discussion types from the Study Groups redesign. Pin / reply use
+  // the same opt-out hook as the rest of the group surface; approve / reject /
+  // removed are essential per the set above and don't read this map.
   group_reply: 'emailStudyGroups',
   group_post_pinned: 'emailStudyGroups',
   contribution_comment: 'emailContributions',
@@ -283,8 +282,8 @@ async function createNotification(
     // this group" all have to reach the recipient even if they've
     // blocked the moderator/admin actor. Without this carve-out a user
     // who blocked a mod could miss their own ban / approval / refund
-    // notice (Copilot finding 2026-05-03). Non-essential actor-based
-    // notifications still respect the block both directions.
+    // notice. Non-essential actor-based notifications still respect the
+    // block both directions.
     try {
       const { isBlockedEitherWay } = require('./social/blockFilter')
       const blocked = await isBlockedEitherWay(prisma, userId, actorId)
@@ -376,7 +375,7 @@ async function createNotification(
   // `message`), NOT just (userId, type). Earlier (userId, type)-only check
   // collapsed semantically distinct events — daily and weekly
   // ai_quota_reached share the same type and would suppress each other
-  // inside the same hour (Copilot review #3, 2026-05-03).
+  // inside the same hour.
   let dedupMessageMarker = null
   if (dedupKey) {
     // In-app dedup uses the DB substring check below as its source of
@@ -385,8 +384,8 @@ async function createNotification(
     // an unconditional bail would also suppress the in-app notification
     // every time the email path successfully delivered a prior message,
     // which is not the intended behavior (in-app fires every time,
-    // email is the throttled channel). Bug was introduced when the same
-    // map was reused for both purposes — fixed 2026-05-22.
+    // email is the throttled channel). Reusing the same map for both
+    // purposes silently suppresses in-app notifications.
     //
     // Embed a stable marker derived from the dedupKey into the persisted
     // message so the DB query can find prior rows for the SAME key. The
@@ -442,10 +441,10 @@ async function createNotification(
     // Note: do NOT _recordSent here. The email path
     // (_maybeSendNotificationEmail) records on successful send, which is
     // what _isDuplicate at the top of this function reads on the NEXT
-    // call. Recording here was a regression that made the email path
-    // skip on first send because it saw its own pre-emptive recording
-    // (2026-05-22 fix). For non-email notifications the DB-substring
-    // dedup at lines 388-407 above is what protects against duplicates.
+    // call. Recording here makes the email path skip on first send
+    // because it would see its own pre-emptive recording. For non-email
+    // notifications the DB-substring dedup above is what protects against
+    // duplicates.
 
     // Real-time push: emit to the user's personal socket room so any open tab
     // surfaces the notification immediately instead of waiting up to 30s for

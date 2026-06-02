@@ -66,9 +66,9 @@ export default function ChatPanel({ open, onClose }) {
   }, [activeId])
 
   // Track the latest attachment list in a ref so the unmount cleanup
-  // sees the full list, not the empty initial value. The original
-  // `[]` deps closed over the empty array → leaks every blob URL the
-  // user added during the session. Wave-11 audit L2-2 fix.
+  // sees the full list, not the empty initial value. A `[]` deps array
+  // would close over the empty initial value and leak every blob URL
+  // the user added during the session.
   const attachmentPreviewsRef = useRef(attachmentPreviews)
   useEffect(() => {
     attachmentPreviewsRef.current = attachmentPreviews

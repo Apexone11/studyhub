@@ -1,5 +1,5 @@
 /**
- * Loop M1 (2026-05-13) — useDeviceClass hook + classifier.
+ * useDeviceClass hook + classifier.
  *
  * Covers:
  *   - phone UA (iPhone) + narrow viewport classifies as 'phone'

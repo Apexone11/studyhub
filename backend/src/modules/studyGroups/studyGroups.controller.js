@@ -61,11 +61,11 @@ async function listGroups(req, res) {
       userGroupIds = memberships.map((m) => m.groupId)
     }
 
-    // Phase 5: hide groups the current user has an unresolved report on,
-    // and hide groups that have been soft-deleted or locked (non-members
-    // see nothing for locked/deleted; members keep reading but the UI
-    // will render a banner). Graceful degradation via try/catch around
-    // the reports service call.
+    // Hide groups the current user has an unresolved report on, and hide
+    // groups that have been soft-deleted or locked (non-members see nothing
+    // for locked/deleted; members keep reading but the UI will render a
+    // banner). Graceful degradation via try/catch around the reports
+    // service call.
     let hiddenGroupIds = new Set()
     try {
       const reportsService = require('./studyGroups.reports.service')
@@ -88,9 +88,9 @@ async function listGroups(req, res) {
               ],
             }
           : {},
-        // Phase 5: exclude soft-deleted groups everywhere.
+        // Exclude soft-deleted groups everywhere.
         { deletedAt: null },
-        // Phase 5: exclude groups this user reported.
+        // Exclude groups this user reported.
         hiddenGroupIds.size > 0 ? { id: { notIn: Array.from(hiddenGroupIds) } } : {},
       ],
     }
@@ -309,9 +309,9 @@ async function getGroup(req, res) {
       return res.status(404).json({ error: 'Group not found.' })
     }
 
-    // Phase 5: soft-deleted groups 404 unless the caller is the owner
-    // (owners still need detail access during their 30-day appeal
-    // window) or a platform admin.
+    // Soft-deleted groups 404 unless the caller is the owner (owners still
+    // need detail access during their 30-day appeal window) or a platform
+    // admin.
     if (group.deletedAt) {
       const isOwner = group.createdById === req.user.userId
       const isPlatformAdmin = req.user.role === 'admin'
@@ -320,7 +320,7 @@ async function getGroup(req, res) {
       }
     }
 
-    // Phase 5: hide groups the caller has an unresolved report on.
+    // Hide groups the caller has an unresolved report on.
     // Exception: platform admins and the group owner always see it.
     try {
       const isOwner = group.createdById === req.user.userId
@@ -411,7 +411,7 @@ async function updateGroup(req, res) {
         typeof avatarUrl === 'string' && avatarUrl.trim() ? avatarUrl.trim() : null
     }
 
-    // Phase 4: owner-curated group background. Accept only the internal
+    // Owner-curated group background. Accept only the internal
     // /uploads/group-media/... path or the curated-gallery /art/... path
     // — external URLs are rejected to prevent hotlinking / CSRF-via-image
     // tracking pixels. Null/empty clears the background.
@@ -445,12 +445,12 @@ async function updateGroup(req, res) {
       }
     }
 
-    // Phase 5 B.3: member-list visibility toggle
+    // Member-list visibility toggle
     if (memberListPrivate !== undefined) {
       updates.memberListPrivate = Boolean(memberListPrivate)
     }
 
-    // Phase 5 B.5: post-approval queue toggle
+    // Post-approval queue toggle
     if (requirePostApproval !== undefined) {
       updates.requirePostApproval = Boolean(requirePostApproval)
     }
@@ -533,10 +533,10 @@ async function deleteGroup(req, res) {
       return res.status(403).json({ error: 'Only creator can delete group.' })
     }
 
-    // Phase 5 D.3: soft-delete with 30-day retention. A cron sweep
-    // will hard-delete groups where deletedAt is older than 30 days.
-    // This lets the owner appeal via the appeal endpoint during that
-    // window. If the group was already soft-deleted, just 204.
+    // Soft-delete with 30-day retention. A cron sweep will hard-delete
+    // groups where deletedAt is older than 30 days. This lets the owner
+    // appeal via the appeal endpoint during that window. If the group was
+    // already soft-deleted, just 204.
     if (group.deletedAt) {
       return res.status(204).send()
     }
@@ -576,7 +576,7 @@ async function joinGroup(req, res) {
       return res.status(404).json({ error: 'Group not found.' })
     }
 
-    // Phase 5: soft-deleted or locked groups cannot accept new members.
+    // Soft-deleted or locked groups cannot accept new members.
     if (group.deletedAt || group.moderationStatus === 'deleted') {
       return res.status(404).json({ error: 'Group not found.' })
     }
@@ -586,8 +586,8 @@ async function joinGroup(req, res) {
         .json({ error: 'This group is currently locked and not accepting new members.' })
     }
 
-    // Phase 5: block check — blocked users see a generic error (no
-    // "you are blocked" reveal, matches the 404-for-private pattern).
+    // Block check — blocked users see a generic error (no "you are blocked"
+    // reveal, matches the 404-for-private pattern).
     const blocked = await isBlockedFromGroup(groupId, req.user.userId)
     if (blocked) {
       return res.status(404).json({ error: 'Group not found.' })
@@ -643,7 +643,7 @@ async function joinGroup(req, res) {
       return res.status(403).json({ error: 'Invite only group.' })
     }
 
-    // Phase 5: capture optional join message for private-group gate.
+    // Capture optional join message for private-group gate.
     const joinMessage =
       typeof req.body?.joinMessage === 'string'
         ? req.body.joinMessage
@@ -689,10 +689,10 @@ async function joinGroup(req, res) {
       }
     }
 
-    // Phase 5: when a user requests to join a private group (status
-    // 'pending'), notify the FULL mod team (creator + admins + mods)
-    // so any of them can approve. The notification links to the
-    // members tab with a pending filter so the action is one click.
+    // When a user requests to join a private group (status 'pending'),
+    // notify the FULL mod team (creator + admins + mods) so any of them
+    // can approve. The notification links to the members tab with a
+    // pending filter so the action is one click.
     if (status === 'pending') {
       try {
         const { createNotifications } = require('../../lib/notify')
@@ -815,8 +815,8 @@ async function listMembers(req, res) {
       return res.status(403).json({ error: 'Not authorized.' })
     }
 
-    // Phase 5 B.3: if memberListPrivate is true, non-members cannot
-    // see the member roster. Admins/mods always see it regardless.
+    // If memberListPrivate is true, non-members cannot see the member
+    // roster. Admins/mods always see it regardless.
     const isMod = userMember && (userMember.role === 'admin' || userMember.role === 'moderator')
     if (group.memberListPrivate && !userMember && !isMod && req.user.role !== 'admin') {
       return res.status(403).json({ error: 'Member list is private.' })
@@ -874,7 +874,7 @@ async function listMembers(req, res) {
       role: m.role,
       status: m.status,
       joinedAt: m.joinedAt,
-      // Phase 5 B.2 + B.4: mute + join-gate message visible to mods only
+      // Mute + join-gate message visible to mods only
       ...(canManageMembers
         ? {
             mutedUntil: m.mutedUntil || null,

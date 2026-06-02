@@ -1,5 +1,5 @@
 /**
- * notes.versions.deep.test.js — Loop T3 (2026-05-12)
+ * notes.versions.deep.test.js
  *
  * Route coverage for the NoteVersion subsystem:
  *   POST /:id/versions                     — manual snapshot

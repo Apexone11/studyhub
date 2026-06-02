@@ -1,5 +1,5 @@
 /**
- * AiSheetReport.test.jsx — Loop T8 coverage for the sheet-aware Hub AI report card.
+ * AiSheetReport.test.jsx — coverage for the sheet-aware Hub AI report card.
  *
  * Verifies:
  *   - Renders nothing outside /sheets/:id (regression for the route guard).

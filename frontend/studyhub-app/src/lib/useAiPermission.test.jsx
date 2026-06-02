@@ -1,5 +1,5 @@
 /**
- * useAiPermission.test.jsx — Loop U20 coverage for the AI permission
+ * useAiPermission.test.jsx — coverage for the AI permission
  * Provider + hook contract.
  *
  * Verifies:
@@ -154,7 +154,6 @@ describe('useAiPermission + AiPermissionProvider', () => {
   })
 
   it('Loop V4: a superseded request resolves to false (auto-reject contract)', async () => {
-    // Sourcery/Codex finding restated as a strict guarantee.
     // It is not enough for the prior promise to settle eventually —
     // a caller awaiting it must see `false` so it can take its "no"
     // branch (toast "discarded", skip the fetch) without waiting for

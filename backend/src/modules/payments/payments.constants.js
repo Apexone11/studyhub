@@ -38,8 +38,7 @@ const PLANS = {
     customThemes: false,
     prioritySupport: false,
     proBadge: false,
-    // Hub AI v2 document caps (master plan §4.1, calibrated May 2026).
-    // Free-tier 40 pages reflects L1-HIGH-1 raise from 20 → 40.
+    // Hub AI v2 document caps (master plan §4.1).
     aiDocumentsPerDay: 3,
     aiDocumentMaxPages: parseDocPages('AI_DOC_MAX_PAGES_FREE', 40),
     aiDocumentMaxBytes: parseDocBytes('AI_DOC_MAX_BYTES_FREE', 5 * 1024 * 1024),
@@ -133,8 +132,8 @@ const DONATION_MAX_CENTS = 100000 // $1,000.00
 // Max message length for donation messages
 const DONATION_MESSAGE_MAX_LENGTH = 500
 
-// Defense in depth (security review 2026-05-03): freeze the plan table so
-// no caller can mutate live limits at runtime, and expose an explicit
+// Defense in depth: freeze the plan table so no caller can mutate live
+// limits at runtime, and expose an explicit
 // allowlist for `PLANS[userPlan]` lookups. Bracket access is currently
 // safe because `getUserPlan()` only returns canonical strings, but a
 // future regression would otherwise let an attacker reach prototype keys

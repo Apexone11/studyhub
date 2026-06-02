@@ -21,10 +21,10 @@ const { verifyMessageParticipant } = require('./messaging.helpers')
 const router = express.Router({ mergeParams: true })
 
 // Hard cap aligned with `MessageReaction.emoji` VarChar(16) column in
-// schema.prisma. The previous 32-char gate let Postgres silently truncate
-// to 16 bytes, which (a) lost the trailing characters of any long emoji
-// sequence and (b) broke the upsert unique key because the truncated
-// value collided with shorter pre-existing entries. Research-loop-4 F11.
+// schema.prisma. A looser gate lets Postgres silently truncate to 16 bytes,
+// which (a) loses the trailing characters of any long emoji sequence and
+// (b) breaks the upsert unique key because the truncated value collides with
+// shorter pre-existing entries.
 const MAX_EMOJI_LENGTH = 16
 
 // Reject ASCII control characters (0x00–0x1F, 0x7F). Emoji codepoints

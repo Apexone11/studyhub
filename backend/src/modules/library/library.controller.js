@@ -492,8 +492,7 @@ async function createBookmarkHandler(req, res) {
     /* Check bookmark limit for free users (total across all books) */
     const userPlan = await getUserPlan(req.user.userId)
     // Derive limit from PLANS (Pro is `-1` = unlimited; free has a concrete
-    // ceiling). Single source of truth replaces the local
-    // MAX_BOOKMARKS_PER_USER_FREE constant.
+    // ceiling) so the gate stays in sync with the pricing page.
     const planConfig = getPlanConfig(userPlan)
     const bookmarkLimit = planConfig.libraryBookmarks
     if (bookmarkLimit !== -1 && !isPro(userPlan)) {

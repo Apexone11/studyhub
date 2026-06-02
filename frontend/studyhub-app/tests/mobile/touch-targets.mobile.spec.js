@@ -13,8 +13,6 @@
  * shows >44px in EITHER dimension after factoring in padding counts as
  * passing. Some icon-only buttons paint at 24px but expand their hit
  * area via padding, which is enough.
- *
- * Loop M21.
  */
 import { expect, test, devices } from '@playwright/test'
 import { mockAuthenticatedApp } from '../helpers/mockStudyHubApi'

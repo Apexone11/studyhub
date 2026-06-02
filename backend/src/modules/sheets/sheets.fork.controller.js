@@ -144,8 +144,8 @@ router.post('/:id/fork', requireAuth, requireVerifiedEmail, sheetWriteLimiter, a
     // ── Create fork as DRAFT + initial fork_base commit in one transaction ──
     const checksum = computeChecksum(original.content)
 
-    // Phase 6: batch all fork writes into a single interactive transaction
-    // to reduce DB round trips (sheet create + fork count increment + commit).
+    // Batch all fork writes into a single interactive transaction to reduce
+    // DB round trips (sheet create + fork count increment + commit).
     const forked = await prisma.$transaction(async (tx) => {
       const created = await tx.studySheet.create({
         data: {

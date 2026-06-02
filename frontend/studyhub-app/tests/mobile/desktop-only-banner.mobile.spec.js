@@ -21,8 +21,6 @@
  *
  * The /sheets/:id/lab route is the canonical surface using the gate
  * (SheetLab editor needs more room than a phone has).
- *
- * Loop M21.
  */
 import { expect, test, devices } from '@playwright/test'
 import { mockAuthenticatedApp } from '../helpers/mockStudyHubApi'

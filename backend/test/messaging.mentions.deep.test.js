@@ -1,6 +1,6 @@
 /**
- * messaging.mentions.deep.test.js — coverage for the Loop A3 mention-notify
- * wiring in messaging.messages.routes.js. 2026-05-12.
+ * messaging.mentions.deep.test.js — coverage for the mention-notify
+ * wiring in messaging.messages.routes.js.
  *
  * Pins:
  *   - notifyMentionedUsers fires on POST when content contains @username

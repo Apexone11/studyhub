@@ -42,7 +42,7 @@ function getClient() {
   return _client
 }
 
-// ── Cost-aware model routing (research loop 1 gap #9) ──────────────
+// ── Cost-aware model routing ──────────────────────────────────────
 
 /**
  * Sheet-generation regex. A request that matches this pattern must
@@ -126,10 +126,9 @@ async function getDailyLimit(user) {
 
   const userId = user.id || user.userId
   // Route through getUserPlan so the same expiry + past_due rules the rest
-  // of the app uses also apply to AI quota (Copilot review #1, 2026-05-03).
-  // Previously this had its own ['active','trialing','past_due'] copy and
-  // skipped currentPeriodEnd, so a Pro user whose card had declined kept
-  // 120/day for the entire 3-week Stripe retry chain.
+  // of the app uses also apply to AI quota. A separate copy here that
+  // skipped currentPeriodEnd would let a Pro user whose card had declined
+  // keep 120/day for the entire multi-week Stripe retry chain.
   try {
     const plan = await getUserPlan(userId)
     if (isPro(plan)) return DAILY_LIMITS.pro
@@ -193,7 +192,7 @@ async function getWeeklyLimit(user) {
   if (user.role === 'admin') return WEEKLY_LIMITS.admin
   const userId = user.id || user.userId
   // Same getUserPlan routing as getDailyLimit — past_due no longer grants
-  // Pro, and gift subs respect currentPeriodEnd (Copilot review #1).
+  // Pro, and gift subs respect currentPeriodEnd.
   try {
     const plan = await getUserPlan(userId)
     if (isPro(plan)) return WEEKLY_LIMITS.pro
@@ -486,17 +485,17 @@ async function streamMessage({
     return
   }
 
-  // Phase 5: AI input sanitization — scan for prompt injection patterns
-  // before saving or sending to Claude. We still save the message (for
-  // audit) and let Claude handle the response (it will politely decline),
-  // but we flag the interaction for security review.
+  // AI input sanitization — scan for prompt injection patterns before
+  // saving or sending to Claude. We still save the message (for audit)
+  // and let Claude handle the response (it will politely decline), but
+  // we flag the interaction for security review.
   try {
     const { sanitizeAiInput } = require('./ai.inputSanitizer')
     const scan = sanitizeAiInput(content)
     if (scan.flagged) {
-      // L10-CRIT-1: previously included `contentPreview: safeContent.slice(0,200)`
-      // which leaked the user's message body to Sentry. Replaced with
-      // length + sha256-prefix for correlation without PII (CLAUDE.md A8).
+      // Never include the raw message body here — a contentPreview slice
+      // would leak the user's message to Sentry. Use length + sha256-prefix
+      // for correlation without PII (CLAUDE.md A8).
       const crypto = require('node:crypto')
       const contentSha8 = crypto.createHash('sha256').update(content).digest('hex').slice(0, 8)
       captureError(new Error('AI prompt injection attempt'), {
@@ -666,9 +665,9 @@ async function streamMessage({
   const isSheetRequest = classification === 'sheet'
   const maxTokens = isSheetRequest ? MAX_OUTPUT_TOKENS_SHEET : MAX_OUTPUT_TOKENS_QA
 
-  // Cost-aware model routing (research loop 1 gap #9). When the
-  // conversation has no explicit pinned model, route by classification;
-  // simple short Q&A goes to Haiku 4.5 (~4-5× cheaper input + output).
+  // Cost-aware model routing. When the conversation has no explicit
+  // pinned model, route by classification; simple short Q&A goes to
+  // Haiku 4.5 (~4-5× cheaper input + output).
   // An explicit `conversation.model` override is respected (used by the
   // achievement / suggestion / sheet sub-paths that intentionally pin
   // their own model) so the routing layer can't accidentally downgrade
@@ -798,17 +797,17 @@ async function streamMessage({
           },
         })
       }
-      // wave-12.19 round-2: aborted streams previously left the reserved
-      // Anthropic spend on the global daily ceiling AND skipped per-user
-      // usage tracking. That let a free-tier user spam abort to receive
-      // free partial text. Fix: record the partial usage captured from
-      // the stream (message_start input_tokens + last message_delta
-      // output_tokens) and refund the over-estimate back to the global
-      // ceiling. Fire-and-forget so abort cleanup never blocks the
-      // response. Fall back to a char-based output estimate (~3.5
-      // chars/token) when Anthropic never emitted a message_delta.
-      // TODO(wave-12.19): if Anthropic ever adds a stream.usage accessor
-      // for aborted streams, prefer that over the char-heuristic fallback.
+      // Aborted streams must not leave the reserved Anthropic spend on the
+      // global daily ceiling or skip per-user usage tracking — otherwise a
+      // free-tier user could spam abort to receive free partial text.
+      // Record the partial usage captured from the stream (message_start
+      // input_tokens + last message_delta output_tokens) and refund the
+      // over-estimate back to the global ceiling. Fire-and-forget so abort
+      // cleanup never blocks the response. Fall back to a char-based output
+      // estimate (~3.5 chars/token) when Anthropic never emitted a
+      // message_delta.
+      // TODO: if Anthropic ever adds a stream.usage accessor for aborted
+      // streams, prefer that over the char-heuristic fallback.
       if (totalOutputTokens === 0 && fullResponse.length > 0) {
         totalOutputTokens = Math.ceil(fullResponse.length / 3.5)
       }
@@ -921,11 +920,10 @@ async function streamMessage({
 
   // 8. Increment usage. `recordActualUsage` upserts the same AiUsageLog
   // row that `incrementUsage` used to write — counting both would double
-  // every messageCount and tokenCount, throttling users at half the cap
-  // (Codex P1 fix). recordActualUsage is now the single writer.
-  // Record the actual numbers (not just the estimate) on the global
-  // spend row + per-user row. Cost rate matches Anthropic Sonnet 4
-  // pricing in attachments.constants.js.
+  // every messageCount and tokenCount, throttling users at half the cap.
+  // recordActualUsage is the single writer. Record the actual numbers
+  // (not just the estimate) on the global spend row + per-user row. Cost
+  // rate matches Anthropic Sonnet 4 pricing in attachments.constants.js.
   const {
     COST_PER_1K_INPUT_CENTS,
     COST_PER_1K_OUTPUT_CENTS,
@@ -953,8 +951,7 @@ async function streamMessage({
   }
 
   // 9. Send completion event. `model` is included so the frontend can
-  // optionally surface a small "via Haiku" indicator on routed messages
-  // (loop A6, 2026-05-12).
+  // optionally surface a small "via Haiku" indicator on routed messages.
   sendSSE(res, {
     type: 'done',
     messageId: assistantMsg.id,
@@ -1029,9 +1026,9 @@ module.exports = {
   // in Hub AI must see "quota exhausted" on the suggestion card too.
   getClient,
   incrementUsage,
-  // Cost-aware model routing (research loop 1 gap #9). Exported as
-  // pure helpers so unit tests can exercise them without spinning up
-  // Anthropic / Prisma / Express scaffolding.
+  // Cost-aware model routing. Exported as pure helpers so unit tests
+  // can exercise them without spinning up Anthropic / Prisma / Express
+  // scaffolding.
   classifyRequest,
   selectModelForClassification,
 }

@@ -18,8 +18,6 @@
  * the named export changed), the test fails with a clear "module not
  * found" error — informative for the failure case where AiPermissionDialog
  * isn't shipped or has been renamed.
- *
- * Loop M21.
  */
 import { expect, test, devices } from '@playwright/test'
 import { mockAuthenticatedApp } from '../helpers/mockStudyHubApi'

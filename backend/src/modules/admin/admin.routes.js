@@ -28,8 +28,7 @@ router.use(adminLimiter)
 // Origin check in index.js is the floor; admin actions are the
 // highest-value CSRF target on the platform so the module re-runs
 // the allowlist at its router boundary. Safe methods short-circuit
-// per the originAllowlist middleware. CLAUDE.md A11. Added wave-11
-// 2026-05-14.
+// per the originAllowlist middleware. CLAUDE.md A11.
 router.use(originAllowlist())
 
 router.use(usersController)

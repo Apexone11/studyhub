@@ -1,5 +1,5 @@
 /**
- * note-highlights.spec.js — Note Review v1 highlight UI (loop T9, Phase 9).
+ * note-highlights.spec.js — Note Review v1 highlight UI (Phase 9).
  *
  * Two scenarios:
  *   1. Selecting text inside the note body surfaces the floating highlight

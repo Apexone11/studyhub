@@ -5,7 +5,7 @@
  * POST /:id/sessions/:sessionId/rsvp.
  * Covers: title/desc validation, scheduledAt parsing, durationMins range,
  * recurring enum (A13), status enum (A13), RSVP states, achievement event
- * emission (Loop A4 GROUP_SESSION_HOST), notification fan-out, A12.
+ * emission (GROUP_SESSION_HOST), notification fan-out, A12.
  */
 import Module, { createRequire } from 'node:module'
 import express from 'express'

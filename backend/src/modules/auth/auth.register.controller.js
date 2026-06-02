@@ -51,7 +51,7 @@ router.post('/register', registerLimiter, async (req, res) => {
       }
     }
 
-    // Phase 5: check password against HIBP breached-password database.
+    // Check password against the HIBP breached-password database.
     // Non-blocking on API failure (graceful degradation).
     try {
       const { checkPasswordBreach } = require('../../lib/passwordSafety')

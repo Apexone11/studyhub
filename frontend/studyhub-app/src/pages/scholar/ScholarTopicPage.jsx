@@ -152,10 +152,9 @@ export default function ScholarTopicPage() {
   // 404 on the GET means "not implemented yet" — the button still functions
   // and toggles purely client-side until the endpoint exists.
   //
-  // Wave-8 fix (2026-05-13, founder): until the backend endpoint exists,
-  // the followed state was lost on page reload. Persist to localStorage
-  // key `studyhub.scholar.followedTopics` (Set of slug strings) so the
-  // user sees their "Following" pill stick across navigation.
+  // Until the backend endpoint exists, persist the followed state to the
+  // localStorage key `studyhub.scholar.followedTopics` (Set of slug strings)
+  // so the "Following" pill sticks across navigation and reloads.
   const FOLLOW_KEY = 'studyhub.scholar.followedTopics'
   const [followed, setFollowed] = useState(() => {
     if (typeof window === 'undefined' || !safeSlug) return false

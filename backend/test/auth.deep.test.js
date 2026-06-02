@@ -162,7 +162,7 @@ const mocks = vi.hoisted(() => {
 // router contract under test (handlers + rate limits + cookies) stays
 // the focus.
 const originAllowlistMock = () => (_req, _res, next) => next()
-// Achievements engine — Loop A4 wires LOGIN/etc. emits into auth.service.
+// Achievements engine wires LOGIN/etc. emits into auth.service.
 // Stub here so the fire-and-forget never bubbles a Sentry capture.
 const achievementsMock = {
   emitAchievementEvent: () => Promise.resolve(),
@@ -388,12 +388,12 @@ describe('POST /login — login flow', () => {
     expect(res.body.setupPath).toBe('/settings/security/setup-2fa')
   })
 
-  // ── Admin MFA fail-closed enforcement (wave-12.8, CLAUDE.md §12 #20) ──
+  // ── Admin MFA fail-closed enforcement (CLAUDE.md §12 #20) ──
   //
   // Pinning the fail direction: any signal that ISN'T an explicit
   // `enabled=false` row must enforce MFA. Missing rows + DB errors are
-  // the canonical incidents — pre-wave-12.8 both silently disabled
-  // enforcement, which inverted the flag's purpose.
+  // the canonical incidents — both must NOT silently disable
+  // enforcement, which would invert the flag's purpose.
 
   it('admin MFA fail-closed: MISSING flag row still enforces (no 2FA → 403)', async () => {
     mocks.prisma.user.findUnique.mockResolvedValue(

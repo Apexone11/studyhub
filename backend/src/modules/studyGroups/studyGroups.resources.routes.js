@@ -300,7 +300,7 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       return res.status(404).json({ error: 'Not a member.' })
     }
 
-    // Phase 5: muted users cannot create resources.
+    // Muted users cannot create resources.
     if (await isMutedInGroup(groupId, req.user.userId)) {
       return res
         .status(403)
@@ -314,7 +314,7 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       resourceUrl,
       sheetId,
       noteId,
-      // Phase 4: optional media metadata from /resources/upload
+      // Optional media metadata from /resources/upload
       mediaType,
       mediaUrl,
       mediaBytes,
@@ -333,7 +333,7 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Description max 2000 chars.' })
     }
 
-    // Validate resourceType — 'image' and 'video' added in Phase 4
+    // Validate resourceType
     if (!['link', 'sheet', 'note', 'file', 'image', 'video'].includes(resourceType)) {
       return res.status(400).json({ error: 'Invalid resourceType.' })
     }
@@ -354,7 +354,7 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       }
     }
 
-    // Phase 5 C.2: link safety check on external URLs.
+    // Link safety check on external URLs.
     if (validUrl && !validUrl.startsWith('/uploads/')) {
       const linkCheck = checkUrl(validUrl)
       if (!linkCheck.safe) {
@@ -365,10 +365,10 @@ router.post('/', writeLimiter, requireAuth, async (req, res) => {
       }
     }
 
-    // Phase 4: if the caller attached structured media metadata from
-    // POST /upload, normalize it into the row. mediaType must match the
-    // allowlist; mediaUrl can only be the internal /uploads/... path to
-    // prevent arbitrary-URL injection via this field.
+    // If the caller attached structured media metadata from POST /upload,
+    // normalize it into the row. mediaType must match the allowlist;
+    // mediaUrl can only be the internal /uploads/... path to prevent
+    // arbitrary-URL injection via this field.
     const mediaData = {}
     if (mediaType !== undefined || mediaUrl !== undefined) {
       const allowedKinds = ['image', 'video', 'file', 'link']
@@ -495,7 +495,7 @@ router.patch('/:resourceId', writeLimiter, requireAuth, async (req, res) => {
           error: 'resourceUrl must be an /uploads/group-media/... path or a valid http(s) URL.',
         })
       }
-      // Phase 5 C.2: same link-safety check as POST — prevent bypass via
+      // Same link-safety check as POST — prevent bypass via
       // create-benign-then-patch-to-phishing attack vector.
       if (isHttpUrl) {
         const linkCheck = checkUrl(resourceUrl)

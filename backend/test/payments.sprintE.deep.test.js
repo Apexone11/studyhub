@@ -1,6 +1,6 @@
 /**
  * payments.sprintE.deep.test.js — deep coverage for the subscription pause
- * + resume flow in sprintE.routes.js. Loop T6 (2026-05-12).
+ * + resume flow in sprintE.routes.js.
  *
  * Pins:
  *   - POST /subscription/pause — only allowed for active subscriptions

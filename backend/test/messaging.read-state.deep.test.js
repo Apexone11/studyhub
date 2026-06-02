@@ -1,6 +1,5 @@
 /**
  * messaging.read-state.deep.test.js — read receipts + unread counts.
- * Loop T4 (2026-05-12).
  *
  * Pins:
  *   - POST /conversations/:id/read updates lastReadAt and returns unreadCount=0

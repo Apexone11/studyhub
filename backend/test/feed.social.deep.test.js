@@ -1,7 +1,7 @@
 /**
  * feed.social.deep.test.js — comprehensive coverage of feed comments + reactions.
  *
- * Focus (Loop T7):
+ * Focus:
  *   - Comment POST validates type (text), length, parentId belongs to same post
  *   - React POST validates type allowlist (like/dislike/null)
  *   - Sort allowlist on GET /posts/:id/comments?sort=

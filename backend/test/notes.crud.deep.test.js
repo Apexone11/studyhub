@@ -1,5 +1,5 @@
 /**
- * notes.crud.deep.test.js — Loop T3 (2026-05-12)
+ * notes.crud.deep.test.js
  *
  * Deep-coverage route tests for the core notes CRUD surface:
  *   POST   /             — create (private=true default, title/content caps)
@@ -12,7 +12,7 @@
  *
  * Defense-in-depth focus:
  *   - A12 (Number.parseInt + Number.isInteger) on every :id segment.
- *   - First-create event (Loop A2) emits trackServerEvent on count === 1.
+ *   - First-create event emits trackServerEvent on count === 1.
  *   - Plagiarism SimHash side-effect (updateFingerprint) is wired.
  *   - Tag sanitization keeps the 10-tag cap from the controller.
  */

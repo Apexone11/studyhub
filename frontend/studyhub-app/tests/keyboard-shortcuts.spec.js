@@ -1,5 +1,5 @@
 /**
- * keyboard-shortcuts.spec.js — Global keyboard navigation contract (loop T9).
+ * keyboard-shortcuts.spec.js — Global keyboard navigation contract.
  *
  * Two scenarios:
  *   1. Pressing `?` opens the global keyboard-shortcuts modal.

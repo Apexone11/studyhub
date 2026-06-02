@@ -6,11 +6,10 @@
 const prisma = require('./prisma')
 
 // Active statuses that grant Pro access. `past_due` is intentionally NOT
-// here as of 2026-05-03: previously a payment failure granted up to 3
-// weeks of free Pro while Stripe's smart retry chain ran. Now we treat
-// past_due as a hard cutoff — the UI shows a "fix payment" banner but the
-// quotas drop to free. The user can restore Pro by updating their card via
-// the Stripe Customer Portal.
+// here: including it would grant up to 3 weeks of free Pro while Stripe's
+// smart retry chain runs. past_due is a hard cutoff — the UI shows a "fix
+// payment" banner but quotas drop to free. The user can restore Pro by
+// updating their card via the Stripe Customer Portal.
 const ACTIVE_STATUSES = ['active', 'trialing']
 
 async function getUserPlan(userId) {

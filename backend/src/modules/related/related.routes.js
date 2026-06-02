@@ -1,5 +1,5 @@
 /**
- * related.routes.js — Ecosystem Track 5 endpoint (wave-12.3, 2026-05-16).
+ * related.routes.js — Ecosystem Track 5 endpoint.
  *
  * Returns a small "Related work" list for a given entity (sheet, note,
  * paper, book). Powers the RelatedWorkStrip on detail pages without
@@ -64,7 +64,6 @@ router.get(
   // No cacheControl: the response depends on the viewer's block list
   // (via getBlockedUserIds). Browser cache could serve blocked-user
   // rows to someone who blocks them on shared-browser machines.
-  // Loop 2 security finding 2026-05-16.
   optionalAuth,
   async (req, res) => {
     const sheetId = Number.parseInt(req.params.id, 10)
@@ -88,7 +87,6 @@ router.get(
       // Visibility gate: unpublished sheets only expose related work to
       // their owner. Returning empty to anyone else avoids leaking the
       // sheet's course linkage + backlink list via ID enumeration.
-      // Codex review finding 2026-05-17.
       const viewerId = req.user?.userId
       const sheetVisible = sheet.status === 'published' || sheet.userId === viewerId
       if (!sheetVisible) return res.json({ items: [] })
@@ -166,7 +164,6 @@ router.get(
   // No cacheControl: the response depends on the viewer's block list
   // (via getBlockedUserIds). Browser cache could serve blocked-user
   // rows to someone who blocks them on shared-browser machines.
-  // Loop 2 security finding 2026-05-16.
   optionalAuth,
   async (req, res) => {
     const noteId = Number.parseInt(req.params.id, 10)
@@ -191,7 +188,6 @@ router.get(
       // owner. Without this, an enumerator could probe note IDs and learn
       // linked-sheet + same-course/same-author public-note metadata that
       // hints at the private note's contents.
-      // Codex review finding 2026-05-17.
       const viewerId = req.user?.userId
       const noteVisible = !note.private || note.userId === viewerId
       if (!noteVisible) return res.json({ items: [] })
@@ -210,11 +206,10 @@ router.get(
             author: { select: { username: true } },
           },
         })
-        // Block-filter against the SHEET's author id, not the sheet id.
-        // `blocked` is a list of userIds — an earlier draft confused
-        // the two (Loop 1 finding 2026-05-16). Also gate by sheet status
-        // so a private note's link to a draft sheet doesn't leak draft
-        // metadata (Codex finding 2026-05-17).
+        // Block-filter against the SHEET's author id, not the sheet id —
+        // `blocked` is a list of userIds, so comparing it against the
+        // sheet id would never match. Also gate by sheet status so a
+        // private note's link to a draft sheet doesn't leak draft metadata.
         const sheetVisible = sheet && (sheet.status === 'published' || sheet.userId === viewerId)
         if (sheetVisible && !blocked.includes(sheet.userId)) {
           items.push({
@@ -267,7 +262,6 @@ router.get(
   // No cacheControl: the response depends on the viewer's block list
   // (via getBlockedUserIds). Browser cache could serve blocked-user
   // rows to someone who blocks them on shared-browser machines.
-  // Loop 2 security finding 2026-05-16.
   optionalAuth,
   async (req, res) => {
     const paperId = String(req.params.paperId || '').slice(0, 128)
@@ -344,7 +338,6 @@ router.get(
   // No cacheControl: the response depends on the viewer's block list
   // (via getBlockedUserIds). Browser cache could serve blocked-user
   // rows to someone who blocks them on shared-browser machines.
-  // Loop 2 security finding 2026-05-16.
   optionalAuth,
   async (req, res) => {
     const volumeId = String(req.params.volumeId || '').slice(0, 64)

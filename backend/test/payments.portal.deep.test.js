@@ -1,6 +1,5 @@
 /**
  * payments.portal.deep.test.js — deep coverage of POST /api/payments/portal.
- * Loop T6 (2026-05-12).
  *
  * Pins:
  *   - Creates Stripe Customer Portal session bound to existing customerId

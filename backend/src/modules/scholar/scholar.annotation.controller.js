@@ -45,7 +45,7 @@ function _validatePaperId(raw) {
   if (typeof raw !== 'string') return null
   if (raw.length > 256) return null
   // Reject control chars + nulls; DOI legitimately contains `/` so we
-  // do not strip it. Belt-and-suspenders per Loop-3 LOW-2.
+  // do not strip it.
   // eslint-disable-next-line no-control-regex
   if (/[\r\n\x00]/.test(raw)) return null
   return CANONICAL_ID_RE.test(raw) ? raw : null
@@ -83,7 +83,7 @@ function _serializeOne(row, viewerId) {
     }
   }
   // Non-owner sees position + color only (so highlight markers render
-  // for school/public visibility), no body/userId/range. Loop-3 LOW-4.
+  // for school/public visibility), no body/userId/range.
   return {
     id: row.id,
     paperId: row.paperId,
@@ -143,10 +143,10 @@ async function listAnnotations(req, res) {
               ? [
                   {
                     visibility: 'school',
-                    // Loop-2-CRIT + Loop-8-CRIT: User has `schoolEnrollments`
-                    // (UserSchoolEnrollment[]), NOT `enrollments` (which is the
-                    // course-level Enrollment[]). The wrong relation name would
-                    // throw PrismaClientValidationError at runtime.
+                    // User has `schoolEnrollments` (UserSchoolEnrollment[]),
+                    // NOT `enrollments` (which is the course-level
+                    // Enrollment[]). The wrong relation name would throw
+                    // PrismaClientValidationError at runtime.
                     user: {
                       schoolEnrollments: { some: { schoolId: viewerSchoolId } },
                     },

@@ -24,7 +24,7 @@ router.use((req, res, next) => {
 // Defense-in-depth origin check on every write under /api/sheets. The
 // global Origin check is the floor; this re-runs the allowlist at the
 // module boundary per CLAUDE.md A11. originAllowlist short-circuits
-// safe methods so it's safe at router.use level. Added 2026-05-14.
+// safe methods so it's safe at router.use level.
 router.use(originAllowlist())
 
 // Static / prefix routes must come before parameterised /:id routes so Express

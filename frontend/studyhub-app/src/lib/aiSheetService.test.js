@@ -1,5 +1,5 @@
 /**
- * aiSheetService.test.js — Loop T8 coverage for the AI sheet/note service wrapper.
+ * aiSheetService.test.js — coverage for the AI sheet/note service wrapper.
  *
  * Verifies the postJson envelope shape (CLAUDE.md error envelope contract):
  *   - 2xx           → { ok: true, data }

@@ -325,8 +325,7 @@ async function deleteUserAccount(prisma, { userId, username, reason = null, deta
     // schema.prisma, so Prisma 6 defaults to Restrict. Deleting the user
     // FIRST would crash with a foreign-key constraint violation. This
     // delete-messages-then-user ordering is the contract — do not reorder
-    // without first migrating the schema to `onDelete: SetNull` (audit
-    // 2026-05-03).
+    // without first migrating the schema to `onDelete: SetNull`.
     await tx.messageReaction.deleteMany({ where: { userId } })
     await tx.message.deleteMany({ where: { senderId: userId } })
     // Remove user from all conversations as participant

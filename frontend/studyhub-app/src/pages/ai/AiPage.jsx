@@ -311,8 +311,7 @@ export default function AiPage() {
       }}
     >
       {/* sr-only h1 for WCAG 1.3.1 — visual chrome opens straight into
-          the conversation list / chat split and never lands an h1.
-          Wave-11 audit L4-5. */}
+          the conversation list / chat split and never lands an h1. */}
       <h1 className="sr-only">Hub AI</h1>
       <AiStreamAnnouncer streaming={chat.streaming} error={chat.error} stopped={stopped} />
       <Navbar crumbs={[{ label: 'Hub AI', to: '/ai' }]} />

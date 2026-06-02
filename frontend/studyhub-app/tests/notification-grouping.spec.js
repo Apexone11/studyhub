@@ -1,5 +1,5 @@
 /**
- * notification-grouping.spec.js — Grouped notification rows (loop T9, loop A5).
+ * notification-grouping.spec.js — Grouped notification rows.
  *
  * Two scenarios:
  *   1. Three stars on the same sheet collapse into a single row with the

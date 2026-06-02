@@ -143,11 +143,11 @@ router.get('/:slug', optionalAuth, readLimiter, async (req, res) => {
     const viewerId = req.user?.userId || null
     const data = await service.getBadge({ slug, viewerId })
     if (!data) return sendError(res, 404, 'Achievement not found.', ERROR_CODES.NOT_FOUND)
-    // Loop-2 finding F-C: a secret badge's detail page returns 404 for any
-    // viewer who doesn't hold it (authed or not). The service already strips
-    // the name + description from the catalog response for non-holders, but
-    // the detail endpoint exposes additional metadata (criteria, holder
-    // counts, recent unlockers) that would leak the secret. 404 is cleanest.
+    // A secret badge's detail page returns 404 for any viewer who doesn't
+    // hold it (authed or not). The service already strips the name +
+    // description from the catalog response for non-holders, but the detail
+    // endpoint exposes additional metadata (criteria, holder counts, recent
+    // unlockers) that would leak the secret. 404 is cleanest.
     if (data.isSecret && !data.isUnlocked) {
       return sendError(res, 404, 'Achievement not found.', ERROR_CODES.NOT_FOUND)
     }

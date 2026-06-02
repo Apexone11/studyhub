@@ -1,5 +1,5 @@
 /**
- * sprintE.routes.js — Sprint E pro-level payment features.
+ * sprintE.routes.js — Pro-level payment features.
  *
  * Routes (all under /api/payments):
  *   POST /referral/create          — Create a referral code (Pro users)

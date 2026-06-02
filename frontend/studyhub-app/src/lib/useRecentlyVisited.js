@@ -1,8 +1,7 @@
 /**
  * useRecentlyVisited — generic localStorage-backed recently-visited
- * tracker. Powers the "Recently viewed" strip on /feed (Bucket C1,
- * wave-12.3) plus any future surface that wants to surface a user's
- * cross-surface recent activity.
+ * tracker. Powers the "Recently viewed" strip on /feed plus any future
+ * surface that wants to surface a user's cross-surface recent activity.
  *
  * Each entry shape:
  *   { type, id, title, href, visitedAt }

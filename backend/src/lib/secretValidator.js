@@ -23,7 +23,7 @@ const RECOMMENDED = [
     key: 'RESEND_WEBHOOK_SECRET',
     description:
       'Resend webhook signing key (svix). Without it the strict-mode handler 503s on every webhook; ' +
-      'with it the handler verifies signatures and stores delivery + suppression events. Added 2026-05-14.',
+      'with it the handler verifies signatures and stores delivery + suppression events.',
   },
   {
     key: 'RESEND_API_KEY',
@@ -46,9 +46,9 @@ const RECOMMENDED = [
   },
   { key: 'SENTRY_DSN', description: 'Error monitoring' },
   // FRONTEND_URL was previously listed here as RECOMMENDED only — promoted
-  // to REQUIRED_IN_PRODUCTION (line ~87) wave-11 2026-05-14 so missing
-  // values fail at boot rather than at the first Stripe checkout. The
-  // RECOMMENDED entry is intentionally removed to avoid double-listing.
+  // to REQUIRED_IN_PRODUCTION so missing values fail at boot rather than at
+  // the first Stripe checkout. The RECOMMENDED entry is intentionally
+  // removed to avoid double-listing.
   {
     key: 'GIPHY_API_KEY',
     description:
@@ -102,15 +102,14 @@ const RECOMMENDED = [
 ]
 
 /* Required only when NODE_ENV === 'production'. Missing → hard exit at boot.
- * Promoted from OPTIONAL on 2026-04-30 after the security audit found that a
- * missing FIELD_ENCRYPTION_KEY in prod would cause encrypted PII columns to
- * silently fall back to plaintext. */
+ * Promoted from OPTIONAL because a missing FIELD_ENCRYPTION_KEY in prod would
+ * cause encrypted PII columns to silently fall back to plaintext. */
 const REQUIRED_IN_PRODUCTION = [
   {
     key: 'FRONTEND_URL',
     minLength: 8,
     description:
-      'Frontend origin used for Stripe checkout success / cancel URLs, password-reset links, and email redirects. Promoted to REQUIRED_IN_PRODUCTION wave-11 2026-05-14 alongside the prod-throw in payments.service.getFrontendAppUrl().',
+      'Frontend origin used for Stripe checkout success / cancel URLs, password-reset links, and email redirects. Required in production alongside the prod-throw in payments.service.getFrontendAppUrl().',
   },
   {
     key: 'FIELD_ENCRYPTION_KEY',
@@ -147,14 +146,13 @@ const REQUIRED_IN_PRODUCTION = [
     description: 'Private Cloudflare R2 bucket for Hub AI v2 document uploads.',
   },
   {
-    // Wave-12.11 — daily mirror of /data/uploads (avatars, covers,
-    // attachments, group media, etc.) to a dedicated R2 bucket so
-    // user-uploaded photos survive a Railway volume crash. Promoted
-    // from OPTIONAL after the wave-12.11 audit pass found a missing
-    // env var would silently disable backups in production — the
-    // startup warning fires at warn level which Sentry doesn't
-    // capture by default. Without it, a volume failure permanently
-    // loses every photo. Fail-loud at boot is the only safe default.
+    // Daily mirror of /data/uploads (avatars, covers, attachments, group
+    // media, etc.) to a dedicated R2 bucket so user-uploaded photos survive
+    // a Railway volume crash. Required in production rather than OPTIONAL: a
+    // missing env var would silently disable backups, and the startup
+    // warning fires at warn level which Sentry doesn't capture by default.
+    // Without it, a volume failure permanently loses every photo. Fail-loud
+    // at boot is the only safe default.
     key: 'R2_BUCKET_UPLOAD_BACKUP',
     description:
       'Private Cloudflare R2 bucket name for the daily volume-uploads mirror. Without it, ' +
@@ -222,9 +220,8 @@ const OPTIONAL = [
       'as soon as the incident is resolved.',
   },
   // R2_BUCKET_UPLOAD_BACKUP moved to REQUIRED_IN_PRODUCTION (top of
-  // this file) after the wave-12.11 audit — a missing value silently
-  // disables backups in prod, which the warn-level startup log
-  // doesn't surface in Sentry.
+  // this file) — a missing value silently disables backups in prod,
+  // which the warn-level startup log doesn't surface in Sentry.
   {
     key: 'UPLOAD_BACKUP_INTERVAL_MS',
     description: 'Override the upload-volume → R2 backup cadence. Default 86400000 (24h).',

@@ -1,7 +1,7 @@
 /**
  * zodSchemas/index.js -- Shared zod schemas for runtime contract validation.
  *
- * Why zod (added 2026-05-13, loop V3):
+ * Why zod:
  *   Hand-rolled `Number.parseInt(x, 10) + Number.isInteger + clamp + slice`
  *   chains are scattered across ~40 route handlers. They each enforce the
  *   same contract (positive int, NaN-rejected; string 1–N chars, trimmed;
@@ -24,10 +24,10 @@
  * This file only exports primitives + schemas; no side effects, no
  * import of prisma/express. Safe to import from anywhere.
  *
- * Migration scope (loop V3): the three high-traffic AI endpoints
- * (analyze, propose-edit, apply-edit). Other modules continue to use the
- * inline pattern until a future loop migrates them. CLAUDE.md A12/A13
- * still apply — zod is one allowed implementation of the same contract.
+ * Migration scope: the three high-traffic AI endpoints (analyze,
+ * propose-edit, apply-edit). Other modules continue to use the inline
+ * pattern until they're migrated. CLAUDE.md A12/A13 still apply — zod is
+ * one allowed implementation of the same contract.
  */
 
 const { z } = require('zod')

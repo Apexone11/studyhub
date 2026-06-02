@@ -123,9 +123,9 @@ async function getBadge({ slug, viewerId }) {
     captureError(error, { source: 'achievements.getBadge.stats', slug })
   }
 
-  // Loop-2 finding F-D: secret-badge unlockers list is only visible to other
-  // holders. Otherwise a non-holder querying the detail page could deduce
-  // the unlock condition from the timestamps in the list.
+  // Secret-badge unlockers list is only visible to other holders. Otherwise
+  // a non-holder querying the detail page could deduce the unlock condition
+  // from the timestamps in the list.
   const canSeeRecents = !badge.isSecret || Boolean(viewerHeld)
 
   let recentUnlockers = []
@@ -229,11 +229,10 @@ async function setAchievementsHidden({ userId, hidden }) {
  * Serialize a Badge row for API output. Combines catalog metadata with the
  * viewer's per-user state when a UserBadge row is provided.
  *
- * Loop-2 finding F-B: when a badge is `secret` and the viewer does NOT hold
- * it, we strip the name / description / iconSlug / threshold from the
- * response so a curious authenticated viewer cannot read the badge title
- * out of the JSON in DevTools. The hexagon and "Secret" placeholder render
- * from `tier` alone.
+ * When a badge is `secret` and the viewer does NOT hold it, strip the
+ * name / description / iconSlug / threshold from the response so a curious
+ * authenticated viewer cannot read the badge title out of the JSON in
+ * DevTools. The hexagon and "Secret" placeholder render from `tier` alone.
  */
 function serializeBadge(badge, userBadge, opts = {}) {
   const isUnlocked = Boolean(userBadge)

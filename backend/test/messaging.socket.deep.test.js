@@ -1,6 +1,5 @@
 /**
  * messaging.socket.deep.test.js — Socket.io handler coverage.
- * Loop T4 (2026-05-12).
  *
  * Strategy:
  *   - We re-implement and pin the isSocketRateLimited contract here, then

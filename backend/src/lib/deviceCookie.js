@@ -12,10 +12,10 @@
  * Reads are cheap. Writes happen at most once per browser-lifetime unless
  * the user manually clears cookies or we explicitly rotate (panic mode).
  *
- * SameSite history (2026-05-14): was hard-coded to 'lax' which caused
- * the device cookie to drop on cross-site fetches between SPA and API
- * origins, degrading device-trust scoring and triggering extra 2FA
- * prompts. Mirrors the proven `authTokens.js` pattern now.
+ * SameSite must follow the cross-origin rules: a hard-coded 'lax' drops
+ * the device cookie on cross-site fetches between the SPA and API origins,
+ * degrading device-trust scoring and triggering extra 2FA prompts. Mirrors
+ * the `authTokens.js` cookie pattern.
  */
 
 const crypto = require('crypto')

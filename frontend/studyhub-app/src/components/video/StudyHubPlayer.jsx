@@ -14,7 +14,7 @@
  *   - Double-tap left/right to skip 10s (mobile)
  *   - Loading spinner overlay
  *
- * Wave-12.11 study-platform additions:
+ * Study-platform additions:
  *   - **Watch progress persistence** — saves current time to
  *     localStorage and auto-resumes from where the user left off
  *     when they reopen the same video. Per-video key keyed on
@@ -101,7 +101,7 @@ export default function StudyHubPlayer({
   const [skipIndicator, setSkipIndicator] = useState(null) // { side, seconds }
   const [isPiP, setIsPiP] = useState(false)
 
-  // Wave-12.11 — A-B loop for study repeat sections.
+  // A-B loop for study repeat sections.
   // pointA / pointB are seconds-into-video; null means "unset".
   // When BOTH are set + pointA < pointB, the timeupdate handler
   // seeks back to pointA whenever currentTime crosses pointB.
@@ -110,10 +110,10 @@ export default function StudyHubPlayer({
   const [pointA, setPointA] = useState(null)
   const [pointB, setPointB] = useState(null)
 
-  // Wave-12.11 — keyboard shortcut help overlay (`?` toggles).
+  // Keyboard shortcut help overlay (`?` toggles).
   const [showShortcutHelp, setShowShortcutHelp] = useState(false)
 
-  // Wave-12.11 — "Resume from X:XX" pill shown briefly after the
+  // "Resume from X:XX" pill shown briefly after the
   // player auto-seeks to the saved position. Null = no pill.
   const [resumeFromSec, setResumeFromSec] = useState(null)
 
@@ -165,7 +165,7 @@ export default function StudyHubPlayer({
       setDuration(dur)
       setLoading(false)
 
-      // Wave-12.11 — auto-resume from saved position. Only restore
+      // Auto-resume from saved position. Only restore
       // when the saved time is > 5s in AND > 10s before the end
       // (so users don't auto-resume right before the credits roll).
       if (storageKey) {
@@ -244,7 +244,7 @@ export default function StudyHubPlayer({
     }
   }, [src])
 
-  // Wave-12.11 — watch-progress persistence + A-B loop enforcement.
+  // Watch-progress persistence + A-B loop enforcement.
   // Both hook into timeupdate but live in a separate effect so the
   // dependency array stays stable (timeupdate fires ~4Hz).
   useEffect(() => {
@@ -300,9 +300,8 @@ export default function StudyHubPlayer({
     // Watched to the end — clear the key so the next visit starts
     // from the beginning instead of jumping back. Named handler so
     // the cleanup can remove it; the effect re-runs whenever pointA
-    // or pointB change (every `[` / `]` keypress) so anonymous
-    // closures here accumulate listeners and leak (caught by the
-    // wave-12.11 code-reviewer audit pass).
+    // or pointB change (every `[` / `]` keypress), so anonymous
+    // closures here would accumulate listeners and leak.
     const handleEnded = () => {
       if (!storageKey) return
       try {
@@ -556,7 +555,7 @@ export default function StudyHubPlayer({
           toggleLoop()
           break
         case 'L':
-          // Wave-12.11 — Shift+L clears the A-B loop. The lowercase
+          // Shift+L clears the A-B loop. The lowercase
           // 'l' case above still toggles native videojs loop.
           // Browsers fire 'L' for Shift+L; without shift, autorepeat
           // keyboards / caps lock get 'L' too — guard so caps lock
@@ -573,7 +572,7 @@ export default function StudyHubPlayer({
         case 'P':
           togglePiP()
           break
-        // Wave-12.11 — A-B loop for study repeat sections.
+        // A-B loop for study repeat sections.
         // `[` sets the A point at the current time. `]` sets B.
         // When both are set, the timeupdate handler loops the
         // [A, B] segment. Shift+L clears both at once.
@@ -585,7 +584,7 @@ export default function StudyHubPlayer({
           e.preventDefault()
           setPointB(playerRef.current?.currentTime() || 0)
           break
-        // Wave-12.11 — keyboard shortcut help overlay.
+        // Keyboard shortcut help overlay.
         case '?':
         case '/':
           // Browsers fire `?` on Shift+/ and `/` without shift; we
@@ -737,7 +736,7 @@ export default function StudyHubPlayer({
         </div>
       )}
 
-      {/* Wave-12.11 — Resume-from pill. Auto-dismisses in 4s.
+      {/* Resume-from pill. Auto-dismisses in 4s.
           Visible briefly after the player seeks to the saved position
           so the user knows it happened (and can scrub back if they
           wanted to restart from the beginning). */}
@@ -787,7 +786,7 @@ export default function StudyHubPlayer({
         </div>
       )}
 
-      {/* Wave-12.11 — A-B loop indicator. Renders a small pill in the
+      {/* A-B loop indicator. Renders a small pill in the
           top-right when at least one point is set so the user sees the
           loop bracket without having to remember they set it. */}
       {(pointA !== null || pointB !== null) && (
@@ -813,7 +812,7 @@ export default function StudyHubPlayer({
         </div>
       )}
 
-      {/* Wave-12.11 — Keyboard shortcut help overlay. Toggled with `?`,
+      {/* Keyboard shortcut help overlay. Toggled with `?`,
           closes on `?` again or Escape. Listed in the order keys
           appear on a US QWERTY keyboard. */}
       {showShortcutHelp && (

@@ -183,10 +183,10 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
     // never bubble back to the response.
     if (sheet.status === SHEET_STATUS.PUBLISHED) {
       const hour = new Date().getHours()
-      // Loop-3 finding F-E: void prefix matches the canonical fire-and-forget
-      // form used by the notes / groups / AI trigger sites. The engine wraps
-      // its own body in try/catch so an unwrapped rejection is impossible
-      // today, but `void` is defensive against future engine changes.
+      // void prefix matches the canonical fire-and-forget form used by the
+      // notes / groups / AI trigger sites. The engine wraps its own body in
+      // try/catch so an unwrapped rejection is impossible today, but `void`
+      // is defensive against future engine changes.
       void emitAchievementEvent(prisma, req.user.userId, EVENT_KINDS.SHEET_PUBLISH, {
         hour,
         sheetId: sheet.id,
@@ -202,11 +202,10 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
       }
     }
 
-    // First-creation funnel event (Loop 5 finding F2). The count
-    // *after* the insert above is the authoritative "is this the
-    // user's first sheet" check — cheaper than a User.firstSheetAt
-    // column for v1. Surfaces a `firstCreation` flag on the response
-    // so the frontend can route into a celebration toast.
+    // First-creation funnel event. The count *after* the insert above is the
+    // authoritative "is this the user's first sheet" check — cheaper than a
+    // User.firstSheetAt column for v1. Surfaces a `firstCreation` flag on the
+    // response so the frontend can route into a celebration toast.
     let firstCreation = false
     try {
       const sheetCount = await prisma.studySheet.count({
@@ -314,7 +313,7 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
       }
     })
 
-    /* Phase 4: comprehensive plagiarism scan with multi-window SimHash + n-gram (fire-and-forget) */
+    /* Comprehensive plagiarism scan with multi-window SimHash + n-gram (fire-and-forget) */
     void runPlagiarismScan(sheet.id, content, req.user.userId)
 
     /* Auto-generate provenance manifest (fire-and-forget) */

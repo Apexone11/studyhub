@@ -1,7 +1,7 @@
 /**
  * streaks.test.js — getUserStreak prefers the denormalized UserStreak row.
  *
- * Loop A2 follow-up (2026-05-13): the legacy O(366) scan in lib/streaks.js
+ * The legacy O(366) scan in lib/streaks.js
  * now reads `UserStreak.findUnique` first and short-circuits when a row
  * exists. The scan path remains in place for users created before the
  * streak table was seeded.

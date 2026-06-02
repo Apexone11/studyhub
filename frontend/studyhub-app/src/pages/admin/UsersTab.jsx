@@ -95,14 +95,12 @@ export default function UsersTab({
     }
   }, [grantTarget, badgeCatalog])
 
-  // Wave-12.12 — these used to use raw fetch which bypassed the
-  // admin apiJson wrapper. After requireRecentMfa() was applied to
-  // both endpoints in this same wave, an admin with a stale session
-  // would have hit a silent 403 here with no step-up prompt. Routing
-  // through the patchTrustLevel / patchMfaRequired methods on
-  // useAdminData fixes both: the step-up modal fires automatically
-  // and any other error surfaces via the standard apiJson throw +
-  // showToast pattern.
+  // These must route through patchTrustLevel / patchMfaRequired on
+  // useAdminData rather than raw fetch. Both endpoints require
+  // requireRecentMfa(), so an admin with a stale session would hit a
+  // silent 403 without a step-up prompt. The wrapped methods fire the
+  // step-up modal automatically and surface any other error via the
+  // standard apiJson throw + showToast pattern.
   async function handleTrustLevelChange(userId, trustLevel) {
     try {
       await patchTrustLevel(userId, trustLevel)

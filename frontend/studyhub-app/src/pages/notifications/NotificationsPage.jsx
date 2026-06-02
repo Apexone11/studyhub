@@ -127,7 +127,7 @@ export default function NotificationsPage() {
     return notifications.filter((n) => allowedTypes.includes(n.type))
   }, [filter, notifications])
 
-  // CLAUDE.md A4 + Copilot review 2026-05-03: optimistic updates with
+  // CLAUDE.md A4: optimistic updates with
   // PER-ROW rollback. The earlier "snapshot the whole array, restore on
   // failure" pattern dropped notifications that arrived via socket push
   // or polling while the request was in flight. Each handler below now

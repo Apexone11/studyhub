@@ -1,5 +1,5 @@
 /**
- * plagiarism.service.js — Phase 4 plagiarism detection engine.
+ * plagiarism.service.js — Plagiarism detection engine.
  *
  * Orchestrates the full detection pipeline when a sheet is published:
  *   Layer 1: Enhanced internal detection (multi-window SimHash + n-gram)

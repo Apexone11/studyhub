@@ -128,7 +128,7 @@ router.post('/reset-password', requireTrustedOrigin, forgotLimiter, async (req, 
       }
     }
 
-    // Phase 5: check against HIBP before allowing password reset
+    // Check against HIBP before allowing password reset
     try {
       const { checkPasswordBreach } = require('../../lib/passwordSafety')
       const breach = await checkPasswordBreach(newPassword)

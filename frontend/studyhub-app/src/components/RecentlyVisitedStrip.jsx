@@ -1,7 +1,7 @@
 /**
  * RecentlyVisitedStrip — small horizontal strip of the user's last 5
  * visited sheets/notes/papers/books. Mounts on /feed and any other
- * surface that wants the affordance. Bucket C1, wave-12.3.
+ * surface that wants the affordance.
  *
  * Renders nothing when the list is empty (don't waste space on
  * brand-new users).

@@ -21,12 +21,12 @@ const { emitAchievementEvent, EVENT_KINDS } = require('../achievements')
 
 function getFrontendAppUrl() {
   // CLAUDE.md A9 — secrets reachable in production must fail-closed.
-  // The previous `|| 'http://localhost:5173'` fallback meant a missing
-  // FRONTEND_URL in prod would send Stripe checkout success / cancel
-  // URLs to localhost (i.e. the user's machine, where there's no
-  // running app), silently breaking the post-checkout redirect. The
-  // dev fallback now ONLY fires outside production; prod throws so the
-  // 500 surfaces immediately in Sentry. Fixed wave-11 2026-05-14.
+  // A `|| 'http://localhost:5173'` fallback would send Stripe checkout
+  // success / cancel URLs to localhost (i.e. the user's machine, where
+  // there's no running app) when FRONTEND_URL is missing in prod,
+  // silently breaking the post-checkout redirect. The dev fallback
+  // fires ONLY outside production; prod throws so the 500 surfaces
+  // immediately in Sentry.
   const fromEnv = process.env.FRONTEND_URL
   if (fromEnv) return fromEnv
   if (process.env.NODE_ENV === 'production') {
@@ -55,8 +55,7 @@ function getStripe() {
  * Build an idempotency key for a state-changing Stripe call. Computed once
  * per call site so the Stripe SDK reuses the SAME key on its internal
  * network retries — a retried `checkout.sessions.create` returns the cached
- * session instead of creating a duplicate (double-charge guard). Sister fix
- * to the webhook idempotency from wave-11. 2026-05-14 L5-1.
+ * session instead of creating a duplicate (double-charge guard).
  *
  * The timestamp + random suffix make the key unique across distinct
  * user-initiated requests (a user legitimately starting checkout twice is a
@@ -463,10 +462,8 @@ async function handleCheckoutCompleted(session) {
   } catch (upsertErr) {
     // This is the most critical error — the DB write failed.
     // Most likely cause: Subscription table does not exist (migration not deployed).
-    // CLAUDE.md A16 — pino-only logging. The structured `log.error`
-    // above carries the err + plan + userId + code; a duplicate
-    // `console.error` bypassed the request-id correlation and broke
-    // log-aggregator alert dedup. Removed 2026-05-14.
+    // CLAUDE.md A16 — pino-only logging keeps request-id correlation and
+    // log-aggregator alert dedup intact.
     log.error(
       { err: upsertErr.message, userId, plan, code: upsertErr.code },
       'CRITICAL: Failed to write subscription to database. Run npx prisma migrate deploy on Railway.',

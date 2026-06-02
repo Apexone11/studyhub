@@ -78,7 +78,7 @@ async function createSession({
   // Passed by the login-challenge + recovery-code paths after a
   // successful 2FA factor (email OTP or recovery code). requireRecentMfa
   // middleware reads this column to enforce step-up on admin-sensitive
-  // routes (wave-12.11).
+  // routes.
   mfaVerified = false,
 }) {
   const jti = generateJti()

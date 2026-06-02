@@ -99,18 +99,16 @@ export function usePreferences() {
           setPrefs((current) => (current ? { ...current, ...merged } : current))
           // Push persisted prefs into session-context so consumers that
           // read `user?.preferences` re-derive synchronously without
-          // waiting for the next /api/auth/me round-trip. This was the
-          // missing half of the wave-12.13 saver-mode fix:
-          // DataAndBatteryTab seeded localStorage, but useDataSaver /
-          // useBatterySaver use `serverMode || readStoredMode()`
-          // precedence, so the stale `serverMode` from session-context
-          // kept winning until the next session refresh — meaning the
-          // toggle silently did nothing on the current page. By
-          // refreshing sessionUser here, every consumer
-          // (SaverModeInitializer, useFeedData, useMessagingData) sees
-          // the new value on next render, the <body data-battery-saver>
-          // attribute updates immediately, and Feed/Messages flip to
-          // lite mode without a reload (wave-12.15 fix from Codex P2).
+          // waiting for the next /api/auth/me round-trip. DataAndBatteryTab
+          // seeds localStorage, but useDataSaver / useBatterySaver use
+          // `serverMode || readStoredMode()` precedence, so a stale
+          // `serverMode` from session-context would keep winning until the
+          // next session refresh — meaning the toggle silently does nothing
+          // on the current page. By refreshing sessionUser here, every
+          // consumer (SaverModeInitializer, useFeedData, useMessagingData)
+          // sees the new value on next render, the <body data-battery-saver>
+          // attribute updates immediately, and Feed/Messages flip to lite
+          // mode without a reload.
           if (user) {
             setSessionUser({
               ...user,

@@ -1,5 +1,5 @@
 /**
- * notes.ai.deep.test.js — Loop T3 (2026-05-12)
+ * notes.ai.deep.test.js
  *
  * Permissions / edge-case coverage on top of ai.notes.routes.test.js.
  *

@@ -1,5 +1,5 @@
 /**
- * signup-to-first-sheet.integ.test.js — Loop T10 deep integration test.
+ * signup-to-first-sheet.integ.test.js — deep integration test.
  *
  * Scenario: a brand new user
  *   1. registers (POST /auth/register) → 201 + cookie session
@@ -12,8 +12,8 @@
  *
  * The test exercises the real Express routes + controllers, with Prisma and
  * every external service mocked. Side-effects asserted:
- *   - First-creation analytics event was emitted (Loop A2 / Loop 5 finding F2)
- *   - SHEET_PUBLISH achievement event fired (Loop A4)
+ *   - First-creation analytics event was emitted
+ *   - SHEET_PUBLISH achievement event fired
  *   - User daily activity is tracked (streak foundation)
  *   - Sheet response has firstCreation:true
  *
@@ -819,7 +819,7 @@ describe('Integration: signup → onboarding → first sheet', () => {
   // Skipped 2026-05-22: onboarding step 3 returns 404 ("Courses not found:
   // 10") because the in-memory course state seeded for this test doesn't
   // match the onboarding service's lookup path. The test predates the
-  // wave-12.3 dual-enrollment / school-scope schema changes — fix needs
+  // dual-enrollment / school-scope schema changes — fix needs
   // to align the test course-seed shape with the new onboarding lookup
   // (likely an enrollment.findFirst by (userId, courseId)). This is an
   // end-to-end happy-path integration test; the underlying step handlers
@@ -919,7 +919,7 @@ describe('Integration: signup → onboarding → first sheet', () => {
       })
 
     expect(sheetRes.status).toBe(201)
-    // Loop A2: first sheet creation surfaces a flag the frontend uses to
+    // First sheet creation surfaces a flag the frontend uses to
     // route into the celebration toast.
     expect(sheetRes.body.firstCreation).toBe(true)
     expect(sheetRes.body.title).toBe('My first study sheet')
@@ -931,7 +931,7 @@ describe('Integration: signup → onboarding → first sheet', () => {
     expect(sheetFirstCreatedEvent).toBeTruthy()
     expect(sheetFirstCreatedEvent.props.sheetId).toBe(sheetRes.body._id)
 
-    // ── Side-effect: SHEET_PUBLISH achievement event emitted (Loop A4) ──
+    // ── Side-effect: SHEET_PUBLISH achievement event emitted ──
     const sheetPublishEvent = state.emittedAchievementEvents.find(
       (e) => e.kind === 'sheet.publish' && e.userId === newUserId,
     )

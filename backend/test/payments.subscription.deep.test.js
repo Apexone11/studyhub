@@ -1,6 +1,6 @@
 /**
  * payments.subscription.deep.test.js — deep coverage for getUserPlan + isPro +
- * getDonorStatus + getUserTier + service.getUserSubscription. Loop T6 (2026-05-12).
+ * getDonorStatus + getUserTier + service.getUserSubscription.
  *
  * Pins:
  *   - free user → 'free'

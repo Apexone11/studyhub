@@ -1,5 +1,5 @@
 /**
- * notes.comments.deep.test.js — Loop T3 (2026-05-12)
+ * notes.comments.deep.test.js
  *
  * Deep coverage of /api/notes/:id/comments + reactions.
  *
@@ -12,7 +12,7 @@
  * Notable invariants we assert:
  *   - A12 on every :id segment.
  *   - A13: reaction `type` must be 'like' or 'dislike'; arbitrary strings 400.
- *   - Mentions notification fires (Loop A3) on top-level comments.
+ *   - Mentions notification fires on top-level comments.
  *   - Comment edit window strictly enforced at 15 minutes.
  *   - Reply depth capped at 1 — replies-to-replies are 400.
  *   - Privacy: non-readers see 404 (not 403) on comments to private notes.

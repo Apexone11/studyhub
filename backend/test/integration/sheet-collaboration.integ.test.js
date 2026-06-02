@@ -1,5 +1,5 @@
 /**
- * sheet-collaboration.integ.test.js — Loop T10 deep integration test.
+ * sheet-collaboration.integ.test.js — deep integration test.
  *
  * Scenario: two users collaborate on a sheet.
  *   1. User A creates a published sheet → SHEET_PUBLISH event emitted.
@@ -12,7 +12,7 @@
  * Contribution submit / accept is simulated via direct service calls because
  * the contributions controller has heavier coupling (notify, mentions, sheetLab
  * commits) that's tested in dedicated unit tests. Achievement event emission
- * is the load-bearing assertion (Loop A4).
+ * is the load-bearing assertion.
  */
 import Module, { createRequire } from 'node:module'
 import express from 'express'
@@ -535,7 +535,7 @@ describe('Integration: sheet collaboration (create → fork → contribute → a
     const forkSheetId = forkRes.body.id
     expect(forkSheetId).not.toBe(sourceSheetId)
 
-    // Side-effect: SHEET_FORK event emitted for bob (Loop A4)
+    // Side-effect: SHEET_FORK event emitted for bob
     expect(
       state.emittedAchievementEvents.find((e) => e.kind === 'sheet.fork' && e.userId === 101),
     ).toBeTruthy()

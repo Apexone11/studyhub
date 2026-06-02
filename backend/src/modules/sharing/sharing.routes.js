@@ -10,13 +10,12 @@ const { watermarkHtml, watermarkText } = require('../../lib/watermark')
 const prisma = require('../../lib/prisma')
 const { sharingMutateLimiter, sharingReadLimiter } = require('../../lib/rateLimiters')
 
-// Wave-11 (2026-05-14) — share-link password storage hardening.
-// Pre-this-wave, `ShareLink.password` was stored in plaintext and compared
-// with `!==`, which is both a credential-storage incident and a timing
-// oracle. We now bcrypt-hash the password on create and use
-// `bcrypt.compare` on access. Backwards compat: rows created before this
-// wave have a plaintext value that doesn't start with `$2`; for those we
-// fall back to a constant-time string compare and silently re-hash on the
+// Share-link password storage hardening. `ShareLink.password` was once
+// stored in plaintext and compared with `!==`, which is both a
+// credential-storage incident and a timing oracle. We now bcrypt-hash the
+// password on create and use `bcrypt.compare` on access. Backwards compat:
+// legacy rows have a plaintext value that doesn't start with `$2`; for those
+// we fall back to a constant-time string compare and silently re-hash on the
 // next successful access so the row converts in place.
 const SHARE_LINK_BCRYPT_COST = 12
 function looksLikeBcryptHash(value) {
@@ -144,8 +143,7 @@ router.post('/links', requireAuth, mutateLimiter, async (req, res) => {
         permission,
         expiresAt: expiresAtParsed,
         maxViews: maxViewsInt,
-        // bcrypt-hash on store. Plain `password ?? null` was a
-        // credential-storage incident — fixed wave-11 2026-05-14.
+        // bcrypt-hash on store — never persist the raw share-link password.
         password: password ? await bcrypt.hash(String(password), SHARE_LINK_BCRYPT_COST) : null,
         active: true,
       },

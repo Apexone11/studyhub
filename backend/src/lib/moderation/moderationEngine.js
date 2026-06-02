@@ -96,7 +96,7 @@ async function callClaudeModeration(text) {
       .trim()
     const result = JSON.parse(cleaned)
 
-    // Map Claude response to the same format as before
+    // Normalize Claude's category map into score + boolean-flag pairs.
     const categories = result.categories || {}
     const categoryScores = {}
     const categoryFlags = {}
@@ -121,7 +121,7 @@ async function callClaudeModeration(text) {
 /* ── Content scanning (fire-and-forget) ──────────────────────────────────── */
 
 /**
- * Scans text content via OpenAI Moderation API and creates a ModerationCase
+ * Scans text content via Claude Haiku and creates a ModerationCase
  * if the confidence score meets the threshold (≥ 0.5).
  *
  * IMPORTANT: This function is designed to be called with `void scanContent()`

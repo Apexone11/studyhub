@@ -1,4 +1,4 @@
-// FeedFollowSuggestions.test — wave-12.19 CLAUDE.md A4 regression. The
+// CLAUDE.md A4 regression. The
 // follow button must hydrate its label from the server response body
 // (`{ following, requested }`) rather than the requested optimistic value.
 // Private accounts return `{ following: false, requested: true }` so the

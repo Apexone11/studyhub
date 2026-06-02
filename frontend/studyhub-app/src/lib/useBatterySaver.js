@@ -1,7 +1,7 @@
 /**
  * useBatterySaver — React hook returning the effective battery-saver state.
  *
- * Wave-12.11. Pairs with `useDataSaver` (same shape).
+ * Pairs with `useDataSaver` (same shape).
  *
  * The hook does TWO things:
  *   1. Returns the effective state for consumers (animation gates,

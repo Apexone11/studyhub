@@ -578,9 +578,8 @@ async function seedBadgeCatalog(prisma) {
  * Skips criteria evaluation entirely and unconditionally awards the
  * badge. Idempotent: if the user already holds it, returns the
  * existing UserBadge row. The `admin_grant` criteria type returns
- * false from `kindMatchesCriteria` so it never auto-awards through
- * the normal evaluator — the only way a user gets a secret /
- * manually-awarded badge is via this path.
+ * false from the normal evaluator so it never auto-awards — the only
+ * way a user gets a secret / manually-awarded badge is via this path.
  */
 async function adminGrantBadge(prisma, { targetUserId, slug, performedBy }) {
   const badge = await prisma.badge.findUnique({ where: { slug } })

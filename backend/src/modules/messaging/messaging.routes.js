@@ -50,7 +50,7 @@ router.use(readLimiter)
 // circuit can't expose any message write. CLAUDE.md A11 — "New write
 // modules must opt in." originAllowlist() short-circuits GET/HEAD/OPTIONS
 // so applying it at the router.use level is safe even on mixed
-// read/write routers. Added 2026-05-14.
+// read/write routers.
 router.use(originAllowlist())
 
 // ─── Top-level endpoints (before sub-routers to avoid /:id conflicts) ───────
@@ -190,9 +190,9 @@ router.post(
   messagingWriteLimiter,
   async (req, res) => {
     try {
-      // CLAUDE.md A12 — parseInt + isNaN was permissive (`isNaN("12abc")` is
-      // false because parseInt parses "12" and stops). Use Number.parseInt +
-      // Number.isInteger for strict validation. Fixed wave-11 2026-05-14.
+      // CLAUDE.md A12 — Number.parseInt + Number.isInteger for strict
+      // validation. Plain parseInt + isNaN is permissive (`isNaN("12abc")` is
+      // false because parseInt parses "12" and stops).
       const conversationId = Number.parseInt(req.params.conversationId, 10)
       if (!Number.isInteger(conversationId) || conversationId < 1) {
         return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
@@ -261,9 +261,9 @@ router.post(
   messagingWriteLimiter,
   async (req, res) => {
     try {
-      // CLAUDE.md A12 — parseInt + isNaN was permissive (`isNaN("12abc")` is
-      // false because parseInt parses "12" and stops). Use Number.parseInt +
-      // Number.isInteger for strict validation. Fixed wave-11 2026-05-14.
+      // CLAUDE.md A12 — Number.parseInt + Number.isInteger for strict
+      // validation. Plain parseInt + isNaN is permissive (`isNaN("12abc")` is
+      // false because parseInt parses "12" and stops).
       const conversationId = Number.parseInt(req.params.conversationId, 10)
       if (!Number.isInteger(conversationId) || conversationId < 1) {
         return sendError(res, 400, 'Invalid conversation ID.', ERROR_CODES.BAD_REQUEST)
