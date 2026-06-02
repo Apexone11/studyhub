@@ -63,21 +63,21 @@ router.get('/export', exportDataLimiter, async (req, res) => {
           accountType: true,
           authProvider: true,
           createdAt: true,
-          lastLoginAt: true,
+          lastActiveAt: true,
         },
       }),
 
       // Study sheets authored
       prisma.studySheet.findMany({
-        where: { authorId: userId },
+        where: { userId },
         select: {
           id: true,
           title: true,
           description: true,
           courseId: true,
-          visibility: true,
-          starCount: true,
-          forkCount: true,
+          status: true,
+          stars: true,
+          forks: true,
           createdAt: true,
           updatedAt: true,
         },
@@ -101,31 +101,32 @@ router.get('/export', exportDataLimiter, async (req, res) => {
 
       // Feed posts
       prisma.feedPost.findMany({
-        where: { authorId: userId },
-        select: {
-          id: true,
-          type: true,
-          content: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-
-      // Contributions (comments, forks, etc.)
-      prisma.contribution.findMany({
         where: { userId: userId },
         select: {
           id: true,
-          type: true,
-          sheetId: true,
           content: true,
-          status: true,
           createdAt: true,
         },
         orderBy: { createdAt: 'desc' },
       }),
 
-      // Course enrollments
+      // Contribute-back proposals the user made (model: SheetContribution).
+      prisma.sheetContribution
+        .findMany({
+          where: { proposerId: userId },
+          select: {
+            id: true,
+            targetSheetId: true,
+            forkSheetId: true,
+            status: true,
+            message: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+        })
+        .catch(() => []),
+
+      // Course enrollments (Enrollment has no timestamp column).
       prisma.enrollment.findMany({
         where: { userId: userId },
         select: {
@@ -133,18 +134,18 @@ router.get('/export', exportDataLimiter, async (req, res) => {
           course: {
             select: { name: true, code: true },
           },
-          enrolledAt: true,
         },
       }),
 
-      // Starred sheets
-      prisma.star.findMany({
-        where: { userId: userId },
-        select: {
-          sheetId: true,
-          createdAt: true,
-        },
-      }),
+      // Starred sheets (StarredSheet has no createdAt).
+      prisma.starredSheet
+        .findMany({
+          where: { userId: userId },
+          select: {
+            sheetId: true,
+          },
+        })
+        .catch(() => []),
 
       // Starred notes
       prisma.noteStar
@@ -157,15 +158,15 @@ router.get('/export', exportDataLimiter, async (req, res) => {
         })
         .catch(() => []),
 
-      // Preferences
-      prisma.preferences
+      // Preferences (model: UserPreferences).
+      prisma.userPreferences
         .findUnique({
           where: { userId: userId },
           select: {
             theme: true,
-            emailNotifications: true,
-            pushNotifications: true,
             profileVisibility: true,
+            emailDigest: true,
+            inAppNotifications: true,
           },
         })
         .catch(() => null),
@@ -274,7 +275,6 @@ router.get('/export', exportDataLimiter, async (req, res) => {
       enrollments: enrollments.map((e) => ({
         courseName: e.course?.name,
         courseCode: e.course?.code,
-        enrolledAt: e.enrolledAt,
       })),
       starredSheets: stars,
       starredNotes: noteStars,

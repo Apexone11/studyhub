@@ -17,11 +17,14 @@ const mocks = vi.hoisted(() => {
     studySheet: { findMany: vi.fn() },
     note: { findMany: vi.fn() },
     feedPost: { findMany: vi.fn() },
-    contribution: { findMany: vi.fn() },
+    // Real model names (the controller previously called non-existent
+    // prisma.contribution / prisma.star / prisma.preferences, which 500'd
+    // the live export; this mock now mirrors the actual Prisma client).
+    sheetContribution: { findMany: vi.fn() },
     enrollment: { findMany: vi.fn() },
-    star: { findMany: vi.fn() },
+    starredSheet: { findMany: vi.fn() },
     noteStar: { findMany: vi.fn() },
-    preferences: { findUnique: vi.fn() },
+    userPreferences: { findUnique: vi.fn() },
     conversationParticipant: { findMany: vi.fn() },
     studyGroupMember: { findMany: vi.fn() },
     // Models the export controller added after this test was written
@@ -117,11 +120,11 @@ describe('GET /export', () => {
     ])
     mocks.prisma.note.findMany.mockResolvedValue([])
     mocks.prisma.feedPost.findMany.mockResolvedValue([])
-    mocks.prisma.contribution.findMany.mockResolvedValue([])
+    mocks.prisma.sheetContribution.findMany.mockResolvedValue([])
     mocks.prisma.enrollment.findMany.mockResolvedValue([])
-    mocks.prisma.star.findMany.mockResolvedValue([])
+    mocks.prisma.starredSheet.findMany.mockResolvedValue([])
     mocks.prisma.noteStar.findMany.mockResolvedValue([])
-    mocks.prisma.preferences.findUnique.mockResolvedValue({ theme: 'dark' })
+    mocks.prisma.userPreferences.findUnique.mockResolvedValue({ theme: 'dark' })
     mocks.prisma.conversationParticipant.findMany.mockResolvedValue([])
     mocks.prisma.studyGroupMember.findMany.mockResolvedValue([])
 
@@ -142,11 +145,11 @@ describe('GET /export', () => {
     mocks.prisma.studySheet.findMany.mockResolvedValue([])
     mocks.prisma.note.findMany.mockResolvedValue([])
     mocks.prisma.feedPost.findMany.mockResolvedValue([])
-    mocks.prisma.contribution.findMany.mockResolvedValue([])
+    mocks.prisma.sheetContribution.findMany.mockResolvedValue([])
     mocks.prisma.enrollment.findMany.mockResolvedValue([])
-    mocks.prisma.star.findMany.mockResolvedValue([])
+    mocks.prisma.starredSheet.findMany.mockResolvedValue([])
     mocks.prisma.noteStar.findMany.mockResolvedValue([])
-    mocks.prisma.preferences.findUnique.mockResolvedValue(null)
+    mocks.prisma.userPreferences.findUnique.mockResolvedValue(null)
     mocks.prisma.conversationParticipant.findMany.mockResolvedValue([])
     mocks.prisma.studyGroupMember.findMany.mockResolvedValue([])
 
