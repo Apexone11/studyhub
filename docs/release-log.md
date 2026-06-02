@@ -28,6 +28,11 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.28 — repair GDPR data export + moderation report priority (2026-06-02)
+
+- Fixed the "Download my data" (GDPR Art. 20 / CCPA) export, which was returning a 500 for every user: it queried Prisma models/fields that don't exist (`contribution`/`star`/`preferences` and several wrong column names). Corrected to the real schema. Each section now loads resiliently — a failure on one sub-query is logged (server-side) and the export still ships, flagged `partial` with the affected section names, instead of either 500-ing the whole download or silently presenting incomplete data as complete.
+- Fixed a moderation-report priority bug where a report targeting a since-deleted note was misclassified as targeting public content.
+
 ### Wave-12.25 — green CI: raise backend test timeout for bcrypt-heavy cases (2026-06-02)
 
 - CI (StudyHub CI + Quality Gates) had been red on `local-main`/#385 because one security test (`recoveryCodes.unit.test.js` — hashes all 10 recovery codes at bcrypt cost 12 and verifies each) took ~5.05s and tripped vitest's 5000ms default. Raised the backend `testTimeout`/`hookTimeout` to 15s in `vitest.config.mjs` (still fails a genuinely-hung test fast). Full backend suite now green on CI (3,513 tests). This was the long-standing red-CI cause, not a regression from recent work.

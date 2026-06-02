@@ -23,6 +23,7 @@
 const express = require('express')
 const prisma = require('../../lib/prisma')
 const { captureError } = require('../../monitoring/sentry')
+const log = require('../../lib/logger')
 const { exportDataLimiter } = require('../../lib/rateLimiters')
 
 const router = express.Router()
@@ -30,8 +31,32 @@ const router = express.Router()
 router.get('/export', exportDataLimiter, async (req, res) => {
   const userId = req.user.userId
 
+  // A GDPR Art. 20 / CCPA export must be honest about completeness. The two
+  // naive options are both wrong: a silent `.catch(() => [])` presents a
+  // partial dump as the user's full data, while a hard 500 on one failed
+  // sub-query denies them the rest of it. `loadSection` splits the difference
+  // — it logs the underlying error (pino + Sentry, so schema drift / query
+  // regressions are observable), returns a fallback so the rest of the export
+  // still ships, and records the section name so the response can flag itself
+  // as partial.
+  const incompleteSections = []
+  const loadSection = async (name, run, fallback) => {
+    try {
+      return await run()
+    } catch (err) {
+      incompleteSections.push(name)
+      log.error(
+        { event: 'settings.export_section_failed', section: name, userId, err: err?.message },
+        'GDPR export section failed to load',
+      )
+      captureError(err, { route: req.originalUrl, method: req.method, userId, section: name })
+      return fallback
+    }
+  }
+
   try {
-    // Fetch all user data in parallel for speed
+    // Fetch all user data in parallel for speed. Each section degrades
+    // independently via loadSection (see above) instead of failing the export.
     const [
       profile,
       sheets,
@@ -50,218 +75,280 @@ router.get('/export', exportDataLimiter, async (req, res) => {
       scholarDiscussions,
     ] = await Promise.all([
       // Profile
-      prisma.user.findUnique({
-        where: { id: userId },
-        select: {
-          id: true,
-          username: true,
-          email: true,
-          displayName: true,
-          bio: true,
-          avatarUrl: true,
-          coverImageUrl: true,
-          accountType: true,
-          authProvider: true,
-          createdAt: true,
-          lastActiveAt: true,
-        },
-      }),
+      loadSection(
+        'profile',
+        () =>
+          prisma.user.findUnique({
+            where: { id: userId },
+            select: {
+              id: true,
+              username: true,
+              email: true,
+              displayName: true,
+              bio: true,
+              avatarUrl: true,
+              coverImageUrl: true,
+              accountType: true,
+              authProvider: true,
+              createdAt: true,
+              lastActiveAt: true,
+            },
+          }),
+        null,
+      ),
 
       // Study sheets authored
-      prisma.studySheet.findMany({
-        where: { userId },
-        select: {
-          id: true,
-          title: true,
-          description: true,
-          courseId: true,
-          status: true,
-          stars: true,
-          forks: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
+      loadSection(
+        'sheets',
+        () =>
+          prisma.studySheet.findMany({
+            where: { userId },
+            select: {
+              id: true,
+              title: true,
+              description: true,
+              courseId: true,
+              status: true,
+              stars: true,
+              forks: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          }),
+        [],
+      ),
 
       // Notes
-      prisma.note.findMany({
-        where: { userId: userId },
-        select: {
-          id: true,
-          title: true,
-          content: true,
-          pinned: true,
-          tags: true,
-          createdAt: true,
-          updatedAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
+      loadSection(
+        'notes',
+        () =>
+          prisma.note.findMany({
+            where: { userId: userId },
+            select: {
+              id: true,
+              title: true,
+              content: true,
+              pinned: true,
+              tags: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          }),
+        [],
+      ),
 
       // Feed posts
-      prisma.feedPost.findMany({
-        where: { userId: userId },
-        select: {
-          id: true,
-          content: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
-
-      // Core current-schema data below is NOT `.catch`-masked. A runtime
-      // failure here must fail the whole export (outer catch → 500 + retry)
-      // rather than return a 200 that silently drops records: an incomplete
-      // GDPR Art. 20 / CCPA export presented as complete misleads the user
-      // about what data we hold. Only the AI/Scholar tables further down stay
-      // `.catch`-tolerant — those are documented schema-drift exceptions.
+      loadSection(
+        'feedPosts',
+        () =>
+          prisma.feedPost.findMany({
+            where: { userId: userId },
+            select: {
+              id: true,
+              content: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          }),
+        [],
+      ),
 
       // Contribute-back proposals the user made (model: SheetContribution).
-      prisma.sheetContribution.findMany({
-        where: { proposerId: userId },
-        select: {
-          id: true,
-          targetSheetId: true,
-          forkSheetId: true,
-          status: true,
-          message: true,
-          createdAt: true,
-        },
-        orderBy: { createdAt: 'desc' },
-      }),
+      loadSection(
+        'contributions',
+        () =>
+          prisma.sheetContribution.findMany({
+            where: { proposerId: userId },
+            select: {
+              id: true,
+              targetSheetId: true,
+              forkSheetId: true,
+              status: true,
+              message: true,
+              createdAt: true,
+            },
+            orderBy: { createdAt: 'desc' },
+          }),
+        [],
+      ),
 
       // Course enrollments (Enrollment has no timestamp column).
-      prisma.enrollment.findMany({
-        where: { userId: userId },
-        select: {
-          courseId: true,
-          course: {
-            select: { name: true, code: true },
-          },
-        },
-      }),
+      loadSection(
+        'enrollments',
+        () =>
+          prisma.enrollment.findMany({
+            where: { userId: userId },
+            select: {
+              courseId: true,
+              course: {
+                select: { name: true, code: true },
+              },
+            },
+          }),
+        [],
+      ),
 
       // Starred sheets (StarredSheet has no createdAt).
-      prisma.starredSheet.findMany({
-        where: { userId: userId },
-        select: {
-          sheetId: true,
-        },
-      }),
+      loadSection(
+        'starredSheets',
+        () =>
+          prisma.starredSheet.findMany({
+            where: { userId: userId },
+            select: {
+              sheetId: true,
+            },
+          }),
+        [],
+      ),
 
       // Starred notes
-      prisma.noteStar.findMany({
-        where: { userId: userId },
-        select: {
-          noteId: true,
-          createdAt: true,
-        },
-      }),
+      loadSection(
+        'starredNotes',
+        () =>
+          prisma.noteStar.findMany({
+            where: { userId: userId },
+            select: {
+              noteId: true,
+              createdAt: true,
+            },
+          }),
+        [],
+      ),
 
       // Preferences (model: UserPreferences).
-      prisma.userPreferences.findUnique({
-        where: { userId: userId },
-        select: {
-          theme: true,
-          profileVisibility: true,
-          emailDigest: true,
-          inAppNotifications: true,
-        },
-      }),
+      loadSection(
+        'preferences',
+        () =>
+          prisma.userPreferences.findUnique({
+            where: { userId: userId },
+            select: {
+              theme: true,
+              profileVisibility: true,
+              emailDigest: true,
+              inAppNotifications: true,
+            },
+          }),
+        null,
+      ),
 
       // Conversations (DM participation, no message content for privacy)
-      prisma.conversationParticipant.findMany({
-        where: { userId: userId },
-        select: {
-          conversationId: true,
-          joinedAt: true,
-          lastReadAt: true,
-        },
-      }),
+      loadSection(
+        'conversations',
+        () =>
+          prisma.conversationParticipant.findMany({
+            where: { userId: userId },
+            select: {
+              conversationId: true,
+              joinedAt: true,
+              lastReadAt: true,
+            },
+          }),
+        [],
+      ),
 
       // Study group memberships
-      prisma.studyGroupMember.findMany({
-        where: { userId: userId },
-        select: {
-          groupId: true,
-          role: true,
-          joinedAt: true,
-          group: {
-            select: { name: true },
-          },
-        },
-      }),
+      loadSection(
+        'studyGroups',
+        () =>
+          prisma.studyGroupMember.findMany({
+            where: { userId: userId },
+            select: {
+              groupId: true,
+              role: true,
+              joinedAt: true,
+              group: {
+                select: { name: true },
+              },
+            },
+          }),
+        [],
+      ),
 
-      // L13-HIGH-2: Hub AI v2 + Scholar — GDPR Art. 15 / Art. 20 portability.
-      // Each block is `.catch(() => [])` so a missing table or schema-drift
-      // never breaks the export for the rest of the user's data.
-      prisma.aiAttachment
-        .findMany({
-          where: { userId, deletedAt: null },
-          select: {
-            id: true,
-            mimeType: true,
-            fileName: true,
-            bytes: true,
-            pageCount: true,
-            createdAt: true,
-            expiresAt: true,
-            pinnedUntil: true,
-          },
-        })
-        .catch(() => []),
+      // Hub AI v2 + Scholar — GDPR Art. 15 / Art. 20 portability.
+      loadSection(
+        'hubAiAttachments',
+        () =>
+          prisma.aiAttachment.findMany({
+            where: { userId, deletedAt: null },
+            select: {
+              id: true,
+              mimeType: true,
+              fileName: true,
+              bytes: true,
+              pageCount: true,
+              createdAt: true,
+              expiresAt: true,
+              pinnedUntil: true,
+            },
+          }),
+        [],
+      ),
 
-      prisma.aiUsageLog
-        .findMany({
-          where: { userId },
-          select: {
-            id: true,
-            date: true,
-            messageCount: true,
-            documentCount: true,
-            tokensIn: true,
-            tokensOut: true,
-            documentTokens: true,
-            costUsdCents: true,
-          },
-        })
-        .catch(() => []),
+      loadSection(
+        'hubAiUsage',
+        () =>
+          prisma.aiUsageLog.findMany({
+            where: { userId },
+            select: {
+              id: true,
+              date: true,
+              messageCount: true,
+              documentCount: true,
+              tokensIn: true,
+              tokensOut: true,
+              documentTokens: true,
+              costUsdCents: true,
+            },
+          }),
+        [],
+      ),
 
-      prisma.scholarAnnotation
-        .findMany({
-          where: { userId },
-          select: {
-            id: true,
-            paperId: true,
-            color: true,
-            visibility: true,
-            body: true,
-            rangeJson: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        })
-        .catch(() => []),
+      loadSection(
+        'scholarAnnotations',
+        () =>
+          prisma.scholarAnnotation.findMany({
+            where: { userId },
+            select: {
+              id: true,
+              paperId: true,
+              color: true,
+              visibility: true,
+              body: true,
+              rangeJson: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          }),
+        [],
+      ),
 
-      prisma.scholarDiscussionThread
-        .findMany({
-          where: { authorId: userId },
-          select: {
-            id: true,
-            paperId: true,
-            schoolId: true,
-            body: true,
-            createdAt: true,
-            deletedAt: true,
-          },
-        })
-        .catch(() => []),
+      loadSection(
+        'scholarDiscussions',
+        () =>
+          prisma.scholarDiscussionThread.findMany({
+            where: { authorId: userId },
+            select: {
+              id: true,
+              paperId: true,
+              schoolId: true,
+              body: true,
+              createdAt: true,
+              deletedAt: true,
+            },
+          }),
+        [],
+      ),
     ])
 
     const exportData = {
       exportedAt: new Date().toISOString(),
       format: 'StudyHub Data Export v1.0',
+      // When non-empty, some sections could not be loaded — the export is a
+      // best-effort partial. The named sections were logged server-side.
+      partial: incompleteSections.length > 0,
+      ...(incompleteSections.length > 0 ? { incompleteSections } : {}),
       user: profile,
       sheets,
       notes,
