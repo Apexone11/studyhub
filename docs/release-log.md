@@ -28,6 +28,10 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.2.0 — public launch ship (2026-04-30)
 
+### Wave-12.25 — green CI: raise backend test timeout for bcrypt-heavy cases (2026-06-02)
+
+- CI (StudyHub CI + Quality Gates) had been red on `local-main`/#385 because one security test (`recoveryCodes.unit.test.js` — hashes all 10 recovery codes at bcrypt cost 12 and verifies each) took ~5.05s and tripped vitest's 5000ms default. Raised the backend `testTimeout`/`hookTimeout` to 15s in `vitest.config.mjs` (still fails a genuinely-hung test fast). Full backend suite now green on CI (3,513 tests). This was the long-standing red-CI cause, not a regression from recent work.
+
 ### Wave-12.24 — 2nd 10-loop audit fixes (Explore/aliasing hardening) (2026-05-31)
 
 A second 10-round adversarial audit (98 sub-agents, 3-skeptic verification) over the wave-12.23 code confirmed 17 + 2 findings (no P0/P1; the batch-1 fixes all held). Fixed here. Touched files green in isolation; lint + build clean.
