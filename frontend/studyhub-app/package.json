@@ -101,11 +101,11 @@
     "jsdom": "^27.0.1",
     "msw": "^2.14.6",
     "rollup-plugin-visualizer": "^6.0.11",
-    "vite": "^8.0.5",
+    "vite": "^8.0.16",
     "vitest": "^4.1.7"
   },
   "overrides": {
-    "vite": "^8.0.5",
+    "vite": "^8.0.16",
     "fast-uri": ">=3.1.2"
   },
   "engines": {
