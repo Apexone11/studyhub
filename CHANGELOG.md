@@ -15,6 +15,7 @@ For internal cycle-by-cycle release notes, see `docs/release-log.md` (tracked) a
 ### Security (2026-06-16 — dependency audit)
 
 - Resolved all 12 open Dependabot alerts: vite 8.0.16 (server.fs.deny bypass + launch-editor), ws 8.21.0, brace-expansion 5.0.6, uuid 11.1.1, plus the backend + frontend minor-patch groups. Root + workspace lockfiles re-synced; `npm audit` is clean.
+- Cleared the remaining Dependabot alerts that surfaced during the cycle: nodemailer 9.0.1 (High raw-option SSRF + List-\* CRLF injection), multer 2.2.0 (DoS), dompurify 3.4.11 (sanitizer hardening), plus transitive form-data 4.0.6 / markdown-it 14.2.0 / @opentelemetry/core 2.8.0 / protobufjs 8.x. All 41 alerts resolved; `npm audit` clean.
 
 ### Security (2026-05-31 — 2nd audit pass, wave-12.24)
 

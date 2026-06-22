@@ -29,6 +29,7 @@ internal log into this file when they describe user-visible behavior.
 ## v2.3.0 — security + product-updates newsletter (2026-06-16)
 
 - Security: resolved all 12 open Dependabot alerts — vite→8.0.16 (server.fs.deny + launch-editor), ws→8.21.0, brace-expansion→5.0.6, uuid→11.1.1 (overrides), plus the backend + frontend minor-patch dependency groups. Root + workspace lockfiles re-synced so `npm ci` passes; `npm audit` reports 0 vulnerabilities.
+- Security (2nd wave): cleared the remaining Dependabot alerts that surfaced during the cycle — nodemailer→9.0.1 (High raw-option SSRF + List-\* CRLF), multer→2.2.0 (DoS via nested field names + aborted-upload cleanup), dompurify→3.4.11 (sanitizer hardening), plus transitive form-data 4.0.6 / markdown-it 14.2.0 / @opentelemetry/core 2.8.0 / protobufjs 8.x re-resolved via clean install. `npm audit` reports 0 across all 41 alerts.
 - Newsletter / "What's New" (#291): admin-authored product updates publish to a public `/updates` archive and email opted-in users with one-click unsubscribe + a Settings toggle (opt-out default). New `/api/newsletter` module, `Newsletter`/`NewsletterSend` tables, consent flag, and a batched background send job.
 
 ## v2.2.0 — public launch ship (2026-04-30)
