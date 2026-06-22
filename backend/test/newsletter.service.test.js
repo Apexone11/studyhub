@@ -43,6 +43,21 @@ describe('newsletter slug', () => {
     expect(baseSlug('')).toBe('update')
     expect(baseSlug('   ')).toBe('update')
   })
+
+  it('collapses repeated separators and trims leading/trailing dashes', () => {
+    expect(baseSlug('Hello   ---  World!!!')).toBe('hello-world')
+    expect(baseSlug('---Hello World---')).toBe('hello-world')
+  })
+
+  it('strips (does not transliterate) non-ASCII characters', () => {
+    // baseSlug removes anything outside [a-z0-9-]; accents/emoji are dropped,
+    // not normalized to ASCII (é -> '', not 'e').
+    expect(baseSlug('Café 🚀 Update')).toBe('caf-update')
+  })
+
+  it('caps the slug length at 80 characters', () => {
+    expect(baseSlug('word '.repeat(40)).length).toBeLessThanOrEqual(80)
+  })
 })
 
 describe('newsletter sanitizeBody', () => {

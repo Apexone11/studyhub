@@ -32,6 +32,11 @@ router.get('/admin', requireAuth, requireAdmin, newsletterAdminLimiter, ctrl.adm
 router.get('/admin/:id', requireAuth, requireAdmin, newsletterAdminLimiter, ctrl.adminGet)
 
 // ── unsubscribe (public, declared before /:slug) ───────────────
+// Intentionally NO originAllowlist here (unlike the admin writes): RFC 8058
+// one-click unsubscribe POSTs originate from the mail client, not the app
+// origin, so a trusted-origin check would break them. CSRF is not a concern —
+// the HMAC unsubscribe token IS the authorization, and a forged request can
+// only flip the token-holder's own emailProductUpdates flag.
 router.get('/unsubscribe', newsletterUnsubscribeLimiter, ctrl.getUnsubscribe)
 router.post('/unsubscribe', newsletterUnsubscribeLimiter, ctrl.postUnsubscribe)
 

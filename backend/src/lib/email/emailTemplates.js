@@ -765,13 +765,15 @@ async function sendNewsletterIssue({ toEmail, username, newsletter, unsubscribeU
   ]
   if (senderAddress) textParts.push('', senderAddress)
 
-  // RFC 8058 one-click unsubscribe — best effort (forwarded by the SMTP path).
+  // List-Unsubscribe header — best effort (forwarded by the SMTP path).
+  // Only advertise RFC 8058 one-click (POST) when we actually have the backend
+  // POST endpoint (oneClickUrl); otherwise a compliant client would POST to the
+  // frontend GET page, which doesn't handle POST. The plain List-Unsubscribe
+  // still falls back to the GET page so the human-clickable link always works.
   const headers = {}
   const listUnsub = oneClickUrl || unsubscribeUrl
-  if (listUnsub) {
-    headers['List-Unsubscribe'] = `<${listUnsub}>`
-    headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
-  }
+  if (listUnsub) headers['List-Unsubscribe'] = `<${listUnsub}>`
+  if (oneClickUrl) headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
 
   await deliverMail(
     {
