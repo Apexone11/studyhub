@@ -583,6 +583,68 @@ const IN_FLIGHT_DESIGN_V2_FLAGS = [
  *   4. For beta_student3, unlock 2.
  *   5. For beta_admin, unlock the founding-member badge.
  */
+// Seed a few PUBLISHED Product-Updates issues (#291) so the public /updates
+// archive renders end-to-end without manual data setup (CLAUDE.md §11).
+// Idempotent: upsert by slug. Authored by the first admin user.
+async function seedNewsletters(users) {
+  const author = users.find((u) => u.role === 'admin') || users[0]
+  if (!author) return
+  const issues = [
+    {
+      slug: 'welcome-to-whats-new',
+      title: `Introducing "What's New" — product updates in one place`,
+      summary:
+        'A dedicated home for new features, fixes, and announcements. Updates stay on by default; unsubscribe anytime.',
+      category: 'announcement',
+      bodyHtml: `<p>We've launched a dedicated <strong>What's New</strong> page so you can follow everything we ship — new features, fixes, and announcements — in one place.</p>
+<p>Product-update emails are on by default. Every email includes a one-click unsubscribe, and you can manage email preferences anytime in <strong>Settings</strong>.</p>`,
+    },
+    {
+      slug: 'study-groups-get-scheduled-sessions',
+      title: 'Study groups now have scheduled sessions',
+      summary: 'Plan study sessions with RSVPs and a shared discussion board.',
+      category: 'feature',
+      bodyHtml: `<p>Study groups now support <strong>scheduled sessions</strong>. Pick a time, invite members, and track RSVPs.</p>
+<ul><li>Create a session with a date, time, and topic.</li><li>Members RSVP so you know who's coming.</li><li>Keep the conversation going on the group discussion board.</li></ul>`,
+    },
+    {
+      slug: 'faster-search-and-fixes',
+      title: 'Faster search + a batch of fixes',
+      summary: 'Cross-school search improvements and a round of bug fixes across sheets and notes.',
+      category: 'bugfix',
+      bodyHtml: `<p>We shipped a round of improvements focused on speed and reliability:</p>
+<ul><li>Faster cross-school search across sheets and notes.</li><li>Fixed several edge cases in the sheet preview and contribution flow.</li><li>Polished empty states and loading skeletons across the app.</li></ul>`,
+    },
+  ]
+  for (let i = 0; i < issues.length; i += 1) {
+    const it = issues[i]
+    const publishedAt = new Date(Date.now() - i * 86_400_000)
+    await prisma.newsletter.upsert({
+      where: { slug: it.slug },
+      update: {
+        title: it.title,
+        summary: it.summary,
+        bodyHtml: it.bodyHtml,
+        category: it.category,
+        status: 'published',
+        isPublic: true,
+        authorId: author.id,
+      },
+      create: {
+        slug: it.slug,
+        title: it.title,
+        summary: it.summary,
+        bodyHtml: it.bodyHtml,
+        category: it.category,
+        status: 'published',
+        isPublic: true,
+        publishedAt,
+        authorId: author.id,
+      },
+    })
+  }
+}
+
 async function seedAchievementsV2(users) {
   const {
     BADGE_CATALOG: _BADGE_CATALOG,
@@ -707,6 +769,7 @@ async function main() {
   await seedSheetsGridFixture(studentUsers)
   await seedCreatorAuditConsent(users)
   await seedAchievementsV2(users)
+  await seedNewsletters(users)
   await seedCourseAliases(prisma)
   await seedFeatureFlags(prisma)
 

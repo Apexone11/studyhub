@@ -122,19 +122,6 @@ export default function LegalPageLayout({
               {link.label}
             </Link>
           ))}
-          <a
-            href="#"
-            className="termly-display-preferences"
-            onClick={(e) => e.preventDefault()}
-            style={{
-              color: 'var(--sh-muted)',
-              fontSize: 12,
-              textDecoration: 'none',
-              fontWeight: 500,
-            }}
-          >
-            Consent Preferences
-          </a>
         </div>
         <div>
           <span className="legal-footer-brand">StudyHub</span>

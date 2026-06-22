@@ -11,7 +11,7 @@ export function TutorialModal({ show, onDismiss }) {
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(15,23,42,0.55)',
+        background: 'var(--sh-modal-overlay)',
         display: 'grid',
         placeItems: 'center',
         zIndex: 80,
@@ -205,7 +205,7 @@ export function HtmlScanModal({
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(15,23,42,0.5)',
+        background: 'var(--sh-modal-overlay)',
         display: 'grid',
         placeItems: 'center',
         zIndex: 85,
@@ -379,7 +379,7 @@ export function HtmlReviewNoticeModal({ show, notice, onClose, onOpenMySheets, o
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'rgba(15,23,42,0.5)',
+        background: 'var(--sh-modal-overlay)',
         display: 'grid',
         placeItems: 'center',
         zIndex: 86,

@@ -27,7 +27,7 @@ export default function NotFoundPage() {
             width: 80,
             height: 80,
             borderRadius: 20,
-            background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
+            background: 'var(--sh-info-bg)',
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
@@ -39,7 +39,7 @@ export default function NotFoundPage() {
             height="36"
             viewBox="0 0 24 24"
             fill="none"
-            stroke="#3b82f6"
+            stroke="var(--sh-brand)"
             strokeWidth="1.5"
             strokeLinecap="round"
             strokeLinejoin="round"
@@ -91,7 +91,7 @@ export default function NotFoundPage() {
               gap: 6,
               padding: '10px 22px',
               borderRadius: 10,
-              background: '#3b82f6',
+              background: 'var(--sh-brand)',
               color: '#fff',
               fontSize: 14,
               fontWeight: 700,

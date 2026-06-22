@@ -20,7 +20,7 @@ export function ConfirmDeleteModal({ isOpen, onConfirm, onCancel }) {
         left: 0,
         right: 0,
         bottom: 0,
-        background: 'rgba(15, 23, 42, 0.5)',
+        background: 'var(--sh-modal-overlay)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',

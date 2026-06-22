@@ -162,7 +162,7 @@ export default function PricingPage() {
 
   return (
     <div style={p.page}>
-      <Navbar />
+      <Navbar variant="landing" />
 
       {/* Success banner */}
       {successFromUrl && (

@@ -463,6 +463,8 @@ export default function LibraryPage() {
                                     src={book.coverUrl}
                                     alt={book.title}
                                     className="library-shelf__book-cover"
+                                    loading="lazy"
+                                    decoding="async"
                                   />
                                 ) : (
                                   <div className="library-shelf__book-placeholder">

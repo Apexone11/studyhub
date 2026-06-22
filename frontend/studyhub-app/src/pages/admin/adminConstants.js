@@ -14,6 +14,7 @@ export const TABS = [
   ['schools', 'Schools'],
   ['settings', 'Admin Settings'],
   ['revenue', 'Revenue'],
+  ['newsletter', 'Newsletter'],
   ['reviews', 'Reviews'],
   ['group-reports', 'Group Reports'],
   ['waitlist', 'Waitlist'],

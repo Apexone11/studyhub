@@ -13,6 +13,8 @@ const PREF_BOOLEAN_KEYS = [
   'emailComments',
   'emailSocial',
   'emailStudyGroups',
+  // Product-updates / "What's New" newsletter consent (#291). Opt-out default.
+  'emailProductUpdates',
   'inAppNotifications',
   'inAppMentions',
   'inAppComments',

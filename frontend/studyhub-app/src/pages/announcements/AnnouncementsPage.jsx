@@ -320,6 +320,8 @@ export default function AnnouncementsPage() {
                   <img
                     src={url}
                     alt={`Pending image ${idx + 1}`}
+                    loading="lazy"
+                    decoding="async"
                     style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                   <button
@@ -576,7 +578,7 @@ export default function AnnouncementsPage() {
               width: 56,
               height: 56,
               borderRadius: 14,
-              background: 'linear-gradient(135deg, #fef3c7, #fde68a)',
+              background: 'var(--sh-warning-bg)',
               display: 'inline-flex',
               alignItems: 'center',
               justifyContent: 'center',

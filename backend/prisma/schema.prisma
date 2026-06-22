@@ -79,6 +79,8 @@ model User {
   starredSheets              StarredSheet[]
   passwordResetToken         PasswordResetToken?
   announcements              Announcement[]
+  newsletters                Newsletter[]
+  newsletterSends            NewsletterSend[]
   notes                      Note[]
   noteComments               NoteComment[]
   noteStars                  NoteStar[]
@@ -947,6 +949,10 @@ model UserPreferences {
   emailComments          Boolean @default(true)
   emailSocial            Boolean @default(true)
   emailStudyGroups       Boolean @default(true)
+  // Product-updates / "What's New" newsletter (#291). Opt-out default:
+  // existing users receive product-update emails unless they unsubscribe
+  // (one-click link in every email) or toggle this off in Settings.
+  emailProductUpdates    Boolean @default(true)
   inAppNotifications     Boolean @default(true)
   inAppMentions          Boolean @default(true)
   inAppComments          Boolean @default(true)
@@ -975,6 +981,47 @@ model UserPreferences {
   dataSaverMode          String  @default("auto")
   batterySaverMode       String  @default("auto")
   user                   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Product-updates / "What's New" newsletter (issue #291). An issue is
+// admin-authored, optionally emailed to opted-in users, and (when public)
+// listed on the public /updates archive.
+model Newsletter {
+  id                  Int              @id @default(autoincrement())
+  slug                String           @unique
+  title               String
+  summary             String?
+  bodyHtml            String
+  category            String           @default("announcement")
+  status              String           @default("draft")
+  isPublic            Boolean          @default(true)
+  publishedAt         DateTime?
+  emailSentAt         DateTime?
+  emailRecipientCount Int              @default(0)
+  authorId            Int?
+  author              User?            @relation(fields: [authorId], references: [id], onDelete: SetNull)
+  sends               NewsletterSend[]
+  createdAt           DateTime         @default(now())
+  updatedAt           DateTime         @updatedAt
+
+  @@index([status, publishedAt(sort: Desc)])
+}
+
+// Per-recipient send log. The (newsletterId, userId) unique key makes the
+// batched send job idempotent so a re-run never double-emails anyone.
+model NewsletterSend {
+  id           Int        @id @default(autoincrement())
+  newsletterId Int
+  newsletter   Newsletter @relation(fields: [newsletterId], references: [id], onDelete: Cascade)
+  userId       Int?
+  user         User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  email        String
+  status       String     @default("sent")
+  error        String?
+  createdAt    DateTime   @default(now())
+
+  @@unique([newsletterId, userId])
+  @@index([newsletterId])
 }
 
 model ModerationCase {

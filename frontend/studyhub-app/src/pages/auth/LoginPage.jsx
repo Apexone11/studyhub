@@ -284,7 +284,7 @@ export default function LoginPage() {
               <SiteAnimatedLogoMark size={56} />
             </div>
             <h1 className="login-h1">Welcome back</h1>
-            <p className="login-subtitle">Sign in to your study sheets, dashboard, and more.</p>
+            <p className="login-subtitle">Sign in to your feed, study sheets, and more.</p>
           </div>
 
           {/* ── Session-expired banner ──────────────────────────────── */}

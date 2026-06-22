@@ -45,6 +45,9 @@ const PricingPage = lazy(() => import('./pages/pricing/PricingPage'))
 const SupportersPage = lazy(() => import('./pages/supporters/SupportersPage'))
 const ForgotPasswordPage = lazy(() => import('./pages/auth/ForgotPasswordPage'))
 const ResetPasswordPage = lazy(() => import('./pages/auth/ResetPasswordPage'))
+const NewsletterPage = lazy(() => import('./pages/newsletter/NewsletterPage'))
+const NewsletterIssuePage = lazy(() => import('./pages/newsletter/NewsletterIssuePage'))
+const UnsubscribePage = lazy(() => import('./pages/newsletter/UnsubscribePage'))
 const UserProfilePage = lazy(() => import('./pages/profile/UserProfilePage'))
 const TestsPage = lazy(() => import('./pages/tests/TestsPage'))
 const TestTakerPage = lazy(() => import('./pages/tests/TestTakerPage'))
@@ -201,6 +204,8 @@ const ROUTE_TITLES = {
   '/onboarding': 'Onboarding',
   '/forgot-password': 'Forgot Password',
   '/reset-password': 'Reset Password',
+  '/updates': 'What’s New',
+  '/unsubscribe': 'Unsubscribe',
 }
 
 const HOME_CONNECTED_FX_ROUTES = new Set(['/', '/terms', '/privacy', '/guidelines', '/about'])
@@ -501,6 +506,12 @@ function AppRoutes() {
                         <Route path="/supporters" element={<SupportersPage />} />
                         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
                         <Route path="/reset-password" element={<ResetPasswordPage />} />
+                        {/* Product Updates / What's New newsletter — public,
+                            viewable logged-out. Archive + single issue + the
+                            email unsubscribe landing page. */}
+                        <Route path="/updates" element={<NewsletterPage />} />
+                        <Route path="/updates/:slug" element={<NewsletterIssuePage />} />
+                        <Route path="/unsubscribe" element={<UnsubscribePage />} />
 
                         {/* ── authenticated ────────────────────────────────────── */}
                         <Route

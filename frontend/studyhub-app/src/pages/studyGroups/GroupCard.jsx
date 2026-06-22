@@ -46,6 +46,8 @@ export default function GroupCard({ group, onJoin, onNavigateDetail }) {
           <img
             src={groupImageUrl}
             alt=""
+            loading="lazy"
+            decoding="async"
             style={{
               position: 'absolute',
               inset: 0,
@@ -111,6 +113,8 @@ export default function GroupCard({ group, onJoin, onNavigateDetail }) {
               <img
                 src={groupImageUrl}
                 alt=""
+                loading="lazy"
+                decoding="async"
                 style={{ width: '100%', height: '100%', objectFit: 'cover' }}
               />
             ) : (

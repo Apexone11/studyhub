@@ -45,6 +45,18 @@ const RECOMMENDED = [
       '(lib/email/emailTransport.js). Pair with EMAIL_USER.',
   },
   { key: 'SENTRY_DSN', description: 'Error monitoring' },
+  {
+    key: 'NEWSLETTER_UNSUBSCRIBE_SECRET',
+    description:
+      'HMAC key for signing one-click newsletter unsubscribe tokens (#291). ' +
+      'Min 16 chars. Missing in dev = a fixed non-secret dev fallback is used; ' +
+      'missing in prod = newsletter.service throws fail-closed when a send is ' +
+      'attempted (so unsigned/forgeable unsubscribe links are never emailed).',
+  },
+  {
+    key: 'NEWSLETTER_SENDER_ADDRESS',
+    description: 'Optional postal/sender identity line appended to newsletter emails (CAN-SPAM).',
+  },
   // FRONTEND_URL was previously listed here as RECOMMENDED only — promoted
   // to REQUIRED_IN_PRODUCTION so missing values fail at boot rather than at
   // the first Stripe checkout. The RECOMMENDED entry is intentionally

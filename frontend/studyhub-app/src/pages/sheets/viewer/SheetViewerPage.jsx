@@ -386,7 +386,7 @@ export default function SheetViewerPage() {
               position: 'fixed',
               inset: 0,
               zIndex: 9999,
-              background: 'rgba(15, 23, 42, 0.5)',
+              background: 'var(--sh-modal-overlay)',
               display: 'grid',
               placeItems: 'center',
             }}

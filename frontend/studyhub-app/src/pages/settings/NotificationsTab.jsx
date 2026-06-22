@@ -36,6 +36,7 @@ const NOTIFICATION_TYPES = [
 
 const EMAIL_NOTIFICATION_KEYS = [
   'emailDigest',
+  'emailProductUpdates',
   'emailMentions',
   'emailComments',
   'emailContributions',
@@ -133,6 +134,18 @@ export default function NotificationsTab() {
           description="One email per week with the top activity across your courses."
           checked={prefs.emailDigest}
           onChange={() => toggle('emailDigest')}
+        />
+      </SectionCard>
+
+      <SectionCard
+        title="Product updates"
+        subtitle="Occasional emails about new StudyHub features and improvements."
+      >
+        <ToggleRow
+          label="Product updates & announcements"
+          description="Get the What’s New newsletter in your inbox when we ship something notable."
+          checked={prefs.emailProductUpdates}
+          onChange={() => toggle('emailProductUpdates')}
         />
       </SectionCard>
 
