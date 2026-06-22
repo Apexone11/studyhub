@@ -77,7 +77,7 @@ export default function ConfirmDialog({
 
 const styles = {
   overlay: {
-    background: 'var(--sh-overlay, rgba(15, 23, 42, 0.5))',
+    background: 'var(--sh-modal-overlay)',
     backdropFilter: 'blur(3px)',
     zIndex: 600,
     fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",

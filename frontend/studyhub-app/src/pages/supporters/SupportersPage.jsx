@@ -140,7 +140,7 @@ export default function SupportersPage() {
 
   return (
     <div style={s.page}>
-      <Navbar />
+      <Navbar variant="landing" />
 
       {/* ── Donation success banner ──────────────────── */}
       {paymentStatus === 'success' && (

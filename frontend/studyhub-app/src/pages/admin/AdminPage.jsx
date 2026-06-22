@@ -24,6 +24,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 
 const AnalyticsTab = lazy(() => import('./AnalyticsTab'))
 const RevenueTab = lazy(() => import('./RevenueTab'))
+const NewsletterTab = lazy(() => import('./NewsletterTab'))
 const GroupReportsTab = lazy(() => import('./GroupReportsTab'))
 const WaitlistTab = lazy(() => import('./WaitlistTab'))
 const SecurityTab = lazy(() => import('./SecurityTab'))
@@ -268,6 +269,18 @@ export default function AdminPage() {
                   </Suspense>
                 ) : null}
 
+                {activeTab === 'newsletter' ? (
+                  <Suspense
+                    fallback={
+                      <div style={{ color: 'var(--sh-subtext)', fontSize: 13 }}>
+                        Loading newsletter…
+                      </div>
+                    }
+                  >
+                    <NewsletterTab />
+                  </Suspense>
+                ) : null}
+
                 {activeTab === 'moderation' ? (
                   <ModerationTab
                     apiJson={d.apiJson}
@@ -285,6 +298,7 @@ export default function AdminPage() {
                 activeTab !== 'schools' &&
                 activeTab !== 'reviews' &&
                 activeTab !== 'revenue' &&
+                activeTab !== 'newsletter' &&
                 activeTab !== 'group-reports' &&
                 activeTab !== 'waitlist' &&
                 activeTab !== 'security' &&

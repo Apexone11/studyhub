@@ -68,7 +68,7 @@ export const styles = {
     background: 'none',
     border: 'none',
     cursor: 'pointer',
-    color: 'var(--sh-slate-400, #94a3b8)',
+    color: 'var(--sh-slate-500, #64748b)',
     display: 'flex',
     alignItems: 'center',
     padding: 2,

@@ -203,7 +203,7 @@ const styles = {
   overlay: {
     position: 'fixed',
     inset: 0,
-    background: 'rgba(15, 23, 42, 0.55)',
+    background: 'var(--sh-modal-overlay)',
     backdropFilter: 'blur(4px)',
     zIndex: 9000,
     display: 'flex',

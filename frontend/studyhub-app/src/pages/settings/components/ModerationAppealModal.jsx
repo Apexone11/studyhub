@@ -80,7 +80,7 @@ export function AppealModal({ open, caseData, onClose, onSubmit }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(15, 23, 42, 0.55)',
+        background: 'var(--sh-modal-overlay)',
         backdropFilter: 'blur(4px)',
         padding: 24,
       }}

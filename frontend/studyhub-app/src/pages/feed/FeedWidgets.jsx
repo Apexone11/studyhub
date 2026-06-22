@@ -100,7 +100,7 @@ export function EmptyFeed({ message, isFirstRun, accountType }) {
           width: 56,
           height: 56,
           borderRadius: 14,
-          background: 'linear-gradient(135deg, #eff6ff, #dbeafe)',
+          background: 'var(--sh-info-bg)',
           display: 'inline-flex',
           alignItems: 'center',
           justifyContent: 'center',
@@ -112,7 +112,7 @@ export function EmptyFeed({ message, isFirstRun, accountType }) {
           height="24"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="#3b82f6"
+          stroke="var(--sh-brand)"
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"

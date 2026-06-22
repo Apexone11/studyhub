@@ -730,7 +730,7 @@ export function FollowModal({ followModal, followList, followListLoading, onClos
         position: 'fixed',
         inset: 0,
         zIndex: 9999,
-        background: 'rgba(15,23,42,0.45)',
+        background: 'var(--sh-modal-overlay)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
         alignItems: 'center',

@@ -89,7 +89,7 @@ const ROADMAP_TONES = {
 export default function AboutPage() {
   return (
     <div style={s.page}>
-      <Navbar />
+      <Navbar variant="landing" />
 
       {/* ── HERO ─────────────────────────────────────── */}
       <section style={s.hero}>

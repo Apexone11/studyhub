@@ -413,6 +413,8 @@ export default function GroupDetailView({ groupId }) {
                 src={headerBackgroundUrl}
                 alt=""
                 aria-hidden="true"
+                loading="lazy"
+                decoding="async"
                 style={{
                   position: 'absolute',
                   inset: 0,

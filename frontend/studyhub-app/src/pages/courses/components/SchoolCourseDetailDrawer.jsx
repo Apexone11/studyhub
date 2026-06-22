@@ -154,7 +154,7 @@ export default function SchoolCourseDetailDrawer({ open, course, schoolId, onClo
       style={{
         position: 'fixed',
         inset: 0,
-        background: 'var(--sh-overlay, rgba(15, 23, 42, 0.5))',
+        background: 'var(--sh-modal-overlay)',
         backdropFilter: 'blur(3px)',
         zIndex: 700,
         display: 'flex',

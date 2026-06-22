@@ -50,6 +50,7 @@ const dashboardRoutes = require('./modules/dashboard')
 const examRoutes = require('./modules/exams')
 const settingsRoutes = require('./modules/settings')
 const announcementRoutes = require('./modules/announcements')
+const newsletterRoutes = require('./modules/newsletter')
 const adminRoutes = require('./modules/admin')
 const uploadRoutes = require('./modules/upload')
 const notesRoutes = require('./modules/notes')
@@ -653,6 +654,9 @@ app.use('/api/settings', settingsRoutes)
 
 // Mount announcements endpoints under /api/announcements.
 app.use('/api/announcements', announcementRoutes)
+
+// Mount newsletter / product-updates endpoints under /api/newsletter (#291).
+app.use('/api/newsletter', newsletterRoutes)
 
 // Mount admin endpoints under /api/admin.
 app.use('/api/admin', adminRoutes)

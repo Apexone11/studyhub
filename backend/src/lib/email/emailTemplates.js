@@ -715,7 +715,81 @@ async function sendDataRequest({
   await deliverMail(mailOptions, 'data-request')
 }
 
+/**
+ * Send a Product-Updates ("What's New") newsletter issue to one recipient.
+ * The body HTML is already sanitized at write time (newsletter.service).
+ * @param {object}  params
+ * @param {string}  params.toEmail
+ * @param {string}  params.username
+ * @param {object}  params.newsletter      Raw Newsletter row (title, summary, bodyHtml, slug).
+ * @param {string}  params.unsubscribeUrl  Frontend confirm page link.
+ * @param {string} [params.oneClickUrl]    Backend RFC 8058 one-click endpoint.
+ */
+async function sendNewsletterIssue({ toEmail, username, newsletter, unsubscribeUrl, oneClickUrl }) {
+  const appUrl = getPublicAppUrl()
+  const viewUrl = newsletter.slug ? `${appUrl}/updates/${newsletter.slug}` : `${appUrl}/updates`
+  const senderAddress = (process.env.NEWSLETTER_SENDER_ADDRESS || '').trim()
+  const greeting = username ? `Hi ${escapeHtml(username)},` : 'Hi,'
+  const summaryHtml = newsletter.summary
+    ? `<p style="margin:0 0 20px;color:#475569;font-size:15px;">${escapeHtml(newsletter.summary)}</p>`
+    : ''
+
+  const body = `
+    <p style="margin:0 0 16px;color:#6b7280;font-size:14px;">${greeting}</p>
+    <h2 style="margin:0 0 12px;color:#1e3a5f;font-size:24px;line-height:1.3;">${escapeHtml(newsletter.title)}</h2>
+    ${summaryHtml}
+    <div style="color:#334155;font-size:15px;line-height:1.6;">
+      ${newsletter.bodyHtml || ''}
+    </div>
+    <div style="text-align:center;margin:28px 0 8px;">
+      <a href="${escapeHtml(viewUrl)}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;font-weight:bold;font-size:14px;padding:12px 28px;border-radius:8px;">Read on StudyHub</a>
+    </div>
+    <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0 16px;" />
+    <p style="margin:0 0 6px;color:#9ca3af;font-size:12px;">
+      You're receiving this because you have a StudyHub account and product-update emails are on.
+      <a href="${escapeHtml(unsubscribeUrl)}" style="color:#3b82f6;text-decoration:underline;">Unsubscribe</a>
+      or manage email preferences in Settings.
+    </p>
+    ${senderAddress ? `<p style="margin:0;color:#d1d5db;font-size:11px;">${escapeHtml(senderAddress)}</p>` : ''}
+  `
+
+  const textParts = [
+    username ? `Hi ${username},` : 'Hi,',
+    '',
+    newsletter.title,
+    newsletter.summary ? `\n${newsletter.summary}` : '',
+    '',
+    `Read it on StudyHub: ${viewUrl}`,
+    '',
+    `Unsubscribe: ${unsubscribeUrl}`,
+  ]
+  if (senderAddress) textParts.push('', senderAddress)
+
+  // List-Unsubscribe header — best effort (forwarded by the SMTP path).
+  // Only advertise RFC 8058 one-click (POST) when we actually have the backend
+  // POST endpoint (oneClickUrl); otherwise a compliant client would POST to the
+  // frontend GET page, which doesn't handle POST. The plain List-Unsubscribe
+  // still falls back to the GET page so the human-clickable link always works.
+  const headers = {}
+  const listUnsub = oneClickUrl || unsubscribeUrl
+  if (listUnsub) headers['List-Unsubscribe'] = `<${listUnsub}>`
+  if (oneClickUrl) headers['List-Unsubscribe-Post'] = 'List-Unsubscribe=One-Click'
+
+  await deliverMail(
+    {
+      from: `"StudyHub" <${getFromAddress()}>`,
+      to: toEmail,
+      subject: `StudyHub — ${newsletter.title}`,
+      text: textParts.join('\n'),
+      html: htmlWrap(escapeHtml(newsletter.title), body),
+      headers,
+    },
+    'newsletter',
+  )
+}
+
 module.exports = {
+  sendNewsletterIssue,
   sendEmailSmoke,
   sendPasswordReset,
   sendEmailVerification,

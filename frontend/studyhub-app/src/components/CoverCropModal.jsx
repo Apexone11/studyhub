@@ -273,7 +273,7 @@ const overlayStyle = {
   position: 'fixed',
   inset: 0,
   zIndex: 1200,
-  background: 'rgba(15, 23, 42, 0.6)',
+  background: 'var(--sh-modal-overlay)',
   backdropFilter: 'blur(4px)',
   display: 'flex',
   alignItems: 'center',

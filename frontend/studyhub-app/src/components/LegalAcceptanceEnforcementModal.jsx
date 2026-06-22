@@ -21,7 +21,7 @@ import FocusTrappedDialog from './Modal/FocusTrappedDialog'
 const styles = {
   overlayOverride: {
     zIndex: 1200,
-    background: 'rgba(15, 23, 42, 0.62)',
+    background: 'var(--sh-modal-overlay)',
     backdropFilter: 'blur(6px)',
   },
   panelOverride: {

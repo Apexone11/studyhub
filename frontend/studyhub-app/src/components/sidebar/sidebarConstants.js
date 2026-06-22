@@ -21,6 +21,7 @@ import {
   IconLink,
   IconSettings,
   IconScroll,
+  IconBell,
 } from '../Icons'
 
 export const FOCUSABLE_DRAWER_SELECTORS = [
@@ -48,6 +49,7 @@ export const NAV_LINKS = [
   { icon: IconLink, label: 'Invite Classmates', to: '/invite' },
   { icon: IconTag, label: 'Pricing', to: '/pricing' },
   { icon: IconHeart, label: 'Supporters', to: '/supporters' },
+  { icon: IconBell, label: 'What’s New', to: '/updates' },
   { icon: IconProfile, label: 'My Profile', to: '__MY_PROFILE__' },
 ]
 
@@ -111,6 +113,7 @@ export const SIDEBAR_SECTIONS = [
     links: [
       { icon: IconTag, label: 'Pricing', to: '/pricing' },
       { icon: IconHeart, label: 'Supporters', to: '/supporters' },
+      { icon: IconBell, label: 'What’s New', to: '/updates' },
       { icon: IconSettings, label: 'Settings', to: '/settings' },
     ],
   },

@@ -348,7 +348,7 @@ export default function NoteVersionHistory({ noteId, onRestore, onClose, flushPe
         style={{
           position: 'fixed',
           inset: 0,
-          background: 'rgba(15, 23, 42, 0.35)',
+          background: 'var(--sh-modal-overlay)',
           backdropFilter: 'blur(3px)',
           zIndex: 999,
           animation: 'fadeIn 150ms ease-out',

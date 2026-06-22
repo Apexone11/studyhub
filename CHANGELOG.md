@@ -8,6 +8,15 @@ For internal cycle-by-cycle release notes, see `docs/release-log.md` (tracked) a
 
 ## [Unreleased]
 
+### Added (2026-06-16 — product-updates newsletter, #291)
+
+- **"What's New" newsletter.** Admins compose product updates that publish to a public `/updates` archive and email opted-in users; every email carries a one-click unsubscribe (RFC 8058) and there's a Settings toggle. Opt-out default. New `/api/newsletter` module + `Newsletter`/`NewsletterSend` tables + `UserPreferences.emailProductUpdates`.
+
+### Security (2026-06-16 — dependency audit)
+
+- Resolved all 12 open Dependabot alerts: vite 8.0.16 (server.fs.deny bypass + launch-editor), ws 8.21.0, brace-expansion 5.0.6, uuid 11.1.1, plus the backend + frontend minor-patch groups. Root + workspace lockfiles re-synced; `npm audit` is clean.
+- Cleared the remaining Dependabot alerts that surfaced during the cycle: nodemailer 9.0.1 (High raw-option SSRF + List-\* CRLF injection), multer 2.2.0 (DoS), dompurify 3.4.11 (sanitizer hardening), plus transitive form-data 4.0.6 / markdown-it 14.2.0 / @opentelemetry/core 2.8.0 / protobufjs 8.x. All 41 alerts resolved; `npm audit` clean.
+
 ### Security (2026-05-31 — 2nd audit pass, wave-12.24)
 
 - **Study-group discussion replies now require active membership to edit/delete.** A banned or removed member previously kept the ability to edit or delete their own old replies in a private group (the active-membership gate covered the post handlers but had missed the reply handlers). Now both `updateReply` and `deleteReply` require active membership.

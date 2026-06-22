@@ -135,7 +135,13 @@ export default function BookDetailPage() {
               <div className="book-detail__left">
                 <div className="book-detail__cover-wrapper">
                   {getBookCover(book) ? (
-                    <img src={getBookCover(book)} alt={book.title} className="book-detail__cover" />
+                    <img
+                      src={getBookCover(book)}
+                      alt={book.title}
+                      className="book-detail__cover"
+                      loading="lazy"
+                      decoding="async"
+                    />
                   ) : (
                     <div
                       className="book-detail__cover-fallback"

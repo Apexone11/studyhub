@@ -521,21 +521,12 @@ export function HomeFooter({ currentYear }) {
         <div className="home-footer-links">
           <Link to="/about">About</Link>
           <Link to="/docs">Product docs</Link>
+          <Link to="/updates">What&rsquo;s New</Link>
           <Link to="/supporters">Supporters</Link>
           <Link to="/terms">Terms</Link>
           <Link to="/privacy">Privacy</Link>
           <Link to="/cookies">Cookies</Link>
           <Link to="/guidelines">Guidelines</Link>
-          {/*
-            Termly's preference center re-opener. The class name is recognised
-            by Termly's resource-blocker script (loaded in index.html); clicking
-            this link reopens the consent banner so users can change their
-            choice after their first acceptance. Required by GDPR and CCPA —
-            see Termly Step 3 in the dashboard for the canonical snippet.
-          */}
-          <a href="#" className="termly-display-preferences">
-            Cookie preferences
-          </a>
           <a href="https://github.com/Apexone11/studyhub" target="_blank" rel="noopener noreferrer">
             GitHub
           </a>

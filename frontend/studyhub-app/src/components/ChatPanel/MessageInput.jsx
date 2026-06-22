@@ -101,6 +101,8 @@ export default function MessageInput({
                 <img
                   src={ap.previewUrl}
                   alt={ap.name}
+                  loading="lazy"
+                  decoding="async"
                   style={{ width: 52, height: 52, objectFit: 'cover', display: 'block' }}
                 />
               ) : (
@@ -306,7 +308,6 @@ export default function MessageInput({
             fontFamily: PAGE_FONT,
             background: 'var(--sh-surface)',
             color: 'var(--sh-text)',
-            outline: 'none',
             maxHeight: 80,
             lineHeight: 1.4,
           }}

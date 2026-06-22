@@ -574,9 +574,9 @@ export default function SheetLabContribute({ sheet, onContributed }) {
 
 function StatusBadge({ status }) {
   const styles = {
-    pending: { background: '#fef3c7', color: '#92400e' },
-    accepted: { background: '#dcfce7', color: '#166534' },
-    rejected: { background: '#fee2e2', color: '#991b1b' },
+    pending: { background: 'var(--sh-warning-bg)', color: 'var(--sh-warning-text)' },
+    accepted: { background: 'var(--sh-success-bg)', color: 'var(--sh-success-text)' },
+    rejected: { background: 'var(--sh-danger-bg)', color: 'var(--sh-danger-text)' },
   }
   const s = styles[status] || styles.pending
   return (

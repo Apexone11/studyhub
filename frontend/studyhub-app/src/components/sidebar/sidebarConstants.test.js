@@ -39,9 +39,9 @@ describe('SIDEBAR_SECTIONS', () => {
     expect(labels).toContain('Invite Classmates')
   })
 
-  it('ACCOUNT includes Pricing, Supporters, Settings', () => {
+  it('ACCOUNT includes Pricing, Supporters, What’s New, Settings', () => {
     const labels = SIDEBAR_SECTIONS.find((s) => s.key === 'account').links.map((l) => l.label)
-    expect(labels).toEqual(['Pricing', 'Supporters', 'Settings'])
+    expect(labels).toEqual(['Pricing', 'Supporters', 'What’s New', 'Settings'])
   })
 })
 

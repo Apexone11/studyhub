@@ -1451,6 +1451,49 @@ const scholarAiSheetLimiter = rateLimit({
   message: { error: 'Too many AI sheet-generation requests. Please slow down.' },
 })
 
+// ── Newsletter / Product-Updates (#291) ─────────────────────────────────────
+
+// Public archive + single-issue reads. Default IP keying (CLAUDE.md A7).
+const newsletterReadLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests. Please slow down.' },
+})
+
+// Admin compose / list / edit. Sits behind requireAuth + requireAdmin, so the
+// 'anon' fallback never fires (A7).
+const newsletterAdminLimiter = rateLimit({
+  windowMs: WINDOW_1_MIN,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `newsletter-admin-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many newsletter admin requests. Please slow down.' },
+})
+
+// Sending an issue fans out email to every opted-in user — expensive. Cap at
+// 10 sends per admin per hour.
+const newsletterSendLimiter = rateLimit({
+  windowMs: WINDOW_1_HOUR,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `newsletter-send-${req.user?.userId || 'anon'}`,
+  message: { error: 'Newsletter send quota reached. Please wait before sending again.' },
+})
+
+// Public unsubscribe (unauthenticated). Default IP keying — never req.ip in a
+// custom keyGenerator (A7).
+const newsletterUnsubscribeLimiter = rateLimit({
+  windowMs: WINDOW_15_MIN,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many unsubscribe requests. Please try again later.' },
+})
+
 // ── Exports ────────────────────────────────────────────────────────────────
 
 module.exports = {
@@ -1463,6 +1506,10 @@ module.exports = {
   adminLimiter,
   adminAnnouncementLimiter,
   noteHighlightLimiter,
+  newsletterReadLimiter,
+  newsletterAdminLimiter,
+  newsletterSendLimiter,
+  newsletterUnsubscribeLimiter,
   discoverySchoolsLimiter,
   discoveryCoursesLimiter,
   forkTreeLimiter,
