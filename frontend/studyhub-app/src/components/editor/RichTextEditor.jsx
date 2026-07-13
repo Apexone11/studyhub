@@ -16,15 +16,10 @@
 import { useEffect, useRef } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import Link from '@tiptap/extension-link'
-import Placeholder from '@tiptap/extension-placeholder'
+import { Placeholder } from '@tiptap/extensions'
 import Image from '@tiptap/extension-image'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
-import Table from '@tiptap/extension-table'
-import TableRow from '@tiptap/extension-table-row'
-import TableCell from '@tiptap/extension-table-cell'
-import TableHeader from '@tiptap/extension-table-header'
+import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
 import EditorToolbar from './EditorToolbar'
 import { MathInline, MathBlock } from './MathExtension'
 import { lowlight } from './codeHighlight'
@@ -59,17 +54,22 @@ export default function RichTextEditor({
         // Disable the default codeBlock in favor of lowlight version
         codeBlock: false,
         heading: { levels: [1, 2, 3, 4] },
-        history: { depth: 100 },
-      }),
-      Underline,
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          rel: 'noopener noreferrer nofollow',
-          target: '_blank',
-          class: 'sh-editor-link',
+        // v3: History was renamed UndoRedo; Underline + Link now ship
+        // inside StarterKit, so they are configured here instead of as
+        // standalone packages.
+        undoRedo: { depth: 100 },
+        link: {
+          openOnClick: false,
+          HTMLAttributes: {
+            rel: 'noopener noreferrer nofollow',
+            target: '_blank',
+            class: 'sh-editor-link',
+          },
+          // v3 replacement for `validate`: keep the same scheme allowlist
+          // on top of Tiptap's built-in unsafe-protocol rejection.
+          isAllowedUri: (url, ctx) =>
+            ctx.defaultValidate(url) && /^(https?:\/\/|mailto:)/i.test(url),
         },
-        validate: (href) => /^https?:\/\/|^mailto:/i.test(href),
       }),
       Placeholder.configure({ placeholder }),
       Image.configure({
@@ -126,7 +126,7 @@ export default function RichTextEditor({
       // Only reset if the editor content actually differs to avoid cursor jumps
       const currentHtml = sanitizeOutput(editor.getHTML())
       if (currentHtml !== content) {
-        editor.commands.setContent(content || '', false)
+        editor.commands.setContent(content || '', { emitUpdate: false })
       }
     }
   }, [content, editor])

@@ -4,9 +4,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import Link from '@tiptap/extension-link'
-import Placeholder from '@tiptap/extension-placeholder'
+import { Placeholder } from '@tiptap/extensions'
 import Image from '@tiptap/extension-image'
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { marked } from 'marked'
@@ -132,17 +130,22 @@ function NoteRichEditor({ content, onUpdate, noteId, sanitizePaste }) {
       StarterKit.configure({
         codeBlock: false,
         heading: { levels: [1, 2, 3, 4] },
-        history: { depth: 100 },
-      }),
-      Underline,
-      Link.configure({
-        openOnClick: false,
-        HTMLAttributes: {
-          rel: 'noopener noreferrer nofollow',
-          target: '_blank',
-          class: 'sh-editor-link',
+        // v3: History was renamed UndoRedo; Underline + Link now ship
+        // inside StarterKit, so they are configured here instead of as
+        // standalone packages.
+        undoRedo: { depth: 100 },
+        link: {
+          openOnClick: false,
+          HTMLAttributes: {
+            rel: 'noopener noreferrer nofollow',
+            target: '_blank',
+            class: 'sh-editor-link',
+          },
+          // v3 replacement for `validate`: keep the same scheme allowlist
+          // on top of Tiptap's built-in unsafe-protocol rejection.
+          isAllowedUri: (url, ctx) =>
+            ctx.defaultValidate(url) && /^(https?:\/\/|mailto:)/i.test(url),
         },
-        validate: (href) => /^https?:\/\/|^mailto:/i.test(href),
       }),
       Placeholder.configure({ placeholder: 'Start writing your notes...' }),
       Image.configure({
@@ -199,7 +202,7 @@ function NoteRichEditor({ content, onUpdate, noteId, sanitizePaste }) {
     if (noteId !== lastNoteId.current) {
       lastNoteId.current = noteId
       const htmlContent = isMarkdown(content) ? markdownToHtml(content) : content || ''
-      editor.commands.setContent(htmlContent, false)
+      editor.commands.setContent(htmlContent, { emitUpdate: false })
     }
   }, [noteId, content, editor])
 
