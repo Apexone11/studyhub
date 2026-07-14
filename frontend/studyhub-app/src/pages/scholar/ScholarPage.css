@@ -1630,3 +1630,51 @@
   color: var(--sh-subtext);
   font-weight: 500;
 }
+
+/* ── Hero example-query chips + corpus stats line ────────────────────── */
+
+.scholar-landing-try {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.scholar-landing-try__label {
+  font-size: var(--type-xs);
+  font-weight: 600;
+  color: var(--sh-subtext);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.scholar-landing-try__chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-text);
+  font-size: var(--type-sm);
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.scholar-landing-try__chip:hover,
+.scholar-landing-try__chip:focus-visible {
+  border-color: var(--sh-brand);
+  background: var(--sh-soft);
+  outline: none;
+}
+
+.scholar-landing-hero__stats {
+  margin: 12px 0 0;
+  text-align: center;
+  font-size: var(--type-xs);
+  color: var(--sh-subtext);
+}
