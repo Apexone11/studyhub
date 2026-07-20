@@ -34,7 +34,7 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "frontend/studyhub-app/jscrambler.json is missing. Skipping Jscrambler protection run."
           fi
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: steps.jscrambler_config.outputs.exists == 'true'
         with:
           node-version: 20
