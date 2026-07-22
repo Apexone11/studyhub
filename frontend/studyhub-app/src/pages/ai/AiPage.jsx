@@ -658,13 +658,16 @@ function ConversationSidebar({
                 <div
                   style={{
                     display: 'grid',
-                    gridTemplateColumns: '1fr auto',
+                    // minmax(0, 1fr): a plain 1fr track refuses to shrink
+                    // below a nowrap child's intrinsic width (grid min-width:
+                    // auto), which kept long titles from ever ellipsizing.
+                    gridTemplateColumns: 'minmax(0, 1fr) auto',
                     alignItems: 'center',
                     columnGap: 6,
                     // Tighter padding at narrow desktop widths so the
                     // list reads denser on iPad landscape without
                     // losing the desktop comfort at wide displays.
-                    padding: 'clamp(8px, 1.2vw, 10px) clamp(12px, 1.4vw, 16px)',
+                    padding: 'clamp(10px, 1.4vw, 12px) clamp(12px, 1.4vw, 16px)',
                   }}
                 >
                   <button
@@ -675,6 +678,7 @@ function ConversationSidebar({
                     style={{
                       display: 'block',
                       width: '100%',
+                      minWidth: 0,
                       background: 'none',
                       border: 'none',
                       padding: 0,
@@ -692,13 +696,16 @@ function ConversationSidebar({
                         whiteSpace: 'nowrap',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
-                        marginBottom: 2,
+                        minWidth: 0,
+                        marginBottom: 3,
                       }}
                     >
                       {conv.title || 'New conversation'}
                     </div>
                     <div style={{ fontSize: 11, color: 'var(--sh-subtext)' }}>
-                      {conv._count?.messages || 0} messages
+                      {(conv._count?.messages || 0) === 0
+                        ? 'New'
+                        : `${conv._count.messages} message${conv._count.messages === 1 ? '' : 's'}`}
                     </div>
                   </button>
                   {/* Bug 9: rename + delete are now available on EVERY row,
