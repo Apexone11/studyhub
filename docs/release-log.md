@@ -28,6 +28,7 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.3.0 — security + product-updates newsletter (2026-06-16)
 
+- Security (sweep wave 2, #433): engine.io 6.6.9 + brace-expansion 5.0.7 across all lockfiles (4 new alerts), backend group of 17, frontend group of 20, actions/setup-node v7, jscrambler action 8.22.0 — supersedes #430/#435–#438.
 - Scholar UX: inline Save + Cite on every paper card (search/landing/topic), working Compare side-by-side sheet, per-source coverage chips with throttle states, hero example chips + live corpus stats, OA "read PDF" card action, ?tab= deep links now honored on the paper page.
 - Security: consolidated Dependabot sweep (supersedes #416/#417/#423–#429) — clears all 7 open alerts (form-data 4.0.6, ws 8.21.0, linkify-it 5.0.2, markdown-it 14.3.0, js-yaml 4.2.0, @babel/core 7.29.6, brace-expansion 5.0.6), backend group of 14 + frontend group of 9 minor/patch bumps, jscrambler action 8.13.0, and the Tiptap v2→v3.27 editor migration (StarterKit undoRedo/link, @tiptap/extensions, consolidated table package). Root + workspace lockfiles regenerated together.
 - Security: resolved all 12 open Dependabot alerts — vite→8.0.16 (server.fs.deny + launch-editor), ws→8.21.0, brace-expansion→5.0.6, uuid→11.1.1 (overrides), plus the backend + frontend minor-patch dependency groups. Root + workspace lockfiles re-synced so `npm ci` passes; `npm audit` reports 0 vulnerabilities.
