@@ -100,6 +100,16 @@ export function formatCount(n) {
   return (n / 1_000_000).toFixed(1).replace(/\.0$/, '') + 'M'
 }
 
+/**
+ * Strip the boilerplate "ABSTRACT" / "Abstract:" / "Summary —" lead-in
+ * that CrossRef and OpenAlex payloads often prepend to abstract text, so
+ * cards don't render "ABSTRACT Considering the growing…".
+ */
+export function cleanAbstract(s) {
+  if (!s || typeof s !== 'string') return ''
+  return s.replace(/^\s*(abstract|summary)\s*[:.—–-]?\s+/i, '')
+}
+
 /** Truncate a string at the nearest word boundary. */
 export function truncate(s, max = 200) {
   if (!s || typeof s !== 'string') return ''

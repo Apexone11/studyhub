@@ -10,7 +10,7 @@
  * Security: KaTeX is a pure renderer — no script execution.
  * LaTeX source is stored as text (not HTML), preventing injection.
  */
-import { Node, mergeAttributes } from '@tiptap/react'
+import { Node, mergeAttributes } from '@tiptap/core'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import katex from 'katex'
 

@@ -31,12 +31,16 @@
  *  - "Why this paper?" tooltip pulling from result._meta
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { API } from '../../config'
 import PaperCard from './paperCard/PaperCard'
 import ScholarShell from './ScholarShell'
 import ScholarFiltersDrawer from './ScholarFiltersDrawer'
+import CiteModal from './cite/CiteModal'
+import SourceStatusStrip from './SourceStatusStrip'
+import ScholarCompareSheet from './compare/ScholarCompareSheet'
+import useSavedPapers from './useSavedPapers'
 import useScholarShortcuts from './shortcuts/useScholarShortcuts'
 import ScholarKeyboardShortcutsModal, {
   ScholarShortcutsHint,
@@ -148,7 +152,6 @@ function WhyPaperTooltip({ meta }) {
 export default function ScholarSearchPage() {
   usePageTitle('Scholar search')
   const [params, setParams] = useSearchParams()
-  const navigate = useNavigate()
   const layout = useResponsiveAppLayout()
 
   // Read URL params (camelCase preferred, snake_case fallback for deep-links).
@@ -401,13 +404,27 @@ export default function ScholarSearchPage() {
     setParams(next, { replace: true })
   }, [params, setParams])
 
+  const [compareOpen, setCompareOpen] = useState(false)
   const goToCompare = useCallback(() => {
     if (compareIds.length < 2) return
-    // Future iteration: render a side-by-side compare table. For now we
-    // simply land the user back on the search URL with the compare set
-    // preserved so a follow-up agent can wire the table.
-    navigate(`/scholar/search?q=${encodeURIComponent(q)}&compare=${compareIds.join(',')}`)
-  }, [compareIds, navigate, q])
+    setCompareOpen(true)
+  }, [compareIds])
+
+  // Deep links land with ?compare=id1,id2 already set — open the sheet
+  // once the papers are on screen so the shared URL delivers what it
+  // promises. Only fires once per mount; after that the button owns it.
+  const compareAutoOpened = useRef(false)
+  useEffect(() => {
+    if (compareAutoOpened.current) return
+    if (compareIds.length >= 2 && results.length > 0) {
+      compareAutoOpened.current = true
+      queueMicrotask(() => setCompareOpen(true))
+    }
+  }, [compareIds, results.length])
+
+  // ── Inline card actions: save + cite ───────────────────────────────
+  const { savedIds, toggleSave } = useSavedPapers()
+  const [citePaper, setCitePaper] = useState(null)
 
   // ── Drawer (mobile) ────────────────────────────────────────────────
   const [drawerOpen, setDrawerOpen] = useState(false)
@@ -582,12 +599,8 @@ export default function ScholarSearchPage() {
         {/* Result count + duration + throttled banner */}
         {q && !loading && !error && results.length > 0 && (
           <div className="scholar-search-page__meta">
+            <SourceStatusStrip throttled={throttled} activeSource={source} />
             <span className="scholar-search-page__meta-spacer" aria-hidden="true" />
-            {throttled.length > 0 && (
-              <span className="scholar-search-page__throttled">
-                {throttled.join(', ')} throttled
-              </span>
-            )}
             <span
               className="scholar-search-page__meta-chip"
               aria-label={`${results.length} result${results.length === 1 ? '' : 's'}${duration ? `, ${duration} milliseconds` : ''}`}
@@ -703,7 +716,13 @@ export default function ScholarSearchPage() {
                     >
                       {selected ? '✓ Compare' : 'Compare'}
                     </button>
-                    <PaperCard paper={paper} variant="full" />
+                    <PaperCard
+                      paper={paper}
+                      variant="full"
+                      saved={savedIds.has(paper.id)}
+                      onSave={toggleSave}
+                      onCite={setCitePaper}
+                    />
                     <WhyPaperTooltip meta={paper._meta} />
                   </div>
                 )
@@ -752,6 +771,22 @@ export default function ScholarSearchPage() {
           </div>
         )}
       </div>
+
+      {citePaper && (
+        <CiteModal
+          paperId={citePaper.id}
+          paperTitle={citePaper.title}
+          onClose={() => setCitePaper(null)}
+        />
+      )}
+
+      {compareOpen && compareIds.length >= 2 && (
+        <ScholarCompareSheet
+          paperIds={compareIds}
+          papers={results}
+          onClose={() => setCompareOpen(false)}
+        />
+      )}
 
       <ScholarFiltersDrawer
         open={drawerOpen}

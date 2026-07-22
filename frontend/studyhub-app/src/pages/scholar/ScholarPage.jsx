@@ -24,7 +24,9 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import useFetch from '../../lib/useFetch'
 import { Skeleton } from '../../components/Skeleton'
 import PaperCard from './paperCard/PaperCard'
-import { POPULAR_TOPICS } from './scholarConstants'
+import CiteModal from './cite/CiteModal'
+import useSavedPapers from './useSavedPapers'
+import { POPULAR_TOPICS, TRY_CHIPS, formatCount } from './scholarConstants'
 import ScholarShell from './ScholarShell'
 import './ScholarPage.css'
 
@@ -130,6 +132,17 @@ export default function ScholarPage() {
     initialData: [],
   })
 
+  // Live corpus stats for the hero (papers indexed / open access). The
+  // line hides entirely on error or a cold, zero-count database — never
+  // advertise "0 papers".
+  const stats = useFetch('/api/scholar/stats', { swr: 300_000 })
+  const statsPapers = Number.isFinite(stats.data?.papers) ? stats.data.papers : 0
+  const statsOa = Number.isFinite(stats.data?.openAccess) ? stats.data.openAccess : 0
+
+  // Inline card actions shared by both discover grids.
+  const { savedIds, toggleSave } = useSavedPapers()
+  const [citePaper, setCitePaper] = useState(null)
+
   const handleSubmit = useCallback(
     (e) => {
       e?.preventDefault?.()
@@ -214,6 +227,29 @@ export default function ScholarPage() {
                 Search
               </button>
             </form>
+
+            {/* Example queries — kills blank-page paralysis on first visit. */}
+            <div className="scholar-landing-try" aria-label="Example searches">
+              <span className="scholar-landing-try__label">Try</span>
+              {TRY_CHIPS.map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  className="scholar-landing-try__chip"
+                  onClick={() => navigate(`/scholar/search?q=${encodeURIComponent(chip)}`)}
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
+
+            {statsPapers > 0 && (
+              <p className="scholar-landing-hero__stats">
+                {formatCount(statsPapers)} papers indexed by StudyHub
+                {statsOa > 0 ? ` · ${formatCount(statsOa)} open access` : ''} · pulled from Semantic
+                Scholar, OpenAlex, CrossRef, arXiv, and Unpaywall
+              </p>
+            )}
           </section>
 
           {/* ── Block 2: Recently viewed (hide when empty) ──────────── */}
@@ -313,7 +349,13 @@ export default function ScholarPage() {
             ) : (
               <div className="scholar-landing-grid scholar-landing-grid--fade-in">
                 {schoolPapers.slice(0, 8).map((paper) => (
-                  <PaperCard key={paper.id} paper={paper} />
+                  <PaperCard
+                    key={paper.id}
+                    paper={paper}
+                    saved={savedIds.has(paper.id)}
+                    onSave={toggleSave}
+                    onCite={setCitePaper}
+                  />
                 ))}
               </div>
             )}
@@ -365,7 +407,13 @@ export default function ScholarPage() {
             ) : (
               <div className="scholar-landing-grid scholar-landing-grid--fade-in">
                 {trendingPapers.slice(0, 8).map((paper) => (
-                  <PaperCard key={paper.id} paper={paper} />
+                  <PaperCard
+                    key={paper.id}
+                    paper={paper}
+                    saved={savedIds.has(paper.id)}
+                    onSave={toggleSave}
+                    onCite={setCitePaper}
+                  />
                 ))}
               </div>
             )}
@@ -446,6 +494,14 @@ export default function ScholarPage() {
           </div>
         </aside>
       </div>
+
+      {citePaper && (
+        <CiteModal
+          paperId={citePaper.id}
+          paperTitle={citePaper.title}
+          onClose={() => setCitePaper(null)}
+        />
+      )}
     </ScholarShell>
   )
 }

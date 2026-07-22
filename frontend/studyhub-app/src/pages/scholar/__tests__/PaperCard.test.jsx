@@ -18,6 +18,7 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import PaperCard from '../paperCard/PaperCard'
+import { cleanAbstract } from '../scholarConstants'
 
 // useDeviceClass hits window.matchMedia + UA sniffing — stub it so the
 // component reliably renders the desktop branch in tests. The
@@ -46,7 +47,31 @@ afterEach(() => {
   cleanup()
 })
 
+describe('cleanAbstract', () => {
+  it('strips a leading ABSTRACT token', () => {
+    expect(cleanAbstract('ABSTRACT Considering the growing interest…')).toBe(
+      'Considering the growing interest…',
+    )
+    expect(cleanAbstract('Abstract: We propose a method.')).toBe('We propose a method.')
+    expect(cleanAbstract('Summary — Results show X.')).toBe('Results show X.')
+  })
+
+  it('leaves normal abstracts untouched', () => {
+    expect(cleanAbstract('We propose a method for X.')).toBe('We propose a method for X.')
+    expect(cleanAbstract('')).toBe('')
+    expect(cleanAbstract(null)).toBe('')
+  })
+})
+
 describe('PaperCard', () => {
+  it('renders a PDF read action only for open-access papers', () => {
+    renderCard({ paper: { ...MINIMAL_PAPER, openAccess: true } })
+    expect(screen.getByRole('link', { name: /read the free pdf/i })).toBeInTheDocument()
+    cleanup()
+    renderCard({ paper: { ...MINIMAL_PAPER, openAccess: false } })
+    expect(screen.queryByRole('link', { name: /read the free pdf/i })).not.toBeInTheDocument()
+  })
+
   it('renders with a minimal paper prop without throwing', () => {
     renderCard()
     expect(screen.getByRole('heading', { name: 'A Study of Gravity' })).toBeInTheDocument()
