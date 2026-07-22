@@ -532,3 +532,164 @@
   font-size: 13px;
   padding: 24px 0;
 }
+
+/* ── Per-source coverage strip ───────────────────────────────────────── */
+/* One chip per federated index. Throttled sources go amber so thinner
+   result lists are explained instead of silent. */
+
+.scholar-source-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.scholar-source-strip__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--sh-border);
+  background: var(--sh-surface);
+  color: var(--sh-subtext);
+  font-size: var(--type-xs);
+  font-weight: 600;
+}
+
+.scholar-source-strip__chip svg {
+  color: var(--sh-success-text);
+}
+
+.scholar-source-strip__chip--throttled {
+  background: var(--sh-warning-bg);
+  border-color: var(--sh-warning-border);
+  color: var(--sh-warning-text);
+}
+
+.scholar-source-strip__chip--throttled svg {
+  color: var(--sh-warning-text);
+}
+
+.scholar-source-strip__note {
+  font-weight: 500;
+}
+
+/* ── Compare sheet ───────────────────────────────────────────────────── */
+
+.scholar-compare__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 22px;
+  border-bottom: 1px solid var(--sh-border);
+}
+
+.scholar-compare__title {
+  margin: 0;
+  font-size: var(--type-lg);
+  font-weight: 700;
+  color: var(--sh-text);
+}
+
+.scholar-compare__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--sh-subtext);
+  font-size: 22px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.scholar-compare__close:hover,
+.scholar-compare__close:focus-visible {
+  background: var(--sh-soft);
+  color: var(--sh-text);
+  outline: none;
+  border-color: var(--sh-brand);
+}
+
+.scholar-compare__scroll {
+  overflow: auto;
+  padding: 0 22px 22px;
+}
+
+.scholar-compare__table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--type-sm);
+}
+
+.scholar-compare__table th,
+.scholar-compare__table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--sh-border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.scholar-compare__row-label {
+  width: 110px;
+  min-width: 90px;
+  font-size: var(--type-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sh-subtext);
+  white-space: nowrap;
+}
+
+.scholar-compare__paper-head {
+  min-width: 180px;
+  max-width: 260px;
+}
+
+.scholar-compare__paper-title {
+  display: block;
+  font-weight: 700;
+  color: var(--sh-text);
+  text-decoration: none;
+  line-height: 1.35;
+}
+
+.scholar-compare__paper-title:hover,
+.scholar-compare__paper-title:focus-visible {
+  color: var(--sh-brand);
+  outline: none;
+}
+
+.scholar-compare__paper-title--missing {
+  color: var(--sh-subtext);
+  font-style: italic;
+  font-weight: 500;
+}
+
+.scholar-compare__paper-authors {
+  display: block;
+  margin-top: 4px;
+  font-size: var(--type-xs);
+  font-weight: 500;
+  color: var(--sh-subtext);
+}
+
+.scholar-compare__cell {
+  color: var(--sh-text);
+}
+
+/* Phones: the dialog flips to a bottom sheet; let the matrix scroll
+   sideways inside its own container instead of squeezing columns. */
+@media (max-width: 767px) {
+  .scholar-compare__scroll {
+    padding: 0 14px 14px;
+  }
+  .scholar-compare__paper-head {
+    min-width: 150px;
+  }
+}

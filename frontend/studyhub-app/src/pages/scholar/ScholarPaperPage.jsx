@@ -292,7 +292,14 @@ export default function ScholarPaperPage() {
   })
   const paper = paperData?.paper || paperData || null
 
-  const [activeTab, setActiveTab] = useState('abstract')
+  // Honor ?tab= deep links (PaperCard's "Cited by" strip links to
+  // ?tab=citations). Lazy initializer only — after mount the tab strip
+  // owns the state and the param is not re-read.
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window === 'undefined') return 'abstract'
+    const requested = new URLSearchParams(window.location.search).get('tab')
+    return TABS.some((t) => t.id === requested) ? requested : 'abstract'
+  })
 
   const refsUrl =
     validId && activeTab === 'references'

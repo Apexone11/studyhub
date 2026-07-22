@@ -21,6 +21,8 @@ import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'
 import { showToast } from '../../lib/toast'
 import PaperCard from './paperCard/PaperCard'
+import CiteModal from './cite/CiteModal'
+import useSavedPapers from './useSavedPapers'
 import { POPULAR_TOPICS } from './scholarConstants'
 import ScholarShell from './ScholarShell'
 import './ScholarPage.css'
@@ -81,6 +83,8 @@ function SkeletonGrid() {
 export default function ScholarTopicPage() {
   const { slug } = useParams()
   const safeSlug = (slug || '').toLowerCase()
+  const { savedIds, toggleSave } = useSavedPapers()
+  const [citePaper, setCitePaper] = useState(null)
   const [params, setParams] = useSearchParams()
   const requestedSort = params.get('sort')
   const sort = SORT_OPTIONS.some((s) => s.id === requestedSort) ? requestedSort : 'recent'
@@ -368,9 +372,24 @@ export default function ScholarTopicPage() {
           {!loading && !error && results.length > 0 && (
             <div className="scholar-list__grid" style={{ marginTop: 16 }}>
               {results.map((paper) => (
-                <PaperCard key={paper.id} paper={paper} variant="full" />
+                <PaperCard
+                  key={paper.id}
+                  paper={paper}
+                  variant="full"
+                  saved={savedIds.has(paper.id)}
+                  onSave={toggleSave}
+                  onCite={setCitePaper}
+                />
               ))}
             </div>
+          )}
+
+          {citePaper && (
+            <CiteModal
+              paperId={citePaper.id}
+              paperTitle={citePaper.title}
+              onClose={() => setCitePaper(null)}
+            />
           )}
 
           <div style={{ marginTop: 32 }}>

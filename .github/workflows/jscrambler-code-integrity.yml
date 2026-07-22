@@ -34,7 +34,7 @@ jobs:
             echo "exists=false" >> "$GITHUB_OUTPUT"
             echo "frontend/studyhub-app/jscrambler.json is missing. Skipping Jscrambler protection run."
           fi
-      - uses: actions/setup-node@v6
+      - uses: actions/setup-node@v7
         if: steps.jscrambler_config.outputs.exists == 'true'
         with:
           node-version: 20
@@ -48,7 +48,7 @@ jobs:
         id: jscrambler
         if: steps.jscrambler_config.outputs.exists == 'true'
         # the complete list of inputs can be found here: https://github.com/marketplace/actions/jscrambler#inputs
-        uses: jscrambler/code-integrity-actions/protect@af3b8668f02abd16ee1b8d9a06276ddd043b053f
+        uses: jscrambler/code-integrity-actions/protect@89dc47d647cafe1d3aa01b80d85aa232f2b9dba1
         with:
           application-id: ${{ secrets['JSCRAMBLER_APPLICATION_ID'] }}  # This value should be created within your Jscrambler account
           secret-key: ${{ secrets['JSCRAMBLER_SECRET_KEY'] }}          # This value can be found in your Jscrambler account

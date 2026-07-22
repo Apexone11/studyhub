@@ -443,3 +443,31 @@
 .paper-card__compact-year::before {
   content: '· ';
 }
+
+/* ── Open-access PDF quick action ────────────────────────────────────── */
+/* Green = "read the full text right now, free, inside StudyHub" — the
+   Unpaywall convention. Rendered only when paper.openAccess === true. */
+
+.paper-card__action--pdf {
+  width: auto;
+  gap: 5px;
+  padding: 0 12px;
+  color: var(--sh-success-text);
+  background: var(--sh-success-bg);
+  border-color: var(--sh-success-border);
+  text-decoration: none;
+  font-size: var(--type-xs);
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.paper-card__action--pdf:hover,
+.paper-card__action--pdf:focus-visible {
+  background: var(--sh-success-bg);
+  color: var(--sh-success-text);
+  border-color: var(--sh-success-text);
+}
+
+.paper-card__action-pdf-label {
+  line-height: 1;
+}

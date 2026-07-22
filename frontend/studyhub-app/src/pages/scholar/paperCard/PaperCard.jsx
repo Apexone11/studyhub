@@ -33,7 +33,7 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import CitationSparkline from './CitationSparkline'
-import { formatCount, truncate } from '../scholarConstants'
+import { cleanAbstract, formatCount, truncate } from '../scholarConstants'
 import useDeviceClass from '../../../lib/useDeviceClass'
 import './PaperCard.css'
 
@@ -156,6 +156,28 @@ function IconPeople() {
   )
 }
 
+function IconPdf() {
+  return (
+    <svg
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <path d="M14 2v6h6" />
+      <path d="M9 15h6" />
+      <path d="M9 11h2" />
+    </svg>
+  )
+}
+
 function IconInfo() {
   return (
     <svg
@@ -221,7 +243,9 @@ export default function PaperCard({
   // Body text: TLDR wins, otherwise 3-line clamped abstract with optional reveal.
   const tldr = typeof paper.tldr === 'string' && paper.tldr.trim() ? paper.tldr.trim() : null
   const abstract =
-    typeof paper.abstract === 'string' && paper.abstract.trim() ? paper.abstract.trim() : null
+    typeof paper.abstract === 'string' && cleanAbstract(paper.abstract).trim()
+      ? cleanAbstract(paper.abstract).trim()
+      : null
   const bodyText = tldr || abstract
   const bodyIsClamped = !tldr && abstract && abstract.length > 240
   const shownBody = tldr ? tldr : showMore ? abstract : truncate(abstract || '', 240)
@@ -526,6 +550,18 @@ export default function PaperCard({
         >
           <IconBook />
         </Link>
+        {paper.openAccess === true && (
+          <Link
+            to={href}
+            className="paper-card__action paper-card__action--pdf"
+            aria-label="Read the free PDF"
+            title="Open access — read the PDF inside StudyHub"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <IconPdf />
+            <span className="paper-card__action-pdf-label">PDF</span>
+          </Link>
+        )}
         {typeof onShare === 'function' && (
           <button
             type="button"
