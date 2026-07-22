@@ -1160,6 +1160,26 @@ function FeedCardInner({
                       background: 'var(--sh-paper-soft)',
                     }}
                   />
+                ) : previewKind === 'pdf' ? (
+                  // Chrome's built-in PDF viewer cannot initialize inside ANY
+                  // sandboxed iframe (plugins are disabled by sandbox —
+                  // crbug.com/41131921), so the PDF branch renders unsandboxed.
+                  // Safe: the response is first-party application/pdf with
+                  // nosniff and script-src 'none' CSP, so it can never be
+                  // reinterpreted as scriptable HTML.
+                  <iframe
+                    src={urls.previewUrl}
+                    title={`Attachment preview ${item.id}`}
+                    referrerPolicy="no-referrer"
+                    loading="lazy"
+                    style={{
+                      width: '100%',
+                      height: 300,
+                      border: 'none',
+                      background: 'var(--sh-paper)',
+                      colorScheme: 'light',
+                    }}
+                  />
                 ) : (
                   <iframe
                     src={urls.previewUrl}

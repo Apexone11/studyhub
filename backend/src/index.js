@@ -323,7 +323,16 @@ app.use(
 )
 
 app.use((req, res, next) => {
-  const isPreviewSurface = req.path === '/preview' || req.path.startsWith('/preview/')
+  // Attachment previews (feed posts etc.) are framed by the SPA in an
+  // <iframe>; the app-surface X-Frame-Options: DENY / frame-ancestors
+  // 'none' pair below would blank them out, so they ride the preview
+  // surface profile (frame-ancestors limited to trusted app origins,
+  // script-src 'none'). The response itself stays application/pdf|image
+  // with nosniff — see lib/attachmentPreview.js.
+  const isPreviewSurface =
+    req.path === '/preview' ||
+    req.path.startsWith('/preview/') ||
+    req.path.endsWith('/attachment/preview')
 
   if (isPreviewSurface) {
     res.setHeader('Content-Security-Policy', previewSurfaceCsp)

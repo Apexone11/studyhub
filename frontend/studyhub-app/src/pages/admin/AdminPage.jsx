@@ -5,7 +5,7 @@ import AppSidebar from '../../components/sidebar/AppSidebar'
 import ConfirmDialog from '../../components/ConfirmDialog'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
 import { useLivePolling } from '../../lib/useLivePolling'
-import { FONT, TABS, formatDateTime } from './adminConstants'
+import { FONT, TAB_GROUPS, formatDateTime } from './adminConstants'
 import { AccessDeniedCard } from './AdminWidgets'
 import { useAdminData } from './useAdminData'
 import ModerationTab from './moderation/ModerationTab'
@@ -193,50 +193,63 @@ export default function AdminPage() {
                     padding: '18px 20px',
                   }}
                 >
-                  <div
-                    style={{
-                      display: 'flex',
-                      // Wider column-gap + an explicit row-gap so the
-                      // second wrapped row has breathing space instead
-                      // of stacking flush against the first. Beta
-                      // tester reported the row felt cramped at full
-                      // admin width (16 tabs).
-                      columnGap: 10,
-                      rowGap: 10,
-                      flexWrap: 'wrap',
-                    }}
-                  >
-                    {TABS.map(([value, label]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setActiveTab(value)}
-                        style={{
-                          // Slightly taller pills give the active-tab
-                          // border more visual weight and align better
-                          // with the v2 button kit (height ~36).
-                          padding: '9px 16px',
-                          borderRadius: 10,
-                          border:
-                            activeTab === value
-                              ? '1px solid var(--sh-info)'
-                              : '1px solid var(--sh-border, #e2e8f0)',
-                          background:
-                            activeTab === value
-                              ? 'var(--sh-info-bg, #eff6ff)'
-                              : 'var(--sh-surface, #fff)',
-                          color:
-                            activeTab === value
-                              ? 'var(--sh-info-text, #1d4ed8)'
-                              : 'var(--sh-slate-600, #475569)',
-                          fontSize: 13,
-                          fontWeight: 700,
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                        }}
-                      >
-                        {label}
-                      </button>
+                  <div style={{ display: 'flex', flexDirection: 'column', rowGap: 14 }}>
+                    {TAB_GROUPS.map((group) => (
+                      <div key={group.label}>
+                        <div
+                          style={{
+                            fontSize: 11,
+                            fontWeight: 700,
+                            letterSpacing: '0.04em',
+                            textTransform: 'uppercase',
+                            color: 'var(--sh-slate-500, #64748b)',
+                            marginBottom: 6,
+                          }}
+                        >
+                          {group.label}
+                        </div>
+                        <div
+                          style={{
+                            display: 'flex',
+                            columnGap: 10,
+                            rowGap: 10,
+                            flexWrap: 'wrap',
+                          }}
+                        >
+                          {group.tabs.map(([value, label]) => (
+                            <button
+                              key={value}
+                              type="button"
+                              onClick={() => setActiveTab(value)}
+                              style={{
+                                // Slightly taller pills give the active-tab
+                                // border more visual weight and align better
+                                // with the v2 button kit (height ~36).
+                                padding: '9px 16px',
+                                borderRadius: 10,
+                                border:
+                                  activeTab === value
+                                    ? '1px solid var(--sh-info)'
+                                    : '1px solid var(--sh-border, #e2e8f0)',
+                                background:
+                                  activeTab === value
+                                    ? 'var(--sh-info-bg, #eff6ff)'
+                                    : 'var(--sh-surface, #fff)',
+                                color:
+                                  activeTab === value
+                                    ? 'var(--sh-info-text, #1d4ed8)'
+                                    : 'var(--sh-slate-600, #475569)',
+                                fontSize: 13,
+                                fontWeight: 700,
+                                cursor: 'pointer',
+                                fontFamily: 'inherit',
+                              }}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     ))}
                   </div>
                 </section>
@@ -304,7 +317,8 @@ export default function AdminPage() {
                 activeTab !== 'security' &&
                 activeTab !== 'activation' &&
                 activeTab !== 'referrals-admin' &&
-                activeTab !== 'observability' ? (
+                activeTab !== 'observability' &&
+                activeTab !== 'consent-log' ? (
                   <section
                     style={{
                       background: 'var(--sh-surface, #fff)',
