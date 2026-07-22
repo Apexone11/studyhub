@@ -166,11 +166,41 @@ function formatPost(item, commentCounts, reactionRows, currentReactions) {
     hasAttachment: Boolean(item.attachmentUrl),
     attachmentName: item.attachmentName || null,
     attachmentType: item.attachmentType || null,
+    attachments: formatPostAttachments(item),
     allowDownloads: item.allowDownloads !== false,
     moderationStatus: item.moderationStatus || 'clean',
     video: formatVideoForFeed(item.video),
     linkPath: `/feed?post=${item.id}`,
   }
+}
+
+// Multi-attachment list for a post. Prefers loaded FeedPostAttachment rows;
+// falls back to synthesizing a one-item list from the legacy single-attachment
+// columns so pre-migration posts (and query sites that don't include the
+// relation yet) keep a uniform shape. Never exposes raw file URLs — the
+// client builds preview/download URLs from the id-keyed API routes.
+function formatPostAttachments(item) {
+  if (Array.isArray(item.attachments) && item.attachments.length > 0) {
+    return item.attachments.map((a) => ({
+      id: a.id,
+      name: a.name,
+      type: a.type,
+      sizeBytes: a.sizeBytes || 0,
+      position: a.position || 0,
+    }))
+  }
+  if (item.attachmentUrl) {
+    return [
+      {
+        id: null,
+        name: item.attachmentName || 'Attachment',
+        type: item.attachmentType || 'file',
+        sizeBytes: 0,
+        position: 0,
+      },
+    ]
+  }
+  return []
 }
 
 function formatNote(item, commentCounts) {
@@ -215,6 +245,7 @@ function formatFeedPostDetail(item, commentCount, reactionRows, currentReactions
     hasAttachment: Boolean(item.attachmentUrl),
     attachmentName: item.attachmentName || null,
     attachmentType: item.attachmentType || null,
+    attachments: formatPostAttachments(item),
     allowDownloads: item.allowDownloads !== false,
     moderationStatus: item.moderationStatus || 'clean',
     video: formatVideoForFeed(item.video),
