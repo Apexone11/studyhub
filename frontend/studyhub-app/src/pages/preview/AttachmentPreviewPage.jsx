@@ -309,6 +309,17 @@ export default function AttachmentPreviewPage() {
                         display: 'block',
                       }}
                     />
+                  ) : previewKind === 'pdf' ? (
+                    // Chrome's PDF viewer can't start inside a sandboxed
+                    // iframe (crbug.com/41131921) — the PDF branch renders
+                    // unsandboxed. Safe: first-party application/pdf +
+                    // nosniff + script-src 'none' CSP on the response.
+                    <iframe
+                      src={config.previewUrl}
+                      title={`Attachment preview ${scope}-${numericId}`}
+                      referrerPolicy="no-referrer"
+                      style={{ width: '100%', height: '80vh', border: 'none' }}
+                    />
                   ) : (
                     <iframe
                       src={config.previewUrl}

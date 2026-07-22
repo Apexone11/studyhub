@@ -1,29 +1,61 @@
 export const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 export const PAGE_SIZE = 20
 
-export const TABS = [
-  ['overview', 'Overview'],
-  ['analytics', 'Analytics'],
-  ['users', 'Users'],
-  ['sheets', 'Sheets'],
-  ['sheet-reviews', 'Sheet Reviews'],
-  ['announcements', 'Announcements'],
-  ['deletion-reasons', 'Deletion Reasons'],
-  ['email-suppressions', 'Email Suppressions'],
-  ['moderation', 'Moderation'],
-  ['schools', 'Schools'],
-  ['settings', 'Admin Settings'],
-  ['revenue', 'Revenue'],
-  ['newsletter', 'Newsletter'],
-  ['reviews', 'Reviews'],
-  ['group-reports', 'Group Reports'],
-  ['waitlist', 'Waitlist'],
-  ['security', 'Security'],
-  ['activation', 'Activation'],
-  ['referrals-admin', 'Referrals'],
-  ['observability', 'Observability'],
-  ['consent-log', 'Consent Log'],
+// Grouped tab registry — the admin nav renders one labeled row per group
+// instead of a single 21-pill ragged wrap. Order within a group is display
+// order; group order is display order top-to-bottom.
+export const TAB_GROUPS = [
+  {
+    label: 'Platform',
+    tabs: [
+      ['overview', 'Overview'],
+      ['analytics', 'Analytics'],
+      ['observability', 'Observability'],
+      ['activation', 'Activation'],
+    ],
+  },
+  {
+    label: 'Content',
+    tabs: [
+      ['sheets', 'Sheets'],
+      ['sheet-reviews', 'Sheet Reviews'],
+      ['reviews', 'Reviews'],
+      ['announcements', 'Announcements'],
+      ['newsletter', 'Newsletter'],
+    ],
+  },
+  {
+    label: 'Community',
+    tabs: [
+      ['users', 'Users'],
+      ['schools', 'Schools'],
+      ['group-reports', 'Group Reports'],
+      ['referrals-admin', 'Referrals'],
+      ['waitlist', 'Waitlist'],
+    ],
+  },
+  {
+    label: 'Trust & Safety',
+    tabs: [
+      ['moderation', 'Moderation'],
+      ['security', 'Security'],
+      ['deletion-reasons', 'Deletion Reasons'],
+      ['email-suppressions', 'Email Suppressions'],
+      ['consent-log', 'Consent Log'],
+    ],
+  },
+  {
+    label: 'Revenue & System',
+    tabs: [
+      ['revenue', 'Revenue'],
+      ['settings', 'Admin Settings'],
+    ],
+  },
 ]
+
+// Flat list derived from the groups — kept for every existing consumer so
+// the two structures can never drift.
+export const TABS = TAB_GROUPS.flatMap((g) => g.tabs)
 
 export function authHeaders() {
   return { 'Content-Type': 'application/json' }
