@@ -120,6 +120,9 @@ export default function UploadSheetPage() {
           setCourseId={hook.setCourseId}
           allowDownloads={hook.allowDownloads}
           setAllowDownloads={hook.setAllowDownloads}
+          fontFamily={hook.fontFamily}
+          setFontFamily={hook.setFontFamily}
+          showFontPicker={!hook.isHtmlMode}
           courses={hook.courses}
           enrolledSchoolIds={hook.enrolledSchoolIds}
           error={hook.error}

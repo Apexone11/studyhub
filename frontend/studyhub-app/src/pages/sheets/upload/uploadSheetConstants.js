@@ -65,3 +65,12 @@ export function useSafeBlocker(predicate) {
 
 /* ── Re-export from uploadSheetComponents.jsx ──────────────────────────── */
 export { MiniPreview } from './uploadSheetComponents.jsx'
+
+// Author-selectable typefaces for rendered sheet content. Values mirror the
+// server allowlist in backend/src/modules/sheets/sheets.constants.js; the
+// `preview` stack lets each button render in the face it selects.
+export const SHEET_FONT_OPTIONS = [
+  { value: 'sans', label: 'Sans', preview: 'inherit' },
+  { value: 'serif', label: 'Serif', preview: 'var(--font-paper), Georgia, serif' },
+  { value: 'mono', label: 'Mono', preview: 'ui-monospace, Menlo, Consolas, monospace' },
+]

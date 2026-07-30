@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import DOMPurify from 'dompurify'
 import { IconFork } from '../../../components/Icons'
@@ -6,6 +6,8 @@ import { FONT, panelStyle, timeAgo } from './sheetViewerConstants'
 import { PURIFY_CONFIG } from '../../../components/editor/editorSanitize'
 import { renderMath } from '../../../components/editor/MathExtension'
 import '../../../components/editor/richTextEditor.css'
+import SheetReaderControls from './SheetReaderControls'
+import { readReaderPrefs, readerClassNameFor, readerPrefsToStyle } from './sheetReaderPrefs'
 
 /* ── Rich text content renderer ────────────────────────────────────── */
 
@@ -203,7 +205,14 @@ export default function SheetContentPanel({
   toggleViewerInteractive,
   sheetPanelRef,
 }) {
+  // Reader preferences are this viewer's, not the sheet's — they persist
+  // across sheets. The author's typeface choice rides alongside as a class.
+  const [readerPrefs, setReaderPrefs] = useState(readReaderPrefs)
+
   if (!sheet) return null
+
+  const readerClassName = readerClassNameFor(sheet.fontFamily)
+  const readerStyle = readerPrefsToStyle(readerPrefs)
 
   // Tier 1 (FLAGGED) sheets serialize with previewMode='interactive' so
   // the in-viewer Safe/Interactive toggle is reachable. The warning UI
@@ -227,6 +236,29 @@ export default function SheetContentPanel({
           marginBottom: 14,
         }}
       >
+        {/* Reader controls only apply to app-rendered content. HTML sheets
+            style themselves inside the sandboxed preview iframe, which we
+            must not reach into (A14). */}
+        {!isHtmlSheet ? (
+          <div style={{ order: 2, marginLeft: 'auto' }}>
+            <SheetReaderControls
+              prefs={readerPrefs}
+              onChange={setReaderPrefs}
+              buttonStyle={{
+                minWidth: 38,
+                height: 34,
+                borderRadius: 8,
+                border: '1px solid var(--sh-border)',
+                background: 'var(--sh-surface)',
+                color: 'var(--sh-text)',
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+              }}
+            />
+          </div>
+        ) : null}
         <div>
           <h1 style={{ margin: 0, fontSize: 30, color: 'var(--sh-heading)' }}>{sheet.title}</h1>
           <div style={{ marginTop: 6, color: 'var(--sh-subtext)', fontSize: 13 }}>
@@ -365,7 +397,9 @@ export default function SheetContentPanel({
       ) : null}
 
       {sheet.contentFormat === 'richtext' ? (
-        <RichTextContentBlock content={sheet.content} />
+        <div className={readerClassName} style={readerStyle}>
+          <RichTextContentBlock content={sheet.content} />
+        </div>
       ) : isHtmlSheet ? (
         previewMode === 'disabled' ? (
           <div
@@ -619,7 +653,9 @@ export default function SheetContentPanel({
           </div>
         )
       ) : (
-        <TextContentBlock content={sheet.content} />
+        <div className={readerClassName} style={readerStyle}>
+          <TextContentBlock content={sheet.content} />
+        </div>
       )}
     </section>
   )

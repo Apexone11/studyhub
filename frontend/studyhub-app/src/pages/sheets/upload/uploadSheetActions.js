@@ -391,6 +391,7 @@ export function useHandleSubmit({
   courseId,
   description,
   draftId,
+  fontFamily,
   isEditing,
   legacyMarkdownMode,
   navigate,
@@ -454,6 +455,7 @@ export function useHandleSubmit({
             content,
             contentFormat: 'markdown',
             allowDownloads,
+            fontFamily,
             removeAttachment: removeExistingAttachment && !attachFile,
           }),
         })

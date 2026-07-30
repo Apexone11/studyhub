@@ -390,6 +390,10 @@ model StudySheet {
   title                  String
   content                String
   contentFormat          String       @default("markdown")
+  // Author-chosen typeface for rendered markdown/richtext content: one of
+  // sans | serif | mono, validated server-side. Ignored for html sheets,
+  // which carry their own styles inside the preview iframe.
+  fontFamily             String       @default("sans")
   status                 String       @default("published")
   htmlScanStatus         String       @default("queued")
   htmlScanFindings       Json?
