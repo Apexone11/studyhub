@@ -186,6 +186,21 @@ export default function AppSidebar({ mode = 'fixed' }) {
         </div>
       </div>
 
+      {/* Explore — cross-school discovery (G2-3). Pinned to the TOP of the
+          sidebar (founder request). Available to every account type; the
+          backend /api/explore surface is fail-closed behind flag_explore_tab
+          and 503s when off. Standalone link, not threaded through
+          sidebarConstants, so it lands without coupling to the section schema. */}
+      <Link
+        to="/explore"
+        onClick={handleNavClick}
+        className={`sh-sidebar-nav-link${pathname === '/explore' ? ' sh-sidebar-nav-link--active' : ''}`}
+        aria-current={pathname === '/explore' ? 'page' : undefined}
+      >
+        <IconSearch size={15} />
+        Explore
+      </Link>
+
       {/* Nav links — clean list, no enclosing card.
           Phase 1: behind design_v2_phase1_dashboard we render sectioned
           groups (MAIN / PERSONAL / ACCOUNT). Legacy flat rendering stays
@@ -295,21 +310,6 @@ export default function AppSidebar({ mode = 'fixed' }) {
           })}
         </nav>
       )}
-
-      {/* Explore — cross-school discovery (G2-3). Available to every
-          account type; the backend /api/explore surface is fail-closed
-          behind flag_explore_tab and 503s when off. Rendered as a
-          standalone link rather than threaded through sidebarConstants so
-          the entry lands without coupling to the section schema. */}
-      <Link
-        to="/explore"
-        onClick={handleNavClick}
-        className={`sh-sidebar-nav-link${pathname === '/explore' ? ' sh-sidebar-nav-link--active' : ''}`}
-        aria-current={pathname === '/explore' ? 'page' : undefined}
-      >
-        <IconSearch size={15} />
-        Explore
-      </Link>
 
       {/* Teacher section — for teacher accounts */}
       {user.accountType === 'teacher' && (
