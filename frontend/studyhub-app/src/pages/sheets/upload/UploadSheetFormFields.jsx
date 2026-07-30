@@ -6,7 +6,7 @@ import { Link } from 'react-router-dom'
 import { IconEye, IconUpload, IconPen } from '../../../components/Icons'
 import StackedEditorPane from '../../../components/editor/StackedEditorPane'
 import CourseSelect from '../../../components/CourseSelect'
-import { FONT, MiniPreview, tierColor, tierLabel } from './uploadSheetConstants'
+import { FONT, MiniPreview, SHEET_FONT_OPTIONS, tierColor, tierLabel } from './uploadSheetConstants'
 
 /* ── First-upload helper card ──────────────────────────────────────────── */
 const UPLOAD_HELPER_KEY = 'studyhub.upload.helper.dismissed'
@@ -113,6 +113,9 @@ export function InfoFields({
   setCourseId,
   allowDownloads,
   setAllowDownloads,
+  fontFamily,
+  setFontFamily,
+  showFontPicker = true,
   courses,
   enrolledSchoolIds,
   error,
@@ -242,6 +245,53 @@ export function InfoFields({
           Allow downloads
         </label>
       </div>
+      {/* HTML sheets bring their own styles, so the typeface picker only
+          applies to app-rendered markdown/richtext content. */}
+      {showFontPicker ? (
+        <div style={{ marginTop: 14 }}>
+          <span
+            style={{
+              display: 'block',
+              marginBottom: 6,
+              fontSize: 12,
+              fontWeight: 700,
+              color: 'var(--sh-slate-600, #475569)',
+            }}
+          >
+            Sheet font
+          </span>
+          <div role="group" aria-label="Sheet font" style={{ display: 'flex', gap: 6 }}>
+            {SHEET_FONT_OPTIONS.map((option) => {
+              const active = (fontFamily || 'sans') === option.value
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => {
+                    setFontFamily(option.value)
+                    setHasUnsavedChanges(true)
+                  }}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: 8,
+                    border: '1px solid',
+                    borderColor: active ? 'var(--sh-brand)' : 'var(--sh-border)',
+                    background: active ? 'var(--sh-info-bg)' : 'var(--sh-surface)',
+                    color: active ? 'var(--sh-brand)' : 'var(--sh-slate-600, #475569)',
+                    fontSize: 12,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                    fontFamily: option.preview,
+                  }}
+                >
+                  {option.label}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

@@ -133,6 +133,16 @@ const mocks = vi.hoisted(() => {
       },
       AUTHOR_SELECT: { id: true, username: true, avatarUrl: true, isStaffVerified: true },
       sheetWriteLimiter: (_req, _res, next) => next(),
+      // Mirrors the real allowlist helper; the controllers call it on every
+      // create/update, so a stub that returns undefined would 500 the route.
+      SHEET_FONT_FAMILIES: new Set(['sans', 'serif', 'mono']),
+      DEFAULT_SHEET_FONT_FAMILY: 'sans',
+      parseSheetFontFamily: (raw) => {
+        if (raw == null || raw === '') return { value: 'sans' }
+        const normalized = String(raw).trim().toLowerCase()
+        if (!['sans', 'serif', 'mono'].includes(normalized)) return { error: true }
+        return { value: normalized }
+      },
     },
     accessControl: {
       assertOwnerOrAdmin: vi.fn(({ res, user, ownerId }) => {

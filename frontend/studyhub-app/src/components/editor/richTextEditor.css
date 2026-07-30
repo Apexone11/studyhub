@@ -667,3 +667,29 @@
   content: 'Definition';
   color: var(--sh-subtext);
 }
+
+/* ── Sheet reader surface ────────────────────────────────────────────── */
+/* Author picks the typeface (StudySheet.fontFamily → modifier class);
+   the reader picks size / measure / leading, supplied as custom properties
+   by SheetReaderControls. Defaults keep pre-existing sheets unchanged. */
+
+.sh-sheet-reader {
+  font-size: var(--sheet-reader-size, 1rem);
+  line-height: var(--sheet-reader-lh, 1.6);
+  max-width: var(--sheet-reader-width, 76ch);
+}
+
+.sh-sheet-reader--serif {
+  font-family: var(--font-paper), Georgia, serif;
+}
+
+.sh-sheet-reader--mono {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}
+
+/* Code and math keep their own typeface regardless of the sheet font — a
+   serif sheet should not render its code blocks in a serif. */
+.sh-sheet-reader--serif :is(code, pre, kbd, samp),
+.sh-sheet-reader--mono :is(code, pre, kbd, samp) {
+  font-family: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+}

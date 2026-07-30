@@ -12,7 +12,12 @@ const { createNotification } = require('../../lib/notify')
 const { runPlagiarismScan } = require('../plagiarism/plagiarism.service')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
-const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
+const {
+  SHEET_STATUS,
+  AUTHOR_SELECT,
+  sheetWriteLimiter,
+  parseSheetFontFamily,
+} = require('./sheets.constants')
 const { extractPreviewText } = require('../../lib/sheets/extractPreviewText')
 const { getUserTier } = require('../../lib/getUserPlan')
 const { PLANS } = require('../payments/payments.constants')
@@ -38,6 +43,10 @@ const router = express.Router()
 router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (req, res) => {
   const { title, content, courseId, forkOf, description, allowDownloads, source } = req.body || {}
   const contentFormat = normalizeContentFormat(req.body?.contentFormat)
+  const fontFamily = parseSheetFontFamily(req.body?.fontFamily)
+  if (fontFamily.error) {
+    return sendError(res, 400, 'Sheet font must be sans, serif, or mono.', ERROR_CODES.BAD_REQUEST)
+  }
   // Accept both `hub_ai` (engine canonical) and `hub-ai` (the frontend
   // navigation-state marker emitted by AiSheetPreview) so a future client
   // tweak that forwards `source` verbatim still triggers AI_PUBLISH_SHEET.
@@ -159,6 +168,7 @@ router.post('/', requireAuth, requireVerifiedEmail, sheetWriteLimiter, async (re
         previewText: extractPreviewText(trimmedContent),
         content: trimmedContent,
         contentFormat,
+        fontFamily: fontFamily.value,
         status:
           htmlScanFields?.htmlRiskTier === RISK_TIER.QUARANTINED
             ? SHEET_STATUS.QUARANTINED
