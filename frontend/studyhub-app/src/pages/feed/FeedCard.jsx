@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import MentionText from '../../components/MentionText'
 import PendingReviewBanner from '../../components/PendingReviewBanner'
 import { IconDownload, IconEye, IconFork, IconStar, IconStarFilled } from '../../components/Icons'
-import { attachmentEndpoints, attachmentPreviewKind } from './feedHelpers'
+import { attachmentEndpoints, postAttachments } from './feedHelpers'
+import AttachmentSlideshow from './AttachmentSlideshow'
+import AttachmentDownloadPicker from './AttachmentDownloadPicker'
 import { popScale } from '../../lib/animations'
 import { Avatar } from './FeedWidgets'
 import CommentSection from './CommentSection'
@@ -794,7 +796,8 @@ function FeedCardInner({
   const isNote = item.type === 'note'
   const reaction = item.reactions || { likes: 0, dislikes: 0, userReaction: null }
   const urls = attachmentEndpoints(item)
-  const previewKind = attachmentPreviewKind(item)
+  const cardAttachments = postAttachments(item)
+  const [downloadPickerOpen, setDownloadPickerOpen] = useState(false)
 
   const [showComments, setShowComments] = useState(!!targetCommentId)
   const [shareToastMessage, setShareToastMessage] = useState('')
@@ -1134,83 +1137,53 @@ function FeedCardInner({
               }}
             >
               <div style={{ fontSize: 12, color: 'var(--sh-subtext)', marginBottom: 10 }}>
-                Attachment:{' '}
-                <span style={{ color: 'var(--sh-text)', fontWeight: 700 }}>
-                  {item.attachmentName || 'Attachment'}
-                </span>
-              </div>
-              <div
-                style={{
-                  border: '1px solid var(--sh-paper-border)',
-                  borderRadius: 10,
-                  background: 'var(--sh-paper)',
-                  overflow: 'hidden',
-                  maxHeight: 300,
-                }}
-              >
-                {previewKind === 'image' ? (
-                  <img
-                    src={urls.previewUrl}
-                    alt={item.attachmentName || 'Attachment preview'}
-                    loading="lazy"
-                    style={{
-                      width: '100%',
-                      maxHeight: 300,
-                      objectFit: 'contain',
-                      background: 'var(--sh-paper-soft)',
-                    }}
-                  />
-                ) : previewKind === 'pdf' ? (
-                  // Chrome's built-in PDF viewer cannot initialize inside ANY
-                  // sandboxed iframe (plugins are disabled by sandbox —
-                  // crbug.com/41131921), so the PDF branch renders unsandboxed.
-                  // Safe: the response is first-party application/pdf with
-                  // nosniff and script-src 'none' CSP, so it can never be
-                  // reinterpreted as scriptable HTML.
-                  <iframe
-                    src={urls.previewUrl}
-                    title={`Attachment preview ${item.id}`}
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                    style={{
-                      width: '100%',
-                      height: 300,
-                      border: 'none',
-                      background: 'var(--sh-paper)',
-                      colorScheme: 'light',
-                    }}
-                  />
+                {cardAttachments.length > 1 ? (
+                  <>
+                    Attachments:{' '}
+                    <span style={{ color: 'var(--sh-text)', fontWeight: 700 }}>
+                      {cardAttachments.length} files
+                    </span>
+                  </>
                 ) : (
-                  <iframe
-                    src={urls.previewUrl}
-                    title={`Attachment preview ${item.id}`}
-                    sandbox="allow-same-origin"
-                    referrerPolicy="no-referrer"
-                    loading="lazy"
-                    style={{
-                      width: '100%',
-                      height: 300,
-                      border: 'none',
-                      background: 'var(--sh-paper)',
-                      colorScheme: 'light',
-                    }}
-                  />
+                  <>
+                    Attachment:{' '}
+                    <span style={{ color: 'var(--sh-text)', fontWeight: 700 }}>
+                      {cardAttachments[0]?.name || item.attachmentName || 'Attachment'}
+                    </span>
+                  </>
                 )}
               </div>
+              <AttachmentSlideshow postId={item.id} attachments={cardAttachments} height={300} />
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 10 }}>
                 <Link to={urls.fullPreviewPath} style={linkButton()}>
                   <IconEye size={14} />
                   Full preview
                 </Link>
-                {item.allowDownloads !== false ? (
+                {item.allowDownloads === false ? (
+                  <span style={pillStyle()}>Downloads disabled</span>
+                ) : cardAttachments.length > 1 ? (
+                  <button
+                    type="button"
+                    onClick={() => setDownloadPickerOpen(true)}
+                    style={{ ...linkButton(), cursor: 'pointer', fontFamily: 'inherit' }}
+                  >
+                    <IconDownload size={14} />
+                    Download original
+                  </button>
+                ) : (
                   <a href={urls.downloadUrl} style={linkButton()}>
                     <IconDownload size={14} />
                     Download original
                   </a>
-                ) : (
-                  <span style={pillStyle()}>Downloads disabled</span>
                 )}
               </div>
+              {downloadPickerOpen && (
+                <AttachmentDownloadPicker
+                  postId={item.id}
+                  attachments={cardAttachments}
+                  onClose={() => setDownloadPickerOpen(false)}
+                />
+              )}
             </section>
           ) : null}
 

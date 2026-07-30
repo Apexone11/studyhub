@@ -592,3 +592,78 @@
   background: var(--sh-soft) !important;
   border-bottom: 1px solid var(--sh-border) !important;
 }
+
+/* ── Callout blocks ──────────────────────────────────────────────────── */
+/* Five fixed types, GitHub-Alerts style: the author picks meaning, the
+   platform picks the palette. Label text comes from ::before so the
+   stored HTML stays clean and translatable at the CSS layer. */
+
+.sh-callout {
+  margin: 14px 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--sh-border);
+  border-radius: 8px;
+  background: var(--sh-soft);
+}
+
+.sh-callout > p:first-child {
+  margin-top: 0;
+}
+
+.sh-callout > p:last-child {
+  margin-bottom: 0;
+}
+
+.sh-callout::before {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sh-callout--note {
+  border-left-color: var(--sh-info-border);
+  background: var(--sh-info-bg);
+}
+.sh-callout--note::before {
+  content: 'Note';
+  color: var(--sh-info-text);
+}
+
+.sh-callout--tip {
+  border-left-color: var(--sh-success-border);
+  background: var(--sh-success-bg);
+}
+.sh-callout--tip::before {
+  content: 'Tip';
+  color: var(--sh-success-text);
+}
+
+.sh-callout--important {
+  border-left-color: var(--sh-brand);
+  background: var(--sh-info-bg);
+}
+.sh-callout--important::before {
+  content: 'Important';
+  color: var(--sh-brand);
+}
+
+.sh-callout--warning {
+  border-left-color: var(--sh-warning-border);
+  background: var(--sh-warning-bg);
+}
+.sh-callout--warning::before {
+  content: 'Warning';
+  color: var(--sh-warning-text);
+}
+
+.sh-callout--definition {
+  border-left-color: var(--sh-slate-400, #94a3b8);
+  background: var(--sh-soft);
+}
+.sh-callout--definition::before {
+  content: 'Definition';
+  color: var(--sh-subtext);
+}

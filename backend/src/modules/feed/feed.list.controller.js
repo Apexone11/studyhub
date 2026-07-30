@@ -214,6 +214,10 @@ router.get('/', async (req, res) => {
             attachmentName: true,
             attachmentType: true,
             allowDownloads: true,
+            attachments: {
+              orderBy: { position: 'asc' },
+              select: { id: true, name: true, type: true, sizeBytes: true, position: true },
+            },
             author: { select: { id: true, username: true, avatarUrl: true } },
             course: { select: { id: true, code: true } },
             forkSource: {
@@ -241,6 +245,10 @@ router.get('/', async (req, res) => {
             attachmentName: true,
             attachmentType: true,
             allowDownloads: true,
+            attachments: {
+              orderBy: { position: 'asc' },
+              select: { id: true, name: true, type: true, sizeBytes: true, position: true },
+            },
             author: { select: { id: true, username: true, avatarUrl: true } },
             course: { select: { id: true, code: true } },
             video: {

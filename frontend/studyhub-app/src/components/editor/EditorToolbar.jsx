@@ -8,6 +8,7 @@ import { API } from '../../config'
 import { resolveImageUrl } from '../../lib/imageUrls'
 import { authHeaders } from '../../pages/sheets/lab/sheetLabConstants'
 import { showToast } from '../../lib/toast'
+import { CALLOUT_LABELS, CALLOUT_TYPES } from './CalloutExtension'
 
 /* ── Toolbar button component ──────────────────────────────── */
 
@@ -420,6 +421,41 @@ export default function EditorToolbar({ editor, themeAware = false }) {
           </text>
         </svg>
       </ToolbarButton>
+
+      <Separator />
+
+      {/* Callout blocks — fixed type set, platform-controlled styling. */}
+      <select
+        value={CALLOUT_TYPES.find((type) => editor.isActive('callout', { type })) || ''}
+        onChange={(event) => {
+          const next = event.target.value
+          if (!next) {
+            editor.chain().focus().unsetCallout().run()
+            return
+          }
+          editor.chain().focus().toggleCallout(next).run()
+        }}
+        aria-label="Callout block"
+        title="Callout block"
+        style={{
+          height: 28,
+          borderRadius: 6,
+          border: '1px solid var(--sh-border)',
+          background: 'var(--sh-surface)',
+          color: 'var(--sh-text)',
+          fontSize: 12,
+          fontFamily: 'inherit',
+          padding: '0 6px',
+          cursor: 'pointer',
+        }}
+      >
+        <option value="">Callout</option>
+        {CALLOUT_TYPES.map((type) => (
+          <option key={type} value={type}>
+            {CALLOUT_LABELS[type]}
+          </option>
+        ))}
+      </select>
 
       <Separator />
 

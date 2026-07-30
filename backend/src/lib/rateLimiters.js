@@ -360,6 +360,20 @@ const feedCommentLimiter = rateLimit({
 })
 
 /**
+ * Feed attachment zip bundles — 10 requests per 5 minutes per user.
+ * Zip generation is CPU/disk-bound, so the ceiling stays low. Auth
+ * precedes the limiter; the 'anon' fallback never fires (A7-safe key).
+ */
+const feedZipLimiter = rateLimit({
+  windowMs: WINDOW_5_MIN,
+  max: 10,
+  standardHeaders: true,
+  legacyHeaders: false,
+  keyGenerator: (req) => `feed-zip-${req.user?.userId || 'anon'}`,
+  message: { error: 'Too many bundle downloads. Try again in a few minutes.' },
+})
+
+/**
  * Feed attachment downloads — 120 requests per 15 minutes per IP.
  */
 const feedAttachmentDownloadLimiter = rateLimit({
@@ -1533,6 +1547,7 @@ module.exports = {
   feedWriteLimiter,
   feedCommentLimiter,
   feedAttachmentDownloadLimiter,
+  feedZipLimiter,
   feedAuthLimiter,
   feedLeaderboardLimiter,
   feedDiscoveryLimiter,

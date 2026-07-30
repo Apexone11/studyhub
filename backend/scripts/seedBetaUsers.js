@@ -12,8 +12,10 @@
  * below). In-flight flags have no row and stay off by default.
  */
 
+const fs = require('node:fs')
 const path = require('node:path')
 const bcrypt = require('bcryptjs')
+const { ATTACHMENTS_DIR, buildAttachmentUrl } = require('../src/lib/storage')
 const { createPrismaClient } = require('../src/lib/prisma')
 const { assertLocalDatabase } = require('./assertLocalDatabase')
 const { seedFeatureFlags } = require('./seedFeatureFlags')
@@ -154,6 +156,84 @@ async function seedFeedFixture(studentUserId) {
     data: {
       userId: studentUserId,
       content: 'beta-diagnostics-fixture',
+    },
+  })
+}
+
+/**
+ * Seed a post carrying several attachments so the slideshow, the "n / N"
+ * counter, and the zip download picker all render end-to-end after
+ * `npm run seed:beta` (CLAUDE.md §Working-Agreement #11). Writes real
+ * files into the uploads dir — the preview routes stream from disk, so
+ * DB rows alone would render broken frames.
+ *
+ * Idempotent on the post's content string.
+ */
+async function seedMultiAttachmentPost(studentUserId) {
+  const CONTENT = 'Week 1 econ bundle — notes, the demand curve, and the raw data.'
+  const existing = await prisma.feedPost.findFirst({
+    where: { userId: studentUserId, content: CONTENT },
+    select: { id: true },
+  })
+  if (existing) return
+
+  // Minimal but genuinely valid files: a one-page PDF, a 1x1 PNG, and a
+  // JSON document. Enough for every preview branch (pdf / image / text).
+  const fixtures = [
+    {
+      name: 'week1-notes.pdf',
+      type: 'pdf',
+      contents: Buffer.from(
+        '%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 200 200]>>endobj\ntrailer<</Root 1 0 R>>\n%%EOF\n',
+        'latin1',
+      ),
+    },
+    {
+      name: 'demand-curve.png',
+      type: 'image',
+      contents: Buffer.from(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
+        'base64',
+      ),
+    },
+    {
+      name: 'week1-data.json',
+      type: 'text',
+      contents: Buffer.from(
+        JSON.stringify({ week: 1, topic: 'gains from trade', observations: [3, 5, 8] }, null, 2),
+        'utf8',
+      ),
+    },
+  ]
+
+  fs.mkdirSync(ATTACHMENTS_DIR, { recursive: true })
+  const post = await prisma.feedPost.create({
+    data: { userId: studentUserId, content: CONTENT, allowDownloads: true },
+    select: { id: true },
+  })
+
+  const rows = fixtures.map((fixture, index) => {
+    const fileName = `seed-post-${post.id}-${fixture.name}`
+    fs.writeFileSync(path.join(ATTACHMENTS_DIR, fileName), fixture.contents)
+    return {
+      postId: post.id,
+      url: buildAttachmentUrl(fileName),
+      type: fixture.type,
+      name: fixture.name,
+      sizeBytes: fixture.contents.length,
+      position: index,
+    }
+  })
+
+  await prisma.feedPostAttachment.createMany({ data: rows })
+  // Mirror attachment #1 into the legacy columns, exactly as the upload
+  // route does, so older read paths still see an attachment.
+  await prisma.feedPost.update({
+    where: { id: post.id },
+    data: {
+      attachmentUrl: rows[0].url,
+      attachmentType: rows[0].type,
+      attachmentName: rows[0].name,
     },
   })
 }
@@ -763,6 +843,7 @@ async function main() {
   await seedEnrollments(studentUsers)
   if (studentUserIds.length > 0) {
     await seedFeedFixture(studentUserIds[0])
+    await seedMultiAttachmentPost(studentUserIds[0])
   }
   await seedUpcomingExams(studentUsers)
   await seedAiSuggestions(studentUsers)
