@@ -1,7 +1,9 @@
 const express = require('express')
 const fs = require('node:fs')
 const path = require('node:path')
-const archiver = require('archiver')
+// archiver v8 dropped the callable factory (`archiver('zip', …)`) in favor
+// of format subclasses; ZipArchive wires the zip module in its constructor.
+const { ZipArchive } = require('archiver')
 const prisma = require('../../lib/prisma')
 const log = require('../../lib/logger')
 const { ERROR_CODES, sendError } = require('../../middleware/errorEnvelope')
@@ -381,7 +383,12 @@ router.get(
 // deflating them burns CPU for ~0% gain.
 const ZIP_TOTAL_MAX_BYTES = 60 * 1024 * 1024
 
-router.post('/posts/:id/attachments/zip', feedZipLimiter, async (req, res) => {
+// `requireAuth` is already applied router-wide before this controller mounts
+// (feed.routes.js), and is repeated here for the same reason the sibling
+// attachment routes repeat it: the limiter below keys on req.user, so the
+// dependency should be visible at the route rather than inferred from the
+// mount order.
+router.post('/posts/:id/attachments/zip', requireAuth, feedZipLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(postId) || postId < 1) {
     return sendError(res, 400, 'Invalid post id.', ERROR_CODES.BAD_REQUEST)
@@ -451,7 +458,7 @@ router.post('/posts/:id/attachments/zip', feedZipLimiter, async (req, res) => {
       return res.download(files[0].localPath, files[0].name)
     }
 
-    const archive = archiver('zip', { zlib: { level: 0 } })
+    const archive = new ZipArchive({ zlib: { level: 0 } })
     let failed = false
     archive.on('error', (err) => {
       failed = true

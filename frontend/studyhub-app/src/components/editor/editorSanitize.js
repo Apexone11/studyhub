@@ -70,6 +70,9 @@ export const PURIFY_CONFIG = {
     'data-language',
     'data-math',
     'data-math-display',
+    // Callout blocks: the value is re-normalized to the known type set by
+    // CalloutExtension on parse, and the CSS only styles those five.
+    'data-callout',
     'xmlns',
     'encoding',
     'mathvariant',
@@ -151,6 +154,8 @@ const TIPTAP_ALLOWED_ATTR = new Set([
   'colspan',
   'rowspan',
   'colwidth',
+  // Callout extension
+  'data-callout',
 ])
 
 /**

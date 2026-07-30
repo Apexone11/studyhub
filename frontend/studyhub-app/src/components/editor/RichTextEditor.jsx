@@ -22,6 +22,7 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { Table, TableRow, TableCell, TableHeader } from '@tiptap/extension-table'
 import EditorToolbar from './EditorToolbar'
 import { MathInline, MathBlock } from './MathExtension'
+import { Callout } from './CalloutExtension'
 import { lowlight } from './codeHighlight'
 import { sanitizeOutput } from './editorSanitize'
 
@@ -89,6 +90,7 @@ export default function RichTextEditor({
       }),
       MathInline,
       MathBlock,
+      Callout,
       // Phase 3: tables become round-trippable with the HTML code editor.
       // Keep in sync with TIPTAP_ALLOWED_TAGS in editorSanitize.js.
       Table.configure({ resizable: false, HTMLAttributes: { class: 'sh-editor-table' } }),

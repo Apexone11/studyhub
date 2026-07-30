@@ -39,6 +39,36 @@ describe('AttachmentSlideshow', () => {
     expect(screen.getByText('week1.pdf')).toBeInTheDocument()
   })
 
+  it('pages with the arrow keys once the viewer has focus', async () => {
+    const user = userEvent.setup()
+    render(<AttachmentSlideshow postId={7} attachments={THREE} />)
+
+    const carousel = screen.getByRole('group', { name: /post attachments/i })
+    carousel.focus()
+
+    await user.keyboard('{ArrowRight}')
+    expect(screen.getByText('2 / 3')).toBeInTheDocument()
+    expect(screen.getByText('chart.png')).toBeInTheDocument()
+
+    await user.keyboard('{ArrowLeft}')
+    expect(screen.getByText('1 / 3')).toBeInTheDocument()
+    expect(screen.getByText('week1.pdf')).toBeInTheDocument()
+  })
+
+  it('jumps straight to a slide from its dot indicator', async () => {
+    const user = userEvent.setup()
+    const { container } = render(<AttachmentSlideshow postId={7} attachments={THREE} />)
+
+    // Dots are decorative for assistive tech (the counter already conveys
+    // position), so they're addressed positionally here.
+    const dots = container.querySelectorAll('span[aria-hidden="true"] > button')
+    expect(dots).toHaveLength(3)
+
+    await user.click(dots[2])
+    expect(screen.getByText('3 / 3')).toBeInTheDocument()
+    expect(screen.getByText('data.json')).toBeInTheDocument()
+  })
+
   it('advances and wraps with the arrow controls', async () => {
     const user = userEvent.setup()
     render(<AttachmentSlideshow postId={7} attachments={THREE} />)

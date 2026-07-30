@@ -81,7 +81,10 @@ export default function AttachmentDownloadPicker({ postId, attachments = [], onC
       const blob = await res.blob()
       const objectUrl = URL.createObjectURL(blob)
       triggerBrowserDownload(objectUrl, `post-${postId}-attachments.zip`)
-      URL.revokeObjectURL(objectUrl)
+      // Revoking synchronously races the browser's download handling —
+      // Firefox in particular can cancel a download whose blob URL is
+      // already gone. One tick later is enough for the click to be picked up.
+      setTimeout(() => URL.revokeObjectURL(objectUrl), 1000)
       onClose?.()
     } catch (err) {
       showToast(err?.message || 'Could not build that bundle.', 'error')
