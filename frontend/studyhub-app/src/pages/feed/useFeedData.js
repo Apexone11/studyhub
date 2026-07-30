@@ -422,11 +422,14 @@ export function useFeedData({ user, search }) {
       throw new Error(getApiErrorMessage(data, 'Could not post to the feed.'))
     }
 
+    // `attachedFile` accepts a single File (legacy callers) or an array of
+    // them; every file rides one multipart request under `attachments`.
+    const files = Array.isArray(attachedFile) ? attachedFile : attachedFile ? [attachedFile] : []
     let finalPost = data
-    if (attachedFile && data.id) {
+    if (files.length > 0 && data.id) {
       try {
         const formData = new FormData()
-        formData.append('attachment', attachedFile)
+        for (const file of files) formData.append('attachments', file)
         const uploadRes = await fetch(`${API}/api/upload/post-attachment/${data.id}`, {
           method: 'POST',
           credentials: 'include',
@@ -434,7 +437,7 @@ export function useFeedData({ user, search }) {
         })
         if (uploadRes.ok) {
           const uploadData = await uploadRes.json().catch(() => ({}))
-          finalPost = { ...data, ...uploadData }
+          finalPost = { ...data, ...uploadData, hasAttachment: true }
         }
       } catch {
         // Post was created successfully, attachment upload failed silently
@@ -448,7 +451,8 @@ export function useFeedData({ user, search }) {
     }))
     trackEvent('feed_post_created', {
       hasCourse: Boolean(courseId),
-      hasAttachment: Boolean(attachedFile),
+      hasAttachment: files.length > 0,
+      attachmentCount: files.length,
       hasVideo: Boolean(videoId),
     })
   }

@@ -11,6 +11,20 @@ import { API } from '../../config'
 
 const VideoUploader = lazy(() => import('../../components/video/VideoUploader'))
 
+// Mirrors the server allowlist in backend/src/modules/upload/upload.routes.js.
+// Client-side checks are for fast feedback only — the server re-validates
+// every file, including magic bytes.
+const MAX_POST_ATTACHMENTS = 5
+const ATTACHMENT_MAX_BYTES = 10 * 1024 * 1024
+const ATTACHMENT_ACCEPT = '.pdf,.jpg,.jpeg,.png,.gif,.webp,.json,.txt,.csv,.md'
+const ATTACHMENT_ALLOWED_EXT = new Set(ATTACHMENT_ACCEPT.split(','))
+
+function isAllowedAttachment(name) {
+  const dot = String(name).lastIndexOf('.')
+  if (dot < 0) return false
+  return ATTACHMENT_ALLOWED_EXT.has(String(name).slice(dot).toLowerCase())
+}
+
 const composerPromptIndex = Math.floor(Date.now() / 60000) % COMPOSER_PROMPTS.length
 
 // Keyframes injected once at module level so they are available to inline
@@ -64,7 +78,7 @@ export default function FeedComposer({ user, onSubmitPost }) {
     courseId: '',
   }))
   const [composeState, setComposeState] = useState({ saving: false, error: '' })
-  const [attachedFile, setAttachedFile] = useState(null)
+  const [attachedFiles, setAttachedFiles] = useState([])
   const [showVideoUploader, setShowVideoUploader] = useState(false)
   const [pendingVideoId, setPendingVideoId] = useState(null)
   const [videoProcessing, setVideoProcessing] = useState(false)
@@ -135,12 +149,12 @@ export default function FeedComposer({ user, onSubmitPost }) {
       await onSubmitPost({
         content: composer.content,
         courseId: composer.courseId,
-        attachedFile,
+        attachedFile: attachedFiles,
         videoId: pendingVideoId || null,
       })
       writeDraft(user, '')
       setComposer({ content: '', courseId: '' })
-      setAttachedFile(null)
+      setAttachedFiles([])
       setPendingVideoId(null)
       setShowVideoUploader(false)
       setVideoProcessing(false)
@@ -172,8 +186,8 @@ export default function FeedComposer({ user, onSubmitPost }) {
     if (showVideoUploader) {
       setShowVideoUploader(false)
     } else {
-      // Clear file attachment when switching to video
-      setAttachedFile(null)
+      // Clear file attachments when switching to video
+      setAttachedFiles([])
       setShowVideoUploader(true)
     }
   }
@@ -364,24 +378,50 @@ export default function FeedComposer({ user, onSubmitPost }) {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+            multiple
+            accept={ATTACHMENT_ACCEPT}
             style={{ display: 'none' }}
             onChange={(e) => {
-              const file = e.target.files?.[0]
-              if (file) {
-                if (file.size > 10 * 1024 * 1024) {
-                  setComposeState((s) => ({ ...s, error: 'File must be under 10 MB.' }))
-                  return
-                }
-                setAttachedFile(file)
-                // Clear video if switching to file
-                setPendingVideoId(null)
-                setVideoProcessing(false)
-                setVideoReady(false)
-                setVideoFailed(false)
-                setShowVideoUploader(false)
-              }
+              const picked = Array.from(e.target.files || [])
               e.target.value = ''
+              if (picked.length === 0) return
+
+              const oversize = picked.find((file) => file.size > ATTACHMENT_MAX_BYTES)
+              if (oversize) {
+                setComposeState((s) => ({
+                  ...s,
+                  error: `"${oversize.name}" is over 10 MB.`,
+                }))
+                return
+              }
+              const unsupported = picked.find((file) => !isAllowedAttachment(file.name))
+              if (unsupported) {
+                setComposeState((s) => ({
+                  ...s,
+                  error: `"${unsupported.name}" is not a supported file type.`,
+                }))
+                return
+              }
+
+              // Appending (rather than replacing) lets the user build the
+              // set across several trips through the file dialog.
+              const combined = [...attachedFiles, ...picked]
+              if (combined.length > MAX_POST_ATTACHMENTS) {
+                setComposeState((s) => ({
+                  ...s,
+                  error: `A post can carry at most ${MAX_POST_ATTACHMENTS} files.`,
+                }))
+                return
+              }
+
+              setAttachedFiles(combined)
+              setComposeState((s) => ({ ...s, error: '' }))
+              // Clear video if switching to files
+              setPendingVideoId(null)
+              setVideoProcessing(false)
+              setVideoReady(false)
+              setVideoFailed(false)
+              setShowVideoUploader(false)
             }}
           />
           <button
@@ -455,42 +495,53 @@ export default function FeedComposer({ user, onSubmitPost }) {
           })()}
         </div>
       </div>
-      {attachedFile && (
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 8,
-            padding: '6px 10px',
-            background: 'var(--sh-soft)',
-            borderRadius: 8,
-            fontSize: 12,
-            color: 'var(--sh-subtext)',
-          }}
-        >
-          <IconUpload size={12} />
-          <span
-            style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          >
-            {attachedFile.name}
-          </span>
-          <span style={{ color: 'var(--sh-muted)', flexShrink: 0 }}>
-            {(attachedFile.size / 1024).toFixed(0)} KB
-          </span>
-          <button
-            type="button"
-            onClick={() => setAttachedFile(null)}
-            style={{
-              background: 'none',
-              border: 'none',
-              cursor: 'pointer',
-              color: 'var(--sh-muted)',
-              display: 'flex',
-              padding: 2,
-            }}
-          >
-            <IconX size={12} />
-          </button>
+      {attachedFiles.length > 0 && (
+        <div style={{ display: 'grid', gap: 6 }}>
+          {attachedFiles.map((file, index) => (
+            <div
+              key={`${file.name}-${file.size}-${index}`}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '6px 10px',
+                background: 'var(--sh-soft)',
+                borderRadius: 8,
+                fontSize: 12,
+                color: 'var(--sh-subtext)',
+              }}
+            >
+              <IconUpload size={12} />
+              <span
+                style={{
+                  flex: 1,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {file.name}
+              </span>
+              <span style={{ color: 'var(--sh-muted)', flexShrink: 0 }}>
+                {(file.size / 1024).toFixed(0)} KB
+              </span>
+              <button
+                type="button"
+                aria-label={`Remove ${file.name}`}
+                onClick={() => setAttachedFiles((current) => current.filter((_, i) => i !== index))}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: 'var(--sh-muted)',
+                  display: 'flex',
+                  padding: 2,
+                }}
+              >
+                <IconX size={12} />
+              </button>
+            </div>
+          ))}
         </div>
       )}
       {composeState.error ? (

@@ -1,7 +1,10 @@
 const express = require('express')
 const fs = require('node:fs')
 const path = require('node:path')
+const archiver = require('archiver')
 const prisma = require('../../lib/prisma')
+const log = require('../../lib/logger')
+const { ERROR_CODES, sendError } = require('../../middleware/errorEnvelope')
 const { captureError } = require('../../monitoring/sentry')
 const { notifyMentionedUsers } = require('../../lib/mentions')
 const { assertOwnerOrAdmin, sendForbidden } = require('../../lib/accessControl')
@@ -10,6 +13,7 @@ const { sendAttachmentPreview } = require('../../lib/attachmentPreview')
 const { isModerationEnabled, scanContent } = require('../../lib/moderation/moderationEngine')
 const requireAuth = require('../../middleware/auth')
 const { feedWriteLimiter, attachmentDownloadLimiter } = require('./feed.constants')
+const { feedZipLimiter } = require('../../lib/rateLimiters')
 const { formatFeedPostDetail, safeDownloadName } = require('./feed.service')
 const { getInitialModerationStatus } = require('../../lib/trustGate')
 const { runAbuseChecks } = require('../../lib/abuseDetection')
@@ -21,6 +25,17 @@ const router = express.Router()
 // null. Throws a tagged Error on garbage input so the route returns a
 // clean 400 instead of a 500 from a downstream FK violation (CLAUDE.md
 // A12 — Number.parseInt + Number.isInteger guard pattern).
+// Ceiling shared with the upload route: a post can carry at most this many
+// attachments, so a zip request can never name more than this.
+const MAX_POST_ATTACHMENTS = 5
+
+// "notes.pdf" + 1 -> "notes (1).pdf"
+function appendNameSuffix(name, index) {
+  const ext = path.extname(name)
+  const base = ext ? name.slice(0, -ext.length) : name
+  return `${base} (${index})${ext}`
+}
+
 function parseOptionalFk(raw, fieldName) {
   if (raw == null || raw === '') return null
   const parsed = Number.parseInt(raw, 10)
@@ -152,6 +167,10 @@ router.get('/posts/:id', async (req, res) => {
       include: {
         author: { select: { id: true, username: true, avatarUrl: true } },
         course: { select: { id: true, code: true } },
+        attachments: {
+          orderBy: { position: 'asc' },
+          select: { id: true, name: true, type: true, sizeBytes: true, position: true },
+        },
         video: {
           select: {
             id: true,
@@ -269,6 +288,206 @@ router.get(
     }
   },
 )
+
+// ── Per-attachment routes (multi-attachment posts) ─────────────────────
+// Path shape /attachment/:attachmentId/{preview,download} never collides
+// with the legacy /attachment and /attachment/preview routes above (they
+// have fewer path segments), so registration order doesn't matter.
+
+async function loadPostAttachment(req, res) {
+  const postId = Number.parseInt(req.params.id, 10)
+  const attachmentId = Number.parseInt(req.params.attachmentId, 10)
+  if (
+    !Number.isInteger(postId) ||
+    postId < 1 ||
+    !Number.isInteger(attachmentId) ||
+    attachmentId < 1
+  ) {
+    res.status(400).json({ error: 'Invalid id.' })
+    return null
+  }
+  const post = await prisma.feedPost.findUnique({
+    where: { id: postId },
+    select: { id: true, userId: true, moderationStatus: true, allowDownloads: true },
+  })
+  if (!post) {
+    res.status(404).json({ error: 'Post not found.' })
+    return null
+  }
+  const attachment = await prisma.feedPostAttachment.findFirst({
+    where: { id: attachmentId, postId },
+    select: { id: true, url: true, type: true, name: true },
+  })
+  if (!attachment) {
+    res.status(404).json({ error: 'Attachment not found.' })
+    return null
+  }
+  const localPath = resolveAttachmentPath(attachment.url)
+  if (!localPath || !fs.existsSync(localPath)) {
+    res.status(404).json({ error: 'Attachment file is missing.', kind: 'missing' })
+    return null
+  }
+  return { post, attachment, localPath }
+}
+
+router.get(
+  '/posts/:id/attachment/:attachmentId/preview',
+  requireAuth,
+  attachmentDownloadLimiter,
+  async (req, res) => {
+    try {
+      const loaded = await loadPostAttachment(req, res)
+      if (!loaded) return
+      await sendAttachmentPreview({
+        res,
+        localPath: loaded.localPath,
+        attachmentName: loaded.attachment.name || path.basename(loaded.localPath),
+        attachmentType: loaded.attachment.type || '',
+      })
+    } catch (error) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+      res.status(500).json({ error: 'Server error.' })
+    }
+  },
+)
+
+router.get(
+  '/posts/:id/attachment/:attachmentId/download',
+  requireAuth,
+  attachmentDownloadLimiter,
+  async (req, res) => {
+    try {
+      const loaded = await loadPostAttachment(req, res)
+      if (!loaded) return
+      const isOwnerOrAdmin =
+        req.user && (req.user.userId === loaded.post.userId || req.user.role === 'admin')
+      if (!isOwnerOrAdmin && !loaded.post.allowDownloads) {
+        return sendForbidden(res, 'Downloads are disabled for this post.')
+      }
+      res.download(
+        loaded.localPath,
+        safeDownloadName(loaded.attachment.name || path.basename(loaded.localPath)),
+      )
+    } catch (error) {
+      captureError(error, { route: req.originalUrl, method: req.method })
+      res.status(500).json({ error: 'Server error.' })
+    }
+  },
+)
+
+// POST /posts/:id/attachments/zip — bundle a chosen subset of a post's
+// attachments. One file streams directly; two or more are archived. Zip
+// entries use STORE (level 0): PDFs and images are already compressed, so
+// deflating them burns CPU for ~0% gain.
+const ZIP_TOTAL_MAX_BYTES = 60 * 1024 * 1024
+
+router.post('/posts/:id/attachments/zip', feedZipLimiter, async (req, res) => {
+  const postId = Number.parseInt(req.params.id, 10)
+  if (!Number.isInteger(postId) || postId < 1) {
+    return sendError(res, 400, 'Invalid post id.', ERROR_CODES.BAD_REQUEST)
+  }
+
+  const rawIds = req.body?.attachmentIds
+  if (!Array.isArray(rawIds) || rawIds.length === 0 || rawIds.length > MAX_POST_ATTACHMENTS) {
+    return sendError(
+      res,
+      400,
+      `Select between 1 and ${MAX_POST_ATTACHMENTS} attachments.`,
+      ERROR_CODES.BAD_REQUEST,
+    )
+  }
+  const attachmentIds = []
+  for (const raw of rawIds) {
+    const parsed = Number.parseInt(raw, 10)
+    if (!Number.isInteger(parsed) || parsed < 1) {
+      return sendError(res, 400, 'Invalid attachment id.', ERROR_CODES.BAD_REQUEST)
+    }
+    attachmentIds.push(parsed)
+  }
+
+  try {
+    const post = await prisma.feedPost.findUnique({
+      where: { id: postId },
+      select: { id: true, userId: true, allowDownloads: true },
+    })
+    if (!post) return res.status(404).json({ error: 'Post not found.' })
+
+    const isOwnerOrAdmin =
+      req.user && (req.user.userId === post.userId || req.user.role === 'admin')
+    if (!isOwnerOrAdmin && !post.allowDownloads) {
+      return sendForbidden(res, 'Downloads are disabled for this post.')
+    }
+
+    // Scoping the query by postId is what stops an id from another post
+    // being smuggled into the bundle.
+    const rows = await prisma.feedPostAttachment.findMany({
+      where: { id: { in: attachmentIds }, postId },
+      orderBy: { position: 'asc' },
+      select: { id: true, url: true, name: true, sizeBytes: true },
+    })
+
+    const files = []
+    let totalBytes = 0
+    for (const row of rows) {
+      const localPath = resolveAttachmentPath(row.url)
+      if (!localPath || !fs.existsSync(localPath)) continue
+      const bytes = row.sizeBytes > 0 ? row.sizeBytes : fs.statSync(localPath).size
+      totalBytes += bytes
+      files.push({ localPath, name: safeDownloadName(row.name || path.basename(localPath)) })
+    }
+
+    if (files.length === 0) {
+      return res.status(404).json({ error: 'No downloadable attachments found.' })
+    }
+    if (totalBytes > ZIP_TOTAL_MAX_BYTES) {
+      return sendError(
+        res,
+        413,
+        'That selection is too large to bundle. Download the files individually.',
+        ERROR_CODES.BAD_REQUEST,
+      )
+    }
+    if (files.length === 1) {
+      return res.download(files[0].localPath, files[0].name)
+    }
+
+    const archive = archiver('zip', { zlib: { level: 0 } })
+    let failed = false
+    archive.on('error', (err) => {
+      failed = true
+      log.error(
+        { event: 'feed.zip_failed', postId, fileCount: files.length, err: err.message },
+        'Attachment bundle failed mid-stream',
+      )
+      res.destroy()
+    })
+
+    res.setHeader('Content-Type', 'application/zip')
+    res.setHeader('Content-Disposition', `attachment; filename="post-${postId}-attachments.zip"`)
+    archive.pipe(res)
+
+    // Two files can legitimately share a display name; zip readers handle
+    // duplicates inconsistently, so disambiguate before appending.
+    const usedNames = new Map()
+    for (const file of files) {
+      const seen = usedNames.get(file.name) || 0
+      usedNames.set(file.name, seen + 1)
+      const entryName = seen === 0 ? file.name : appendNameSuffix(file.name, seen)
+      archive.file(file.localPath, { name: entryName })
+    }
+    await archive.finalize()
+
+    if (!failed) {
+      log.info(
+        { event: 'feed.zip_created', postId, fileCount: files.length, totalBytes },
+        'Attachment bundle streamed',
+      )
+    }
+  } catch (error) {
+    captureError(error, { route: req.originalUrl, method: req.method })
+    if (!res.headersSent) res.status(500).json({ error: 'Server error.' })
+  }
+})
 
 router.delete('/posts/:id', feedWriteLimiter, async (req, res) => {
   const postId = Number.parseInt(req.params.id, 10)
