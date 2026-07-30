@@ -11,7 +11,12 @@ const { findSimilarSheets } = require('../../lib/plagiarism')
 const { runPlagiarismScan } = require('../plagiarism/plagiarism.service')
 const { createProvenanceToken } = require('../../lib/provenance')
 const { isHtmlUploadsEnabled } = require('../../lib/html/htmlKillSwitch')
-const { SHEET_STATUS, AUTHOR_SELECT, sheetWriteLimiter } = require('./sheets.constants')
+const {
+  SHEET_STATUS,
+  AUTHOR_SELECT,
+  sheetWriteLimiter,
+  parseSheetFontFamily,
+} = require('./sheets.constants')
 const { extractPreviewText } = require('../../lib/sheets/extractPreviewText')
 const {
   normalizeSheetStatus,
@@ -101,6 +106,18 @@ router.patch('/:id', requireAuth, sheetWriteLimiter, async (req, res) => {
     }
     if (requestedContentFormat) {
       data.contentFormat = requestedContentFormat
+    }
+    if (req.body && Object.hasOwn(req.body, 'fontFamily')) {
+      const fontFamily = parseSheetFontFamily(req.body.fontFamily)
+      if (fontFamily.error) {
+        return sendError(
+          res,
+          400,
+          'Sheet font must be sans, serif, or mono.',
+          ERROR_CODES.BAD_REQUEST,
+        )
+      }
+      data.fontFamily = fontFamily.value
     }
     if (courseId !== undefined) {
       if (courseId === null) {

@@ -53,6 +53,9 @@ export default function useUploadSheet() {
   const [courseId, setCourseId] = useState('')
   const [description, setDescription] = useState('')
   const [allowDownloads, setAllowDownloads] = useState(true)
+  // Author's typeface for the rendered sheet. Mirrors the server allowlist
+  // in sheets.constants.js; ignored for HTML sheets, which style themselves.
+  const [fontFamily, setFontFamily] = useState('sans')
   const [content, setContent] = useState('')
   const [contentFormat, setContentFormat] = useState('html')
   const [status, setStatus] = useState(isEditing ? 'published' : 'draft')
@@ -142,6 +145,7 @@ export default function useUploadSheet() {
     setCourseId(sheet.courseId ? String(sheet.courseId) : '')
     setDescription(sheet.description || '')
     setAllowDownloads(sheet.allowDownloads !== false)
+    if (sheet.fontFamily) setFontFamily(sheet.fontFamily)
     setContent(sheet.content || '')
     setContentFormat(sheet.contentFormat === 'html' ? 'html' : 'markdown')
     setStatus(sheet.status || 'draft')
@@ -553,6 +557,7 @@ export default function useUploadSheet() {
     courseId,
     description,
     draftId,
+    fontFamily,
     isEditing,
     legacyMarkdownMode,
     navigate,
@@ -589,6 +594,8 @@ export default function useUploadSheet() {
     setDescription,
     allowDownloads,
     setAllowDownloads,
+    fontFamily,
+    setFontFamily,
     content,
     setContent,
     status,

@@ -575,6 +575,53 @@ async function seedSheetsGridFixture(studentUsers) {
 }
 
 /**
+ * Seed a richtext sheet that demonstrates the sheet-customization options:
+ * a serif typeface (author-chosen) and all five callout blocks. Gives
+ * `npm run seed:beta` a surface where the "Aa" reader controls, the font
+ * choice, and the callout styling are all visible without hand-authoring
+ * content (CLAUDE.md §Working-Agreement #11).
+ *
+ * Idempotent on (userId, title).
+ */
+async function seedCustomizationShowcaseSheet(studentUserId) {
+  const TITLE = 'Reading a sheet: fonts, callouts, and display options'
+  const existing = await prisma.studySheet.findFirst({
+    where: { userId: studentUserId, title: TITLE },
+    select: { id: true },
+  })
+  if (existing) return
+
+  // Any enrolled course works; the sheet is about presentation, not content.
+  const enrollment = await prisma.enrollment
+    .findFirst({ where: { userId: studentUserId }, select: { courseId: true } })
+    .catch(() => null)
+  const courseId = enrollment?.courseId ?? null
+
+  const content = [
+    '<p>This sheet is set in the serif face. Use the <strong>Aa</strong> control above to change text size, reading width, and line height — those are your preferences and follow you to every sheet.</p>',
+    '<div data-callout="note" class="sh-callout sh-callout--note"><p>Callouts come in five kinds. This is a note — background context that is useful but not urgent.</p></div>',
+    '<div data-callout="tip" class="sh-callout sh-callout--tip"><p>Draw the free-body diagram before writing any equations. It catches sign errors early.</p></div>',
+    '<div data-callout="important" class="sh-callout sh-callout--important"><p>The exam covers chapters 5 through 9. Chapter 10 is explicitly out of scope.</p></div>',
+    '<div data-callout="warning" class="sh-callout sh-callout--warning"><p>Do not apply the small-angle approximation past about 15 degrees — the error grows fast.</p></div>',
+    '<div data-callout="definition" class="sh-callout sh-callout--definition"><p><strong>Marginal cost:</strong> the change in total cost from producing one additional unit.</p></div>',
+    '<p>Everything above is ordinary sheet content, so it forks, diffs, and exports like any other sheet.</p>',
+  ].join('')
+
+  await prisma.studySheet.create({
+    data: {
+      title: TITLE,
+      content,
+      previewText: extractPreviewText(content),
+      courseId: courseId ?? null,
+      userId: studentUserId,
+      status: 'published',
+      contentFormat: 'richtext',
+      fontFamily: 'serif',
+    },
+  })
+}
+
+/**
  * Seed creator-audit consent rows for beta users so the consent modal does NOT
  * fire on first publish during local smoke testing (CLAUDE.md rule #11). The
  * consent is recorded against the current responsibility doc version. To
@@ -844,6 +891,7 @@ async function main() {
   if (studentUserIds.length > 0) {
     await seedFeedFixture(studentUserIds[0])
     await seedMultiAttachmentPost(studentUserIds[0])
+    await seedCustomizationShowcaseSheet(studentUserIds[0])
   }
   await seedUpcomingExams(studentUsers)
   await seedAiSuggestions(studentUsers)
