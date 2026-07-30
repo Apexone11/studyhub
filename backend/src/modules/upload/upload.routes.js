@@ -50,6 +50,18 @@ const ATTACHMENT_ALLOWED_MIME = new Set([
 ])
 const ATTACHMENT_ALLOWED_EXT = new Set(['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp'])
 
+// Text-based attachment types for feed posts (multi-attachment feature).
+// Served as text/plain with nosniff by attachmentPreview, so none of these
+// can ever execute — the binary signature checks don't apply to them.
+const POST_TEXT_ATTACHMENT_MIME = new Set([
+  'application/json',
+  'text/plain',
+  'text/csv',
+  'text/markdown',
+])
+const POST_TEXT_ATTACHMENT_EXT = new Set(['.json', '.txt', '.csv', '.md'])
+const MAX_POST_ATTACHMENTS = 5
+
 // ── Safe filename: strip to alphanumeric + dash/dot ───────────
 function safeName(original) {
   const ext = path.extname(original).toLowerCase()
@@ -340,38 +352,113 @@ router.post('/attachment/:sheetId', requireAuth, uploadAttachmentLimiter, (req, 
   })
 })
 
+// Multer instance for post attachments: same storage/size limits as sheet
+// attachments, but the allowlist additionally accepts the text-based types
+// (JSON/TXT/CSV/MD) that feed posts may carry.
+const postAttachmentUpload = multer({
+  storage: attachmentStorage,
+  limits: { fileSize: ATTACHMENT_MAX_BYTES, files: MAX_POST_ATTACHMENTS },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase()
+    const binaryOk = ATTACHMENT_ALLOWED_MIME.has(file.mimetype) && ATTACHMENT_ALLOWED_EXT.has(ext)
+    const textOk = POST_TEXT_ATTACHMENT_MIME.has(file.mimetype) && POST_TEXT_ATTACHMENT_EXT.has(ext)
+    if (!binaryOk && !textOk) {
+      return cb(
+        new Error('Attachments must be PDF, image (JPEG/PNG/GIF/WebP), JSON, TXT, CSV, or MD.'),
+      )
+    }
+    cb(null, true)
+  },
+})
+
+function postAttachmentTypeFor(filename) {
+  const ext = path.extname(filename).toLowerCase()
+  if (ext === '.pdf') return 'pdf'
+  if (POST_TEXT_ATTACHMENT_EXT.has(ext)) return 'text'
+  return 'image'
+}
+
 // POST /api/upload/post-attachment/:postId
+// Accepts the legacy single `attachment` field AND the new multi-file
+// `attachments` field (max 5 total). Replaces the post's attachment set:
+// rows in FeedPostAttachment are the source of truth, and the legacy
+// FeedPost.attachment* columns mirror file #1 for older readers.
 router.post('/post-attachment/:postId', requireAuth, uploadAttachmentLimiter, (req, res) => {
-  attachmentUpload.single('attachment')(req, res, async (err) => {
+  const fieldsUpload = postAttachmentUpload.fields([
+    { name: 'attachment', maxCount: 1 },
+    { name: 'attachments', maxCount: MAX_POST_ATTACHMENTS },
+  ])
+  fieldsUpload(req, res, async (err) => {
+    const files = [...(req.files?.attachment || []), ...(req.files?.attachments || [])].slice(
+      0,
+      MAX_POST_ATTACHMENTS,
+    )
+    const unlinkAll = () => files.forEach((f) => safeUnlinkFile(f.path))
+
     if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
-      return sendError(res, 400, 'Attachment must be 10 MB or smaller.', ERROR_CODES.UPLOAD_INVALID)
-    }
-    if (err) return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
-    if (!req.file) return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
-    if (!signatureMatchesExpected(req.file.path, Array.from(ATTACHMENT_ALLOWED_MIME)).ok) {
-      return rejectSignatureMismatch(
+      unlinkAll()
+      return sendError(
         res,
-        req.file,
-        'Attachment contents do not match a supported PDF or image format.',
+        400,
+        'Each attachment must be 10 MB or smaller.',
+        ERROR_CODES.UPLOAD_INVALID,
       )
     }
-    const postMagic = validateMagicBytes(req.file.path, req.file.mimetype)
-    if (!postMagic.valid) {
-      return rejectSignatureMismatch(
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_COUNT') {
+      unlinkAll()
+      return sendError(
         res,
-        req.file,
-        `Attachment file signature does not match declared type (detected: ${postMagic.detectedType || 'unknown'}, declared: ${postMagic.declaredType}).`,
+        400,
+        `A post can carry at most ${MAX_POST_ATTACHMENTS} attachments.`,
+        ERROR_CODES.UPLOAD_INVALID,
       )
+    }
+    if (err) {
+      unlinkAll()
+      return sendError(res, 400, err.message, ERROR_CODES.UPLOAD_INVALID)
+    }
+    if (files.length === 0) {
+      return sendError(res, 400, 'No file uploaded.', ERROR_CODES.UPLOAD_MISSING_FILE)
+    }
+
+    // Per-file content validation. Binary types get the magic-byte checks;
+    // text types are validated as safe-to-serve-inline (served text/plain
+    // + nosniff downstream, so no execution vector).
+    for (const file of files) {
+      const ext = path.extname(file.filename).toLowerCase()
+      const isText = POST_TEXT_ATTACHMENT_EXT.has(ext)
+      if (isText) continue
+      if (!signatureMatchesExpected(file.path, Array.from(ATTACHMENT_ALLOWED_MIME)).ok) {
+        unlinkAll()
+        return rejectSignatureMismatch(
+          res,
+          file,
+          `"${safeAttachmentLabel(file.originalname)}" does not match a supported PDF or image format.`,
+        )
+      }
+      const postMagic = validateMagicBytes(file.path, file.mimetype)
+      if (!postMagic.valid) {
+        unlinkAll()
+        return rejectSignatureMismatch(
+          res,
+          file,
+          `"${safeAttachmentLabel(file.originalname)}" file signature does not match its declared type (detected: ${postMagic.detectedType || 'unknown'}, declared: ${postMagic.declaredType}).`,
+        )
+      }
     }
 
     const postId = Number.parseInt(req.params.postId, 10)
+    if (!Number.isInteger(postId) || postId < 1) {
+      unlinkAll()
+      return sendError(res, 400, 'Invalid post id.', ERROR_CODES.BAD_REQUEST)
+    }
     try {
       const post = await prisma.feedPost.findUnique({
         where: { id: postId },
         select: { id: true, userId: true, attachmentUrl: true },
       })
       if (!post) {
-        safeUnlinkFile(req.file.path)
+        unlinkAll()
         return res.status(404).json({ error: 'Post not found.' })
       }
       if (
@@ -384,31 +471,62 @@ router.post('/post-attachment/:postId', requireAuth, uploadAttachmentLimiter, (r
           targetId: postId,
         })
       ) {
-        safeUnlinkFile(req.file.path)
+        unlinkAll()
         return
       }
 
-      const ext = path.extname(req.file.filename).toLowerCase()
-      const attachmentType = ext === '.pdf' ? 'pdf' : 'image'
-      const attachmentUrl = buildAttachmentUrl(req.file.filename)
-      const attachmentName = safeAttachmentLabel(req.file.originalname)
-
-      const updated = await prisma.feedPost.update({
-        where: { id: postId },
-        data: { attachmentUrl, attachmentType, attachmentName },
-        select: { id: true, attachmentUrl: true, attachmentType: true, attachmentName: true },
-      })
-
-      await cleanupAttachmentIfUnused(prisma, post.attachmentUrl, {
-        route: req.originalUrl,
+      const rows = files.map((file, index) => ({
         postId,
+        url: buildAttachmentUrl(file.filename),
+        type: postAttachmentTypeFor(file.filename),
+        name: safeAttachmentLabel(file.originalname),
+        sizeBytes: Number.isFinite(file.size) ? file.size : 0,
+        position: index,
+      }))
+
+      const previousRows = await prisma.feedPostAttachment.findMany({
+        where: { postId },
+        select: { url: true },
       })
 
-      res.json(updated)
+      const [, , updated] = await prisma.$transaction([
+        prisma.feedPostAttachment.deleteMany({ where: { postId } }),
+        prisma.feedPostAttachment.createMany({ data: rows }),
+        prisma.feedPost.update({
+          where: { id: postId },
+          data: {
+            attachmentUrl: rows[0].url,
+            attachmentType: rows[0].type,
+            attachmentName: rows[0].name,
+          },
+          select: { id: true, attachmentUrl: true, attachmentType: true, attachmentName: true },
+        }),
+      ])
+
+      // Drop replaced files from disk once nothing references them.
+      const keptUrls = new Set(rows.map((r) => r.url))
+      for (const prev of previousRows) {
+        if (!keptUrls.has(prev.url)) {
+          await cleanupAttachmentIfUnused(prisma, prev.url, { route: req.originalUrl, postId })
+        }
+      }
+      if (post.attachmentUrl && !keptUrls.has(post.attachmentUrl)) {
+        await cleanupAttachmentIfUnused(prisma, post.attachmentUrl, {
+          route: req.originalUrl,
+          postId,
+        })
+      }
+
+      const attachments = await prisma.feedPostAttachment.findMany({
+        where: { postId },
+        orderBy: { position: 'asc' },
+        select: { id: true, url: true, type: true, name: true, sizeBytes: true, position: true },
+      })
+      res.json({ ...updated, attachments })
     } catch (dbErr) {
-      safeUnlinkFile(req.file?.path)
+      unlinkAll()
       captureError(dbErr, { route: req.originalUrl })
-      return sendError(res, 500, 'Failed to save attachment.', ERROR_CODES.UPLOAD_SAVE_FAILED)
+      return sendError(res, 500, 'Failed to save attachments.', ERROR_CODES.UPLOAD_SAVE_FAILED)
     }
   })
 })

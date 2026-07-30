@@ -769,10 +769,29 @@ model FeedPost {
   video            Video?             @relation("FeedPostVideo", fields: [videoId], references: [id], onDelete: SetNull)
   comments         FeedPostComment[]
   reactions        FeedPostReaction[]
+  attachments      FeedPostAttachment[]
 
   @@index([createdAt(sort: Desc)])
   @@index([userId, createdAt(sort: Desc)])
   @@index([courseId, createdAt(sort: Desc)])
+}
+
+// Multi-attachment support (2026-07). The legacy single-attachment columns
+// on FeedPost stay populated with attachment #1 so older code paths and
+// pre-migration posts keep working; this table is the source of truth for
+// the slideshow / zip-download surfaces.
+model FeedPostAttachment {
+  id        Int      @id @default(autoincrement())
+  postId    Int
+  url       String
+  type      String
+  name      String
+  sizeBytes Int      @default(0)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  post      FeedPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@index([postId, position])
 }
 
 model FeedPostComment {

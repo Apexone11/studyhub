@@ -332,7 +332,10 @@ app.use((req, res, next) => {
   const isPreviewSurface =
     req.path === '/preview' ||
     req.path.startsWith('/preview/') ||
-    req.path.endsWith('/attachment/preview')
+    req.path.endsWith('/attachment/preview') ||
+    // Per-attachment previews on multi-attachment posts:
+    // /api/feed/posts/:id/attachment/:attachmentId/preview
+    /\/attachment\/\d+\/preview$/.test(req.path)
 
   if (isPreviewSurface) {
     res.setHeader('Content-Security-Policy', previewSurfaceCsp)

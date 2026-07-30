@@ -7,6 +7,8 @@ import { API } from '../../config'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'
 import { pageShell } from '../../lib/ui'
 import { usePageTitle } from '../../lib/usePageTitle'
+import AttachmentSlideshow from '../feed/AttachmentSlideshow'
+import AttachmentDownloadPicker from '../feed/AttachmentDownloadPicker'
 
 const HTML_EXTENSIONS = new Set(['html', 'htm', 'xhtml', 'svg'])
 
@@ -132,6 +134,7 @@ export default function AttachmentPreviewPage() {
   const { scope, id } = useParams()
   const [state, setState] = useState({ loading: true, error: '', detail: null })
   const [downloadWarning, setDownloadWarning] = useState({ open: false, tier: 0, url: '' })
+  const [downloadPickerOpen, setDownloadPickerOpen] = useState(false)
   const numericId = Number.parseInt(id, 10)
 
   const config = useMemo(() => {
@@ -189,6 +192,13 @@ export default function AttachmentPreviewPage() {
     state.detail?.attachmentName,
   )
 
+  // Only feed posts carry multi-attachment lists; sheet previews keep the
+  // single-attachment path below.
+  const postAttachmentList =
+    scope === 'feed-post' && Array.isArray(state.detail?.attachments)
+      ? state.detail.attachments
+      : []
+
   return (
     <>
       <Navbar />
@@ -231,6 +241,23 @@ export default function AttachmentPreviewPage() {
                     ? (() => {
                         const ext = attachmentExtension(state.detail?.attachmentName)
                         const isHtml = HTML_EXTENSIONS.has(ext)
+                        if (postAttachmentList.length > 1) {
+                          return (
+                            <button
+                              type="button"
+                              onClick={() => setDownloadPickerOpen(true)}
+                              style={{
+                                ...primaryLinkButton(),
+                                border: 'none',
+                                cursor: 'pointer',
+                                fontFamily: 'inherit',
+                              }}
+                            >
+                              <IconDownload size={14} />
+                              Download original
+                            </button>
+                          )
+                        }
                         if (!isHtml) {
                           return (
                             <a href={config.downloadUrl} style={primaryLinkButton()}>
@@ -286,55 +313,72 @@ export default function AttachmentPreviewPage() {
             ) : state.detail ? (
               <section style={panelStyle()}>
                 <div style={{ fontSize: 12, color: 'var(--sh-muted)', marginBottom: 12 }}>
-                  {state.detail.attachmentName || 'Attachment'}
+                  {postAttachmentList.length > 1
+                    ? `${postAttachmentList.length} files`
+                    : state.detail.attachmentName || 'Attachment'}
                 </div>
-                <div
-                  style={{
-                    border: '1px solid var(--sh-border)',
-                    borderRadius: 14,
-                    background: 'var(--sh-surface)',
-                    overflow: 'hidden',
-                    minHeight: 420,
-                  }}
-                >
-                  {previewKind === 'image' ? (
-                    <img
-                      src={config.previewUrl}
-                      alt={state.detail.attachmentName || 'Attachment preview'}
-                      loading="lazy"
-                      style={{
-                        width: '100%',
-                        maxHeight: '80vh',
-                        objectFit: 'contain',
-                        display: 'block',
-                      }}
-                    />
-                  ) : previewKind === 'pdf' ? (
-                    // Chrome's PDF viewer can't start inside a sandboxed
-                    // iframe (crbug.com/41131921) — the PDF branch renders
-                    // unsandboxed. Safe: first-party application/pdf +
-                    // nosniff + script-src 'none' CSP on the response.
-                    <iframe
-                      src={config.previewUrl}
-                      title={`Attachment preview ${scope}-${numericId}`}
-                      referrerPolicy="no-referrer"
-                      style={{ width: '100%', height: '80vh', border: 'none' }}
-                    />
-                  ) : (
-                    <iframe
-                      src={config.previewUrl}
-                      title={`Attachment preview ${scope}-${numericId}`}
-                      sandbox="allow-same-origin"
-                      referrerPolicy="no-referrer"
-                      style={{ width: '100%', height: '80vh', border: 'none' }}
-                    />
-                  )}
-                </div>
+                {postAttachmentList.length > 1 ? (
+                  <AttachmentSlideshow
+                    postId={numericId}
+                    attachments={postAttachmentList}
+                    height="80vh"
+                  />
+                ) : (
+                  <div
+                    style={{
+                      border: '1px solid var(--sh-border)',
+                      borderRadius: 14,
+                      background: 'var(--sh-surface)',
+                      overflow: 'hidden',
+                      minHeight: 420,
+                    }}
+                  >
+                    {previewKind === 'image' ? (
+                      <img
+                        src={config.previewUrl}
+                        alt={state.detail.attachmentName || 'Attachment preview'}
+                        loading="lazy"
+                        style={{
+                          width: '100%',
+                          maxHeight: '80vh',
+                          objectFit: 'contain',
+                          display: 'block',
+                        }}
+                      />
+                    ) : previewKind === 'pdf' ? (
+                      // Chrome's PDF viewer can't start inside a sandboxed
+                      // iframe (crbug.com/41131921) — the PDF branch renders
+                      // unsandboxed. Safe: first-party application/pdf +
+                      // nosniff + script-src 'none' CSP on the response.
+                      <iframe
+                        src={config.previewUrl}
+                        title={`Attachment preview ${scope}-${numericId}`}
+                        referrerPolicy="no-referrer"
+                        style={{ width: '100%', height: '80vh', border: 'none' }}
+                      />
+                    ) : (
+                      <iframe
+                        src={config.previewUrl}
+                        title={`Attachment preview ${scope}-${numericId}`}
+                        sandbox="allow-same-origin"
+                        referrerPolicy="no-referrer"
+                        style={{ width: '100%', height: '80vh', border: 'none' }}
+                      />
+                    )}
+                  </div>
+                )}
               </section>
             ) : null}
           </main>
         </div>
       </div>
+      {downloadPickerOpen && (
+        <AttachmentDownloadPicker
+          postId={numericId}
+          attachments={postAttachmentList}
+          onClose={() => setDownloadPickerOpen(false)}
+        />
+      )}
       <HtmlDownloadWarningModal
         open={downloadWarning.open}
         tier={downloadWarning.tier}
