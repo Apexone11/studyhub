@@ -28,6 +28,7 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.3.0 — security + product-updates newsletter (2026-06-16)
 
+- Security (round 4): postcss 8.5.25 and tar 7.5.22 across all lockfiles, clearing 3 more advisories (2 high). react-router's 2 remaining high alerts need a 7→8 major and are held for founder sign-off.
 - Sheets: authors pick a typeface (Sans / Serif / Mono) and can add Note / Tip / Important / Warning / Definition callout blocks; readers get an "Aa" control for text size, reading width, and line height that persists across sheets.
 - Feed: posts now carry up to 5 attachments (PDF, images, JSON/TXT/CSV/MD) shown as a slideshow with prev/next paging, and "Download original" opens a picker that bundles the chosen files into a zip.
 - Security (round 3): cleared 9 fresh advisories — tar 7.5.21 (incl. a critical), fast-uri 4.1.1/off-4.x, js-yaml 4.3.0, body-parser 2.3.0 — lockfile-only; supersedes #439/#440.
