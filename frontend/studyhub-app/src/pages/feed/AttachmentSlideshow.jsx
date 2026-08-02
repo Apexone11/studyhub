@@ -45,8 +45,9 @@ function arrowStyle(side) {
     display: 'inline-flex',
     alignItems: 'center',
     justifyContent: 'center',
-    width: 36,
-    height: 36,
+    // 44x44 is the WCAG 2.5.5 target-size floor the project holds itself to.
+    width: 44,
+    height: 44,
     borderRadius: '50%',
     border: '1px solid var(--sh-border)',
     background: 'var(--sh-surface)',
@@ -214,12 +215,17 @@ export default function AttachmentSlideshow({ postId, attachments = [], height =
                   type="button"
                   tabIndex={-1}
                   onClick={() => setIndex(dotIndex)}
+                  // The visible dot stays 7px, but the hit area is padded
+                  // out so a thumb can land on it; the arrows and counter
+                  // remain the primary, fully-sized controls.
                   style={{
                     width: 7,
                     height: 7,
                     padding: 0,
+                    boxSizing: 'content-box',
+                    border: '8px solid transparent',
+                    backgroundClip: 'padding-box',
                     borderRadius: '50%',
-                    border: 'none',
                     cursor: 'pointer',
                     background:
                       dotIndex === index ? 'var(--sh-brand)' : 'var(--sh-slate-300, #cbd5e1)',

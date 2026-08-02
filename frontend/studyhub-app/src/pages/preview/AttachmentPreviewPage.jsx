@@ -93,7 +93,7 @@ function panelStyle() {
   return {
     background: 'var(--sh-surface)',
     borderRadius: 18,
-    border: '1px solid #e2e8f0',
+    border: '1px solid var(--sh-border)',
     padding: 18,
   }
 }
