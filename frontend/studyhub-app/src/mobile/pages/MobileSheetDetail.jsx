@@ -3,7 +3,7 @@
 // and an iframe preview of the HTML content.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router'
 import anime from '../lib/animeCompat'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'

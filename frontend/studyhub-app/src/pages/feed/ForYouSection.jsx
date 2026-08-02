@@ -10,7 +10,7 @@
  * Each section is a horizontal card row with lazy-loaded data.
  */
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import UserAvatar from '../../components/UserAvatar'
 import { API } from '../../config'
 import { showToast } from '../../lib/toast'

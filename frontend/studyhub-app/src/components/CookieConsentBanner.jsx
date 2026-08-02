@@ -34,7 +34,7 @@
  *     is preserved.
  */
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { readConsent, writeConsent } from '../lib/cookieConsent'
 import styles from './CookieConsentBanner.module.css'
 

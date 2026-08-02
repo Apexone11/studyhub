@@ -30,7 +30,7 @@
  * goes through `useAiPermission()` before firing.
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { useNavigate, useParams, Link } from 'react-router-dom'
+import { useNavigate, useParams, Link } from 'react-router'
 import { usePageTitle } from '../../lib/usePageTitle'
 import useFetch, { cache as fetchCache, clearFetchCache } from '../../lib/useFetch'
 import { API } from '../../config'

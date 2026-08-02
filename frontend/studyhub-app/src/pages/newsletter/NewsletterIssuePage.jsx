@@ -6,7 +6,7 @@
  * DOMPurify (CLAUDE.md — never render server HTML unsanitized). Handles a
  * not-found / load-error state and links back to /updates.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import DOMPurify from 'dompurify'
 import Navbar from '../../components/navbar/Navbar'
 import UserAvatar from '../../components/UserAvatar'

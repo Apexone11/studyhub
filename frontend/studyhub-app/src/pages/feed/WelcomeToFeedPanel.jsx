@@ -11,7 +11,7 @@
  * renders the welcome copy with deep links to /sheets and /study-groups.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import useFetch from '../../lib/useFetch'
 import { API } from '../../config'
 import UserAvatar from '../../components/UserAvatar'

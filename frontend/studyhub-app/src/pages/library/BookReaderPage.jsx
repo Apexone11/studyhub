@@ -5,7 +5,7 @@
  * a toolbar with bookmark creation, bookmark list panel, and progress bar.
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router'
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { IconArrowLeft } from '../../components/Icons'

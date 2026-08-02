@@ -9,7 +9,7 @@
 // and renders as a corner "More" icon on phone viewports.
 
 import { useEffect } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router'
 import { useSession } from '../../lib/session-context'
 import { useResponsiveAppLayout } from '../../lib/ui'
 import { IconFeed, IconSheets, IconNotes, IconMessages, IconSpark } from '../Icons'

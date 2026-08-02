@@ -10,7 +10,7 @@
  * Saves via PATCH /api/settings/courses.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import SafeJoyride from '../../components/SafeJoyride'
 import { Skeleton } from '../../components/Skeleton'

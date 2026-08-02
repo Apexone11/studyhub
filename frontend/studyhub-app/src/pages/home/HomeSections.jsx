@@ -1,7 +1,7 @@
 // HomeSections.jsx — Features, Steps, Testimonials, CTA, and Footer sections for the HomePage.
 // Default export bundles all below-fold content for React.lazy() code-splitting.
 import { forwardRef, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { trackEvent } from '../../lib/telemetry'
 import { IconArrowRight, LogoMark } from '../../components/Icons'
 import {

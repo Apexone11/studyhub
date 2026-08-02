@@ -6,7 +6,7 @@
  * gift subscription, and redeem code live on PricingPage.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'
 import { SectionCard, Button, Message } from './settingsShared'

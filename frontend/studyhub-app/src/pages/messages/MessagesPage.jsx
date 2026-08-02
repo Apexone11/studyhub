@@ -21,7 +21,7 @@ import { usePageTitle } from '../../lib/usePageTitle'
 import { useSession } from '../../lib/session-context'
 import { useSocket } from '../../lib/useSocket'
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 import { useMessagingData } from './useMessagingData'
 import { SkeletonList, SkeletonCard } from '../../components/Skeleton'
 

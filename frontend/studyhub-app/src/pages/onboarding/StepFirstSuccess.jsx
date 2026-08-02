@@ -5,7 +5,7 @@
  * Only one card expanded at a time.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { forwardRef, useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { API } from '../../config'
 
 const StepFirstSuccess = forwardRef(function StepFirstSuccess({ onNext, onSkip, submitting }, ref) {

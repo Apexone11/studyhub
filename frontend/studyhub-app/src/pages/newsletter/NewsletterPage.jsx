@@ -10,7 +10,7 @@
  * Settings link is only meaningful for authenticated users, so the
  * "manage email preferences" note links there for them.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import UserAvatar from '../../components/UserAvatar'
 import { SkeletonCard } from '../../components/Skeleton'

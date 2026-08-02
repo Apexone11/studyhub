@@ -8,7 +8,7 @@
  * a fetch error shows a distinct "couldn't load" affordance with a retry;
  * empty shows a quiet, announced empty-state with a hint to switch topics.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { IconStar, IconUsers } from '../../components/Icons'
 import UserAvatar from '../../components/UserAvatar'
 import { SkeletonCard } from '../../components/Skeleton'

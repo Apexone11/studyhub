@@ -7,7 +7,7 @@
  * Shows classmates first, then popular users as backfill.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { FONT, cardStyle, sectionHeadingStyle } from './profileConstants'
 import UserAvatar from '../../components/UserAvatar'
 import { API } from '../../config'

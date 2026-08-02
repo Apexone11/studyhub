@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * FeedAside.jsx — Leaderboard sidebar for the feed page
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { IconPlus } from '../../components/Icons'
 import { linkButton } from './feedConstants'
 import { Panel, LeaderboardPanel } from './FeedWidgets'

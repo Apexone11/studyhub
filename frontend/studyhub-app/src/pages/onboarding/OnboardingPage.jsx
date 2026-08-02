@@ -6,7 +6,7 @@
  * and full-bleed card on phones (<768px).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useMemo, useRef, useEffect, useCallback } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import { Skeleton } from '../../components/Skeleton'
 import { useProtectedPage } from '../../lib/useProtectedPage'

@@ -35,7 +35,7 @@
  *                     on close (FocusTrappedDialog handles this).
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import FocusTrappedDialog from '../../components/Modal/FocusTrappedDialog'
 import useDeviceClass, { DEVICE_CLASS_DESKTOP } from '../../lib/useDeviceClass'
 import { POPULAR_TOPICS, SCHOLAR_SOURCES, SCHOLAR_SORTS } from './scholarConstants'

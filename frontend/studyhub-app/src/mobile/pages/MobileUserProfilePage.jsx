@@ -10,7 +10,7 @@
 // instead, which has a different layout (settings, sign out, etc.).
 
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
 import { resolveImageUrl } from '../../lib/imageUrls'

@@ -2,7 +2,7 @@
  * Sheet Lab — custom hook for all state management and API calls.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useNavigate, useParams, useSearchParams } from 'react-router'
 import { API } from '../../../config'
 import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../../lib/http'
 import { useSession } from '../../../lib/session-context'

@@ -11,7 +11,7 @@
 // user menu in NavbarUserMenu.jsx, notifications in NavbarNotifications.jsx.
 
 import { useState, useEffect, Fragment, lazy, Suspense } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link, useLocation } from 'react-router'
 import { LogoMark, AnimatedLogoMark, IconSearch } from '../Icons'
 const SearchModal = lazy(() => import('../search/SearchModal'))
 const ChatPanel = lazy(() => import('../ChatPanel'))

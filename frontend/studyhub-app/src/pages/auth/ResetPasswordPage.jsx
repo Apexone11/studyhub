@@ -1,5 +1,5 @@
 import Navbar from '../../components/navbar/Navbar'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 import { useState, useEffect } from 'react'
 import { API } from '../../config'
 import SubmitSpinner from '../../components/SubmitSpinner'

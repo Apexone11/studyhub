@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * SheetsAside.jsx — Quick-view sidebar for the sheets page
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 export default function SheetsAside({
   sheetsTotal,

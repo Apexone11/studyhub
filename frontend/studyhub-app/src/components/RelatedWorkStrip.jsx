@@ -10,7 +10,7 @@
  * Backend: GET /api/related/{type}/{id}. Hard cap of 8 items total.
  * SWR-cached for 60s. Returns null when there's nothing to show.
  */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import useFetch from '../lib/useFetch'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"

@@ -5,7 +5,7 @@
  * Fetches onboarding state and feature flag once, caches results.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { API } from '../config'
 import { useFeatureFlag } from './featureFlags'
 

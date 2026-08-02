@@ -9,7 +9,7 @@
  * Polling: Announcements refresh every 20 seconds via useLivePolling.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { lazy, Suspense, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import SafeJoyride from '../../components/SafeJoyride'

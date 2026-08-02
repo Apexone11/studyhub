@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import Navbar from '../../../components/navbar/Navbar'
 import SafeJoyride from '../../../components/SafeJoyride'
 import { IconArrowLeft, IconFork } from '../../../components/Icons'

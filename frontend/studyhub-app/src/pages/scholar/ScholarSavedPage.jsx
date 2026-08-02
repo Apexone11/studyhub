@@ -14,7 +14,7 @@
  * The page never hard-fails on 404 — empty array fallback per brief.
  */
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import { usePageTitle } from '../../lib/usePageTitle'
 import useFetch from '../../lib/useFetch'
 import { API } from '../../config'

@@ -5,7 +5,7 @@
  * Only rendered on the user's own profile page.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API } from '../../config'
 import UserAvatar from '../../components/UserAvatar'
 import { showToast } from '../../lib/toast'

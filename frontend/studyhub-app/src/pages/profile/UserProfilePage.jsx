@@ -12,7 +12,7 @@
  * legacy DashboardPage was removed in v2.0; /dashboard now redirects here).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
-import { Link, useParams, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useNavigate, useSearchParams } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import { IconShield, IconProfile, IconStar } from '../../components/Icons'
 import ReportModal from '../../components/ReportModal'

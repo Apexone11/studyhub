@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * SheetsEmptyState.jsx — Empty state variants for the sheets page
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { IconUpload } from '../../components/Icons'
 
 export default function SheetsEmptyState({

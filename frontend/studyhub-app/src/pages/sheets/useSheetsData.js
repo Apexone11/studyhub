@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router'
 import { API } from '../../config'
 import { getApiErrorMessage, isAuthSessionFailure, readJsonSafely } from '../../lib/http'
 import { useSession } from '../../lib/session-context'

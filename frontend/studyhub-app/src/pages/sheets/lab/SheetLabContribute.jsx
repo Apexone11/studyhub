@@ -4,7 +4,7 @@
  * Uses POST /api/sheets/:id/contributions and GET /api/sheets/contributions/:id/diff.
  */
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API } from '../../../config'
 import { authHeaders } from './sheetLabConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'

@@ -5,7 +5,7 @@
  * for the owner. Click navigates to the detail page.
  */
 
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import AchievementHexagon from './AchievementHexagon'
 import { TIER_LABEL } from './tierStyles'
 

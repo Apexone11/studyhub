@@ -15,7 +15,7 @@
  * modal). The listener does not own that storage; the modal does.
  */
 import { useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router'
 import { useSocket } from '../../lib/useSocket'
 import { SOCKET_EVENTS } from '../../lib/socketEvents'
 

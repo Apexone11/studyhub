@@ -7,7 +7,7 @@
  */
 
 import { useSession } from '../../lib/session-context'
-import { Navigate } from 'react-router-dom'
+import { Navigate } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'

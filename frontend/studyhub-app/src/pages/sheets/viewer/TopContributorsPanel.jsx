@@ -7,7 +7,7 @@
  * sheets). Each contributor links to their public profile.
  */
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import UserAvatar from '../../../components/UserAvatar'
 import { fetchSheetContributors } from '../../../lib/diffService'
 import { panelStyle } from './sheetViewerConstants'

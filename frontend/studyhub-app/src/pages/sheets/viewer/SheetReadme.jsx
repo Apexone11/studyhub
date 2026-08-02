@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { IconStar, IconFork, IconDownload } from '../../../components/Icons'
 import VerificationBadge from '../../../components/verification/VerificationBadge'
 import { panelStyle, timeAgo } from './sheetViewerConstants'

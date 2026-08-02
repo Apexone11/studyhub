@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { panelStyle } from './sheetViewerConstants'
 
 export default function RelatedSheetsPanel({ sheet, relatedSheets }) {

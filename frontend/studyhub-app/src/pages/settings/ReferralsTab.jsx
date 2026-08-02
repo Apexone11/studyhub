@@ -5,7 +5,7 @@
  * and a link to the full /invite management page.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API } from '../../config'
 import { SectionCard, Button, Message } from './settingsShared'
 import { FONT } from './settingsState'

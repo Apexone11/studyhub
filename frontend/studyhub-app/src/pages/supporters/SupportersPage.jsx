@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import UserAvatar from '../../components/UserAvatar'
 import { Skeleton, SkeletonCard } from '../../components/Skeleton'

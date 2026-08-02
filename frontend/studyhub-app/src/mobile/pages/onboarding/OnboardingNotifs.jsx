@@ -2,7 +2,7 @@
 // Step 3 of 3: Notification preferences.
 
 import { useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import anime from '../../lib/animeCompat'
 
 const NOTIF_OPTIONS = [

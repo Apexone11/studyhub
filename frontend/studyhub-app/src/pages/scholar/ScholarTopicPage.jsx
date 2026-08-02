@@ -14,7 +14,7 @@
  *   - GET /api/scholar/topics/:slug/follow reads current follow state.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useParams, useSearchParams } from 'react-router-dom'
+import { Link, useParams, useSearchParams } from 'react-router'
 import { usePageTitle } from '../../lib/usePageTitle'
 import useFetch from '../../lib/useFetch'
 import { API } from '../../config'

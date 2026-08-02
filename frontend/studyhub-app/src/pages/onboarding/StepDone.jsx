@@ -2,7 +2,7 @@
  * StepDone -- Onboarding step 7: You're all set
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { forwardRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 const NEXT_STEPS = [
   {

@@ -10,7 +10,7 @@
  *
  * See docs/internal/design-refresh-v2-week2-brainstorm.md §12
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { Link, useParams } from 'react-router-dom'
+import { Link, useParams } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { useSession } from '../../lib/session-context'

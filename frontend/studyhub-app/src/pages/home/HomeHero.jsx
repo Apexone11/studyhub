@@ -1,5 +1,5 @@
 // HomeHero.jsx — Hero section and social-proof banner for the HomePage.
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { trackEvent } from '../../lib/telemetry'
 import { IconArrowRight } from '../../components/Icons'
 import { HOME_TREE_COLORS, PROOF_ITEMS } from './homeConstants'

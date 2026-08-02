@@ -6,7 +6,7 @@
  * Data: useSheetsData, useSheetsViewMode, useDesignV2Flags
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import { IconUpload } from '../../components/Icons'

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
-import { MemoryRouter, Route, Routes, useNavigate } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useNavigate } from 'react-router'
 import SwUpdateAutoReloader from './SwUpdateAutoReloader'
 import { _resetForTests, markSwUpdateAvailable } from '../lib/swUpdateState'
 

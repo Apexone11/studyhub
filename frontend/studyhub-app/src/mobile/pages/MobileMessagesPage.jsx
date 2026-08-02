@@ -4,7 +4,7 @@
 // Tapping a conversation navigates to the web thread view (for now).
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import anime from '../lib/animeCompat'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'

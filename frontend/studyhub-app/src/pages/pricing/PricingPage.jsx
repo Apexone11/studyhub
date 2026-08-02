@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import { Skeleton } from '../../components/Skeleton'
 import { API } from '../../config'

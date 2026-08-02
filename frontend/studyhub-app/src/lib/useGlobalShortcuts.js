@@ -26,7 +26,7 @@
  * Side-effect-only hook — returns nothing; mount once near the App root.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 const SEQUENCE_TIMEOUT_MS = 1200
 

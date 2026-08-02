@@ -3,7 +3,7 @@
 // Uses the same backend endpoint as the web LoginPage.
 
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import BottomSheet from '../components/BottomSheet'
 import MobileButton from '../components/MobileButton'
 import MobileInput from '../components/MobileInput'

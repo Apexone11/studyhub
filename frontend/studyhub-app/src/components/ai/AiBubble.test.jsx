@@ -14,13 +14,13 @@
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, act } from '@testing-library/react'
-import { MemoryRouter, Routes, Route } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router'
 
 // Mocks BEFORE the SUT import — Vitest hoists vi.mock automatically but
 // these have to be defined before the import for ESM ordering safety.
 
 const navigateSpy = vi.fn()
-vi.mock('react-router-dom', async (orig) => {
+vi.mock('react-router', async (orig) => {
   const actual = await orig()
   return {
     ...actual,

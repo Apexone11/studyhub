@@ -12,7 +12,7 @@
  * PrivateRoute wrapper in App.jsx and update this header.
  */
 
-import { useParams, Link, Navigate } from 'react-router-dom'
+import { useParams, Link, Navigate } from 'react-router'
 import { useState } from 'react'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'

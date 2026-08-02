@@ -12,7 +12,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useState, useRef, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import { IconSearch, IconBook, IconInfoCircle } from '../../components/Icons'
 import { SkeletonCard } from '../../components/Skeleton'

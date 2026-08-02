@@ -17,7 +17,7 @@
  * branch SVG still imply the tree structure.
  */
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { IconFork } from '../Icons'
 import UserAvatar from '../UserAvatar'
 import { timeAgo } from '../../pages/sheets/lab/sheetLabConstants'

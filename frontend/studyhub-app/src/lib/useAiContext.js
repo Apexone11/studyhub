@@ -3,7 +3,7 @@
  * Returns suggestion prompts based on the current route.
  */
 import { useMemo } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router'
 
 const CONTEXT_CHIPS = {
   '/sheets/:id': [

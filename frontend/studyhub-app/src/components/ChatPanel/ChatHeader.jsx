@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 const PAGE_FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 

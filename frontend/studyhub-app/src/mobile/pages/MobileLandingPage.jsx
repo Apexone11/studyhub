@@ -4,7 +4,7 @@
 // Design is intentionally distinct from the web — mobile-first, bold, visual.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router'
 import anime from '../lib/animeCompat'
 import GradientMesh from '../components/GradientMesh'
 import BottomSheet from '../components/BottomSheet'

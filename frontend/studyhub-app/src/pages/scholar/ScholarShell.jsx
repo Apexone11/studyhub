@@ -22,7 +22,7 @@
  *                   avoids label truncation on narrow viewports)
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, useLocation, useNavigate } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import { pageShell, useResponsiveAppLayout } from '../../lib/ui'
@@ -512,7 +512,7 @@ function ScholarPageMark() {
 function ScholarSubNav({ isCompact, showBreadcrumb, breadcrumb }) {
   // Force re-renders of NavLink on every route change so the active
   // underline syncs even if a child page does a programmatic navigate.
-  // react-router-dom NavLink already listens via context — the location
+  // react-router NavLink already listens via context — the location
   // hook here is the cheapest way to keep the strip in sync without
   // an extra useEffect.
   useLocation()

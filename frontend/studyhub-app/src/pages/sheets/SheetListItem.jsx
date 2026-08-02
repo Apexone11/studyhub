@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { IconComment, IconFork, IconStar, IconStarFilled } from '../../components/Icons'
 import StudyStatusChip from '../../components/StudyStatusChip'
 import {

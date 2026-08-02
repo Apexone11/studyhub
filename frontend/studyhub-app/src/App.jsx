@@ -1,5 +1,5 @@
 import { Suspense, lazy, useEffect, useRef } from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation, useParams } from 'react-router'
 import { GoogleOAuthProvider } from '@react-oauth/google'
 import { trackPageView, identifyAuthenticatedUser, clearAuthenticatedUser } from './lib/telemetry'
 import { useBootstrapPreferences } from './lib/useBootstrapPreferences'

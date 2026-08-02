@@ -16,7 +16,7 @@
  *   list path unconditionally.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 
 const STORAGE_KEY = 'studyhub.sheets.viewMode'
 const DEFAULT_VIEW_MODE = 'list'

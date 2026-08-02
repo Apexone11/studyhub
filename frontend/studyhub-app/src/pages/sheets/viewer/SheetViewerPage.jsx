@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import Navbar from '../../../components/navbar/Navbar'
 import ReportModal from '../../../components/ReportModal'
 import ModerationBanner from '../../../components/ModerationBanner'

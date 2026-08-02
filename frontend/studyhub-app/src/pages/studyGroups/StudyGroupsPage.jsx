@@ -14,7 +14,7 @@
  * - GroupModals (CreateGroupModal, EditGroupModal)
  * - studyGroupsStyles (shared styles)
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useParams } from 'react-router-dom'
+import { useParams } from 'react-router'
 import GroupListView from './GroupListView'
 import GroupDetailView from './GroupDetailView'
 import { usePageTitle } from '../../lib/usePageTitle'

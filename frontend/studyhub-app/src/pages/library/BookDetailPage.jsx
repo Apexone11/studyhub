@@ -10,7 +10,7 @@
  *   - Related books by author (via search link)
  * ═══════════════════════════════════════════════════════════════════════════ */
 
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router'
 import { useState, useRef, useEffect } from 'react'
 import DOMPurify from 'dompurify'
 import Navbar from '../../components/navbar/Navbar'

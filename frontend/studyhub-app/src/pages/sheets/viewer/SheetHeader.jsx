@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import UserAvatar from '../../../components/UserAvatar'
 import VerificationBadge from '../../../components/verification/VerificationBadge'
 import { IconFork, IconStar, IconArrowLeft } from '../../../components/Icons'

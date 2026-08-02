@@ -3,7 +3,7 @@
  * Handles conversations, message sending with SSE streaming, and usage tracking.
  */
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router'
 import * as aiService from './aiService'
 import {
   startStreaming as markStreamActive,

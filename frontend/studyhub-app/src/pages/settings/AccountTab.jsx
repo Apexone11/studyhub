@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 import { API } from '../../config'
 import { Button, FormField, Input, Message, MsgList, SectionCard } from './settingsShared'
 import { FONT } from './settingsState'

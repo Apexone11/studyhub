@@ -5,7 +5,7 @@
  * Respects dark mode via CSS class. Hidden on print.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useMemo, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router'
 
 export default function ScrollToTop() {
   const location = useLocation()

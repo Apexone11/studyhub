@@ -9,7 +9,7 @@
 // owns.
 
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams } from 'react-router'
 import { API } from '../../config'
 import MobileTopBar from '../components/MobileTopBar'
 

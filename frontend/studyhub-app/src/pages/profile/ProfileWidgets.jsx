@@ -4,7 +4,7 @@
  * Extracted to keep UserProfilePage.jsx a thin orchestrator.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { IconBook, IconSheets, IconStar } from '../../components/Icons'
 import StudyStatusChip from '../../components/StudyStatusChip'
 import UserAvatar from '../../components/UserAvatar'

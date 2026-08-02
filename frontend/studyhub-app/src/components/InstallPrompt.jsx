@@ -27,7 +27,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router'
 
 const DISMISS_KEY = 'studyhub.pwaInstallDismissedAt'
 const DISMISS_TTL_MS = 30 * 24 * 60 * 60 * 1000

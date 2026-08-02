@@ -2,7 +2,7 @@
  * UploadSheetFormFields.jsx — Form field components for the upload sheet page
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { IconEye, IconUpload, IconPen } from '../../../components/Icons'
 import StackedEditorPane from '../../../components/editor/StackedEditorPane'
 import CourseSelect from '../../../components/CourseSelect'
