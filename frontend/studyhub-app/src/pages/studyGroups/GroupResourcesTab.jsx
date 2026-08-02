@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { formatRelativeTime, truncateText } from './studyGroupsHelpers'
 import { styles } from './GroupDetailTabs.styles'
 import MediaComposer from './MediaComposer'

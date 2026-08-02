@@ -3,7 +3,7 @@
  * Features: like/dislike, star, download tracking, comments
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { useSession } from '../../lib/session-context'
 import { API } from '../../config'
 import { authHeaders } from '../shared/pageUtils'

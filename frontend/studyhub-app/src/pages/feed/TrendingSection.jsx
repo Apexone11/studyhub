@@ -6,7 +6,7 @@
  * Fetches from GET /api/feed/trending and displays ranked sheet cards.
  */
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API } from '../../config'
 import { Skeleton } from '../../components/Skeleton'
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"

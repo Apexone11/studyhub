@@ -12,7 +12,7 @@
 // native plugin loaded.
 
 import { useCallback, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { GOOGLE_CLIENT_ID, API } from '../../config'
 import { buildGoogleOAuthUrl } from '../../components/googleSignInHelpers'
 import { isNativePlatform } from '../../lib/mobile/detectMobile'

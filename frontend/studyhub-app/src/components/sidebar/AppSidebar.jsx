@@ -3,7 +3,7 @@
 // Used by: FeedPage, TestsPage, NotesPage, AnnouncementsPage, SubmitPage, SheetsPage
 
 import { useEffect, useRef, useState } from 'react'
-import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router'
 import { IconPlus, IconSearch, IconSettings, IconSheets, IconUsers } from '../Icons'
 import { useSession } from '../../lib/session-context'
 import { prefetchForRoute } from '../../lib/prefetch'

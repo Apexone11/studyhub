@@ -2,7 +2,7 @@
 // Two-step mobile signup using Design Refresh v3 primitives.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import BottomSheet from '../components/BottomSheet'
 import MobileButton from '../components/MobileButton'
 import MobileInput from '../components/MobileInput'

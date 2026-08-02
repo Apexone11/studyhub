@@ -14,7 +14,7 @@
  * CLAUDE.md forbids emoji in UI chrome. We use a small SVG flame glyph
  * that conveys the same intent without an emoji codepoint.
  */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import useFetch from '../../lib/useFetch'
 import { useSession } from '../../lib/session-context'
 

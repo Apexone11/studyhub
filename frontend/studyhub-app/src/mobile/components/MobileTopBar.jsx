@@ -3,7 +3,7 @@
 // has been scrolled. Back-compatible props with the v2 implementation.
 
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 
 function BackArrow({ size = 20 }) {
   return (

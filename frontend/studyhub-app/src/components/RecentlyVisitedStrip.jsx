@@ -7,7 +7,7 @@
  * brand-new users).
  */
 import { useRecentlyVisited } from '../lib/useRecentlyVisited'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 const FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
 

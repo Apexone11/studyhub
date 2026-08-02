@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
 import { http, HttpResponse } from 'msw'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import { SessionProvider, useSession } from './session-context'
 import { server } from '../test/server'
 import { AUTH_SESSION_EXPIRED_EVENT } from './http'

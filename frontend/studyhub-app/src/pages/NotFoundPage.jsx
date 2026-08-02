@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * NotFoundPage.jsx — Styled 404 page for unmatched routes
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { usePageTitle } from '../lib/usePageTitle'
 
 const FONT = "'Plus Jakarta Sans', sans-serif"

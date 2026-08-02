@@ -11,7 +11,7 @@
  * - GET /api/users/me/weekly-activity
  * - GET /api/feed/leaderboard?period=weekly
  */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { Panel } from './FeedWidgets'
 import UserAvatar from '../../components/UserAvatar'
 import { Skeleton } from '../../components/Skeleton'

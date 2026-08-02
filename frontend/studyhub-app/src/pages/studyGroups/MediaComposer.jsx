@@ -17,7 +17,7 @@
  *     parent modal which already uses createPortal.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { IconUpload, IconX, IconInfoCircle, IconCheck } from '../../components/Icons'
 import { uploadGroupMedia } from './groupMediaService'
 import useMediaQuota from './useMediaQuota'

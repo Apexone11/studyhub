@@ -9,7 +9,7 @@ import {
   useState,
 } from 'react'
 import { flushSync } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { API } from '../config'
 import {
   AUTH_SESSION_EXPIRED_EVENT,

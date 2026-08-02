@@ -22,7 +22,7 @@
  * dismiss hides the card immediately and only re-shows on a server error.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { API } from '../../config'
 import { Button, Card, CardBody, Chip, SkeletonCard } from '../../components/ui'
 import { useDesignV2Flags } from '../../lib/designV2Flags'

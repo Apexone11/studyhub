@@ -31,7 +31,7 @@
  *  - "Why this paper?" tooltip pulling from result._meta
  */
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 import { usePageTitle } from '../../lib/usePageTitle'
 import { API } from '../../config'
 import PaperCard from './paperCard/PaperCard'

@@ -2,7 +2,7 @@
 // Step 1 of 3: What are your study goals?
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import anime from '../../lib/animeCompat'
 
 const GOALS = [

@@ -12,7 +12,7 @@
  *   - Professional fallback UI with retry + navigation buttons
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router'
 import { ErrorBoundary } from 'react-error-boundary'
 import { captureRouteCrash } from '../lib/telemetry'
 

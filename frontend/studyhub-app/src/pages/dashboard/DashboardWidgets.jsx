@@ -1,7 +1,7 @@
 /* ═══════════════════════════════════════════════════════════════════════════
  * DashboardWidgets.jsx — Presentational widget components for the Dashboard
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import {
   IconClock,
   IconNotes,

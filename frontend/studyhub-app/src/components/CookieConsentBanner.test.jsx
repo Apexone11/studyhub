@@ -17,7 +17,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { render, fireEvent, screen } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter } from 'react-router'
 import CookieConsentBanner from './CookieConsentBanner'
 import { COOKIE_CONSENT_STORAGE_KEY } from '../lib/cookieConsent'
 

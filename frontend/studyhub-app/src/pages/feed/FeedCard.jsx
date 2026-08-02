@@ -1,5 +1,5 @@
 import { memo, useState, useEffect, useCallback, useRef } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import MentionText from '../../components/MentionText'
 import PendingReviewBanner from '../../components/PendingReviewBanner'
 import { IconDownload, IconEye, IconFork, IconStar, IconStarFilled } from '../../components/Icons'

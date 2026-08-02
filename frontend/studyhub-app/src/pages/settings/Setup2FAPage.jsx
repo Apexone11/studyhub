@@ -16,7 +16,7 @@
  * lands here.
  */
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 import { API } from '../../config'
 import { Button, Message, SectionCard } from './settingsShared'
 import { usePageTitle } from '../../lib/usePageTitle'

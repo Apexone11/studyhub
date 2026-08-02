@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { SUPPORT_EMAIL } from '../../config'
 import { primaryButtonLink, settingsCardStyle } from './adminConstants'
 

@@ -5,7 +5,7 @@
  * and group creation. Manages search params and filtering state.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { useSearchParams, useNavigate } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router'
 import { createPortal } from 'react-dom'
 import { useSession } from '../../lib/session-context'
 import { PAGE_FONT } from '../shared/pageUtils'

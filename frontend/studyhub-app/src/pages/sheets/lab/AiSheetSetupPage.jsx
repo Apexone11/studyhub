@@ -13,7 +13,7 @@
  * /sheets/:id/lab so the student can refine it in the full Sheet Lab.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect, useCallback, useMemo } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router'
 import Navbar from '../../../components/navbar/Navbar'
 import AppSidebar from '../../../components/sidebar/AppSidebar'
 import { IconSpark, IconSheets, IconSpinner } from '../../../components/Icons'

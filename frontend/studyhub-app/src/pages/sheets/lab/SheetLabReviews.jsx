@@ -4,7 +4,7 @@
  * Uses PATCH /api/sheets/contributions/:id and GET /api/sheets/contributions/:id/diff.
  */
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API } from '../../../config'
 import { authHeaders } from './sheetLabConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../../lib/http'

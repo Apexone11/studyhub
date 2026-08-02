@@ -6,7 +6,7 @@
  * 8 tabs: Profile, Security, Notifications, Privacy, Appearance, Account, Moderation
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import SafeJoyride from '../../components/SafeJoyride'
 import { API } from '../../config'

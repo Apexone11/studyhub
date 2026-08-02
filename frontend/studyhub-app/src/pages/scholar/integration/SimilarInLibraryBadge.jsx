@@ -10,7 +10,7 @@
  *   - Any other error → render nothing (silent — this is decorative).
  */
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API } from '../../../config'
 
 const CHIP_STYLE = {

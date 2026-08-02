@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { API } from '../../config'
 import { CURRENT_LEGAL_VERSION } from '../../lib/legalVersions'
 import { useSession } from '../../lib/session-context'

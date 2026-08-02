@@ -13,7 +13,7 @@
  *   - Backdrop click does NOT close (same reason)
  *   - aria-labelledby still points at the visible title heading
  */
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router'
 import { LEGAL_DOCUMENT_LABELS } from '../lib/legalVersions'
 import { useSession } from '../lib/session-context'
 import FocusTrappedDialog from './Modal/FocusTrappedDialog'

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { Button, FormField, MsgList, SectionCard, Select, ToggleRow } from './settingsShared'
 import { usePreferences, FONT } from './settingsState'
 import { API } from '../../config'

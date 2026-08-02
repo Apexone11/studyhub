@@ -7,7 +7,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { getAuthenticatedHomePath } from '../../lib/authNavigation'
 import { trackSignupConversion, trackEvent } from '../../lib/telemetry'
 import { useSession } from '../../lib/session-context'

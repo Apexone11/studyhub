@@ -2,7 +2,7 @@
 // Study group detail — group info, member count, resources, sessions, join action.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams } from 'react-router-dom'
+import { useParams } from 'react-router'
 import anime from '../lib/animeCompat'
 import { API } from '../../config'
 import { resolveImageUrl } from '../../lib/imageUrls'

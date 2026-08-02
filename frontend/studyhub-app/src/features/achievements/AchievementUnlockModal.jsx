@@ -13,7 +13,7 @@
 
 import { useEffect, useState } from 'react'
 import FocusTrappedDialog from '../../components/Modal/FocusTrappedDialog'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router'
 import AchievementHexagon from './AchievementHexagon'
 import { TIER_LABEL } from './tierStyles'
 import { useAchievementDetail } from './useAchievements'

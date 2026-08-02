@@ -9,7 +9,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import { fadeInUp } from '../../lib/animations'
 import { validateAccountFields, validateAccountFieldsMap, getSteps } from './registerConstants'

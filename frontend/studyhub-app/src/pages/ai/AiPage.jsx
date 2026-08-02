@@ -28,7 +28,7 @@ import { pageShell } from '../../lib/ui'
 import { API as API_BASE } from '../../config'
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 
 // Inline trash glyph — Icons.jsx ships no IconTrash today and this file
 // is the only consumer. Kept local rather than touching the shared icon

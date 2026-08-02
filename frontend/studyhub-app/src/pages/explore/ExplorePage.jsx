@@ -12,7 +12,7 @@
  * data hook surfaces that as a quiet "feature unavailable" state rather
  * than an error banner.
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import { IconBolt, IconSheets, IconNotes, IconUsers } from '../../components/Icons'

@@ -11,7 +11,7 @@
  * no UI noise when the feature is disabled.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API } from '../config'
 import { Skeleton } from './Skeleton'
 import { authHeaders } from '../pages/shared/pageUtils'

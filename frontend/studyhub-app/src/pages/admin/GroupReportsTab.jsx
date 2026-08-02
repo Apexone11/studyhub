@@ -8,7 +8,7 @@
  * Uses GET /api/admin/group-reports + PATCH /api/admin/group-reports/:id.
  */
 import { useCallback, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API } from '../../config'
 import { authHeaders, FONT } from './adminConstants'
 import { getApiErrorMessage, readJsonSafely } from '../../lib/http'

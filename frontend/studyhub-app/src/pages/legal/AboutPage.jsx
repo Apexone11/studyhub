@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import Navbar from '../../components/navbar/Navbar'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { API } from '../../config'
 
 const ROADMAP_V22 = [

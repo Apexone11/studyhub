@@ -20,7 +20,7 @@
  *     docs/internal/design-refresh-v2-week2-to-week5-execution.md W2+W3.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useMemo, useState } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import { IconSheets, IconUpload, IconPlus } from '../../components/Icons'

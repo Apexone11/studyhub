@@ -37,7 +37,7 @@ jobs:
       - uses: actions/setup-node@v7
         if: steps.jscrambler_config.outputs.exists == 'true'
         with:
-          node-version: 20
+          node-version: 22
       - run: npm ci
         if: steps.jscrambler_config.outputs.exists == 'true'
         working-directory: frontend/studyhub-app

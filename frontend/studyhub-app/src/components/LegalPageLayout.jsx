@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import Navbar from './navbar/Navbar'
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from '../config'
 

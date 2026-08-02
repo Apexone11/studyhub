@@ -12,7 +12,7 @@
  * repo modal rule; bottom-sheet flip on phones via mobileLayout="auto".
  */
 import { useId } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import FocusTrappedDialog from '../../../components/Modal/FocusTrappedDialog'
 import { cleanAbstract, formatCount, truncate } from '../scholarConstants'
 

@@ -53,7 +53,7 @@ export function tierColor(tier) {
 }
 
 /* ── Hook: useSafeBlocker ──────────────────────────────────────────────── */
-import { useBlocker } from 'react-router-dom'
+import { useBlocker } from 'react-router'
 
 export function useSafeBlocker(predicate) {
   try {

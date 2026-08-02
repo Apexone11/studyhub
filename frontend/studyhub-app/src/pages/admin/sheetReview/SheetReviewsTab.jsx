@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { Pager, PipelineBadge } from '../AdminWidgets'
 import { createPageState, filterSelectStyle, pillButton } from '../adminConstants'
 

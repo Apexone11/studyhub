@@ -8,7 +8,7 @@
  *   - Live socket push (no polling lag) + 30s polling fallback
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useEffect, useState, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'

@@ -9,7 +9,7 @@
  * the page renders for logged-out recipients clicking from their inbox.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import { IconCheck } from '../../components/Icons'
 import { API } from '../../config'

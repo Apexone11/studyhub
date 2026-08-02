@@ -2,7 +2,7 @@
 // Extracted from Navbar.jsx — user avatar + dropdown menu component.
 
 import { Fragment, useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { IconChevronDown } from '../Icons'
 import { useSession } from '../../lib/session-context'
 import { S } from './navbarConstants'

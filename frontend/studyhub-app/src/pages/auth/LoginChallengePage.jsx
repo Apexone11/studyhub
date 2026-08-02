@@ -9,7 +9,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import { API } from '../../config'
 import { useSession } from '../../lib/session-context'

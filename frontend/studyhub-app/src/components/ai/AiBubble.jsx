@@ -11,7 +11,7 @@
  * their chat widgets -- total isolation from the main page tree.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { Component, useState, useRef, useEffect } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router'
 import { createPortal } from 'react-dom'
 import { IconSpark, IconX, IconPlus } from '../Icons'
 import AiMarkdown from './AiMarkdown'

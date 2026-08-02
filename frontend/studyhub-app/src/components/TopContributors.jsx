@@ -15,7 +15,7 @@
  * See docs/internal/design-refresh-v2-master-plan.md (Phase 1) and
  * docs/internal/design-refresh-v2-roles-integration.md (Phase 1 role deltas).
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import UserAvatar from './UserAvatar'
 import { roleCopy } from '../lib/roleCopy'
 

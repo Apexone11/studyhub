@@ -5,7 +5,7 @@
  * and privacy controls (consent preferences, data request).
  */
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { CURRENT_LEGAL_VERSION, LEGAL_DOCUMENT_LABELS } from '../../lib/legalVersions'
 import { LEGAL_EMAILS } from '../../lib/legalConstants'
 import { acceptCurrentLegalDocuments, fetchMyLegalStatus } from '../../lib/legalService'

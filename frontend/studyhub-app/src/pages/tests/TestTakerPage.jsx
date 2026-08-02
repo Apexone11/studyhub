@@ -2,7 +2,7 @@
 // the full practice runtime ships in v2. Honest "planned for v2"
 // holding page rather than a hidden stub. Tokens come from index.css
 // so the placeholder themes correctly in both light and dark mode.
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import { PAGE_FONT } from '../shared/pageUtils'
 

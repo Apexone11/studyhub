@@ -15,7 +15,7 @@
  */
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { API } from '../../../config'
 import { useFocusTrap } from '../../../lib/useFocusTrap'
 import { authHeaders } from './uploadSheetConstants'

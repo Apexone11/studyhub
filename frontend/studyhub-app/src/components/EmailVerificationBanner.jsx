@@ -8,7 +8,7 @@
  * returns EMAIL_NOT_VERIFIED. Use inside forms/editors after a blocked action.
  */
 import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { useSession } from '../lib/session-context'
 
 /**

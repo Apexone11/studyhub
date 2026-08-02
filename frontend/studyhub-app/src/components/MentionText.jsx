@@ -3,7 +3,7 @@
  *
  * Usage:  <MentionText text="Hello @john, check this out!" />
  * ═══════════════════════════════════════════════════════════════════════════ */
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 
 export default function MentionText({ text, style }) {
   if (!text) return null

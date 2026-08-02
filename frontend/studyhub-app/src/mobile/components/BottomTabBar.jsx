@@ -3,7 +3,7 @@
 // See docs/internal/mobile-design-refresh-v3-spec.md §4.6.
 
 import { useCallback, useState } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router'
 import { useSession } from '../../lib/session-context'
 import haptics from '../lib/haptics'
 import { resolveImageUrl } from '../../lib/imageUrls'

@@ -3,7 +3,7 @@
 // real-time updates via Socket.io, message input, and reply support.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router'
 import { useSession } from '../../lib/session-context'
 import { useSocket } from '../../lib/useSocket'
 import { SOCKET_EVENTS } from '../../lib/socketEvents'

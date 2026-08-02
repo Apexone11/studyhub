@@ -4,7 +4,7 @@
 // Shares SessionProvider and auth state with the web app.
 
 import { Suspense, lazy, useCallback, useEffect, useState } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { Routes, Route, Navigate, useLocation } from 'react-router'
 import { useSession } from '../lib/session-context'
 import { useDeepLinkRouter } from '../lib/mobile/deepLinking'
 import BottomTabBar from './components/BottomTabBar'

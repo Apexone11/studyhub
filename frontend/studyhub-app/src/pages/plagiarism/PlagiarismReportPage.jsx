@@ -3,7 +3,7 @@
  * Route: /sheets/:id/plagiarism (authenticated, author or admin)
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useCallback } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import AppSidebar from '../../components/sidebar/AppSidebar'
 import UserAvatar from '../../components/UserAvatar'

@@ -10,7 +10,7 @@
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 import { useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 import Navbar from '../../components/navbar/Navbar'
 import GoogleSignInButton from '../../components/GoogleSignInButton'
 import SubmitSpinner from '../../components/SubmitSpinner'

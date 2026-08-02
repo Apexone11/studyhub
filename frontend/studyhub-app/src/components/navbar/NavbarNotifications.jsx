@@ -2,7 +2,7 @@
 // Extracted from Navbar.jsx — notification bell + dropdown component.
 
 import { useState, useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import { IconBell } from '../Icons'
 import { useSession } from '../../lib/session-context'
 import { useLivePolling } from '../../lib/useLivePolling'

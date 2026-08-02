@@ -11,7 +11,7 @@
  * slug to the badge modal (which would 404 against the catalog).
  */
 import { useEffect } from 'react'
-import { useLocation, useNavigate } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router'
 import { showToast } from '../lib/toast'
 
 const CELEBRATED_KEY = 'studyhub.firstCreation.celebrated'

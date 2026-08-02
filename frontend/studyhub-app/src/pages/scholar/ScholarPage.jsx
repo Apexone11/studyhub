@@ -19,7 +19,7 @@
  * not be live yet — we render an empty state instead of crashing.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router'
 import { usePageTitle } from '../../lib/usePageTitle'
 import useFetch from '../../lib/useFetch'
 import { Skeleton } from '../../components/Skeleton'

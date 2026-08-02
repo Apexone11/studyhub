@@ -6,7 +6,7 @@
  * a one-click follow button and a "See All" link to the user's profile.
  */
 import { useCallback, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { Panel } from './FeedWidgets'
 import UserAvatar from '../../components/UserAvatar'
 import useFetch from '../../lib/useFetch'

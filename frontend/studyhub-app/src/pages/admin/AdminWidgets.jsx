@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import { PAGE_SIZE, pagerButton, primaryButtonLink } from './adminConstants'
 
 export function StatsGrid({ stats }) {

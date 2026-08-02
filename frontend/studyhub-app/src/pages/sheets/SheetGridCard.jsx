@@ -17,7 +17,7 @@
  * span. Different surface, different treatment, intentional.
  */
 import { useMemo, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import Chip from '../../components/ui/Chip/Chip'
 import { IconComment, IconFork, IconStar, IconStarFilled } from '../../components/Icons'
 import StudyStatusChip from '../../components/StudyStatusChip'

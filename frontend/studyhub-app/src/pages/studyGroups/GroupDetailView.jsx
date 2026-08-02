@@ -5,7 +5,7 @@
  * Discussions, and Members. Handles editing, deletion, joining, and leaving.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useEffect } from 'react'
-import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { createPortal } from 'react-dom'
 import { useSession } from '../../lib/session-context'
 import { useStudyGroupsData } from './useStudyGroupsData'

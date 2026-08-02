@@ -10,7 +10,7 @@
  * backdrop click close cleanly. Iframe sandbox unchanged (CLAUDE.md A14).
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useState, useMemo } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import ComponentErrorBoundary from '../ComponentErrorBoundary'
 import FocusTrappedDialog from '../Modal/FocusTrappedDialog'
 import { IconSheets, IconPen, IconX, IconEye } from '../Icons'

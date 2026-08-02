@@ -5,7 +5,7 @@
  * uploadSheetActions.js to keep this file focused on state and effects.
  * ═══════════════════════════════════════════════════════════════════════════ */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useLocation, useNavigate, useParams, useSearchParams } from 'react-router'
 import { API } from '../../../config'
 import { useSession } from '../../../lib/session-context'
 import { useTutorial } from '../../../lib/useTutorial'

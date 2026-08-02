@@ -3,7 +3,7 @@
 // v3 refresh: confetti burst, check stroke-draw, haptic success.
 
 import { useEffect, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate } from 'react-router'
 import anime from '../../lib/animeCompat'
 import GradientMesh from '../../components/GradientMesh'
 import MobileButton from '../../components/MobileButton'

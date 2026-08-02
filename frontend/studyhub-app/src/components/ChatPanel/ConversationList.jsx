@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom'
+import { Link } from 'react-router'
 import UserAvatar from '../UserAvatar'
 
 const PAGE_FONT = "'Plus Jakarta Sans', system-ui, sans-serif"
