@@ -245,8 +245,8 @@ export default function SheetContentPanel({
               prefs={readerPrefs}
               onChange={setReaderPrefs}
               buttonStyle={{
-                minWidth: 38,
-                height: 34,
+                minWidth: 44,
+                height: 44,
                 borderRadius: 8,
                 border: '1px solid var(--sh-border)',
                 background: 'var(--sh-surface)',

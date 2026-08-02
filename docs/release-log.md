@@ -28,6 +28,7 @@ internal log into this file when they describe user-visible behavior.
 
 ## v2.3.0 — security + product-updates newsletter (2026-06-16)
 
+- Polish: attachment preview panels use the border token so they stop rendering a light edge in dark mode; slideshow arrows, its dot indicators, and the sheet reader's "Aa" control now meet the 44×44 touch-target floor; added rendering coverage for the admin analytics charts, which had none.
 - Security (majors): react-router 7→8.3.0 clears the last 2 high alerts — `react-router-dom` was removed upstream, so all 225 importing files now pull from `react-router`. Also recharts 3.10.1, @vitejs/plugin-react 6.0.4, jest-dom 7.0.0, rollup-plugin-visualizer 7.0.1. Node floor moves to 22.22 (CI + `.node-version`) per react-router v8's requirement.
 - Security (round 4): postcss 8.5.25 and tar 7.5.22 across all lockfiles, clearing 3 more advisories (2 high). react-router's 2 remaining high alerts need a 7→8 major and are held for founder sign-off.
 - Sheets: authors pick a typeface (Sans / Serif / Mono) and can add Note / Tip / Important / Warning / Definition callout blocks; readers get an "Aa" control for text size, reading width, and line height that persists across sheets.
